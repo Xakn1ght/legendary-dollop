@@ -945,14 +945,11 @@ html[data-theme="light"] .vpn-card::before,
 
 /* ── 23. REDUCED MOTION GUARD ───────────────────────────────────── */
 @media (prefers-reduced-motion: reduce) {
+  /* Only kill motion — backdrop-filter is a static visual, not motion */
   .card, .action-tile, .speed-chip, .btn, .bottom-nav, header {
-    backdrop-filter: none !important;
-    -webkit-backdrop-filter: none !important;
     transition-duration: 0.01ms !important;
     animation: none !important;
   }
-  .card { background: var(--bg-elev-1) !important; }
-  [data-theme="light"] .card { background: rgba(255,255,255,0.94) !important; }
 }
 
 
@@ -2393,17 +2390,18 @@ html[data-theme="light"] .card.vpn-card {
 }
 
 /* ── 21. REDUCED MOTION GUARD ─────────────────────────────────── */
+/* Only stop animations. backdrop-filter is static — keep it.     */
 @media (prefers-reduced-motion: reduce) {
   [data-theme="light"] .card,
   [data-theme="light"] .action-tile,
   [data-theme="light"] .speed-chip {
-    backdrop-filter: none !important;
-    -webkit-backdrop-filter: none !important;
-    background: rgba(255, 255, 255, 0.92) !important;
     transition-duration: 0.01ms !important;
+    animation: none !important;
   }
-  [data-theme="light"] #astro-lava {
-    display: none !important;
+  /* Stop lava blob drift but keep them visible */
+  .lava-blob-1, .lava-blob-2, .lava-blob-3,
+  .lava-blob-4, .lava-blob-5 {
+    animation: none !important;
   }
   html[data-theme="light"] body::before {
     animation: none !important;
