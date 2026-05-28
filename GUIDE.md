@@ -38,8 +38,14 @@ git push
 # See commit history
 git log --oneline
 
+# See what's on GitHub vs local
+git status   # shows "ahead by N commits" if unpushed
+
 # Undo changes to a file (before committing)
 git checkout -- src/app/some_file.py
+
+# Go back to what's on GitHub (nuclear — discards all local changes)
+git reset --hard origin/main
 ```
 
 > The `.env` file is in `.gitignore` — it is never pushed to GitHub. Keep a separate backup of it.
@@ -47,6 +53,8 @@ git checkout -- src/app/some_file.py
 ---
 
 ## Backups & restore
+
+### Snapshot (full project backup)
 
 ```bash
 # Create a snapshot before risky changes
@@ -59,10 +67,41 @@ bash scripts/list_snapshots.sh
 RESTORE_OK=yes bash scripts/restore_snapshot.sh backups/LATEST.tar.gz
 
 # Restore a specific snapshot
-RESTORE_OK=yes bash scripts/restore_snapshot.sh backups/snapshot-20260528-before-change.tar.gz
+RESTORE_OK=yes bash scripts/restore_snapshot.sh backups/snapshot-20260528-my-label.tar.gz
 ```
 
-Snapshots are stored in `backups/`. The 25 most recent are kept automatically.
+Snapshots live in `backups/`. The 25 most recent are kept automatically.
+
+### Git as a restore point
+
+Every push to GitHub is a permanent restore point.
+
+```bash
+# See all commits (most recent first)
+git log --oneline
+
+# Restore all files to a specific commit (non-destructive — leaves history intact)
+git checkout abc1234 -- .
+
+# Hard reset to a specific commit (destructive — rewrites history)
+git reset --hard abc1234
+
+# Hard reset to whatever is on GitHub right now
+git reset --hard origin/main
+```
+
+### Recommended before any big change
+
+```bash
+# 1. Snapshot (local safety net)
+bash scripts/backup_snapshot.sh before-my-change
+
+# 2. Commit current state if anything is uncommitted
+git add -A && git commit -m "checkpoint before my-change"
+
+# 3. Push (permanent GitHub restore point)
+git push
+```
 
 ---
 
@@ -95,6 +134,57 @@ curl http://localhost:8585/health
 ```
 
 Returns status for: database, Redis, Marzban, bot, scheduler.
+
+---
+
+## Frontend (webapp)
+
+The dashboard and admin panel are static HTML/CSS/JS files served by the aiohttp web server. No build step needed — edit the files and refresh.
+
+```
+src/app/webapp/
+├── dashboard/           ← User dashboard (the Telegram Mini App)
+│   ├── index.html       ← Home page (subscriptions, VPN card)
+│   ├── purchase.html    ← Buy a plan
+│   ├── charge.html      ← Top up data
+│   ├── support.html     ← Support tickets
+│   ├── shop.html        ← Rewards shop + VIP
+│   ├── tasks.html       ← Rewards / challenges / achievements
+│   ├── profile.html     ← User profile
+│   ├── css/             ← Page-specific CSS + tokens + glass system
+│   │   ├── tokens.css   ← Design tokens (colors, spacing, shadows)
+│   │   ├── glass.css    ← Liquid glass overlay (loads last, overrides)
+│   │   └── *.css        ← One file per page
+│   ├── js/
+│   │   ├── head-boot.js ← Boot script (security, theme, Telegram expand)
+│   │   ├── index-main.js← Home page logic
+│   │   └── ...
+│   ├── ui.js            ← Shared UI utilities
+│   └── lang.js          ← Language / i18n system
+├── admin/               ← Admin panel SPA
+│   ├── index.html
+│   └── support.html
+└── arcade/              ← AstroBugz HTML5 game
+```
+
+### CSS load order (important)
+
+Every dashboard page loads CSS in this order:
+1. `tokens.css` — design tokens (via `@import` inside page CSS)
+2. Page-specific CSS (e.g. `purchase.css`)
+3. `glass.css` — glass system, loaded last, overrides everything with `!important`
+
+Don't fight `glass.css` — if you want to change how something looks, either edit `glass.css` or add your rule after it with `!important`.
+
+### Cache busting
+
+When you change a CSS or JS file and users aren't seeing the update, bump the version query string in the HTML:
+
+```html
+<!-- Change ?v=12 to ?v=13 -->
+<link rel="stylesheet" href="/webapp/dashboard/css/glass.css?v=13">
+<script src="/webapp/dashboard/js/index-main.js?v=15"></script>
+```
 
 ---
 
@@ -131,31 +221,53 @@ python scripts/root/generate_admin_password.py
 # Copy the hash into config/.env → ADMIN_PANEL_PASSWORD_HASH
 ```
 
+### Clear Redis cache
+```bash
+redis-cli -h 127.0.0.1 FLUSHDB
+# Then restart services
+systemctl restart userbot.service
+```
+
+### Check what's using port 8585
+```bash
+ss -tlnp | grep 8585
+```
+
 ---
 
 ## Project structure (quick reference)
 
 ```
-src/app/
-├── main.py                  ← user bot entry + web server
-├── admin_main.py            ← admin bot entry
-├── api/routes/              ← web API handlers (~180 files)
-├── handlers/
-│   ├── admin/               ← admin Telegram handlers
-│   └── user/                ← user Telegram handlers
-├── database/
-│   ├── models/              ← SQLAlchemy models (split by domain)
-│   ├── crud.py              ← flat function exports (used everywhere)
-│   ├── cached_crud.py       ← Redis-cached wrappers
-│   └── repos/               ← domain repositories
-├── jobs/                    ← background jobs (APScheduler)
-├── services/marzban.py      ← Marzban VPN API client ⚠️ don't break this
-├── core/settings/           ← all config, loaded from config/.env
-├── utils/                   ← logging, i18n, middleware, helpers
-└── webapp/                  ← frontend HTML/CSS/JS
-    ├── admin/               ← admin panel SPA
-    ├── arcade/              ← AstroBugz game
-    └── dashboard/           ← user dashboard SPA
+ASTROBYTE/
+├── src/app/
+│   ├── main.py                  ← user bot entry + web server
+│   ├── admin_main.py            ← admin bot entry
+│   ├── api/routes/              ← web API handlers (~180 files)
+│   ├── handlers/
+│   │   ├── admin/               ← admin Telegram handlers
+│   │   └── user/                ← user Telegram handlers
+│   ├── database/
+│   │   ├── models/              ← SQLAlchemy models (split by domain)
+│   │   ├── crud.py              ← flat function exports (used everywhere)
+│   │   ├── cached_crud.py       ← Redis-cached wrappers
+│   │   └── repos/               ← domain repositories
+│   ├── jobs/                    ← background jobs (APScheduler)
+│   ├── services/marzban.py      ← Marzban VPN API client ⚠️
+│   ├── core/settings/           ← all config, loaded from config/.env
+│   ├── utils/                   ← logging, i18n, middleware, helpers
+│   └── webapp/                  ← frontend HTML/CSS/JS
+│       ├── admin/               ← admin panel SPA
+│       ├── arcade/              ← AstroBugz game
+│       └── dashboard/           ← user dashboard SPA
+├── alembic/versions/            ← DB migration files
+├── config/
+│   ├── .env                     ← secrets (never committed)
+│   ├── .env.example             ← template
+│   └── requirements.txt
+├── scripts/                     ← backup, restore, maintenance
+├── backups/                     ← snapshot archives (never committed)
+├── GUIDE.md                     ← this file
+└── README.md                    ← project overview
 ```
 
 ---
@@ -216,4 +328,48 @@ PYTHONPATH=src .venv/bin/python -c "import app.main; import app.admin_main; prin
 
 # Health check
 curl http://localhost:8585/health
+```
+
+---
+
+## Troubleshooting
+
+### Bot not responding
+```bash
+systemctl status userbot.service
+journalctl -u userbot.service -n 50
+```
+
+### Web dashboard not loading
+```bash
+curl http://localhost:8585/health
+ss -tlnp | grep 8585   # confirm server is up
+```
+
+### Database connection error
+```bash
+# Check PostgreSQL is running
+systemctl status postgresql
+# Test connection
+python scripts/root/test_postgresql_connection.py
+```
+
+### Users not seeing CSS/JS changes
+Bump the version query string in the relevant HTML file:
+```html
+<link rel="stylesheet" href="/webapp/dashboard/css/glass.css?v=23">
+```
+
+### Redis errors
+```bash
+systemctl status redis-server
+redis-cli ping   # should return PONG
+```
+
+### After any crash or weird state
+```bash
+# Restart everything
+systemctl restart userbot.service adminbot.service
+# Check logs
+journalctl -u userbot.service -n 100
 ```
