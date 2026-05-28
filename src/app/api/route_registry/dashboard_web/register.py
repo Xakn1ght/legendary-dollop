@@ -37,5 +37,5 @@ def register_dashboard_web_routes(app: web.Application, wd: Path) -> None:
     app.router.add_static(DASHBOARD_WEB_BASE + "/", path=str(wd / "dashboard"), name="dashboard_static")
 
     app.router.add_get(PROFILE_WEB_BASE, handle_profile_index)
-    app.router.add_static(PROFILE_WEB_BASE + "/", path=str(wd / "profile"), name="profile_static")
+    # profile/ dir was removed — profile.html lives under dashboard_static
     app.router.add_static(SHARED_STATIC_PREFIX, path=str(wd / "static"), name="web_static")
