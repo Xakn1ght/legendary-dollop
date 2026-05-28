@@ -2650,4 +2650,149 @@ html:not([data-theme="light"]) body::before {
   opacity: 1 !important;
   animation: ambientDrift 24s ease-in-out infinite alternate !important;
 }
+
+/* ── 4. DARK MODE LIQUID GLASS — cards, tiles, shop ──────────
+   The FINAL PASS section earlier kills backdrop-filter and sets
+   opaque #131c28 backgrounds on cards. We restore glass here.  */
+
+/* Cards */
+html[data-theme="dark"] .card,
+html:not([data-theme="light"]) .card,
+[data-theme="dark"] .card {
+  background: rgba(10, 18, 34, 0.58) !important;
+  backdrop-filter: blur(22px) saturate(160%) brightness(1.06) !important;
+  -webkit-backdrop-filter: blur(22px) saturate(160%) brightness(1.06) !important;
+  border: 1px solid rgba(255, 255, 255, 0.07) !important;
+  border-top-color: rgba(255, 255, 255, 0.14) !important;
+  box-shadow:
+    0 6px 28px rgba(0, 0, 0, 0.45),
+    0 2px 6px rgba(0, 0, 0, 0.28),
+    inset 0 1px 0 rgba(255, 255, 255, 0.09) !important;
+}
+html[data-theme="dark"] .placeholder-card,
+html:not([data-theme="light"]) .placeholder-card {
+  background: rgba(10, 18, 34, 0.52) !important;
+  backdrop-filter: blur(22px) saturate(160%) !important;
+  -webkit-backdrop-filter: blur(22px) saturate(160%) !important;
+  border: 1px solid rgba(255, 255, 255, 0.07) !important;
+  border-top-color: rgba(255, 255, 255, 0.12) !important;
+}
+
+/* Action tiles */
+html[data-theme="dark"] .action-tile,
+html:not([data-theme="light"]) .action-tile,
+[data-theme="dark"] .action-tile {
+  background: rgba(10, 18, 34, 0.55) !important;
+  backdrop-filter: blur(22px) saturate(160%) brightness(1.06) !important;
+  -webkit-backdrop-filter: blur(22px) saturate(160%) brightness(1.06) !important;
+  border: 1px solid rgba(255, 255, 255, 0.07) !important;
+  border-top-color: rgba(255, 255, 255, 0.14) !important;
+  box-shadow:
+    0 4px 20px rgba(0, 0, 0, 0.40),
+    inset 0 1px 0 rgba(255, 255, 255, 0.08) !important;
+}
+
+/* Speed chips */
+html[data-theme="dark"] .speed-chip,
+html:not([data-theme="light"]) .speed-chip {
+  background: rgba(10, 18, 34, 0.52) !important;
+  backdrop-filter: blur(18px) saturate(150%) !important;
+  -webkit-backdrop-filter: blur(18px) saturate(150%) !important;
+  border: 1px solid rgba(255, 255, 255, 0.07) !important;
+  border-top-color: rgba(255, 255, 255, 0.13) !important;
+}
+
+/* Shop plan cards */
+html[data-theme="dark"] .shop-plan-card,
+html:not([data-theme="light"]) .shop-plan-card {
+  background: rgba(10, 18, 34, 0.58) !important;
+  backdrop-filter: blur(22px) saturate(160%) !important;
+  -webkit-backdrop-filter: blur(22px) saturate(160%) !important;
+  border: 1px solid rgba(255, 255, 255, 0.07) !important;
+  border-top-color: rgba(255, 255, 255, 0.13) !important;
+  box-shadow:
+    0 4px 20px rgba(0, 0, 0, 0.40),
+    inset 0 1px 0 rgba(255, 255, 255, 0.08) !important;
+}
+
+/* Shop tabs, chips, sort pills */
+html[data-theme="dark"] .shop-tabs,
+html:not([data-theme="light"]) .shop-tabs {
+  background: rgba(10, 18, 34, 0.52) !important;
+  backdrop-filter: blur(18px) !important;
+  -webkit-backdrop-filter: blur(18px) !important;
+  border: 1px solid rgba(255, 255, 255, 0.07) !important;
+}
+html[data-theme="dark"] .shop-chip,
+html:not([data-theme="light"]) .shop-chip {
+  background: rgba(10, 18, 34, 0.50) !important;
+  backdrop-filter: blur(14px) !important;
+  -webkit-backdrop-filter: blur(14px) !important;
+  border: 1px solid rgba(255, 255, 255, 0.08) !important;
+}
+html[data-theme="dark"] .shop-sort-pills,
+html:not([data-theme="light"]) .shop-sort-pills {
+  background: rgba(10, 18, 34, 0.45) !important;
+  backdrop-filter: blur(14px) !important;
+  -webkit-backdrop-filter: blur(14px) !important;
+  border: 1px solid rgba(255, 255, 255, 0.07) !important;
+}
+html[data-theme="dark"] .shop-input,
+html[data-theme="dark"] .shop-field,
+html:not([data-theme="light"]) .shop-input,
+html:not([data-theme="light"]) .shop-field {
+  background: rgba(10, 18, 34, 0.55) !important;
+  backdrop-filter: blur(14px) !important;
+  -webkit-backdrop-filter: blur(14px) !important;
+  border: 1px solid rgba(255, 255, 255, 0.08) !important;
+}
+
+/* Sheet panels */
+html[data-theme="dark"] .sheet-panel,
+html:not([data-theme="light"]) .sheet-panel {
+  background: rgba(8, 14, 28, 0.88) !important;
+  backdrop-filter: blur(36px) saturate(180%) !important;
+  -webkit-backdrop-filter: blur(36px) saturate(180%) !important;
+  border: 1px solid rgba(255, 255, 255, 0.09) !important;
+  border-bottom: none !important;
+}
+
+/* Usage badge */
+html[data-theme="dark"] .usage-badge,
+html:not([data-theme="light"]) .usage-badge {
+  background: rgba(8, 14, 28, 0.82) !important;
+  backdrop-filter: blur(22px) !important;
+  -webkit-backdrop-filter: blur(22px) !important;
+  border: 1.5px solid rgba(255, 255, 255, 0.10) !important;
+}
+
+/* ── 5. LIGHT MODE SHOP — replace inner bar with border-left ──
+   The ::before accent bar inside glass cards looks cluttered.
+   Swap to a clean border-left so it's part of the card edge.  */
+[data-theme="light"] .shop-plan-card {
+  border-left: 3.5px solid rgba(var(--brandRgb), 0.65) !important;
+  border-top-color: rgba(255, 255, 255, 0.92) !important;
+  padding-left: 14px !important;
+}
+html[dir="rtl"][data-theme="light"] .shop-plan-card,
+[data-theme="light"] html[dir="rtl"] .shop-plan-card {
+  border-left: 1px solid rgba(255, 255, 255, 0.58) !important;
+  border-right: 3.5px solid rgba(var(--brandRgb), 0.65) !important;
+  padding-left: 14px !important;
+  padding-right: 14px !important;
+}
+[data-theme="light"] .shop-plan-card::before {
+  display: none !important;
+}
+
+/* Dark mode: keep ::before bar, make it glass-aware */
+html[data-theme="dark"] .shop-plan-card::before,
+html:not([data-theme="light"]) .shop-plan-card::before {
+  background: linear-gradient(
+    180deg,
+    rgba(var(--brandRgb), 0.75) 0%,
+    rgba(var(--brandRgb), 0.12) 100%
+  ) !important;
+  opacity: 0.90 !important;
+  box-shadow: 0 0 8px rgba(var(--brandRgb), 0.30) !important;
 }
