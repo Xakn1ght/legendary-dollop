@@ -137,13 +137,68 @@ Returns status for: database, Redis, Marzban, bot, scheduler.
 
 ---
 
+## How the system works
+
+### Two bots, one web server
+
+- **User bot** (`main.py`) — the bot your customers talk to. It also starts the embedded aiohttp web server on port 8585 that serves the dashboard, admin panel, and arcade game.
+- **Admin bot** (`admin_main.py`) — a separate bot only you can use. Handles approvals, broadcasts, stats, system commands.
+- Both bots share the same PostgreSQL database and Redis instance.
+
+### Purchase flow (what happens when someone buys)
+
+```
+User picks plan in dashboard
+  → POST /api/dashboard/purchase/start   (creates a draft order in DB)
+  → User submits receipt photo
+  → POST /api/dashboard/purchase/submit-receipt  (saves image, notifies admin bot)
+  → Admin sees request in admin bot
+  → Admin approves
+  → POST /api/admin/receipts/{id}/approve
+      → Creates Marzban user via marzban.py
+      → Saves subscription to DB (status: active)
+      → Sends sub link to user via Telegram
+```
+
+### Charge (top-up) flow
+
+```
+User selects subscription → picks GB/days package
+  → POST /api/dashboard/charge/start
+  → User submits receipt
+  → Admin approves
+  → POST /api/admin/charges/{id}/approve
+      → Adds traffic/days to existing Marzban user
+```
+
+### Marzban integration
+
+`services/marzban.py` is the only file that talks to Marzban. It uses JWT auth with a lock to prevent concurrent logins. Every call that creates/modifies a VPN user goes through here.
+
+If Marzban is down: the health check will show it, approvals will fail gracefully, and errors are logged. Nothing else breaks.
+
+### Notifications
+
+Notifications to users go through an async queue (`notification_queue` in `main.py`). Nothing sends directly — everything is queued and a worker coroutine drains it. This prevents Telegram rate limiting.
+
+### Redis
+
+Used for:
+- **FSM state** — Telegram conversation state (which step the user is at in a purchase flow etc.)
+- **Caching** — user lookups, subscription data (`cached_crud.py`)
+- **Session storage** — dashboard web sessions
+
+If Redis goes down, the bot will keep running but FSM-based conversations (purchase, support ticket creation) will break until Redis is back.
+
+---
+
 ## Frontend (webapp)
 
-The dashboard and admin panel are static HTML/CSS/JS files served by the aiohttp web server. No build step needed — edit the files and refresh.
+The dashboard and admin panel are static HTML/CSS/JS files served by the aiohttp web server. No build step — edit the files and refresh.
 
 ```
 src/app/webapp/
-├── dashboard/           ← User dashboard (the Telegram Mini App)
+├── dashboard/           ← User dashboard (Telegram Mini App)
 │   ├── index.html       ← Home page (subscriptions, VPN card)
 │   ├── purchase.html    ← Buy a plan
 │   ├── charge.html      ← Top up data
@@ -151,40 +206,75 @@ src/app/webapp/
 │   ├── shop.html        ← Rewards shop + VIP
 │   ├── tasks.html       ← Rewards / challenges / achievements
 │   ├── profile.html     ← User profile
-│   ├── css/             ← Page-specific CSS + tokens + glass system
-│   │   ├── tokens.css   ← Design tokens (colors, spacing, shadows)
-│   │   ├── glass.css    ← Liquid glass overlay (loads last, overrides)
-│   │   └── *.css        ← One file per page
+│   ├── css/
+│   │   ├── tokens.css   ← Design tokens (colors, spacing, shadows, accents)
+│   │   ├── glass.css    ← Liquid glass system (loads last, overrides everything)
+│   │   └── *.css        ← One CSS file per page
 │   ├── js/
-│   │   ├── head-boot.js ← Boot script (security, theme, Telegram expand)
-│   │   ├── index-main.js← Home page logic
-│   │   └── ...
-│   ├── ui.js            ← Shared UI utilities
-│   └── lang.js          ← Language / i18n system
+│   │   ├── head-boot.js ← Runs first: security check, theme, Telegram setup
+│   │   ├── index-main.js← Home page JS
+│   │   └── *.js         ← One JS file per page (where needed)
+│   ├── ui.js            ← Shared UI utilities (toasts, sheets, haptics)
+│   └── lang.js          ← Language / i18n system (fa/en, syncs to backend)
 ├── admin/               ← Admin panel SPA
-│   ├── index.html
-│   └── support.html
+│   ├── index.html       ← Main admin panel
+│   └── support.html     ← Admin support view
 └── arcade/              ← AstroBugz HTML5 game
+    ├── index.html        ← Game launcher
+    └── astrobugz/        ← Compiled Construct2 game files
 ```
+
+### How pages load
+
+Each dashboard page is both a **standalone page** (accessed directly) and a **shell-injectable page** (loaded into `index.html` via JS for soft navigation). This is why some CSS/JS lives inside the `.content` div — the shell extracts that div and re-injects it.
+
+- **Head scripts** (`head-boot.js`): runs before anything renders. Applies theme, checks Telegram auth, sets up expand/fullscreen.
+- **Page CSS**: imported via `@import url("tokens.css")` at the top of each CSS file.
+- **`glass.css`**: always loaded last on every page. Overrides base styles with the liquid glass look using `!important`.
 
 ### CSS load order (important)
 
-Every dashboard page loads CSS in this order:
-1. `tokens.css` — design tokens (via `@import` inside page CSS)
-2. Page-specific CSS (e.g. `purchase.css`)
-3. `glass.css` — glass system, loaded last, overrides everything with `!important`
+```
+tokens.css  →  [page].css  →  glass.css
+```
 
-Don't fight `glass.css` — if you want to change how something looks, either edit `glass.css` or add your rule after it with `!important`.
+Don't fight `glass.css`. To override something, either edit `glass.css` directly or put your rule after it with `!important`.
 
 ### Cache busting
 
 When you change a CSS or JS file and users aren't seeing the update, bump the version query string in the HTML:
 
 ```html
-<!-- Change ?v=12 to ?v=13 -->
-<link rel="stylesheet" href="/webapp/dashboard/css/glass.css?v=13">
+<!-- Change v=22 to v=23 -->
+<link rel="stylesheet" href="/webapp/dashboard/css/glass.css?v=23">
 <script src="/webapp/dashboard/js/index-main.js?v=15"></script>
 ```
+
+### Adding a new dashboard page
+
+1. Create `src/app/webapp/dashboard/mypage.html`
+2. Head must include (in this order):
+   ```html
+   <script src="/webapp/dashboard/lang.js"></script>
+   <script src="https://telegram.org/js/telegram-web-app.js"></script>
+   <script src="/webapp/dashboard/js/head-boot.js"></script>
+   <script src="/webapp/dashboard/ui.js" defer></script>
+   ```
+3. Create `src/app/webapp/dashboard/css/mypage.css` with `@import url("./tokens.css");` at the top
+4. Add `<link rel="stylesheet" href="/webapp/dashboard/css/mypage.css">` and `glass.css` last
+5. Register the route in `src/app/api/route_registry/dashboard_web/handlers.py` and `register.py`
+6. Add a nav item in `index.html` bottom nav if needed
+
+### i18n (Persian / English)
+
+All user-facing text in the dashboard should support both languages. Use the translation system:
+
+```javascript
+// In page JS, use t('key') to get translated text
+el.textContent = t('myKey');
+```
+
+Add the key to both `'fa'` and `'en'` objects inside `lang.js`.
 
 ---
 
@@ -196,21 +286,34 @@ Edit `src/app/core/plans.json`.
 ### Change charge packages
 Edit `src/app/core/charge_packages.json` or `src/app/core/settings/catalog_plans.py`.
 
-### Add a Telegram handler (user bot)
-Create a file in `src/app/handlers/user/` and register the router in `src/app/main.py`.
+### Add a Telegram command (user bot)
 
-### Add a Telegram handler (admin bot)
-Create a file in `src/app/handlers/admin/` and register the router in `src/app/admin_main.py`.
+1. Create a handler file in `src/app/handlers/user/`
+2. Define a `router = Router()` and decorate your functions with `@router.message(Command("mycommand"))`
+3. Import and include the router in `src/app/main.py`:
+   ```python
+   from app.handlers.user import mymodule
+   dp.include_router(mymodule.router)
+   ```
+
+### Add a Telegram command (admin bot)
+
+Same pattern but in `src/app/handlers/admin/` and registered in `src/app/admin_main.py`.
 
 ### Add an API route
-1. Create handler in `src/app/api/routes/<domain>/`
-2. Register it in the matching `src/app/api/route_registry/` file
+
+1. Create handler in `src/app/api/routes/<domain>/myroute.py`
+2. Define an async function: `async def handle_my_route(request: web.Request):`
+3. Register it in `src/app/api/route_registry/<domain>/register.py`:
+   ```python
+   app.router.add_post("/api/my/endpoint", handle_my_route)
+   ```
 
 ### Change a job schedule
 Edit `JOB_SCHEDULES` in `src/app/core/settings/bot_behavior.py`.
 
 ### Change a DB model
-1. Edit the relevant model file in `src/app/database/models/`
+1. Edit the relevant file in `src/app/database/models/`
 2. Create a migration: `alembic revision --autogenerate -m "description"`
 3. Apply it: `alembic upgrade head`
 4. Restart services
@@ -219,19 +322,99 @@ Edit `JOB_SCHEDULES` in `src/app/core/settings/bot_behavior.py`.
 ```bash
 python scripts/root/generate_admin_password.py
 # Copy the hash into config/.env → ADMIN_PANEL_PASSWORD_HASH
+systemctl restart userbot.service
 ```
 
 ### Clear Redis cache
 ```bash
 redis-cli -h 127.0.0.1 FLUSHDB
-# Then restart services
 systemctl restart userbot.service
 ```
+
+### Force-refresh a user's subscription from Marzban
+Use the admin bot → find user → "Sync from Marzban", or via admin panel → Subscriptions → Sync.
 
 ### Check what's using port 8585
 ```bash
 ss -tlnp | grep 8585
 ```
+
+### Update Python packages
+```bash
+cd /root/5a06b8e65bdb/ASTROBYTE
+source .venv/bin/activate
+pip install -r config/requirements.txt --upgrade
+# Test before restarting
+PYTHONPATH=src python -c "import app.main; print('OK')"
+systemctl restart userbot.service adminbot.service
+```
+
+---
+
+## Reward system — how it works
+
+Users earn **stars** through referrals, achievements, and the arcade game. Stars accumulate and unlock **star reward tiers** (milestones) that grant discounts, credit, or extra days.
+
+- **Star pieces**: 10 pieces = 1 star. Arcade game gives pieces.
+- **Monthly star cap**: users can earn max 6 stars/month from the arcade to prevent farming.
+- **Daily cap**: max 3 stars/day from any source.
+- **XP**: earned from most actions. XP → levels → loyalty point/credit rewards at each level.
+- **Loyalty points**: spendable in the rewards shop.
+- **Achievements**: one-time milestones (5 referrals, 50GB used, etc.).
+- **Challenges**: daily/weekly goals that reset automatically.
+
+Configuration: `src/app/core/settings/bot_behavior.py` (caps, rates), DB table `reward_config` (cashback %s).
+
+---
+
+## Admin panel — what each section does
+
+Access: your `DASHBOARD_PUBLIC_BASE_URL/admin`
+
+| Section | What it does |
+|---|---|
+| **Dashboard** | Overview stats — users, revenue, active subs |
+| **Users** | Search, view, edit any user. Adjust credit/stars/ban |
+| **Subscriptions** | View all subs, sync with Marzban, extend/delete |
+| **Receipts** | Approve or deny pending purchase receipts |
+| **Charges** | Approve or deny pending top-up receipts |
+| **VIP** | Approve VIP membership orders |
+| **Tickets** | Support ticket queue. Assign, reply, close |
+| **Broadcast** | Send a message to all users or a filtered subset |
+| **Financial** | Revenue charts, cashout requests |
+| **Reward settings** | Configure star tier rewards |
+| **DB Explorer** | Run raw SQL queries — be careful |
+| **System** | View logs, restart services, run admin commands |
+| **Settings** | IP whitelist, payment info, job schedules |
+
+---
+
+## Logs — reading them
+
+```bash
+# Live stream
+journalctl -u userbot.service -f
+
+# Last 100 lines
+journalctl -u userbot.service -n 100
+
+# Since last restart
+journalctl -u userbot.service -b
+
+# Search for errors
+journalctl -u userbot.service | grep ERROR
+
+# Log files (also written to disk)
+tail -f /root/5a06b8e65bdb/ASTROBYTE/logs/bot.log
+tail -f /root/5a06b8e65bdb/ASTROBYTE/logs/bot_error.log
+tail -f /root/5a06b8e65bdb/ASTROBYTE/logs/admin_bot.log
+```
+
+Common log patterns:
+- `[MARZBAN]` — Marzban API calls
+- `[STAR_MANAGER]` — star additions/deductions
+- `[RENEWAL]` — auto-renewal job
+- `ERROR` — something went wrong (check the traceback below it)
 
 ---
 
@@ -305,6 +488,23 @@ ASTROBYTE/
 
 ---
 
+## Moving to a new server
+
+1. On new server, install Python 3.10+, PostgreSQL, Redis
+2. Clone from GitHub: `git clone git@github.com:Xakn1ght/legendary-dollop.git ASTROBYTE`
+3. Copy `config/.env` from old server (never in git)
+4. Set up venv and install deps:
+   ```bash
+   python -m venv .venv && source .venv/bin/activate
+   pip install -r config/requirements.txt && pip install -e .
+   ```
+5. Run migrations: `PYTHONPATH=src alembic -c config/alembic.ini upgrade head`
+6. Copy service files and enable: `cp *.service /etc/systemd/system/ && systemctl enable userbot adminbot`
+7. Restore DB from backup if needed: `python scripts/backup_db.py` (run on old server first)
+8. Add new server's SSH key to GitHub (see `ssh-keygen -t ed25519` instructions)
+
+---
+
 ## Lint
 
 ```bash
@@ -346,11 +546,12 @@ curl http://localhost:8585/health
 ss -tlnp | grep 8585   # confirm server is up
 ```
 
+### Dashboard shows "Access Restricted"
+The page is being opened outside of Telegram (e.g. directly in a browser). This is expected — the dashboard only works inside the Telegram Mini App. Use `?auth=...` token flow for testing outside Telegram.
+
 ### Database connection error
 ```bash
-# Check PostgreSQL is running
 systemctl status postgresql
-# Test connection
 python scripts/root/test_postgresql_connection.py
 ```
 
@@ -366,10 +567,31 @@ systemctl status redis-server
 redis-cli ping   # should return PONG
 ```
 
+### Marzban API failing
+```bash
+curl http://localhost:8585/health   # check marzban status
+# If down, fix Marzban first — the bot queues nothing, approvals will fail
+```
+
+### A user's subscription isn't activating
+1. Check logs for `[MARZBAN]` errors
+2. Check the subscription's status in DB via admin panel → DB Explorer:
+   ```sql
+   SELECT * FROM subscriptions WHERE user_id = <id> ORDER BY created_at DESC LIMIT 5;
+   ```
+3. Try re-approving from admin panel
+
 ### After any crash or weird state
 ```bash
-# Restart everything
 systemctl restart userbot.service adminbot.service
-# Check logs
 journalctl -u userbot.service -n 100
+```
+
+### Port 8585 already in use after crash
+```bash
+# Find what's holding the port
+ss -tlnp | grep 8585
+# Kill it by PID, then restart
+kill <PID>
+systemctl start userbot.service
 ```
