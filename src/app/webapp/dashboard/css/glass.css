@@ -2762,16 +2762,16 @@ html:not([data-theme="light"]) .usage-badge {
    The ::before accent bar inside glass cards looks cluttered.
    Swap to a clean border-left so it's part of the card edge.  */
 [data-theme="light"] .shop-plan-card {
-  border-left: 3.5px solid rgba(var(--brandRgb), 0.65) !important;
+  border-left: 3px solid rgba(var(--brandRgb), 0.65) !important;
   border-top-color: rgba(255, 255, 255, 0.92) !important;
-  padding-left: 14px !important;
+  padding-left: 16px !important;
 }
 html[dir="rtl"][data-theme="light"] .shop-plan-card,
 [data-theme="light"] html[dir="rtl"] .shop-plan-card {
   border-left: 1px solid rgba(255, 255, 255, 0.58) !important;
-  border-right: 3.5px solid rgba(var(--brandRgb), 0.65) !important;
-  padding-left: 14px !important;
-  padding-right: 14px !important;
+  border-right: 3px solid rgba(var(--brandRgb), 0.65) !important;
+  padding-left: 16px !important;
+  padding-right: 16px !important;
 }
 [data-theme="light"] .shop-plan-card::before {
   display: none !important;

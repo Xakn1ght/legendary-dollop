@@ -180,16 +180,16 @@
    align-items:flex-end;
    justify-content:space-between;
    gap: 10px;
-   margin-bottom: 12px;
+   margin-bottom: 16px;
  }
  .shop-section-title{ font-weight: 950; font-size: 14px; letter-spacing: .2px; }
  .shop-section-sub{ color: var(--muted); font-size: 12px; opacity: 0.8; margin-top: 2px; }
 
  .shop-controls{
    display:grid;
-   gap: 10px;
-   margin-top: 10px;
-   margin-bottom: 12px;
+   gap: 12px;
+   margin-top: 14px;
+   margin-bottom: 16px;
  }
 
  /* Plans section: fully transparent, no padding frame */
@@ -206,7 +206,7 @@
  .shop-controls-row{
    display:grid;
    grid-template-columns: 1fr 1fr;
-   gap: 10px;
+   gap: 12px;
    align-items:center;
  }
  #shopClearFiltersBtn{ grid-column: 1 / -1; }
@@ -231,7 +231,7 @@
  }
  .shop-sort-pill{
    flex: 1;
-   padding: 9px 6px;
+   padding: 11px 6px;
    border: none;
    border-radius: 10px;
    background: transparent;
@@ -376,7 +376,7 @@
  .shop-plans-grid{
    display:flex;
    flex-direction:column;
-   gap: 10px;
+   gap: 14px;
    width: 100%;
    max-width: 100%;
    overflow-x: hidden;
@@ -408,11 +408,11 @@
     background:
       radial-gradient(120% 140% at 12% 8%, rgba(var(--brandRgb),0.13), transparent 55%),
       linear-gradient(180deg, rgba(255,255,255,0.06), rgba(255,255,255,0.02));
-    border-radius: 18px;
-    padding: 14px 14px 14px 22px;
+    border-radius: 20px;
+    padding: 20px 16px 20px 26px;
     display:flex;
     flex-direction:column;
-    gap: 10px;
+    gap: 14px;
     cursor:pointer;
     transition: transform .16s ease, border-color .2s ease, box-shadow .2s ease;
     -webkit-tap-highlight-color: transparent;
@@ -425,16 +425,16 @@
     min-width: 0;
   }
   html[dir="rtl"] .shop-plan-card{
-    padding: 14px 22px 14px 14px;
+    padding: 20px 26px 20px 16px;
   }
   /* Accent bar */
   .shop-plan-card::before{
     content: '';
     position: absolute;
-    left: 8px;
-    top: 14px;
-    bottom: 14px;
-    width: 3.5px;
+    left: 10px;
+    top: 18px;
+    bottom: 18px;
+    width: 3px;
     border-radius: 999px;
     background: linear-gradient(180deg, var(--brand), rgba(var(--brandRgb),0.18));
     opacity: 0.85;
@@ -447,7 +447,7 @@
   }
   html[dir="rtl"] .shop-plan-card::before{
     left: auto;
-    right: 8px;
+    right: 10px;
   }
   [data-theme="light"] .shop-plan-card{
     border-color: rgba(15,23,42,0.08);
