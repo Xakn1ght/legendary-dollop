@@ -58,9 +58,10 @@ async def security_headers_middleware(request: web.Request, handler):
         # 6 months; includeSubDomains is usually correct when you serve everything over https
         resp.headers.setdefault("Strict-Transport-Security", "max-age=15552000; includeSubDomains")
 
-    # Force no-cache for webapp CSS/JS so design changes are picked up immediately.
+    # Force no-cache for all webapp assets so design changes are picked up immediately.
+    # Telegram Desktop and Telegram Web can cache mini-app resources aggressively.
     path = request.path
-    if path.startswith("/webapp/") and path.endswith((".css", ".js")):
+    if path.startswith("/webapp/") and path.endswith((".css", ".js", ".html")):
         resp.headers["Cache-Control"] = "no-store, no-cache, must-revalidate"
         resp.headers["Pragma"] = "no-cache"
         resp.headers["Expires"] = "0"

@@ -81,28 +81,19 @@ html:not([data-theme="light"]) {
    We only need to bump up the blobs so they show against the light bg. */
 
 /* Light lava blobs — soft pastel so they don't bleed harshly into glass cards */
-[data-theme="light"] #astro-lava {
-  filter: blur(100px) saturate(110%) !important;
-  opacity: 0.75 !important;
-}
-[data-theme="light"] .lava-blob-1 { background: rgba(240,140,150,0.40) !important; }
-[data-theme="light"] .lava-blob-2 { background: rgba(180,140,255,0.38) !important; }
-[data-theme="light"] .lava-blob-3 { background: rgba(120,180,255,0.40) !important; }
-[data-theme="light"] .lava-blob-4 { background: rgba(120,220,180,0.34) !important; }
-[data-theme="light"] .lava-blob-5 { background: rgba(255,200,140,0.36) !important; }
-
-/* GPU-promote blobs so they animate on compositor thread */
+/* GPU-promote blobs — compositor thread */
 .lava-blob-1, .lava-blob-2, .lava-blob-3, .lava-blob-4, .lava-blob-5 {
-  will-change: transform !important;
+  will-change: transform, border-radius !important;
 }
 
-/* Dark blobs — a touch more vivid */
-:root .lava-blob-1,
-[data-theme="dark"] .lava-blob-1 { background: rgba(var(--brandRgb),0.42) !important; }
-:root .lava-blob-2,
-[data-theme="dark"] .lava-blob-2 { background: rgba(34,211,238,0.34) !important; }
-:root .lava-blob-3,
-[data-theme="dark"] .lava-blob-3 { background: rgba(139,92,246,0.32) !important; }
+/* All blob colors now use --brandRgb (set per chosen accent).
+   These are the base values; the Liquid Aurora/Nebula sections at
+   the bottom of this file set the final values per theme.          */
+.lava-blob-1 { background: rgba(var(--brandRgb), 0.58) !important; }
+.lava-blob-2 { background: rgba(var(--brandRgb), 0.42) !important; }
+.lava-blob-3 { background: rgba(var(--brandRgb), 0.30) !important; }
+.lava-blob-4 { background: rgba(var(--brandRgb), 0.48) !important; }
+.lava-blob-5 { background: rgba(var(--brandRgb), 0.24) !important; }
 
 
 /* ── 3. CARDS → LIQUID GLASS PANELS ────────────────────────────── */
@@ -1455,43 +1446,24 @@ button.btn-primary:active {
   display: block !important;
 }
 
-/* ── DARK MODE blobs: keep existing brand ember + ocean tones ─── */
-html:not([data-theme="light"]) #astro-lava,
-[data-theme="dark"] #astro-lava {
-  filter: blur(90px) saturate(130%) !important;
-  opacity: 0.55 !important;
-}
+/* Blob colors are now fully managed by the Liquid Aurora/Nebula
+   sections at the bottom of this file using --brandRgb.
+   These placeholder rules ensure the accent is applied on first paint. */
 html:not([data-theme="light"]) .lava-blob-1,
-[data-theme="dark"] .lava-blob-1 {
-  background: rgba(var(--brandRgb), 0.38) !important;
-}
+[data-theme="dark"] .lava-blob-1 { background: rgba(var(--brandRgb), 0.58) !important; }
 html:not([data-theme="light"]) .lava-blob-2,
-[data-theme="dark"] .lava-blob-2 {
-  background: rgba(40, 130, 255, 0.22) !important;
-}
+[data-theme="dark"] .lava-blob-2 { background: rgba(var(--brandRgb), 0.42) !important; }
 html:not([data-theme="light"]) .lava-blob-3,
-[data-theme="dark"] .lava-blob-3 {
-  background: rgba(60, 190, 200, 0.16) !important;
-}
+[data-theme="dark"] .lava-blob-3 { background: rgba(var(--brandRgb), 0.30) !important; }
 html:not([data-theme="light"]) .lava-blob-4,
-[data-theme="dark"] .lava-blob-4 {
-  background: rgba(var(--brandRgb), 0.18) !important;
-}
+[data-theme="dark"] .lava-blob-4 { background: rgba(var(--brandRgb), 0.48) !important; }
 html:not([data-theme="light"]) .lava-blob-5,
-[data-theme="dark"] .lava-blob-5 {
-  background: rgba(100, 80, 220, 0.14) !important;
-}
-
-/* ── LIGHT MODE blobs: warm peach/amber ONLY — no cold purple/blue ─ */
-[data-theme="light"] #astro-lava {
-  filter: blur(110px) saturate(90%) !important;
-  opacity: 0.70 !important;
-}
-[data-theme="light"] .lava-blob-1 { background: rgba(255, 205, 170, 0.72) !important; }
-[data-theme="light"] .lava-blob-2 { background: rgba(255, 220, 185, 0.58) !important; }
-[data-theme="light"] .lava-blob-3 { background: rgba(255, 235, 200, 0.62) !important; }
-[data-theme="light"] .lava-blob-4 { background: rgba(245, 190, 145, 0.50) !important; }
-[data-theme="light"] .lava-blob-5 { background: rgba(255, 215, 180, 0.55) !important; }
+[data-theme="dark"] .lava-blob-5 { background: rgba(var(--brandRgb), 0.24) !important; }
+[data-theme="light"] .lava-blob-1 { background: rgba(var(--brandRgb), 0.68) !important; }
+[data-theme="light"] .lava-blob-2 { background: rgba(var(--brandRgb), 0.50) !important; }
+[data-theme="light"] .lava-blob-3 { background: rgba(var(--brandRgb), 0.38) !important; }
+[data-theme="light"] .lava-blob-4 { background: rgba(var(--brandRgb), 0.58) !important; }
+[data-theme="light"] .lava-blob-5 { background: rgba(var(--brandRgb), 0.30) !important; }
 
 
 /* ── AMBIENT: brighter, faster, more perceptible ─────────────── */
@@ -2435,6 +2407,28 @@ html[data-theme="light"] .card.vpn-card {
   }
   html[data-theme="light"] body::before {
     animation: none !important;
+  }
+}
+
+/* ── BACKDROP-FILTER FALLBACK ────────────────────────────────────
+   When backdrop-filter is unavailable (Telegram Desktop WebView,
+   older browsers), cards get a slightly higher opacity + accent
+   tint so they still look glassy rather than flat white/dark.    */
+@supports not (backdrop-filter: blur(1px)) {
+  [data-theme="light"] .card,
+  [data-theme="light"] .placeholder-card,
+  [data-theme="light"] .action-tile,
+  [data-theme="light"] .vpn-card,
+  [data-theme="light"] .shop-plan-card {
+    background: rgba(255, 255, 255, 0.72) !important;
+  }
+  html[data-theme="dark"] .card,
+  html:not([data-theme="light"]) .card,
+  html[data-theme="dark"] .action-tile,
+  html:not([data-theme="light"]) .action-tile,
+  html[data-theme="dark"] .shop-plan-card,
+  html:not([data-theme="light"]) .shop-plan-card {
+    background: rgba(10, 18, 34, 0.82) !important;
   }
 }
 

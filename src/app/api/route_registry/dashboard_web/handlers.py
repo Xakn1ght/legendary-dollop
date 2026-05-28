@@ -14,7 +14,8 @@ def _no_store_headers(resp: web.FileResponse) -> web.FileResponse:
 
 def build_dashboard_web_handlers(wd: Path):
     async def handle_dashboard_shop(request: web.Request):
-        return web.FileResponse(path=str(wd / "dashboard" / "shop.html"))
+        resp = web.FileResponse(path=str(wd / "dashboard" / "shop.html"))
+        return _no_store_headers(resp)
 
     async def handle_dashboard_purchase(request: web.Request):
         resp = web.FileResponse(path=str(wd / "dashboard" / "purchase.html"))
