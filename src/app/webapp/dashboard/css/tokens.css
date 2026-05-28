@@ -1,0 +1,323 @@
+/* ============================================================
+   ASTROBYTE design tokens
+   - Layered surfaces (base → elev-1 → elev-2 → elev-3)
+   - Theme: data-theme="dark" (default) | "light"
+   - Accent: data-accent="red" (default) | "cyan" | "emerald" | "violet" | "amber"
+   ============================================================ */
+
+:root {
+  /* ---------- Surface layers (DARK is default) ---------- */
+  --bg-base:    #0a141b;
+  --bg-elev-1:  #10202a;
+  --bg-elev-2:  #162a36;
+  --bg-elev-3:  #1d3543;
+  --surface-overlay: rgba(6, 12, 17, 0.62);
+
+  /* ---------- Text ---------- */
+  --text:       #F5F2EA;
+  --text-muted: #8a93a3;
+  --text-soft:  #c7ccd6;
+
+  /* ---------- Lines & dividers ---------- */
+  --line:        #1f3240;
+  --line-strong: #2a4253;
+  --divider:     rgba(255, 255, 255, 0.06);
+
+  /* ---------- Elevation / rings ---------- */
+  --shadow-1: 0 2px 6px rgba(0, 0, 0, 0.35), 0 1px 2px rgba(0, 0, 0, 0.25);
+  --shadow-2: 0 8px 22px rgba(0, 0, 0, 0.42), 0 3px 6px rgba(0, 0, 0, 0.28);
+  --shadow-3: 0 18px 44px rgba(0, 0, 0, 0.55), 0 6px 14px rgba(0, 0, 0, 0.35);
+  --ring:        0 0 0 2px rgba(var(--brandRgb), 0.35);
+  --ring-strong: 0 0 0 3px rgba(var(--brandRgb), 0.55);
+
+  /* ---------- Semantic ---------- */
+  --ok:   #34d399;
+  --warn: #fbbf24;
+  --bad:  #f87171;
+  --success: var(--ok);
+  --warning: var(--warn);
+  --okRgb: 52, 211, 153;
+
+  --purple: #a78bfa;
+  --blue:   #60a5fa;
+
+  /* ---------- Accent (default = red, overridden by [data-accent]) ---------- */
+  --brand:       #ec5652;
+  --brandDark:   #d43f3b;
+  --brandRgb:    236, 86, 82;
+  --brand-soft:  rgba(236, 86, 82, 0.14);
+  --brand-glow:  rgba(236, 86, 82, 0.32);
+
+  /* Legacy aliases so existing CSS keeps working */
+  --bg1:        var(--bg-base);
+  --bg2:        var(--bg-elev-1);
+  --panel:      var(--bg-elev-1);
+  --panel2:     var(--bg-elev-2);
+  --chip:       var(--bg-elev-1);
+  --chipHover:  var(--bg-elev-2);
+  --darkCard:   var(--bg-base);
+  --lightText:  var(--text);
+  --muted:      var(--text-muted);
+  --orange:     var(--brand);
+  --orangeGlow: var(--brand-glow);
+
+  /* ---------- Misc ---------- */
+  --transition-x: 50%;
+  --transition-y: 85%;
+  --transition-gradient: radial-gradient(
+    circle at center,
+    rgba(255, 255, 255, 0.18) 0%,
+    rgba(var(--brandRgb), 0.22) 38%,
+    rgba(10, 20, 27, 0.95) 100%
+  );
+  --space-1: 8px;
+  --space-2: 12px;
+  --space-3: 16px;
+  --space-4: 24px;
+  --space-5: 32px;
+  --stack-gap: var(--space-3);
+}
+
+/* ============================================================
+   LIGHT THEME
+   ============================================================ */
+[data-theme="light"] {
+  --bg-base:    rgba(255,255,255,0.22);
+  --bg-elev-1:  rgba(255,255,255,0.28);
+  --bg-elev-2:  rgba(255,255,255,0.18);
+  --bg-elev-3:  rgba(255,255,255,0.12);
+  --surface-overlay: rgba(255,255,255,0.55);
+
+  --text:       #1a2535;
+  --text-muted: #556070;
+  --text-soft:  #344056;
+
+  --line:        rgba(255,255,255,0.42);
+  --line-strong: rgba(255,255,255,0.65);
+  --divider:     rgba(255,255,255,0.30);
+
+  --shadow-1: 0 2px 8px rgba(15,23,42,0.08);
+  --shadow-2: 0 8px 24px rgba(15,23,42,0.10), 0 2px 8px rgba(15,23,42,0.06);
+  --shadow-3: 0 20px 48px rgba(15,23,42,0.14), 0 6px 16px rgba(15,23,42,0.08);
+
+  --ok:   #10b981;
+  --warn: #f59e0b;
+  --bad:  #ef4444;
+  --okRgb: 16, 185, 129;
+
+  --purple: #8b5cf6;
+  --blue:   #3b82f6;
+
+  --transition-gradient: radial-gradient(
+    circle at center,
+    rgba(255, 255, 255, 0.50) 0%,
+    rgba(var(--brandRgb), 0.18) 38%,
+    rgba(244, 246, 251, 0.95) 100%
+  );
+}
+
+/* ============================================================
+   ACCENTS — override --brand* tokens. Theme-agnostic.
+   ============================================================ */
+:root,
+[data-accent="red"] {
+  --brand:      #ec5652;
+  --brandDark:  #d43f3b;
+  --brandRgb:   236, 86, 82;
+  --brand-soft: rgba(236, 86, 82, 0.14);
+  --brand-glow: rgba(236, 86, 82, 0.32);
+}
+[data-accent="cyan"] {
+  --brand:      #22d3ee;
+  --brandDark:  #0ea5b7;
+  --brandRgb:   34, 211, 238;
+  --brand-soft: rgba(34, 211, 238, 0.14);
+  --brand-glow: rgba(34, 211, 238, 0.32);
+}
+[data-accent="emerald"] {
+  --brand:      #34d399;
+  --brandDark:  #10b981;
+  --brandRgb:   52, 211, 153;
+  --brand-soft: rgba(52, 211, 153, 0.14);
+  --brand-glow: rgba(52, 211, 153, 0.32);
+}
+[data-accent="violet"] {
+  --brand:      #a78bfa;
+  --brandDark:  #7c3aed;
+  --brandRgb:   167, 139, 250;
+  --brand-soft: rgba(167, 139, 250, 0.14);
+  --brand-glow: rgba(167, 139, 250, 0.32);
+}
+[data-accent="amber"] {
+  --brand:      #fbbf24;
+  --brandDark:  #d97706;
+  --brandRgb:   251, 191, 36;
+  --brand-soft: rgba(251, 191, 36, 0.14);
+  --brand-glow: rgba(251, 191, 36, 0.32);
+}
+
+/* ============================================================
+   GLOBAL BASE — lets the lava layer show through both themes
+   Use high-specificity selectors to beat page html,body rules
+   without !important cascade pollution.
+   ============================================================ */
+html[data-theme] {
+  background: #0a141b;
+}
+html[data-theme] body {
+  background: transparent;
+}
+html[data-theme="light"] {
+  background: #d4dff0;
+}
+
+/* Profile section glass — only where tokens.css applies */
+[data-theme="dark"] .profile-section,
+:root .profile-section {
+  background: rgba(16, 32, 42, 0.72);
+  backdrop-filter: blur(16px) saturate(110%);
+}
+[data-theme="light"] .profile-section {
+  background: rgba(255,255,255,0.30);
+  backdrop-filter: blur(22px) saturate(160%);
+  border-color: rgba(255,255,255,0.62);
+}
+
+/* ============================================================
+   LAVA LAMP BACKGROUND — both themes, different opacities.
+   position: fixed so it works behind every page/panel.
+   filter: blur on the CONTAINER keeps GPU cost low.
+   ============================================================ */
+#astro-lava {
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  overflow: hidden;
+  pointer-events: none;
+  filter: blur(80px) saturate(130%);
+  opacity: 0;
+  transition: opacity 1.2s ease;
+}
+/* Dark mode — nebula: moody deep-space atmosphere */
+:root #astro-lava,
+[data-theme="dark"] #astro-lava {
+  opacity: 1;
+  filter: blur(85px) saturate(115%);
+}
+/* Light mode — watercolor: soft drifting pastel washes */
+[data-theme="light"] #astro-lava {
+  opacity: 1;
+  filter: blur(105px) saturate(88%);
+}
+.lava-blob {
+  position: absolute;
+  border-radius: 50%;
+  will-change: transform;
+}
+
+/* --- LIGHT MODE blobs (watercolor palette — warm rose, lavender, sky, mint, peach) --- */
+[data-theme="light"] .lava-blob-1 {
+  background: rgba(255, 168, 180, 0.48);  /* soft rose / blush */
+}
+[data-theme="light"] .lava-blob-2 {
+  background: rgba(180, 160, 255, 0.42);  /* soft lavender */
+}
+[data-theme="light"] .lava-blob-3 {
+  background: rgba(130, 200, 255, 0.44);  /* soft sky blue */
+}
+[data-theme="light"] .lava-blob-4 {
+  background: rgba(140, 230, 200, 0.38);  /* soft mint / aqua */
+}
+[data-theme="light"] .lava-blob-5 {
+  background: rgba(255, 210, 170, 0.40);  /* warm peach */
+}
+
+/* --- DARK MODE blobs (deep-space nebula — visible but not harsh) --- */
+:root .lava-blob-1,
+[data-theme="dark"] .lava-blob-1 {
+  background: rgba(var(--brandRgb), 0.36);
+}
+:root .lava-blob-2,
+[data-theme="dark"] .lava-blob-2 {
+  background: rgba(34, 211, 238, 0.30);
+}
+:root .lava-blob-3,
+[data-theme="dark"] .lava-blob-3 {
+  background: rgba(139, 92, 246, 0.28);
+}
+:root .lava-blob-4,
+[data-theme="dark"] .lava-blob-4 {
+  background: rgba(16, 185, 129, 0.24);
+}
+:root .lava-blob-5,
+[data-theme="dark"] .lava-blob-5 {
+  background: rgba(56, 120, 200, 0.30);
+}
+
+/* --- SHARED blob sizes & positions & animations --- */
+.lava-blob-1 {
+  width: 55vw; height: 55vw;
+  max-width: 400px; max-height: 400px;
+  top: -8%; left: -6%;
+  animation: lava1 40s ease-in-out infinite;
+}
+.lava-blob-2 {
+  width: 48vw; height: 48vw;
+  max-width: 360px; max-height: 360px;
+  top: -6%; right: -8%;
+  animation: lava2 52s ease-in-out infinite;
+}
+.lava-blob-3 {
+  width: 52vw; height: 52vw;
+  max-width: 390px; max-height: 390px;
+  bottom: 8%; left: 4%;
+  animation: lava3 36s ease-in-out infinite;
+}
+.lava-blob-4 {
+  width: 44vw; height: 44vw;
+  max-width: 330px; max-height: 330px;
+  bottom: -4%; right: 4%;
+  animation: lava4 48s ease-in-out infinite;
+}
+.lava-blob-5 {
+  width: 38vw; height: 38vw;
+  max-width: 290px; max-height: 290px;
+  top: 38%; left: 28%;
+  animation: lava5 56s ease-in-out infinite;
+}
+
+@keyframes lava1 {
+  0%   { transform: translate(0, 0) scale(1); }
+  20%  { transform: translate(20vw, 18vh) scale(1.14); }
+  40%  { transform: translate(6vw, 50vh) scale(0.90); }
+  60%  { transform: translate(32vw, 32vh) scale(1.10); }
+  80%  { transform: translate(-4vw, 22vh) scale(1.06); }
+  100% { transform: translate(0, 0) scale(1); }
+}
+@keyframes lava2 {
+  0%   { transform: translate(0, 0) scale(1); }
+  25%  { transform: translate(-24vw, 28vh) scale(1.12); }
+  50%  { transform: translate(-10vw, 60vh) scale(0.88); }
+  75%  { transform: translate(-20vw, 14vh) scale(1.16); }
+  100% { transform: translate(0, 0) scale(1); }
+}
+@keyframes lava3 {
+  0%   { transform: translate(0, 0) scale(1); }
+  30%  { transform: translate(22vw, -22vh) scale(1.12); }
+  60%  { transform: translate(38vw, -6vh) scale(0.86); }
+  80%  { transform: translate(12vw, -32vh) scale(1.07); }
+  100% { transform: translate(0, 0) scale(1); }
+}
+@keyframes lava4 {
+  0%   { transform: translate(0, 0) scale(1); }
+  33%  { transform: translate(-28vw, -18vh) scale(1.14); }
+  66%  { transform: translate(-12vw, -44vh) scale(0.88); }
+  100% { transform: translate(0, 0) scale(1); }
+}
+@keyframes lava5 {
+  0%   { transform: translate(0, 0) scale(1); }
+  25%  { transform: translate(-16vw, 22vh) scale(1.18); }
+  50%  { transform: translate(20vw, -18vh) scale(0.82); }
+  75%  { transform: translate(-10vw, -28vh) scale(1.12); }
+  100% { transform: translate(0, 0) scale(1); }
+}

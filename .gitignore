@@ -1,0 +1,57 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyd
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+
+# Virtual environments
+venv/
+.venv/
+env/
+.envrc
+
+# Secrets / local config
+.env
+**/.env
+postgresql_connection.txt
+docs/notes/postgresql_connection.txt
+
+# Logs / artifacts
+logs/
+*.log
+artifacts/
+
+# Backups created by scripts
+backups/
+*.backup
+
+# Databases (keep these out of git; back them up via tar/backup scripts)
+*.db
+*.sqlite
+*.sqlite3
+
+# App runtime state / local data
+app/data/*.json
+app/webapp/admin/uploads/
+
+# Captured network traces / local misc
+misc/other/*.har
+misc/other/network-tab.txt
+
+# Editor/OS
+.vscode/
+.DS_Store
+
+# Large archives (keep these out of git history)
+*.zip
+
+# Local binaries
+bin/
+
+
+# Session/handoff notes
+handoff.md

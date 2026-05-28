@@ -1,0 +1,972 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover, interactive-widget=resizes-content" />
+  <title>AstroByte Mission Control</title>
+  <script src="https://telegram.org/js/telegram-web-app.js"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Urbanist:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/admin/admin.css?v=22">
+  <script src="/admin/admin_shared.js?v=1"></script>
+</head>
+<body class="admin-panel">
+
+  <!-- Loading Overlay -->
+  <div id="loadingOverlay" style="position: fixed; inset: 0; background: #0B0E14; z-index: 9999; display: none; align-items: center; justify-content: center; flex-direction: column; gap: 20px;">
+    <svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="var(--lime, #a4ff5a)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="overflow: visible; filter: drop-shadow(0 0 12px rgba(164, 255, 90, 0.5));"><g transform="translate(12 12) scale(0.82) translate(-12 -12)"><animateTransform attributeName="transform" type="rotate" from="360 12 12" to="0 12 12" dur="0.9s" repeatCount="indefinite" additive="sum"/><path d="M2.5 2v6h6M2.66 15.57a10 10 0 1 0 .57-8.38"/></g></svg>
+    <div style="font-size: 14px; color: var(--text-muted); letter-spacing: 1px;">LOADING MISSION CONTROL</div>
+  </div>
+
+  <!-- Login Screen -->
+  <div class="login-wrapper" id="loginScreen">
+    <div class="login-card">
+      <div style="width: 60px; height: 60px; background: linear-gradient(135deg, var(--primary), var(--accent)); border-radius: 16px; margin: 0 auto 24px; display: flex; align-items: center; justify-content: center; font-size: 32px; box-shadow: 0 0 30px var(--primary-glow);">🚀</div>
+      <h1 style="margin: 0 0 8px 0; font-size: 24px;">AstroByte Admin</h1>
+      <p style="color: var(--text-muted); margin: 0 0 32px 0;">Authentication Required</p>
+      
+      <div id="loginError" style="background: rgba(239, 68, 68, 0.1); color: var(--danger); padding: 12px; border-radius: 8px; margin-bottom: 20px; font-size: 13px; display: none;"></div>
+      
+      <form id="loginForm" autocomplete="on">
+        <div style="margin-bottom: 16px; text-align: left;">
+          <label for="chatId" style="display: block; font-size: 12px; color: var(--text-muted); margin-bottom: 6px; text-transform: uppercase; font-weight: 600;">Chat ID</label>
+          <input type="text" id="chatId" name="username" class="input-field" placeholder="Enter ID..." autocomplete="username" inputmode="text">
+        </div>
+        <div style="margin-bottom: 24px; text-align: left;">
+          <label for="password" style="display: block; font-size: 12px; color: var(--text-muted); margin-bottom: 6px; text-transform: uppercase; font-weight: 600;">Password</label>
+          <input type="password" id="password" name="password" class="input-field" placeholder="••••••••" autocomplete="current-password">
+        </div>
+        <div style="margin-bottom: 18px; text-align: left; display: flex; align-items: center; gap: 10px;">
+          <input type="checkbox" id="trustedDevice" style="width: 16px; height: 16px;">
+          <label for="trustedDevice" style="font-size: 13px; color: var(--text-muted); cursor: pointer;">
+            Trusted device (save login on this browser)
+          </label>
+        </div>
+        <button type="submit" class="btn btn-primary" style="width: 100%; padding: 14px;">Initiate Sequence</button>
+      </form>
+
+      <form id="twoFactorForm" style="display: none;" autocomplete="on">
+        <p style="color: var(--text-muted); margin-bottom: 20px;">Enter the 6-digit code sent to your device</p>
+        <input type="text" id="twoFactorCode" name="otp" class="input-field" placeholder="000000" maxlength="6" autocomplete="one-time-code" inputmode="numeric" pattern="[0-9]*" style="text-align: center; font-size: 24px; letter-spacing: 8px; margin-bottom: 24px;">
+        <button type="submit" class="btn btn-primary" style="width: 100%;">Verify Access</button>
+        <button type="button" onclick="backToLogin()" class="btn" style="width: 100%; margin-top: 12px; color: black;">Cancel</button>
+      </form>
+      
+      <div id="lockoutMessage" style="display: none;">
+        <h3 style="color: var(--danger);">Locked Out</h3>
+        <p style="color: var(--text-muted);">Try again in <span id="lockoutTimer">0</span>s</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- Admin Interface -->
+  <div class="app-container" id="adminPanel" style="display: none;">
+    <!-- Mobile Overlay -->
+    <div class="overlay" onclick="closeMobileMenu()"></div>
+
+    <!-- Sidebar -->
+    <aside class="sidebar" id="sidebar">
+      <div class="sidebar-header">
+        <a href="#" class="logo">
+          <div class="logo-icon">🚀</div>
+          <span>AstroByte</span>
+        </a>
+      </div>
+      
+      <div class="sidebar-content">
+        <div class="menu-section">
+          <div class="menu-title">Overview</div>
+          <div class="nav-item active" data-page="dashboard" onclick="navigateTo('dashboard')">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"></rect><rect x="14" y="3" width="7" height="7"></rect><rect x="14" y="14" width="7" height="7"></rect><rect x="3" y="14" width="7" height="7"></rect></svg>
+            <span>Dashboard</span>
+          </div>
+          <div class="nav-item" data-page="receipts" onclick="navigateTo('receipts')">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline></svg>
+            <span>Receipts</span>
+            <span id="receiptsBadge" style="margin-left: auto; background: var(--primary); color: white; padding: 2px 6px; border-radius: 4px; font-size: 10px; display: none;">0</span>
+          </div>
+        </div>
+
+        <div class="menu-section">
+          <div class="menu-title">Management</div>
+          <div class="nav-item" data-page="users" onclick="navigateTo('users')">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M23 21v-2a4 4 0 0 0-3-3.87"></path><path d="M16 3.13a4 4 0 0 1 0 7.75"></path></svg>
+            <span>Users</span>
+          </div>
+          <div class="nav-item" data-page="vip" onclick="navigateTo('vip')">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon></svg>
+            <span>VIP</span>
+          </div>
+          <div class="nav-item" data-page="subscriptions" onclick="navigateTo('subscriptions')">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="7" width="20" height="14" rx="2" ry="2"></rect><path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"></path></svg>
+            <span>Subscriptions</span>
+          </div>
+          <div class="nav-item" data-page="servers" onclick="navigateTo('servers')">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="2" width="20" height="8" rx="2" ry="2"></rect><rect x="2" y="14" width="20" height="8" rx="2" ry="2"></rect><line x1="6" y1="6" x2="6.01" y2="6"></line><line x1="6" y1="18" x2="6.01" y2="18"></line></svg>
+            <span>Servers</span>
+          </div>
+        </div>
+
+        <div class="menu-section">
+          <div class="menu-title">System</div>
+          <div class="nav-item" data-page="support" onclick="navigateTo('support')">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path></svg>
+            <span>Support Chat</span>
+            <span id="supportBadge" style="margin-left: auto; background: var(--primary); color: white; padding: 2px 6px; border-radius: 4px; font-size: 10px; display: none;">0</span>
+          </div>
+          <div class="nav-item" data-page="notifications" onclick="navigateTo('notifications')">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path><path d="M13.73 21a2 2 0 0 1-3.46 0"></path></svg>
+            <span>Notifications</span>
+          </div>
+          <div class="nav-item" data-page="settings" onclick="navigateTo('settings')">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>
+            <span>Settings</span>
+          </div>
+          <div class="nav-item" data-page="logs" onclick="navigateTo('logs')">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline></svg>
+            <span>Logs</span>
+          </div>
+          <div class="nav-item" data-page="database" onclick="navigateTo('database')">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><ellipse cx="12" cy="5" rx="9" ry="3"></ellipse><path d="M3 5v14c0 1.66 4.03 3 9 3s9-1.34 9-3V5"></path><path d="M3 12c0 1.66 4.03 3 9 3s9-1.34 9-3"></path></svg>
+            <span>Database</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="sidebar-footer">
+        <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 16px;">
+          <div id="adminAvatar" style="width: 40px; height: 40px; border-radius: 50%; background: var(--bg-card); display: flex; align-items: center; justify-content: center; font-weight: 700; border: 1px solid var(--border-subtle);">A</div>
+          <div>
+            <div id="adminName" style="font-size: 14px; font-weight: 600;">Admin</div>
+            <div style="font-size: 11px; color: var(--text-muted);">Super Admin</div>
+          </div>
+        </div>
+        <button onclick="logout()" class="btn btn-secondary" style="width: 100%; justify-content: flex-start;">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path><polyline points="16 17 21 12 16 7"></polyline><line x1="21" y1="12" x2="9" y2="12"></line></svg>
+          Log Out
+        </button>
+      </div>
+    </aside>
+
+    <!-- Main View -->
+    <main class="main-content">
+      <header class="top-bar">
+        <div style="display: flex; align-items: center; gap: 16px;">
+          <button class="mobile-toggle" onclick="toggleMobileMenu()">
+            <svg xmlns="http://www.w3.org/2000/svg" width="25" height="25" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="3" y1="12" x2="21" y2="12"></line><line x1="3" y1="6" x2="21" y2="6"></line><line x1="3" y1="18" x2="21" y2="18"></line></svg>
+          </button>
+          <div class="page-title">
+            <h1 id="pageTitle">Dashboard</h1>
+            <p id="pageSubtitle">System Overview</p>
+          </div>
+        </div>
+        <!-- Right side actions can go here -->
+      </header>
+
+      <div class="content-scroll">
+        
+        <!-- DASHBOARD -->
+        <div id="page-dashboard" class="page-content active">
+          <div class="stats-grid" id="statsGrid">
+            <!-- Stats loaded by JS -->
+          </div>
+          
+          <div class="glass-card">
+            <div class="table-header">
+              <h3 style="margin: 0; font-size: 16px;">Recent Activity</h3>
+            </div>
+            <div class="table-responsive">
+            <table id="recentActivity">
+              <thead>
+                <tr><th>User</th><th>Action</th><th>Time</th><th>Status</th></tr>
+              </thead>
+              <tbody>
+                <tr><td colspan="4" style="text-align: center; color: var(--text-muted); padding: 32px;">Loading activity...</td></tr>
+              </tbody>
+            </table>
+            </div>
+          </div>
+        </div>
+
+        <!-- DATABASE -->
+        <div id="page-database" class="page-content">
+          <div class="glass-card" style="margin-bottom: 16px;">
+            <div class="table-header" style="display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;">
+              <div>
+                <h3 style="margin:0;font-size:16px;">Database Explorer</h3>
+                <div style="font-size:12px;color:var(--text-muted);margin-top:6px;">
+                  Read-only by default. Enable writes only by setting <code>ADMIN_DB_DANGEROUS_SQL=1</code> on the server.
+                </div>
+              </div>
+              <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;">
+                <button class="btn btn-secondary" onclick="dbReload()" type="button">Refresh</button>
+              </div>
+            </div>
+          </div>
+
+          <div style="display:grid;grid-template-columns: 320px 1fr; gap:16px; align-items:start;">
+            <div class="glass-card" style="padding: 14px;">
+              <div style="display:flex; gap:10px; align-items:center; margin-bottom: 12px;">
+                <input id="dbTableSearch" class="input-field" placeholder="Search tables…" oninput="dbRenderTables()" />
+              </div>
+              <div id="dbTablesList" style="max-height: 65vh; overflow:auto; font-size: 13px;"></div>
+            </div>
+
+            <div>
+              <div class="glass-card" style="padding: 14px; margin-bottom: 16px;">
+                <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;">
+                  <div>
+                    <div style="font-weight:700;">Table</div>
+                    <div id="dbActiveTable" style="color:var(--text-muted);font-size:12px;">—</div>
+                  </div>
+                  <div style="display:flex;gap:10px;align-items:center;">
+                    <button class="btn btn-secondary" type="button" onclick="dbPrevPage()">← Prev</button>
+                    <div id="dbPageInfo" style="font-size:12px;color:var(--text-muted);">0–0</div>
+                    <button class="btn btn-secondary" type="button" onclick="dbNextPage()">Next →</button>
+                  </div>
+                </div>
+                <div id="dbTableMeta" style="margin-top:10px;color:var(--text-muted);font-size:12px;"></div>
+                <div class="table-responsive" style="margin-top:12px;">
+                  <table id="dbRowsTable">
+                    <thead><tr><th>—</th></tr></thead>
+                    <tbody><tr><td style="color:var(--text-muted);padding:18px;">Select a table.</td></tr></tbody>
+                  </table>
+                </div>
+              </div>
+
+              <div class="glass-card" style="padding: 14px;">
+                <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;">
+                  <div style="font-weight:700;">SQL Runner</div>
+                  <div style="display:flex; gap:10px; align-items:center; flex-wrap:wrap;">
+                    <button class="btn btn-primary" type="button" onclick="dbRunQuery(false)">Run (read-only)</button>
+                    <button class="btn btn-danger" id="dbExecBtn" type="button" onclick="dbRunQuery(true)" style="display:none;">Execute (danger)</button>
+                  </div>
+                </div>
+                <textarea id="dbSqlInput" class="input-field" style="width:100%;min-height:130px;margin-top:10px;font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace; font-size: 12px;" placeholder="SELECT * FROM users LIMIT 50"></textarea>
+                <div id="dbQueryHint" style="margin-top:8px;font-size:12px;color:var(--text-muted);"></div>
+                <div class="table-responsive" style="margin-top:12px;">
+                  <table id="dbQueryTable">
+                    <thead><tr><th>—</th></tr></thead>
+                    <tbody><tr><td style="color:var(--text-muted);padding:18px;">Run a query.</td></tr></tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- USERS -->
+        <div id="page-users" class="page-content">
+          <div class="filter-bar glass-card">
+            <div class="search-wrapper">
+              <svg class="search-icon" xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
+              <input type="text" id="userSearch" class="search-input" placeholder="Search users..." oninput="searchUsers()">
+            </div>
+            <div class="filter-controls">
+              <!-- Custom dropdown with SVG icons (icon-only compact button) -->
+              <div class="custom-select custom-select-icon-only" id="userSortDropdown">
+                <button type="button" class="custom-select-btn" onclick="toggleCustomSelect('userSortDropdown')" title="Sort by: Newest">
+                  <span class="custom-select-icon">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="8.5" cy="7" r="4"/><line x1="20" y1="8" x2="20" y2="14"/><line x1="23" y1="11" x2="17" y2="11"/></svg>
+                  </span>
+                </button>
+                <div class="custom-select-menu">
+                  <div class="custom-select-option selected" data-value="created" onclick="selectUserSort('created', 'Newest', this)">
+                    <span class="opt-icon"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="8.5" cy="7" r="4"/><line x1="20" y1="8" x2="20" y2="14"/><line x1="23" y1="11" x2="17" y2="11"/></svg></span>
+                    <span>Newest</span>
+                  </div>
+                  <div class="custom-select-option" data-value="credit" onclick="selectUserSort('credit', 'Credit ↓', this)">
+                    <span class="opt-icon"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M16 8h-6a2 2 0 1 0 0 4h4a2 2 0 1 1 0 4H8"/><path d="M12 18V6"/></svg></span>
+                    <span>Credit ↓</span>
+                  </div>
+                  <div class="custom-select-option" data-value="credit_asc" onclick="selectUserSort('credit_asc', 'Credit ↑', this)">
+                    <span class="opt-icon"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M16 8h-6a2 2 0 1 0 0 4h4a2 2 0 1 1 0 4H8"/><path d="M12 18V6"/></svg></span>
+                    <span>Credit ↑</span>
+                  </div>
+                  <div class="custom-select-option" data-value="username" onclick="selectUserSort('username', 'Username', this)">
+                    <span class="opt-icon"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg></span>
+                    <span>Username</span>
+                  </div>
+                  <div class="custom-select-option" data-value="level" onclick="selectUserSort('level', 'Level', this)">
+                    <span class="opt-icon"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg></span>
+                    <span>Level</span>
+                  </div>
+                </div>
+                <input type="hidden" id="userSort" value="created">
+              </div>
+              <button class="refresh-btn" onclick="refreshUsers()" title="Refresh">
+                <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2.5 2v6h6M2.66 15.57a10 10 0 1 0 .57-8.38"/></svg>
+              </button>
+            </div>
+          </div>
+
+          <div id="usersGrid" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 16px; padding-top: 20px;">
+            <!-- User Cards JS -->
+          </div>
+          
+          <div class="pagination-bar glass-card" style="margin-top: 24px; padding: 12px 16px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px;">
+            <span id="userPagination" style="font-size: 13px; color: var(--text-muted);">Showing 0 users</span>
+            <div style="display: flex; gap: 10px; align-items: center;">
+              <button id="userPrevBtn" class="btn btn-secondary" onclick="prevUserPage()" disabled style="min-width: 70px;">← Prev</button>
+              <select id="userPageSelect" class="input-field" style="width: auto; min-width: 90px; text-align: center;" onchange="goToUserPage(this.value)">
+                <option value="0">Page 1</option>
+              </select>
+              <button id="userNextBtn" class="btn btn-secondary" onclick="nextUserPage()" style="min-width: 70px;">Next →</button>
+            </div>
+          </div>
+          <table id="usersTable" style="display: none;"><tbody></tbody></table>
+        </div>
+
+        <!-- SUBSCRIPTIONS -->
+        <div id="page-subscriptions" class="page-content">
+          <div class="filter-bar glass-card">
+            <div class="search-wrapper">
+              <svg class="search-icon" xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
+              <input type="text" id="subSearch" class="search-input" placeholder="Search subscriptions..." oninput="searchSubscriptions()">
+            </div>
+            <div class="filter-controls">
+              <!-- Bulk Select Toggle Button -->
+              <button class="bulk-select-btn" id="bulkSelectToggle" onclick="toggleBulkSelectMode()" title="Bulk Select">
+                <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 11 12 14 22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
+              </button>
+              <!-- Custom dropdown with SVG icons (icon-only compact button) -->
+              <div class="custom-select custom-select-icon-only" id="subSortDropdown">
+                <button type="button" class="custom-select-btn" onclick="toggleCustomSelect('subSortDropdown')" title="Sort by">
+                  <span class="custom-select-icon">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="8.5" cy="7" r="4"/><line x1="20" y1="8" x2="20" y2="14"/><line x1="23" y1="11" x2="17" y2="11"/></svg>
+                  </span>
+                </button>
+                <div class="custom-select-menu">
+                  <div class="custom-select-option selected" data-value="created" data-icon="user-plus" onclick="selectSubSort('created', 'Created (new)', this)">
+                    <span class="opt-icon"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="8.5" cy="7" r="4"/><line x1="20" y1="8" x2="20" y2="14"/><line x1="23" y1="11" x2="17" y2="11"/></svg></span>
+                    <span>Created (new)</span>
+                  </div>
+                  <div class="custom-select-option" data-value="created_asc" data-icon="user-clock" onclick="selectSubSort('created_asc', 'Created (old)', this)">
+                    <span class="opt-icon"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg></span>
+                    <span>Created (old)</span>
+                  </div>
+                  <div class="custom-select-option" data-value="expire" data-icon="hourglass" onclick="selectSubSort('expire', 'Expiry (soon)', this)">
+                    <span class="opt-icon"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 22h14"/><path d="M5 2h14"/><path d="M17 22v-4.172a2 2 0 0 0-.586-1.414L12 12l-4.414 4.414A2 2 0 0 0 7 17.828V22"/><path d="M7 2v4.172a2 2 0 0 0 .586 1.414L12 12l4.414-4.414A2 2 0 0 0 17 6.172V2"/></svg></span>
+                    <span>Expiry (soon)</span>
+                  </div>
+                  <div class="custom-select-option" data-value="expire_desc" data-icon="calendar" onclick="selectSubSort('expire_desc', 'Expiry (later)', this)">
+                    <span class="opt-icon"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg></span>
+                    <span>Expiry (later)</span>
+                  </div>
+                  <div class="custom-select-option" data-value="used" data-icon="download" onclick="selectSubSort('used', 'Traffic ↓', this)">
+                    <span class="opt-icon"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg></span>
+                    <span>Traffic ↓</span>
+                  </div>
+                  <div class="custom-select-option" data-value="used_asc" data-icon="upload" onclick="selectSubSort('used_asc', 'Traffic ↑', this)">
+                    <span class="opt-icon"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg></span>
+                    <span>Traffic ↑</span>
+                  </div>
+                  <div class="custom-select-option" data-value="username" data-icon="user" onclick="selectSubSort('username', 'Username', this)">
+                    <span class="opt-icon"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg></span>
+                    <span>Username</span>
+                  </div>
+                </div>
+                <input type="hidden" id="subSort" value="created">
+              </div>
+              <button class="refresh-btn" onclick="refreshSubscriptions()" id="subRefreshBtn" title="Refresh">
+                <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2.5 2v6h6M2.66 15.57a10 10 0 1 0 .57-8.38"/></svg>
+              </button>
+            </div>
+          </div>
+
+          <!-- Bulk Actions Bar (hidden by default) -->
+          <div class="bulk-actions-bar glass-card" id="bulkActionsBar" style="display: none;">
+            <div class="bulk-actions-left">
+              <label class="bulk-checkbox-wrapper" title="Select All">
+                <input type="checkbox" id="bulkSelectAll" onchange="toggleSelectAll(this.checked)">
+                <span class="bulk-checkbox-custom"></span>
+              </label>
+              <span class="bulk-count" id="bulkSelectedCount">0 selected</span>
+            </div>
+            <div class="bulk-actions-right">
+              <button class="bulk-action-btn" onclick="bulkEnable()" title="Enable Selected">
+                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+                <span>Enable</span>
+              </button>
+              <button class="bulk-action-btn" onclick="bulkDisable()" title="Disable Selected">
+                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="4.93" y1="4.93" x2="19.07" y2="19.07"/></svg>
+                <span>Disable</span>
+              </button>
+              <button class="bulk-action-btn" onclick="bulkResetTraffic()" title="Reset Traffic">
+                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2.5 2v6h6M2.66 15.57a10 10 0 1 0 .57-8.38"/></svg>
+                <span>Reset</span>
+              </button>
+              <button class="bulk-action-btn bulk-action-danger" onclick="bulkDelete()" title="Delete Selected">
+                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/></svg>
+                <span>Delete</span>
+              </button>
+              <button class="bulk-action-btn bulk-action-close" onclick="toggleBulkSelectMode()" title="Cancel">
+                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+              </button>
+            </div>
+          </div>
+
+          <!-- Stats bar -->
+          <div class="stats-grid" style="padding-top: 20px; margin-bottom: 20px; display: flex; gap: 12px; flex-wrap: nowrap; align-items: stretch; justify-content: center;">
+            <div class="glass-card stat-card" style="padding: 16px; flex: 1 1 0; min-width: 0; min-height: 72px; display: flex; flex-direction: column; justify-content: center; align-items: center;">
+              <div class="stat-value" id="subTotalUsers" style="font-size: 22px;">0</div>
+              <div class="stat-label">Total Users</div>
+            </div>
+            <div class="glass-card stat-card" style="padding: 16px; flex: 1 1 0; min-width: 0; min-height: 72px; display: flex; flex-direction: column; justify-content: center; align-items: center;">
+              <div class="stat-value" id="subActiveUsers" style="font-size: 22px; color: var(--success);">0</div>
+              <div class="stat-label">Active</div>
+            </div>
+            <div class="glass-card stat-card" style="padding: 16px; flex: 1 1 0; min-width: 0; min-height: 72px; display: flex; flex-direction: column; justify-content: center; align-items: center;">
+              <div class="stat-value" id="subOnlineUsers" style="font-size: 22px; color: var(--lime);">0</div>
+              <div class="stat-label">Online Now</div>
+            </div>
+          </div>
+
+          <div id="vpnGrid" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 12px;">
+            <!-- VPN Cards JS -->
+          </div>
+          
+          <div class="pagination-bar glass-card" style="margin-top: 24px; padding: 12px 16px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px;">
+            <span id="subPagination" style="font-size: 13px; color: var(--text-muted);">Showing 0</span>
+            <div style="display: flex; gap: 10px; align-items: center;">
+              <button id="subPrevBtn" class="btn btn-secondary" onclick="prevSubPage()" disabled style="min-width: 70px;">← Prev</button>
+              <select id="subPageSelect" class="input-field" style="width: auto; min-width: 90px; text-align: center;" onchange="goToSubPage(this.value)">
+                <option value="0">Page 1</option>
+              </select>
+              <button id="subNextBtn" class="btn btn-secondary" onclick="nextSubPage()" style="min-width: 70px;">Next →</button>
+            </div>
+          </div>
+          <table id="subscriptionsTable" style="display: none;"><tbody></tbody></table>
+        </div>
+
+        <!-- SERVERS -->
+        <div id="page-servers" class="page-content">
+          <div class="stats-grid">
+             <div class="glass-card stat-card">
+               <div class="stat-label">Total Servers</div>
+               <div class="stat-value" id="totalServers">0</div>
+               <div class="stat-change positive" id="onlineServers">Checking...</div>
+             </div>
+             <div class="glass-card stat-card">
+               <div class="stat-label">Total Traffic</div>
+               <div class="stat-value" id="totalTraffic">0 GB</div>
+             </div>
+             <div class="glass-card stat-card">
+               <div class="stat-label">Active Users</div>
+               <div class="stat-value" id="totalServerUsers">0</div>
+             </div>
+          </div>
+          
+          <div id="serversGrid" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 20px;">
+            <!-- Server Cards JS -->
+          </div>
+           <table id="serversTable" style="display: none;"><tbody></tbody></table>
+        </div>
+
+        <!-- VIP MANAGEMENT -->
+        <div id="page-vip" class="page-content">
+          <!-- VIP Stats -->
+          <div class="stats-grid" style="margin-bottom: 24px;">
+            <div class="glass-card stat-card">
+              <div class="stat-label">Total VIP</div>
+              <div class="stat-value" id="vipTotalCount">0</div>
+            </div>
+            <div class="glass-card stat-card">
+              <div class="stat-label">Lifetime VIP</div>
+              <div class="stat-value" id="vipLifetimeCount" style="color: var(--lime);">0</div>
+            </div>
+            <div class="glass-card stat-card">
+              <div class="stat-label">Expiring Soon</div>
+              <div class="stat-value" id="vipExpiringSoon" style="color: var(--warning);">0</div>
+            </div>
+          </div>
+
+          <!-- Add VIP Section -->
+          <div class="glass-card" style="margin-bottom: 24px; padding: 20px;">
+            <h3 style="margin: 0 0 16px 0; font-size: 16px; display: flex; align-items: center; gap: 8px;">
+              <svg viewBox="0 0 24 24" fill="none" stroke="var(--lime)" stroke-width="2" width="20" height="20"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon></svg>
+              Add VIP User
+            </h3>
+            <div style="display: flex; gap: 12px; flex-wrap: wrap; align-items: flex-end;">
+              <div style="flex: 1; min-width: 200px; position: relative;">
+                <label style="display: block; font-size: 12px; color: var(--text-muted); margin-bottom: 6px;">Search User</label>
+                <input type="text" id="vipSearchInput" class="input-field" placeholder="Username, name or chat ID..." oninput="searchUserForVip()" autocomplete="off">
+                <div id="vipSearchResults" class="vip-search-results" style="display: none;"></div>
+              </div>
+              <div style="min-width: 140px;">
+                <label style="display: block; font-size: 12px; color: var(--text-muted); margin-bottom: 6px;">Duration</label>
+                <select id="vipDuration" class="input-field">
+                  <option value="0">Lifetime</option>
+                  <option value="7">7 Days</option>
+                  <option value="30" selected>30 Days</option>
+                  <option value="90">90 Days</option>
+                  <option value="180">6 Months</option>
+                  <option value="365">1 Year</option>
+                </select>
+              </div>
+              <button class="btn btn-primary" onclick="addVipFromSearch()" id="addVipBtn" disabled style="height: 44px;">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon></svg>
+                Grant VIP
+              </button>
+            </div>
+          </div>
+
+          <!-- VIP Users List -->
+          <div class="glass-card">
+            <div class="table-header" style="display: flex; justify-content: space-between; align-items: center;">
+              <h3 style="margin: 0; font-size: 16px;">VIP Users</h3>
+              <button class="btn btn-secondary" onclick="loadVipUsers()" title="Refresh">
+                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2.5 2v6h6M2.66 15.57a10 10 0 1 0 .57-8.38"/></svg>
+              </button>
+            </div>
+            <div class="table-responsive">
+              <table id="vipUsersTable">
+                <thead>
+                  <tr>
+                    <th>User</th>
+                    <th>Chat ID</th>
+                    <th>Status</th>
+                    <th>Expires</th>
+                    <th>Actions</th>
+                  </tr>
+                </thead>
+                <tbody id="vipUsersBody">
+                  <tr><td colspan="5" style="text-align: center; color: var(--text-muted); padding: 32px;">Loading VIP users...</td></tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+
+        <!-- RECEIPTS -->
+        <div id="page-receipts" class="page-content">
+          <div class="glass-card receipts-shell">
+            <div class="table-header receipts-header">
+              <div>
+                <h3 style="margin: 0;">Pending Approvals</h3>
+                <div id="receiptCountLabel" class="receipts-subtitle">0 pending</div>
+              </div>
+              <div class="receipts-actions">
+                <div class="receipts-search">
+                  <input id="receiptSearch" class="input-field" type="text" placeholder="Search by user, username, plan, service…">
+                  <span class="receipts-search-ico">🔎</span>
+                </div>
+                <select id="receiptSource" class="input-field" style="width:auto;">
+                  <option value="all">All</option>
+                  <option value="web">Web</option>
+                  <option value="telegram">Telegram</option>
+                </select>
+                <select id="receiptSort" class="input-field" style="width:auto;">
+                  <option value="newest">Newest</option>
+                  <option value="oldest">Oldest</option>
+                  <option value="price_high">Price (high)</option>
+                  <option value="price_low">Price (low)</option>
+                </select>
+              <button class="btn btn-primary" onclick="loadReceipts()" title="Refresh"><svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2.5 2v6h6M2.66 15.57a10 10 0 1 0 .57-8.38"/></svg></button>
+            </div>
+            </div>
+            <div id="receiptsContainer" class="receipts-list">
+              <!-- Receipts JS -->
+            </div>
+          </div>
+
+          <!-- Receipt details drawer -->
+          <div class="drawer-backdrop" id="receiptDrawerBackdrop" onclick="event.target === event.currentTarget && closeReceiptDrawer()"></div>
+          <div class="img-backdrop" id="receiptImgBackdrop" onclick="closeReceiptImage()">
+            <img id="receiptImgModal" alt="Receipt image" onclick="event.stopPropagation()" />
+          </div>
+          <aside class="receipt-drawer" id="receiptDrawer" aria-hidden="true" onclick="event.stopPropagation()">
+            <div class="receipt-drawer-head">
+              <div>
+                <div class="receipt-drawer-title">Receipt Details</div>
+                <div class="receipt-drawer-sub" id="receiptDrawerSub">—</div>
+              </div>
+              <button class="mini-close" type="button" onclick="closeReceiptDrawer()" aria-label="Close">✕</button>
+            </div>
+            <div class="receipt-drawer-body" id="receiptDrawerBody">
+              <!-- JS -->
+            </div>
+            <div class="receipt-drawer-actions">
+              <button class="btn btn-primary" id="receiptDrawerApproveBtn" type="button">Approve</button>
+              <button class="btn btn-secondary receipt-deny" id="receiptDrawerDenyBtn" type="button">Deny</button>
+            </div>
+          </aside>
+        </div>
+
+        <!-- NOTIFICATIONS -->
+        <div id="page-notifications" class="page-content">
+          <div class="broadcast-grid">
+          <!-- Broadcast Form Card -->
+          <div class="broadcast-card glass-card">
+            <div class="broadcast-header">
+              <div class="broadcast-header-icon">
+                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m3 11 18-5v12L3 13v-2z"/><path d="M11.6 16.8a3 3 0 1 1-5.8-1.6"/></svg>
+              </div>
+              <div>
+                <h3 class="broadcast-title">Broadcast Message</h3>
+                <p class="broadcast-subtitle">Send announcements to your users</p>
+              </div>
+            </div>
+            
+            <form id="notificationForm" onsubmit="sendNotification(event); return false;" class="broadcast-form">
+              <!-- Title Input -->
+              <div class="broadcast-field">
+                <label class="broadcast-label">Title</label>
+                <input type="text" id="notifTitle" class="broadcast-input" placeholder="Enter announcement title...">
+              </div>
+              
+              <!-- Message Input -->
+              <div class="broadcast-field">
+                <label class="broadcast-label">Message</label>
+                <textarea id="notifMessage" class="broadcast-input broadcast-textarea" rows="4" placeholder="Write your message here..."></textarea>
+              </div>
+              
+              <!-- Recipients Selection -->
+              <div class="broadcast-field">
+                <label class="broadcast-label">Recipients</label>
+                <div class="recipient-options">
+                  <div id="recipientAll" class="recipient-option selected" onclick="selectRecipientType('all')">
+                    <div class="recipient-icon">
+                      <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M12,16a4,4,0,1,1,4-4A4,4,0,0,1,12,16Zm0-6a2,2,0,1,0,2,2A2,2,0,0,0,12,10Zm6,13A6,6,0,0,0,6,23a1,1,0,0,0,2,0,4,4,0,0,1,8,0,1,1,0,0,0,2,0ZM18,8a4,4,0,1,1,4-4A4,4,0,0,1,18,8Zm0-6a2,2,0,1,0,2,2A2,2,0,0,0,18,2Zm6,13a6.006,6.006,0,0,0-6-6,1,1,0,0,0,0,2,4,4,0,0,1,4,4,1,1,0,0,0,2,0ZM6,8a4,4,0,1,1,4-4A4,4,0,0,1,6,8ZM6,2A2,2,0,1,0,8,4,2,2,0,0,0,6,2ZM2,15a4,4,0,0,1,4-4A1,1,0,0,0,6,9a6.006,6.006,0,0,0-6,6,1,1,0,0,0,2,0Z"/></svg>
+                    </div>
+                    <span>All Users</span>
+                  </div>
+                  <div id="recipientSpecific" class="recipient-option" onclick="selectRecipientType('specific')">
+                    <div class="recipient-icon">
+                      <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="m7.5 13a4.5 4.5 0 1 1 4.5-4.5 4.505 4.505 0 0 1 -4.5 4.5zm0-7a2.5 2.5 0 1 0 2.5 2.5 2.5 2.5 0 0 0 -2.5-2.5zm7.5 17v-.5a7.5 7.5 0 0 0 -15 0v.5a1 1 0 0 0 2 0v-.5a5.5 5.5 0 0 1 11 0v.5a1 1 0 0 0 2 0zm9-5a7 7 0 0 0 -11.667-5.217 1 1 0 1 0 1.334 1.49 5 5 0 0 1 8.333 3.727 1 1 0 0 0 2 0zm-6.5-9a4.5 4.5 0 1 1 4.5-4.5 4.505 4.505 0 0 1 -4.5 4.5zm0-7a2.5 2.5 0 1 0 2.5 2.5 2.5 2.5 0 0 0 -2.5-2.5z"/></svg>
+                    </div>
+                    <span>Specific Users</span>
+                  </div>
+                </div>
+                <input type="hidden" id="notifTarget" value="all">
+              </div>
+              
+              <!-- User Selection (Hidden by default) -->
+              <div id="userIdInputContainer" class="broadcast-field user-select-container" style="display: none;">
+                <div class="user-search-wrapper">
+                  <svg class="user-search-icon" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
+                  <input type="text" id="userSearchInput" class="broadcast-input user-search-input" placeholder="Search users..." oninput="filterUserList()">
+                </div>
+                <div id="selectedUserCount" class="selected-user-count" style="display: none;">
+                  <span id="selectedCountText">0 selected</span>
+                  <button type="button" onclick="clearAllUsers()" class="clear-users-btn">Clear all</button>
+                </div>
+                <div id="userListContainer" class="user-list-container">
+                  <!-- User list populated by JS -->
+                </div>
+                <input type="hidden" id="notifUserIds">
+              </div>
+              
+              <!-- Channel Selection -->
+              <div class="broadcast-field">
+                <label class="broadcast-label">Channels</label>
+                <div class="channel-options">
+                  <label class="channel-checkbox" id="channelWebApp">
+                    <input type="checkbox" id="notifWebApp" checked>
+                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M16.2 7.8l-2 6.3-6.4 2.1 2-6.3z"/></svg>
+                    <span>Dashboard</span>
+                  </label>
+                  <label class="channel-checkbox" id="channelBot">
+                    <input type="checkbox" id="notifBot">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="m21,23c0,.553-.448,1-1,1s-1-.447-1-1c0-2.206-1.794-4-4-4h-6c-2.206,0-4,1.794-4,4,0,.553-.448,1-1,1s-1-.447-1-1c0-3.309,2.691-6,6-6h6c3.309,0,6,2.691,6,6Zm1-15.5v2c0,.827-.673,1.5-1.5,1.5h-.5c0,2.206-1.794,4-4,4h-8c-2.206,0-4-1.794-4-4h-.5c-.827,0-1.5-.673-1.5-1.5v-2c0-.827.673-1.5,1.5-1.5h.5c0-2.206,1.794-4,4-4h3v-1c0-.553.448-1,1-1s1,.447,1,1v1h3c2.206,0,4,1.794,4,4h.5c.827,0,1.5.673,1.5,1.5Zm-4-1.5c0-1.103-.897-2-2-2h-8c-1.103,0-2,.897-2,2v5c0,1.103.897,2,2,2h8c1.103,0,2-.897,2-2v-5Zm-8.5,1c-.828,0-1.5.672-1.5,1.5s.672,1.5,1.5,1.5,1.5-.672,1.5-1.5-.672-1.5-1.5-1.5Zm5,0c-.828,0-1.5.672-1.5,1.5s.672,1.5,1.5,1.5,1.5-.672,1.5-1.5-.672-1.5-1.5-1.5Z"/></svg>
+                    <span>Telegram</span>
+                  </label>
+                </div>
+              </div>
+              
+              <!-- Action Buttons -->
+              <div class="broadcast-actions">
+                <button type="submit" id="sendNotifBtn" class="btn btn-primary btn-3d broadcast-send-btn">
+                  <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m22 2-7 20-4-9-9-4Z"/><path d="M22 2 11 13"/></svg>
+                  Send Broadcast
+                </button>
+                <button type="button" onclick="clearNotificationForm()" class="btn btn-secondary btn-3d">Clear</button>
+              </div>
+              <div id="notifResult" style="display: none;"></div>
+            </form>
+          </div>
+          
+          <!-- Recent Broadcasts Card -->
+          <div class="broadcast-card glass-card recent-broadcasts-card">
+            <div class="broadcast-header">
+              <div class="broadcast-header-icon">
+                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+              </div>
+              <div>
+                <h3 class="broadcast-title">Recent Broadcasts</h3>
+                <p class="broadcast-subtitle">History of sent messages</p>
+              </div>
+              <button onclick="loadRecentBroadcasts()" class="refresh-btn btn-3d" title="Refresh" style="margin-left: auto;">
+                <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2.5 2v6h6M2.66 15.57a10 10 0 1 0 .57-8.38"/></svg>
+              </button>
+            </div>
+            <div id="recentBroadcastsList" class="broadcasts-list"></div>
+          </div>
+          </div>
+        </div>
+
+        <!-- LOGS -->
+        <div id="page-logs" class="page-content">
+          <div class="glass-card">
+            <div class="table-header">
+              <h3>System Logs</h3>
+              <div style="display: flex; gap: 12px;">
+                <select id="logLevel" class="input-field" style="width: auto;" onchange="filterLogs()">
+                  <option value="all">All Levels</option>
+                  <option value="ERROR">Errors</option>
+                </select>
+                <input type="text" id="logSearch" class="input-field" style="width: 200px;" placeholder="Search logs..." onkeyup="searchLogs()">
+                <button class="btn btn-primary" onclick="refreshLogs()" title="Refresh"><svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2.5 2v6h6M2.66 15.57a10 10 0 1 0 .57-8.38"/></svg></button>
+              </div>
+            </div>
+            <div id="logsContainer" style="padding: 20px; font-family: monospace; font-size: 13px; color: var(--text-muted); height: 500px; overflow-y: auto;">
+              Loading...
+            </div>
+          </div>
+        </div>
+
+        <!-- SETTINGS -->
+        <div id="page-settings" class="page-content">
+          <div class="settings-subtitle">System settings • Expand a category to edit</div>
+
+          <div class="settings-search">
+            <div class="settings-search-box">
+              <input id="settingsSearch" class="input-field" type="text" placeholder="Search settings (plans, packages, payment, jobs, sessions)…">
+              <span class="settings-search-ico">🔎</span>
+          </div>
+            <button id="settingsSearchClear" class="btn btn-secondary" type="button">Clear</button>
+          </div>
+          <div id="settingsSearchHint" class="settings-search-hint" style="display:none;">No matches</div>
+
+          <div class="settings-accordion">
+            <details class="settings-group glass-card" id="settingsGroupPlans" data-tab="plans">
+              <summary>
+                <div class="settings-group-header">
+                  <div class="settings-group-icon">📋</div>
+                  <div class="settings-group-text">
+                    <div class="settings-group-title">Plans</div>
+                    <div class="settings-group-desc">Manage subscription plans shown to users</div>
+                  </div>
+                </div>
+                <svg class="settings-group-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg>
+              </summary>
+              <div class="settings-group-body">
+                <div class="table-header">
+                  <h3>Subscription Plans</h3>
+                  <div style="display: flex; gap: 8px;">
+                     <button onclick="addPlan()" class="btn btn-secondary">+ Add</button>
+                     <button onclick="savePlans()" class="btn btn-primary">Save</button>
+                  </div>
+                </div>
+                <div id="plansEditor" style="padding: 20px;"></div>
+              </div>
+            </details>
+
+            <details class="settings-group glass-card" id="settingsGroupCharge" data-tab="charge">
+              <summary>
+                <div class="settings-group-header">
+                  <div class="settings-group-icon">📦</div>
+                  <div class="settings-group-text">
+                    <div class="settings-group-title">Packages</div>
+                    <div class="settings-group-desc">One-time charge packages (price, GB, days)</div>
+                  </div>
+                </div>
+                <svg class="settings-group-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg>
+              </summary>
+              <div class="settings-group-body">
+                <div class="table-header">
+                  <h3>Charge Packages</h3>
+                  <div style="display: flex; gap: 8px;">
+                    <button onclick="addChargePackage()" class="btn btn-secondary">+ Add</button>
+                    <button onclick="saveChargePackages()" class="btn btn-primary">Save</button>
+                  </div>
+                </div>
+                <div id="chargePackagesEditor" style="padding: 20px;"></div>
+              </div>
+            </details>
+
+            <details class="settings-group glass-card" id="settingsGroupPayment" data-tab="payment">
+              <summary>
+                <div class="settings-group-header">
+                  <div class="settings-group-icon">💳</div>
+                  <div class="settings-group-text">
+                    <div class="settings-group-title">Payment</div>
+                    <div class="settings-group-desc">Payment card configuration for billing</div>
+                  </div>
+                </div>
+                <svg class="settings-group-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg>
+              </summary>
+              <div class="settings-group-body">
+                <div class="table-header">
+                  <h3>Payment Configuration</h3>
+                  <div>
+                    <button onclick="savePaymentSettings()" class="btn btn-primary">Save Settings</button>
+                  </div>
+                </div>
+                <div style="padding: 20px 24px;">
+                  <div style="margin: 0 0 20px 0;">
+                    <label style="display: block; margin-bottom: 8px;">Card Number</label>
+                    <input type="text" id="paymentCardNumber" class="input-field">
+                  </div>
+                  <div style="margin: 0;">
+                    <label style="display: block; margin-bottom: 8px;">Holder Name</label>
+                    <input type="text" id="paymentCardHolder" class="input-field">
+                  </div>
+                </div>
+              </div>
+            </details>
+
+            <details class="settings-group glass-card" id="settingsGroupJobs" data-tab="jobs">
+              <summary>
+                <div class="settings-group-header">
+                  <div class="settings-group-icon">⚙️</div>
+                  <div class="settings-group-text">
+                    <div class="settings-group-title">Jobs</div>
+                    <div class="settings-group-desc">Background schedules (sync, cleanup, etc.)</div>
+                  </div>
+                </div>
+                <svg class="settings-group-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg>
+              </summary>
+              <div class="settings-group-body">
+                <div class="table-header">
+                  <h3>Job Schedules</h3>
+                  <div>
+                    <button onclick="saveJobSchedules()" class="btn btn-primary">Save Schedules</button>
+                  </div>
+                </div>
+                <div id="jobSchedulesDisplay" style="padding: 20px;"></div>
+              </div>
+            </details>
+
+            <details class="settings-group glass-card" id="settingsGroupSessions" data-tab="sessions">
+              <summary>
+                <div class="settings-group-header">
+                  <div class="settings-group-icon">🔐</div>
+                  <div class="settings-group-text">
+                    <div class="settings-group-title">Sessions</div>
+                    <div class="settings-group-desc">See where you're logged in and revoke devices</div>
+                  </div>
+                </div>
+                <svg class="settings-group-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg>
+              </summary>
+              <div class="settings-group-body">
+                <div id="settingsSessions" class="settings-content">
+                  <div class="table-header">
+                    <h3>Active Sessions</h3>
+                    <div style="display:flex; gap:8px; align-items:center;">
+                      <button class="btn btn-secondary" onclick="loadAdminSessions()" title="Refresh"><svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2.5 2v6h6M2.66 15.57a10 10 0 1 0 .57-8.38"/></svg></button>
+                      <button class="btn btn-primary" onclick="revokeOtherAdminSessions()">Revoke others</button>
+                    </div>
+                  </div>
+                  <div id="adminSessionsList" style="padding: 20px;"></div>
+                  <div style="padding: 0 20px 20px; color: var(--text-muted); font-size: 12px;">
+                    Tip: you can stay logged in on your PC and phone at the same time.
+                  </div>
+                </div>
+              </div>
+            </details>
+          </div>
+        </div>
+
+      </div>
+    </main>
+  </div>
+
+  <!-- Subscription Detail Modal -->
+  <div class="sub-modal-overlay" id="subDetailModal" onclick="closeSubDetail(event)">
+    <div class="sub-modal" onclick="event.stopPropagation()">
+      <div class="sub-modal-header">
+        <div class="sub-modal-title" id="subModalTitle">User Details</div>
+        <button class="sub-modal-close" onclick="closeSubDetail()">×</button>
+      </div>
+      <div class="sub-modal-body">
+        <div class="sub-modal-info" id="subModalInfo">
+          <!-- Dynamic content -->
+        </div>
+        
+        <details class="sub-modal-details">
+          <summary class="sub-modal-summary">
+            <span>Edit Subscription</span>
+            <svg class="sub-modal-summary-arrow" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+          </summary>
+          <div class="sub-modal-inputs">
+            <div class="sub-modal-input-group">
+              <label>Traffic (GB)</label>
+              <div class="custom-select custom-select-sm" id="subEditTrafficModeDropdown">
+                <button type="button" class="custom-select-btn" onclick="toggleCustomSelect('subEditTrafficModeDropdown')">
+                  <span class="custom-select-value">Add to current</span>
+                  <svg class="custom-select-arrow" xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+                </button>
+                <div class="custom-select-menu">
+                  <div class="custom-select-option selected" data-value="add" onclick="selectCustomOption('subEditTrafficModeDropdown', 'add', 'Add to current')">Add to current</div>
+                  <div class="custom-select-option" data-value="set" onclick="selectCustomOption('subEditTrafficModeDropdown', 'set', 'Set total')">Set total</div>
+                </div>
+                <input type="hidden" id="subEditTrafficMode" value="add">
+              </div>
+              <input type="number" id="subEditTraffic" class="input-field" placeholder="0" min="0">
+              <div id="subTrafficHelp" style="color: var(--text-muted); font-size: 11px; margin-top: 4px;"></div>
+            </div>
+            <div class="sub-modal-input-group">
+              <label>Days / Expiry</label>
+              <div class="custom-select custom-select-sm" id="subEditDaysModeDropdown">
+                <button type="button" class="custom-select-btn" onclick="toggleCustomSelect('subEditDaysModeDropdown')">
+                  <span class="custom-select-value">Add days</span>
+                  <svg class="custom-select-arrow" xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+                </button>
+                <div class="custom-select-menu">
+                  <div class="custom-select-option selected" data-value="add" onclick="selectCustomOption('subEditDaysModeDropdown', 'add', 'Add days')">Add days</div>
+                  <div class="custom-select-option" data-value="set" onclick="selectCustomOption('subEditDaysModeDropdown', 'set', 'Set from now')">Set from now</div>
+                </div>
+                <input type="hidden" id="subEditDaysMode" value="add">
+              </div>
+              <input type="number" id="subEditDays" class="input-field" placeholder="0" min="0">
+              <input type="datetime-local" id="subEditExpireAt" class="input-field" style="margin-top: 6px;">
+              <div id="subDaysHelp" style="color: var(--text-muted); font-size: 11px; margin-top: 4px;"></div>
+            </div>
+          </div>
+        </details>
+        
+        <div class="sub-modal-icon-actions">
+          <button class="btn-icon btn-danger" id="subToggleBtn" onclick="toggleCurrentSub()" title="Disable User">
+            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18.36 6.64a9 9 0 1 1-12.73 0"></path><line x1="12" y1="2" x2="12" y2="12"></line></svg>
+          </button>
+          <button class="btn-icon save-btn" onclick="saveSubChanges()" title="Save Changes">
+            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24"
+                 fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"></path>
+              <polyline points="17 21 17 13 7 13 7 21"></polyline>
+              <polyline points="7 3 7 8 15 8"></polyline>
+            </svg>
+          </button>
+          <button class="btn-icon" onclick="showSubUsage()" title="Usage Stats">
+            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21.21 15.89A10 10 0 1 1 8 2.83"></path><path d="M22 12A10 10 0 0 0 12 2v10z"></path></svg>
+          </button>
+          <button class="btn-icon btn-danger" onclick="deleteCurrentSub()" title="Delete User">
+            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path><line x1="10" y1="11" x2="10" y2="17"></line><line x1="14" y1="11" x2="14" y2="17"></line></svg>
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Usage Chart Popup -->
+  <div class="sub-modal-overlay" id="usageChartModal" onclick="closeUsageChart(event)">
+    <div class="sub-modal" onclick="event.stopPropagation()" style="max-width: 320px;">
+      <div class="sub-modal-header">
+        <div class="sub-modal-title" id="usageChartTitle">Server Usage</div>
+        <button class="sub-modal-close" onclick="closeUsageChart()">×</button>
+      </div>
+      <div class="sub-modal-body" style="padding: 20px;">
+        <div id="usageChartContainer" style="display: flex; flex-direction: column; align-items: center;">
+          <canvas id="usageChart" width="180" height="180"></canvas>
+          <div id="usageChartLegend" style="margin-top: 16px; width: 100%;"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="/admin/index-main.js?v=1"></script>
+  <script src="/admin/admin_customizer.js?v=8"></script>
+</body>
+</html>

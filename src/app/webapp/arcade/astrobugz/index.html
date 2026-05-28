@@ -1,0 +1,1027 @@
+﻿<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8" />
+	<meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1" />
+	<title>AstroBugz</title>
+	
+	<!-- Google Font for consistent typography -->
+	<link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+	
+	<!-- Standardised web app manifest -->
+	<link rel="manifest" href="appmanifest.json" />
+	
+	<!-- Allow fullscreen mode on iOS devices. (These are Apple specific meta tags.) -->
+	<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, minimum-scale=1.0, user-scalable=no, minimal-ui" />
+    <meta name="viewport" content="width=320, initial-scale=1">
+	<meta name="apple-mobile-web-app-capable" content="yes" />
+	<meta name="apple-mobile-web-app-status-bar-style" content="black" />
+	<link rel="apple-touch-icon" sizes="256x256" href="icon-256.png" />
+	<meta name="HandheldFriendly" content="true" />
+	
+	<!-- Chrome for Android web app tags -->
+	<meta name="mobile-web-app-capable" content="yes" />
+	<link rel="shortcut icon" sizes="256x256" href="icon-256.png" />
+
+    <!-- Telegram Web App -->
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+
+    <!-- All margins and padding must be zero for the canvas to fill the screen. -->
+	<style type="text/css">
+		* {
+			padding: 0;
+			margin: 0;
+		}
+		html, body {
+			background: #000;
+			color: #fff;
+			overflow: hidden;
+			touch-action: none;
+			-ms-touch-action: none;
+			overscroll-behavior: none;
+			-webkit-overflow-scrolling: touch;
+			position: fixed;
+			width: 100%;
+			height: 100%;
+		}
+
+		/* Desktop centering (Telegram Desktop / wide screens) */
+		@media (min-width: 700px) {
+			body {
+				display: flex;
+				flex-direction: column;
+				align-items: center;
+				justify-content: flex-start;
+			}
+
+			#c2canvasdiv {
+				max-width: 480px;
+				margin: 0 auto;
+				left: 0 !important;
+				right: 0 !important;
+			}
+		}
+		canvas {
+			touch-action: none;
+			-ms-touch-action: none;
+		}
+	/* Overlays */
+	#astro-name-overlay, #astro-lb-overlay { position: fixed; inset: 0; display: none; align-items: center; justify-content: center; z-index: 9999; }
+	#astro-name-overlay .panel, #astro-lb-overlay .panel { width: 90%; max-width: 420px; background: rgba(10,10,14,0.95); color: #fff; border: 1px solid #3a3a4a; border-radius: 12px; box-shadow: 0 8px 24px rgba(0,0,0,0.6); }
+	.panel .hdr { padding: 14px 16px; font-weight: 700; border-bottom: 1px solid #2b2b3b; text-align: center; }
+	.panel .body { padding: 16px; }
+	.panel label { display: block; font-size: 14px; opacity: 0.85; margin-bottom: 8px; }
+	.panel input[type=text] { width: 100%; padding: 12px 14px; border-radius: 8px; border: 1px solid #444; background: #0f0f16; color: #fff; font-size: 16px; }
+	.panel .row { display: flex; gap: 8px; margin-top: 12px; }
+	.panel button { flex: 1; padding: 12px; border-radius: 8px; border: 1px solid #555; background: #1b1b28; color: #fff; font-weight: 600; }
+	.panel button.primary { background: #6b46ff; border-color: #6b46ff; }
+	.small-link { font-size: 12px; opacity: 0.8; text-align: center; margin-top: 10px; cursor: pointer; }
+	.lb-list { list-style: none; padding: 0; margin: 0; }
+	.lb-list li { display: flex; justify-content: space-between; padding: 10px 0; border-bottom: 1px dashed #2b2b3b; }
+	.lb-list li .name { max-width: 70%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+	
+	/* Game Over Overlay */
+	#game-over-overlay {
+		position: fixed;
+		inset: 0;
+		z-index: 10001;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		animation: gameOverFadeIn 0.6s ease-out;
+	}
+	.game-over-bg {
+		position: absolute;
+		inset: 0;
+		background: 
+			radial-gradient(circle at 30% 20%, rgba(236, 86, 82, 0.15) 0%, transparent 40%),
+			radial-gradient(circle at 70% 80%, rgba(255, 107, 107, 0.1) 0%, transparent 40%),
+			linear-gradient(180deg, rgba(10, 14, 27, 0.95) 0%, rgba(10, 14, 27, 0.98) 100%);
+		backdrop-filter: blur(12px);
+	}
+	.particle {
+		position: absolute;
+		width: 4px;
+		height: 4px;
+		background: #ec5652;
+		border-radius: 50%;
+		box-shadow: 0 0 10px rgba(236, 86, 82, 0.8);
+		animation: particleFloat 3s ease-in-out infinite;
+		opacity: 0;
+	}
+	.particle:nth-child(1) { left: 20%; top: 20%; animation-delay: 0s; animation-duration: 3s; }
+	.particle:nth-child(2) { left: 80%; top: 30%; animation-delay: 0.6s; animation-duration: 3.5s; }
+	.particle:nth-child(3) { left: 50%; top: 60%; animation-delay: 1.2s; animation-duration: 2.8s; }
+	.particle:nth-child(4) { left: 30%; top: 80%; animation-delay: 1.8s; animation-duration: 3.2s; }
+	.particle:nth-child(5) { left: 70%; top: 70%; animation-delay: 2.4s; animation-duration: 3s; }
+	.game-over-content {
+		position: relative;
+		width: min(360px, 100% - 32px);
+		max-width: 360px;
+		margin: 16px;
+		padding: 0;
+		background: linear-gradient(135deg, rgba(20, 25, 40, 0.95), rgba(15, 20, 35, 0.95));
+		border: 1.5px solid rgba(236, 86, 82, 0.3);
+		border-radius: 24px;
+		box-shadow: 
+			0 20px 60px rgba(0, 0, 0, 0.8),
+			0 0 0 1px rgba(255, 255, 255, 0.05) inset,
+			0 0 80px rgba(236, 86, 82, 0.15);
+		text-align: center;
+		animation: gameOverSlideUp 0.7s cubic-bezier(0.34, 1.56, 0.64, 1);
+		overflow: hidden;
+		backdrop-filter: blur(20px);
+		max-height: 90vh;
+		display: flex;
+		flex-direction: column;
+		justify-content: flex-start;
+	}
+	.game-over-icon {
+		font-size: clamp(40px, 7vh, 56px);
+		margin: 24px 0 12px;
+		animation: iconBounce 0.6s cubic-bezier(0.68, -0.55, 0.265, 1.55) 0.2s backwards;
+		filter: drop-shadow(0 4px 12px rgba(236, 86, 82, 0.4));
+	}
+	.game-over-title {
+		font-family: 'Poppins', -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Segoe UI', sans-serif;
+		font-size: clamp(22px, 4vh, 28px);
+		font-weight: 800;
+		background: linear-gradient(135deg, #ff6b6b 0%, #ec5652 50%, #ff6b6b 100%);
+		-webkit-background-clip: text;
+		-webkit-text-fill-color: transparent;
+		background-clip: text;
+		margin-bottom: 20px;
+		text-transform: uppercase;
+		letter-spacing: 4px;
+		animation: titleGlow 2s ease-in-out infinite;
+		filter: drop-shadow(0 0 20px rgba(236, 86, 82, 0.4));
+	}
+	.score-card {
+		position: relative;
+		margin: 0 16px 20px;
+		padding: 18px;
+		background: linear-gradient(135deg, rgba(236, 86, 82, 0.15), rgba(236, 86, 82, 0.05));
+		border: 1px solid rgba(236, 86, 82, 0.3);
+		border-radius: 16px;
+		overflow: hidden;
+	}
+	.score-card-glow {
+		position: absolute;
+		top: -50%;
+		left: -50%;
+		width: 200%;
+		height: 200%;
+		background: radial-gradient(circle, rgba(236, 86, 82, 0.2) 0%, transparent 70%);
+		animation: glowPulse 3s ease-in-out infinite;
+	}
+	.game-over-score-label {
+		position: relative;
+		font-family: 'Poppins', -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', sans-serif;
+		font-size: 12px;
+		font-weight: 600;
+		color: rgba(236, 86, 82, 0.9);
+		text-transform: uppercase;
+		letter-spacing: 3px;
+		margin-bottom: 10px;
+	}
+	.game-over-score {
+		position: relative;
+		font-family: 'Poppins', -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Segoe UI', sans-serif;
+		font-size: clamp(40px, 8vh, 56px);
+		font-weight: 800;
+		background: linear-gradient(135deg, #ffffff 0%, #ffd6d6 100%);
+		-webkit-background-clip: text;
+		-webkit-text-fill-color: transparent;
+		background-clip: text;
+		animation: scoreCountUp 0.8s cubic-bezier(0.34, 1.56, 0.64, 1) 0.4s backwards;
+		filter: drop-shadow(0 2px 12px rgba(236, 86, 82, 0.3));
+		line-height: 1;
+	}
+	.game-over-stats {
+		display: flex;
+		gap: 12px;
+		padding: 0 20px;
+		margin-bottom: 28px;
+	}
+	.stat-item {
+		flex: 1;
+		display: flex;
+		flex-direction: row;
+		align-items: center;
+		gap: 12px;
+		padding: 16px;
+		background: linear-gradient(135deg, rgba(255, 255, 255, 0.05), rgba(255, 255, 255, 0.02));
+		border: 1px solid rgba(255, 255, 255, 0.1);
+		border-radius: 14px;
+		animation: statSlideIn 0.6s cubic-bezier(0.34, 1.56, 0.64, 1) backwards;
+		box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+	}
+	.stat-item:nth-child(1) { animation-delay: 0.6s; }
+	.stat-item:nth-child(2) { animation-delay: 0.7s; }
+	.stat-icon {
+		font-size: 32px;
+		line-height: 1;
+		filter: drop-shadow(0 2px 6px rgba(236, 86, 82, 0.3));
+	}
+	.stat-content {
+		flex: 1;
+		text-align: left;
+	}
+	.stat-value {
+		font-family: 'Poppins', -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Segoe UI', sans-serif;
+		font-size: 22px;
+		font-weight: 700;
+		color: #ffffff;
+		margin-bottom: 4px;
+		line-height: 1.2;
+	}
+	.stat-label {
+		font-family: 'Poppins', -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', sans-serif;
+		font-size: 10px;
+		font-weight: 500;
+		color: rgba(255, 255, 255, 0.5);
+		text-transform: uppercase;
+		letter-spacing: 1px;
+		line-height: 1.2;
+	}
+	.game-over-actions {
+		display: flex;
+		flex-direction: column;
+		gap: 12px;
+		padding: 0 20px 28px;
+		animation: actionsFadeIn 0.7s ease-out 0.8s backwards;
+	}
+	.game-over-btn {
+		position: relative;
+		font-family: 'Poppins', -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', sans-serif;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		padding: 16px 28px;
+		border: none;
+		border-radius: 14px;
+		font-size: 15px;
+		font-weight: 600;
+		cursor: pointer;
+		transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+		letter-spacing: 0.5px;
+		overflow: hidden;
+	}
+	.game-over-btn svg {
+		width: 18px;
+		height: 18px;
+		position: relative;
+		z-index: 1;
+	}
+	.game-over-btn.primary {
+		background: linear-gradient(135deg, #ec5652 0%, #ff6b6b 100%);
+		color: #ffffff;
+		box-shadow: 0 6px 20px rgba(236, 86, 82, 0.4);
+		border: 1px solid rgba(255, 255, 255, 0.1);
+	}
+	.btn-shine {
+		position: absolute;
+		top: -50%;
+		left: -50%;
+		width: 200%;
+		height: 200%;
+		background: linear-gradient(
+			45deg,
+			transparent 30%,
+			rgba(255, 255, 255, 0.1) 50%,
+			transparent 70%
+		);
+		animation: btnShine 3s ease-in-out infinite;
+	}
+	.game-over-btn.primary:active {
+		transform: scale(0.96);
+		box-shadow: 0 4px 12px rgba(236, 86, 82, 0.5);
+	}
+	.game-over-btn.secondary {
+		background: rgba(255, 255, 255, 0.05);
+		color: rgba(255, 255, 255, 0.85);
+		border: 1.5px solid rgba(255, 255, 255, 0.15);
+		box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+	}
+	.game-over-btn.secondary:active {
+		transform: scale(0.96);
+		background: rgba(255, 255, 255, 0.08);
+	}
+	
+	/* Rewards Section */
+	.rewards-section {
+		margin: 0 20px 20px;
+	}
+	.rewards-title {
+		font-family: 'Poppins', sans-serif;
+		font-size: 13px;
+		font-weight: 700;
+		color: #ec5652;
+		margin-bottom: 14px;
+		text-transform: uppercase;
+		letter-spacing: 1.5px;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		gap: 8px;
+	}
+	.rewards-grid {
+		display: flex;
+		gap: 10px;
+		justify-content: center;
+	}
+	.reward-item {
+		flex: 1;
+		padding: 14px 10px;
+		border-radius: 14px;
+		text-align: center;
+	}
+	.reward-item.credits {
+		background: rgba(255, 193, 7, 0.12);
+		border: 1px solid rgba(255, 193, 7, 0.35);
+	}
+	.reward-item.stars {
+		background: rgba(236, 86, 82, 0.12);
+		border: 1px solid rgba(236, 86, 82, 0.35);
+	}
+	.reward-item.xp {
+		background: rgba(76, 175, 80, 0.12);
+		border: 1px solid rgba(76, 175, 80, 0.35);
+	}
+	.reward-value {
+		font-family: 'Poppins', sans-serif;
+		font-size: 22px;
+		font-weight: 700;
+		line-height: 1.2;
+	}
+	.reward-item.credits .reward-value { color: #ffc107; }
+	.reward-item.stars .reward-value { color: #ec5652; }
+	.reward-item.xp .reward-value { color: #4caf50; }
+	.reward-label {
+		font-family: 'Poppins', sans-serif;
+		font-size: 10px;
+		font-weight: 600;
+		color: rgba(255, 255, 255, 0.5);
+		text-transform: uppercase;
+		letter-spacing: 0.5px;
+		margin-top: 4px;
+	}
+	.reward-sub {
+		font-family: 'Poppins', sans-serif;
+		font-size: 9px;
+		color: rgba(255, 255, 255, 0.4);
+		margin-top: 4px;
+	}
+	
+	/* Leaderboard Toggle */
+	.leaderboard-toggle {
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		gap: 12px;
+		margin: 0 20px 20px;
+		padding: 14px 16px;
+		background: rgba(255, 255, 255, 0.04);
+		border: 1px solid rgba(255, 255, 255, 0.1);
+		border-radius: 12px;
+	}
+	.toggle-label {
+		font-family: 'Poppins', sans-serif;
+		font-size: 13px;
+		font-weight: 500;
+		color: rgba(255, 255, 255, 0.75);
+	}
+	.toggle-switch {
+		position: relative;
+		width: 48px;
+		height: 26px;
+		background: rgba(255, 255, 255, 0.15);
+		border-radius: 13px;
+		cursor: pointer;
+		transition: background 0.3s;
+	}
+	.toggle-switch.active {
+		background: linear-gradient(135deg, #6b46ff, #818cf8);
+	}
+	.toggle-switch::after {
+		content: '';
+		position: absolute;
+		top: 3px;
+		left: 3px;
+		width: 20px;
+		height: 20px;
+		background: white;
+		border-radius: 50%;
+		transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+		box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+	}
+	.toggle-switch.active::after {
+		transform: translateX(22px);
+	}
+	
+	/* Animations */
+	@keyframes gameOverFadeIn {
+		from { opacity: 0; }
+		to { opacity: 1; }
+	}
+	@keyframes gameOverSlideUp {
+		from {
+			opacity: 0;
+			transform: translateY(60px) scale(0.85);
+		}
+		to {
+			opacity: 1;
+			transform: translateY(0) scale(1);
+		}
+	}
+	@keyframes iconBounce {
+		from {
+			opacity: 0;
+			transform: scale(0) rotate(-180deg);
+		}
+		to {
+			opacity: 1;
+			transform: scale(1) rotate(0deg);
+		}
+	}
+	@keyframes titleGlow {
+		0%, 100% {
+			filter: drop-shadow(0 0 20px rgba(236, 86, 82, 0.4));
+		}
+		50% {
+			filter: drop-shadow(0 0 30px rgba(236, 86, 82, 0.6));
+		}
+	}
+	@keyframes glowPulse {
+		0%, 100% {
+			transform: scale(1);
+			opacity: 0.3;
+		}
+		50% {
+			transform: scale(1.2);
+			opacity: 0.5;
+		}
+	}
+	@keyframes scoreCountUp {
+		from {
+			opacity: 0;
+			transform: scale(0.3) translateY(30px);
+		}
+		to {
+			opacity: 1;
+			transform: scale(1) translateY(0);
+		}
+	}
+	@keyframes statSlideIn {
+		from {
+			opacity: 0;
+			transform: translateX(-30px) scale(0.8);
+		}
+		to {
+			opacity: 1;
+			transform: translateX(0) scale(1);
+		}
+	}
+	@keyframes actionsFadeIn {
+		from {
+			opacity: 0;
+			transform: translateY(30px);
+		}
+		to {
+			opacity: 1;
+			transform: translateY(0);
+		}
+	}
+	@keyframes btnShine {
+		0% {
+			transform: translateX(-100%) translateY(-100%) rotate(45deg);
+		}
+		100% {
+			transform: translateX(100%) translateY(100%) rotate(45deg);
+		}
+	}
+	@keyframes particleFloat {
+		0% {
+			opacity: 0;
+			transform: translateY(0) scale(0);
+		}
+		20% {
+			opacity: 1;
+		}
+		80% {
+			opacity: 1;
+		}
+		100% {
+			opacity: 0;
+			transform: translateY(-100px) scale(1.5);
+		}
+	}
+    </style>
+	
+
+</head> 
+ 
+<body> 
+	<div id="fb-root"></div>
+	
+	<script>
+	// Issue a warning if trying to preview an exported project on disk.
+	(function(){
+		// Check for running exported on file protocol
+		if (window.location.protocol.substr(0, 4) === "file")
+		{
+			alert("Exported games won't work until you upload them. (When running on the file:/// protocol, browsers block many features from working for security reasons.)");
+		}
+	})();
+	</script>
+	
+	<!-- The canvas must be inside a div called c2canvasdiv -->
+	<div id="c2canvasdiv">
+	
+		<!-- The canvas the project will render to.  If you change its ID, don't forget to change the
+		ID the runtime looks for in the jQuery events above (ready() and cr_sizeCanvas()). -->
+		<canvas id="c2canvas" width="720" height="1280">
+			<!-- This text is displayed if the visitor's browser does not support HTML5.
+			You can change it, but it is a good idea to link to a description of a browser
+			and provide some links to download some popular HTML5-compatible browsers. -->
+			<h1>Your browser does not appear to support HTML5.  Try upgrading your browser to the latest version.  <a href="http://www.whatbrowser.org">What is a browser?</a>
+			<br/><br/><a href="http://www.microsoft.com/windows/internet-explorer/default.aspx">Microsoft Internet Explorer</a><br/>
+			<a href="http://www.mozilla.com/firefox/">Mozilla Firefox</a><br/>
+			<a href="http://www.google.com/chrome/">Google Chrome</a><br/>
+			<a href="http://www.apple.com/safari/download/">Apple Safari</a></h1>
+		</canvas>
+		
+	</div>
+
+	<!-- Name prompt overlay -->
+	<div id="astro-name-overlay">
+		<div class="panel">
+			<div class="hdr">Choose a display name</div>
+			<div class="body">
+				<label for="astro-display-name">This name shows on the leaderboard</label>
+				<input id="astro-display-name" type="text" maxlength="40" placeholder="e.g. AstroBugz Pro" />
+				<div class="row">
+					<button id="astro-name-cancel">Cancel</button>
+					<button id="astro-name-save" class="primary">Save</button>
+				</div>
+			</div>
+		</div>
+	</div>
+
+	<!-- Leaderboard overlay -->
+	<div id="astro-lb-overlay">
+		<div class="panel">
+			<div class="hdr">Daily Leaderboard</div>
+			<div class="body">
+				<div id="astro-lb-score" style="text-align:center;margin-bottom:8px;opacity:.85"></div>
+				<ul id="astro-lb-list" class="lb-list"></ul>
+				<div class="row">
+					<button id="astro-lb-close" class="primary">Close</button>
+					<button id="astro-lb-change-name">Change name</button>
+				</div>
+				<div class="small-link" id="astro-lb-refresh" style="display: flex; align-items: center; gap: 6px;"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2.5 2v6h6M2.66 15.57a10 10 0 1 0 .57-8.38"/></svg>Refresh</div>
+			</div>
+		</div>
+	</div>
+
+	<!-- Game Over Overlay -->
+	<div id="game-over-overlay" style="display: none;">
+		<div class="game-over-bg">
+			<div class="particle"></div>
+			<div class="particle"></div>
+			<div class="particle"></div>
+			<div class="particle"></div>
+			<div class="particle"></div>
+		</div>
+		<div class="game-over-content">
+			<div class="game-over-icon">💥</div>
+			<div class="game-over-title">GAME OVER</div>
+			<div class="score-card">
+				<div class="score-card-glow"></div>
+				<div class="game-over-score-label">FINAL SCORE</div>
+				<div class="game-over-score" id="game-over-score-value">0</div>
+			</div>
+			<div id="game-rewards-section" class="rewards-section" style="display: none;">
+				<div class="rewards-title">🎁 Rewards Earned</div>
+				<div class="rewards-grid">
+					<div class="reward-item credits">
+						<div class="reward-value" id="reward-credits-val">+0</div>
+						<div class="reward-label">Credits</div>
+					</div>
+					<div class="reward-item stars">
+						<div class="reward-value" id="reward-stars-val">+0</div>
+						<div class="reward-label">Stars</div>
+						<div class="reward-sub" id="reward-pieces-sub">0/10 star pieces</div>
+					</div>
+					<div class="reward-item xp">
+						<div class="reward-value" id="reward-xp-val">+0</div>
+						<div class="reward-label">XP</div>
+					</div>
+				</div>
+			</div>
+			<div class="game-over-stats">
+				<div class="stat-item">
+					<div class="stat-icon">⏱️</div>
+					<div class="stat-content">
+						<div class="stat-value" id="game-over-time">0:00</div>
+						<div class="stat-label">Time Survived</div>
+					</div>
+				</div>
+				<div class="stat-item">
+					<div class="stat-icon">🏆</div>
+					<div class="stat-content">
+						<div class="stat-value" id="game-over-rank">-</div>
+						<div class="stat-label">Your Rank</div>
+					</div>
+				</div>
+			</div>
+			<div class="leaderboard-toggle" id="leaderboard-toggle-container">
+				<span class="toggle-label">Show on Leaderboard</span>
+				<div class="toggle-switch active" id="leaderboard-toggle"></div>
+			</div>
+			<div class="game-over-actions">
+				<button class="game-over-btn primary" id="game-over-restart">
+					<div class="btn-shine"></div>
+					<svg viewBox="0 0 24 24" style="margin-right: 8px;">
+						<path fill="currentColor" d="M12 5V1L7 6l5 5V7c3.31 0 6 2.69 6 6s-2.69 6-6 6-6-2.69-6-6H4c0 4.42 3.58 8 8 8s8-3.58 8-8-3.58-8-8-8z"/>
+					</svg>
+					Try Again
+				</button>
+				<button class="game-over-btn secondary" id="game-over-back">
+					<svg viewBox="0 0 24 24" style="margin-right: 8px;">
+						<path fill="currentColor" d="M20 11H7.83l5.59-5.59L12 4l-8 8 8 8 1.41-1.41L7.83 13H20v-2z"/>
+					</svg>
+					Exit to Lobby
+				</button>
+			</div>
+		</div>
+	</div>
+	
+	<!-- Pages load faster with scripts at the bottom -->
+	
+	<!-- Construct 2 exported games require jQuery. -->
+	<script src="jquery-2.1.1.min.js"></script>
+
+	<script src="astrobridge.js"></script>
+
+	
+    <!-- The runtime script.  You can rename it, but don't forget to rename the reference here as well.
+    This file will have been minified and obfuscated if you enabled "Minify script" during export. -->
+	<script src="c2runtime.js"></script>
+
+    <script>
+		// Start the Construct 2 project running on window load.
+		jQuery(document).ready(function ()
+		{			
+			// Create new runtime using the c2canvas
+			cr_createRuntime("c2canvas");
+		});
+		
+		// Pause and resume on page becoming visible/invisible
+		function onVisibilityChanged() {
+			if (document.hidden || document.mozHidden || document.webkitHidden || document.msHidden)
+				cr_setSuspended(true);
+			else
+				cr_setSuspended(false);
+		};
+		
+		document.addEventListener("visibilitychange", onVisibilityChanged, false);
+		document.addEventListener("mozvisibilitychange", onVisibilityChanged, false);
+		document.addEventListener("webkitvisibilitychange", onVisibilityChanged, false);
+		document.addEventListener("msvisibilitychange", onVisibilityChanged, false);
+		
+		function OnRegisterSWError(e)
+		{
+			console.warn("Failed to register service worker: ", e);
+		};
+		
+		// Runtime calls this global method when ready to start caching (i.e. after startup).
+		// This registers the service worker which caches resources for offline support.
+		window.C2_RegisterSW = function C2_RegisterSW()
+		{
+			// Service Worker disabled to prevent 403 errors on protected routes
+			return;
+			
+			/* Original code disabled:
+			if (!navigator.serviceWorker)
+				return;		// no SW support, ignore call
+			
+			try {
+				navigator.serviceWorker.register("sw.js", { scope: "./" })
+				.then(function (reg)
+				{
+					console.log("Registered service worker on " + reg.scope);
+				})
+				.catch(OnRegisterSWError);
+			}
+			catch (e)
+			{
+				OnRegisterSWError(e);
+			}
+			*/
+		};
+
+		// Name + Leaderboard overlay logic
+		(function(){
+			var nameOv = document.getElementById('astro-name-overlay');
+			var lbOv = document.getElementById('astro-lb-overlay');
+			var nameInput = document.getElementById('astro-display-name');
+			var nameSave = document.getElementById('astro-name-save');
+			var nameCancel = document.getElementById('astro-name-cancel');
+			var lbList = document.getElementById('astro-lb-list');
+			var lbClose = document.getElementById('astro-lb-close');
+			var lbChange = document.getElementById('astro-lb-change-name');
+			var lbRefresh = document.getElementById('astro-lb-refresh');
+			var lbScore = document.getElementById('astro-lb-score');
+
+			function getName(){ try { return (localStorage.getItem('astro_display_name')||'').trim(); } catch(_) { return ''; } }
+			function setName(v){ try { if (v) localStorage.setItem('astro_display_name', v.trim()); } catch(_) {} }
+			function show(el){ el.style.display = 'flex'; }
+			function hide(el){ el.style.display = 'none'; }
+
+			function maybePromptName(){
+				// Disabled: always skip manual name prompt, fall back to Telegram name on backend
+				return;
+			}
+
+			nameSave.addEventListener('click', function(){
+				var v = (nameInput.value||'').trim().slice(0,40);
+				if (v){ setName(v); }
+				hide(nameOv);
+			});
+			nameCancel.addEventListener('click', function(){ hide(nameOv); });
+
+			function renderLeaderboard(items){
+				lbList.innerHTML = '';
+				items.forEach(function(it){
+					var li = document.createElement('li');
+					var nameSpan = document.createElement('span'); nameSpan.className = 'name'; nameSpan.textContent = (it.rank + '. ' + it.name);
+					var scoreSpan = document.createElement('span'); scoreSpan.textContent = it.score;
+					li.appendChild(nameSpan); li.appendChild(scoreSpan);
+					lbList.appendChild(li);
+				});
+			}
+
+			function loadLeaderboard(){
+				fetch('/api/arcade/leaderboard?period=daily&limit=10').then(function(r){ return r.json(); }).then(function(j){
+					if (j && j.ok) renderLeaderboard(j.leaderboard||[]);
+				}).catch(function(){});
+			}
+
+			lbClose.addEventListener('click', function(){ hide(lbOv); });
+			lbChange.addEventListener('click', function(){ hide(lbOv); nameInput.value = getName(); show(nameOv); });
+			lbRefresh.addEventListener('click', function(){ loadLeaderboard(); });
+
+		// Game over handler - show amazing game over screen
+		var gameStartTime = Date.now();
+		window.addEventListener('astro:gameover', function(ev){
+			var s = (ev && ev.detail && ev.detail.score) ? ev.detail.score : 0;
+			var isPracticeMode = (ev && ev.detail && ev.detail.practice);
+			
+			// Calculate time played
+			var elapsedMs = Date.now() - gameStartTime;
+			var minutes = Math.floor(elapsedMs / 60000);
+			var seconds = Math.floor((elapsedMs % 60000) / 1000);
+			var timeStr = minutes + ':' + (seconds < 10 ? '0' : '') + seconds;
+			
+			// Show game over overlay
+			var gameOverOverlay = document.getElementById('game-over-overlay');
+			var scoreValue = document.getElementById('game-over-score-value');
+			var timeValue = document.getElementById('game-over-time');
+			var rankValue = document.getElementById('game-over-rank');
+			
+			// Set score with animation
+			scoreValue.textContent = s.toLocaleString();
+			timeValue.textContent = timeStr;
+			
+			// Set rank based on score
+			if (s < 1000) rankValue.textContent = 'Beginner';
+			else if (s < 3000) rankValue.textContent = 'Rookie';
+			else if (s < 5000) rankValue.textContent = 'Player';
+			else if (s < 10000) rankValue.textContent = 'Expert';
+			else if (s < 20000) rankValue.textContent = 'Master';
+			else rankValue.textContent = 'Legend';
+			
+			gameOverOverlay.style.display = 'flex';
+			
+			// Load leaderboard in background
+			loadLeaderboard();
+		});
+		
+		// Listen for submission response to show rewards
+		window.addEventListener('astro:submitted', function(ev){
+			console.log('[GAME] Submission event received:', ev.detail);
+			var rewards = ev.detail && ev.detail.rewards;
+			var rewarded = ev.detail && ev.detail.rewarded;
+			var isPractice = ev.detail && ev.detail.practice;
+			
+			var restartBtn = document.getElementById('game-over-restart');
+			var rewardsSection = document.getElementById('game-rewards-section');
+			
+			// --- BUTTON LOGIC ---
+			// No more practice runs: after a rewarded game, hide the restart button.
+			if(restartBtn){
+				if(rewarded){
+					restartBtn.style.display = 'none';
+				}else{
+					// Fallback: non‑rewarded (should not normally happen) just reloads
+					restartBtn.onclick = function(e){
+						e.preventDefault();
+						e.stopPropagation();
+						window.location.reload();
+					};
+				}
+			}
+
+			// --- REWARDS / BADGE LOGIC ---
+			if(rewardsSection){
+				// Mark a non-practice game as the daily rewarded run (for lobby button)
+				if(!isPractice){
+					try { localStorage.setItem('astro_last_played_date', new Date().toDateString()); } catch(e) {}
+				}
+				
+				if(rewarded && rewards){
+					// CASE 1: Rewarded - Show Stats with new clean design
+					rewardsSection.style.display = 'block';
+					
+					// Update the values
+					var creditsVal = document.getElementById('reward-credits-val');
+					var starsVal = document.getElementById('reward-stars-val');
+					var xpVal = document.getElementById('reward-xp-val');
+					var piecesSub = document.getElementById('reward-pieces-sub');
+					
+					if(creditsVal) creditsVal.textContent = '+' + (rewards.credits || 0).toLocaleString();
+					if(starsVal) starsVal.textContent = '+' + (rewards.stars_converted || rewards.stars || 0);
+						if(xpVal) xpVal.textContent = '+' + (rewards.xp || 0);
+						if(piecesSub) {
+							var piecesPerStar = (rewards.pieces_per_star != null) ? rewards.pieces_per_star : 10;
+							var piecesProgress = (rewards.pieces_progress != null) ? rewards.pieces_progress : (rewards.total_pieces || rewards.star_pieces || 0);
+							var toNext = (rewards.pieces_to_next_star != null) ? rewards.pieces_to_next_star : null;
+							var capReached = !!(rewards.monthly_cap_reached || rewards.cap_reached);
+							var monthlyStars = rewards.monthly_stars;
+							var monthlyCap = rewards.monthly_cap;
+							
+							var piecesText = piecesProgress + '/' + piecesPerStar + ' star pieces';
+							if(capReached && monthlyCap != null && monthlyStars != null){
+								piecesText += ' · cap ' + monthlyStars + '/' + monthlyCap;
+							} else if (typeof toNext === 'number') {
+								if(toNext === 0){
+									piecesText += ' · star ready';
+								} else if (toNext > 0) {
+									piecesText += ' · ' + toNext + ' to next';
+								}
+							}
+							piecesSub.textContent = piecesText;
+						}
+					} else if (isPractice) {
+					// CASE 2: Practice - Show clear badge instead of empty stats
+					rewardsSection.style.display = 'block';
+					rewardsSection.innerHTML = '<div style="padding: 16px; background: rgba(255,255,255,0.04); border: 1px dashed rgba(255,255,255,0.15); border-radius: 14px;"><div style="font-family: Poppins, sans-serif; font-size: 14px; font-weight: 600; color: rgba(255,255,255,0.6); margin-bottom: 4px;">Practice Mode</div><div style="font-family: Poppins, sans-serif; font-size: 12px; color: rgba(255,255,255,0.35);">No rewards earned in this mode</div></div>';
+				} else {
+					// Fallback
+					rewardsSection.style.display = 'none';
+				}
+			}
+		});
+		
+		// Leaderboard toggle functionality
+		(function initLeaderboardToggle(){
+			var toggle = document.getElementById('leaderboard-toggle');
+			var urlParams = new URLSearchParams(window.location.search);
+			var authToken = urlParams.get('auth') || '';
+			var tg = window.Telegram && window.Telegram.WebApp ? window.Telegram.WebApp : null;
+			
+			// Load initial state from server
+			fetch('/api/arcade/status?auth=' + encodeURIComponent(authToken) + '&init_data=' + encodeURIComponent(tg ? (tg.initData || '') : '') + '&_t=' + Date.now())
+				.then(function(r){ return r.json(); })
+				.then(function(data){
+					if(data.ok && toggle){
+						var showOnLb = data.show_on_leaderboard !== false;
+						if(showOnLb){
+							toggle.classList.add('active');
+						} else {
+							toggle.classList.remove('active');
+						}
+					}
+				})
+				.catch(function(e){ console.error('Failed to load leaderboard status', e); });
+			
+			// Handle toggle click
+			if(toggle){
+				toggle.addEventListener('click', function(){
+					var isActive = toggle.classList.contains('active');
+					var newValue = !isActive;
+					
+					// Optimistic update
+					if(newValue){
+						toggle.classList.add('active');
+					} else {
+						toggle.classList.remove('active');
+					}
+					
+					// Send to server
+					fetch('/api/arcade/toggle-leaderboard?auth=' + encodeURIComponent(authToken), {
+						method: 'POST',
+						headers: { 'Content-Type': 'application/json' },
+						body: JSON.stringify({ show_on_leaderboard: newValue })
+					})
+					.then(function(r){ return r.json(); })
+					.then(function(data){
+						if(data.ok){
+							console.log('[GAME] Leaderboard visibility updated:', data.show_on_leaderboard);
+						}
+					})
+					.catch(function(e){
+						console.error('Failed to toggle leaderboard', e);
+						// Revert on error
+						if(newValue){
+							toggle.classList.remove('active');
+						} else {
+							toggle.classList.add('active');
+						}
+					});
+				});
+			}
+		})();
+		
+		// Game over button handlers (setup after a small delay to ensure DOM is ready)
+		setTimeout(function(){
+			var restartBtn = document.getElementById('game-over-restart');
+			var backBtn = document.getElementById('game-over-back');
+			
+			if(restartBtn){
+				restartBtn.addEventListener('click', function(e){
+					e.preventDefault();
+					e.stopPropagation();
+					console.log('[GAME] Restart clicked');
+					
+					// Check if we should switch to practice mode
+					if(this.getAttribute('data-next-mode') === 'practice'){
+						var url = window.location.href;
+						if(url.indexOf('?') > -1){
+							if(url.indexOf('practice=') > -1){
+								url = url.replace(/practice=[01]/, 'practice=1');
+							} else {
+								url += '&practice=1';
+							}
+						} else {
+							url += '?practice=1';
+						}
+						window.location.href = url;
+						return;
+					}
+					
+					// Reload the page to restart the game
+					window.location.reload();
+				});
+			}
+			
+			if(backBtn){
+				backBtn.addEventListener('click', function(e){
+					e.preventDefault();
+					e.stopPropagation();
+					console.log('[GAME] Back to lobby clicked');
+					// Get the auth token from URL
+					var urlParams = new URLSearchParams(window.location.search);
+					var authToken = urlParams.get('auth');
+					
+					// Go back to arcade lobby
+					if(authToken){
+						window.location.href = '/webapp/arcade?auth=' + authToken;
+					} else {
+						window.location.href = '/webapp/arcade';
+					}
+				});
+			}
+		}, 100);
+
+			// Name prompt disabled (we now rely on Telegram identity / backend defaults)
+			// maybePromptName();
+
+	// Prevent game from receiving pointer while overlays visible
+	function shouldBlockEvent(target){ 
+		var nameOverlay = document.getElementById('astro-name-overlay');
+		var lbOverlay = document.getElementById('astro-lb-overlay');
+		var pauseOverlay = document.getElementById('game-pause-overlay');
+		var gameOverOverlay = document.getElementById('game-over-overlay');
+		
+		// Don't block clicks on buttons inside overlays
+		if(target && (target.tagName === 'BUTTON' || target.tagName === 'INPUT')){
+			return false;
+		}
+		
+		// Check if any modal overlay is visible
+		return (
+			(nameOverlay && nameOverlay.style.display==='flex') || 
+			(lbOverlay && lbOverlay.style.display==='flex') ||
+			(pauseOverlay && pauseOverlay.style.display) ||
+			(gameOverOverlay && gameOverOverlay.style.display==='flex')
+		);
+	}
+		['pointerdown','mousedown','touchstart','click'].forEach(function(evt){
+			document.addEventListener(evt, function(e){ if (shouldBlockEvent(e.target)){ e.stopImmediatePropagation(); e.preventDefault(); } }, true);
+		});
+		})();
+    </script>
+</body> 
+</html> 

@@ -1,0 +1,171 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover, interactive-widget=resizes-content" />
+  <title>Support Hub - AstroByte Admin</title>
+  <script src="https://telegram.org/js/telegram-web-app.js"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Urbanist:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/admin/admin.css?v=22">
+  <script src="/admin/admin_shared.js?v=1"></script>
+  <link rel="stylesheet" href="/admin/support-page.css?v=2">
+</head>
+<body class="admin-panel support-page">
+  <div class="app-container">
+    <!-- Top Header -->
+    <div class="top-header">
+      <div class="header-left">
+        <a href="/admin/" class="back-btn">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M19 12H5M12 19l-7-7 7-7"/>
+          </svg>
+        </a>
+        <div class="header-title">
+          <h1>Support Hub</h1>
+          <p>Real-time ticket management</p>
+        </div>
+      </div>
+      <span class="header-badge" id="headerBadge" style="display: none;">0</span>
+    </div>
+
+    <!-- Main Content -->
+    <div class="main-content">
+      <!-- Sidebar -->
+      <div class="sidebar">
+        <div class="sidebar-header">
+          <div class="search-box">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"></circle><path d="m21 21-4.35-4.35"></path></svg>
+            <input type="text" id="searchInput" placeholder="Search tickets..." onkeyup="searchTickets()">
+          </div>
+          <div class="filter-section">
+            <button class="filter-btn active" data-filter="all" onclick="filterTickets('all')"><span>All</span></button>
+            <button class="filter-btn" data-filter="open" onclick="filterTickets('open')"><span>Open</span></button>
+            <button class="filter-btn" data-filter="closed" onclick="filterTickets('closed')"><span>Closed</span></button>
+            <button class="filter-btn" data-filter="archived" onclick="filterTickets('archived')"><span>Archived</span></button>
+          </div>
+          <div class="stats-row">
+            <div class="stat-item" onclick="filterTickets('open'); hapticFeedback('light');" data-tooltip="Click to filter">
+              <div class="stat-number" id="statOpen">0</div>
+              <div class="stat-label">Open</div>
+            </div>
+            <div class="stat-item" onclick="filterTickets('closed'); hapticFeedback('light');" data-tooltip="Click to filter">
+              <div class="stat-number" id="statClosed">0</div>
+              <div class="stat-label">Closed</div>
+            </div>
+            <div class="stat-item" onclick="filterTickets('archived'); hapticFeedback('light');" data-tooltip="Click to filter">
+              <div class="stat-number" id="statArchived">0</div>
+              <div class="stat-label">Archived</div>
+            </div>
+            <div class="stat-item" onclick="filterTickets('all'); hapticFeedback('light');" data-tooltip="Total unread">
+              <div class="stat-number" id="statUnread">0</div>
+              <div class="stat-label">Unread</div>
+            </div>
+          </div>
+        </div>
+        <div class="tickets-scroll" id="ticketsList">
+          <!-- Tickets loaded here -->
+        </div>
+      </div>
+
+      <!-- Chat Area -->
+      <div class="chat-area" id="chatArea">
+        <div class="chat-header">
+          <div class="chat-user">
+            <button class="mobile-back" onclick="backToList()">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M19 12H5M12 19l-7-7 7-7"/>
+              </svg>
+            </button>
+            <div class="chat-avatar" id="chatAvatar">U</div>
+            <div class="chat-user-info">
+              <h3 id="chatName">Select a ticket</h3>
+              <p id="chatSubject">Choose a conversation</p>
+            </div>
+          </div>
+          <div class="chat-actions" id="chatActions" style="display: none;">
+            <div class="chat-actions-track">
+              <div class="chat-menu-accordion" id="chatMenuAccordion">
+                <button class="action-btn success" onclick="closeTicket(); closeChatMenu();" title="Close ticket">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>
+                </button>
+                <button class="action-btn" onclick="reopenTicket(); closeChatMenu();" title="Reopen ticket">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M21 12a9 9 0 1 1-3-6.7"/><path d="M21 3v7h-7"/>
+                  </svg>
+                </button>
+                <button class="action-btn" id="archiveAccordionBtn" onclick="toggleArchive(); closeChatMenu();" title="Archive ticket">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M21 8v13H3V8"/><path d="M1 3h22v5H1z"/><path d="M10 12h4"/>
+                  </svg>
+                </button>
+                <button class="action-btn danger" onclick="deleteTicket(); closeChatMenu();" title="Delete ticket">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
+                </button>
+              </div>
+            </div>
+            <button class="chat-menu-trigger" id="chatMenuTrigger" onclick="toggleChatMenu(event)" title="Actions">
+              <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <line x1="3" y1="6" x2="21" y2="6"/>
+                <line x1="3" y1="12" x2="21" y2="12"/>
+                <line x1="3" y1="18" x2="21" y2="18"/>
+              </svg>
+            </button>
+          </div>
+        </div>
+        <div class="ticket-info-bar" id="ticketInfoBar">
+          <div class="ticket-info-left">
+            <div class="pill status-open" id="ticketStatusPill"><span class="dot"></span><span id="ticketStatusText">open</span></div>
+            <div class="ticket-info-title" id="ticketMetaText">Ticket #—</div>
+          </div>
+          <div class="ticket-info-right">
+            <button class="mini-btn" id="copyTicketIdBtn" type="button" data-tooltip="Copy ticket id">Copy</button>
+          </div>
+        </div>
+        <div class="chat-messages" id="chatMessages">
+          <div class="chat-thread" id="chatThread">
+          <div class="empty">
+            <div class="empty-icon">💬</div>
+            <div class="empty-text">Select a conversation</div>
+            </div>
+          </div>
+          
+          <!-- Scroll to Bottom Button -->
+          <button class="scroll-to-bottom" id="scrollToBottom" onclick="scrollToLatestMessage()">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M12 5v14M19 12l-7 7-7-7"/>
+            </svg>
+          </button>
+        </div>
+        <div class="chat-input-box" id="chatInputBox" style="display: flex; align-items: center;">
+          <button class="keyboard-dismiss-btn" id="keyboardDismissBtn" type="button" title="Hide keyboard">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M4 6h16M4 10h16M4 14h16M8 18l4 3 4-3"/>
+            </svg>
+          </button>
+          <textarea id="messageInput" placeholder="Type a message..." rows="1" onkeydown="handleKey(event)" oninput="autoResize(this)"></textarea>
+          <button class="send-btn" id="sendBtn" type="button">
+            <svg viewBox="0 0 24 24" fill="currentColor"><path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/></svg>
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Loading Overlay -->
+  <div class="loading-overlay" id="loadingOverlay">
+    <div class="loading-overlay-spinner"></div>
+    <div class="loading-overlay-text" id="loadingText">Loading...</div>
+  </div>
+
+  <!-- Keyboard Shortcut Toast -->
+  <div class="shortcut-toast" id="shortcutToast">
+    <span class="shortcut-key" id="shortcutKey">Esc</span>
+    <span class="shortcut-desc" id="shortcutDesc">Close chat</span>
+  </div>
+
+  <script src="/admin/support-main.js?v=1"></script>
+  <script src="/admin/admin_customizer.js?v=8"></script>
+</body>
+</html>

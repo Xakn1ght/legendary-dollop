@@ -1,0 +1,886 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+  <title>AstroByte Arcade</title>
+  <script src="https://telegram.org/js/telegram-web-app.js"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg-deep: #0f172a;
+      --bg-star: #1e1b4b;
+      --primary: #818cf8;
+      --primary-glow: rgba(129, 140, 248, 0.5);
+      --accent: #f472b6;
+      --accent-glow: rgba(244, 114, 182, 0.5);
+      --gold: #fbbf24;
+      --text: #f8fafc;
+      --text-muted: #94a3b8;
+      --glass: rgba(30, 41, 59, 0.7);
+      --glass-border: rgba(255, 255, 255, 0.1);
+      --radius-lg: 24px;
+      --radius-md: 16px;
+      --radius-sm: 12px;
+    }
+
+    * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+    
+    body {
+      margin: 0;
+      padding: 0;
+      font-family: 'Poppins', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      background: var(--bg-deep);
+      color: var(--text);
+      overflow-x: hidden;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+
+    /* --- Background Animation --- */
+    .space-bg {
+      position: fixed;
+      top: 0; left: 0; width: 100%; height: 100%;
+      background: radial-gradient(circle at 50% 0%, #2e1065 0%, #0f172a 60%);
+      z-index: -1;
+      overflow: hidden;
+    }
+    
+    .star {
+      position: absolute;
+      background: white;
+      border-radius: 50%;
+      opacity: 0.3;
+      animation: twinkle var(--duration, 3s) infinite ease-in-out;
+    }
+    
+    @keyframes twinkle {
+      0%, 100% { opacity: 0.3; transform: scale(1); }
+      50% { opacity: 1; transform: scale(1.2); }
+    }
+    
+    /* --- Layout --- */
+    .container {
+      max-width: 480px;
+      margin: 0 auto;
+      width: 100%;
+      padding: 20px;
+      padding-top: calc(env(safe-area-inset-top) + 20px);
+      padding-bottom: calc(env(safe-area-inset-bottom) + 40px);
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+      flex: 1;
+    }
+
+    /* Platform specific container padding */
+    body.platform-android .container {
+      padding-top: calc(env(safe-area-inset-top) + 80px) !important;
+    }
+
+    body.platform-ios .container {
+      padding-top: calc(env(safe-area-inset-top) + 50px) !important;
+    }
+
+    /* --- Header & Mascot --- */
+    .header {
+      text-align: center;
+      margin-bottom: 10px;
+      position: relative;
+    }
+
+    /* Top Navigation Bar */
+    .nav-bar {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 0 4px;
+      z-index: 10;
+    }
+
+    .nav-btn {
+      width: 40px;
+      height: 40px;
+      border-radius: 12px;
+      background: rgba(255, 255, 255, 0.1);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: white;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+    .nav-btn:active { transform: scale(0.9); background: rgba(255,255,255,0.2); }
+
+    .mascot-container {
+      width: 120px;
+      height: 120px;
+      margin: 0 auto 16px;
+      position: relative;
+      animation: float 6s ease-in-out infinite;
+    }
+
+    @keyframes float {
+      0%, 100% { transform: translateY(0px) rotate(0deg); }
+      50% { transform: translateY(-15px) rotate(2deg); }
+    }
+
+    /* Cute Astronaut SVG */
+    .astro-svg {
+      width: 100%;
+      height: 100%;
+      filter: drop-shadow(0 10px 20px var(--primary-glow));
+    }
+    
+    .title {
+      font-size: 28px;
+      font-weight: 800;
+      background: linear-gradient(135deg, #fff 0%, #818cf8 100%);
+      -webkit-background-clip: text;
+      background-clip: text;
+      -webkit-text-fill-color: transparent;
+      margin: 0;
+      letter-spacing: -0.5px;
+      text-shadow: 0 10px 20px rgba(0,0,0,0.2);
+    }
+
+    .subtitle {
+      font-size: 14px;
+      color: var(--text-muted);
+      font-weight: 500;
+      margin-top: 4px;
+    }
+    
+    /* --- Cards Generic --- */
+    .card {
+      background: var(--glass);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      border: 1px solid var(--glass-border);
+      border-radius: var(--radius-lg);
+      padding: 20px;
+      box-shadow: 0 8px 32px rgba(0,0,0,0.2);
+      transition: transform 0.2s;
+    }
+
+    /* --- Pilot License (Profile) --- */
+    .pilot-card {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      padding: 14px 18px;
+    }
+
+    .pilot-avatar {
+      width: 44px;
+      height: 44px;
+      background: linear-gradient(135deg, var(--primary), var(--accent));
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 20px;
+      box-shadow: 0 4px 12px var(--primary-glow);
+    }
+
+    .pilot-info {
+      flex: 1;
+      overflow: hidden;
+    }
+    
+    .pilot-label {
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      color: var(--text-muted);
+      font-weight: 700;
+      margin-bottom: 2px;
+    }
+    
+    .pilot-name-input {
+      background: transparent;
+      border: none;
+      color: white;
+      font-size: 18px;
+      font-weight: 700;
+      width: 100%;
+      padding: 0;
+      outline: none;
+      border-bottom: 2px solid transparent;
+      transition: all 0.3s;
+    }
+
+    .pilot-name-input:focus {
+      border-bottom-color: var(--primary);
+    }
+    
+    .pilot-name-input::placeholder {
+      color: rgba(255,255,255,0.3);
+      font-style: italic;
+    }
+
+    .pilot-edit-icon {
+      color: var(--text-muted);
+      opacity: 0.5;
+    }
+
+    /* Leaderboard Toggle */
+    .lb-toggle-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 14px 18px;
+      background: rgba(255, 255, 255, 0.03);
+      border-top: 1px solid rgba(255, 255, 255, 0.08);
+      margin-top: 0;
+    }
+    .lb-toggle-label {
+      font-size: 13px;
+      color: var(--text-muted);
+      font-weight: 500;
+    }
+    .toggle-switch {
+      position: relative;
+      width: 44px;
+      height: 24px;
+      background: rgba(255, 255, 255, 0.15);
+      border-radius: 12px;
+      cursor: pointer;
+      transition: background 0.3s;
+    }
+    .toggle-switch.active {
+      background: linear-gradient(135deg, var(--primary), #6366f1);
+    }
+    .toggle-switch::after {
+      content: '';
+      position: absolute;
+      top: 2px;
+      left: 2px;
+      width: 20px;
+      height: 20px;
+      background: white;
+      border-radius: 50%;
+      transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+      box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+    }
+    .toggle-switch.active::after {
+      transform: translateX(20px);
+    }
+
+    /* --- Mission Control (Play) --- */
+    .mission-card {
+      text-align: center;
+      position: relative;
+      overflow: hidden;
+      border: 1px solid rgba(129, 140, 248, 0.3);
+      padding: 18px;
+    }
+
+    .mission-card::before {
+      content: '';
+      position: absolute;
+      top: 0; left: 0; right: 0; height: 2px;
+      background: linear-gradient(90deg, transparent, var(--primary), transparent);
+      opacity: 0.5;
+    }
+
+    .daily-badge {
+      display: inline-block;
+      background: rgba(129, 140, 248, 0.15);
+      color: var(--primary);
+      border: 1px solid rgba(129, 140, 248, 0.3);
+      font-size: 11px;
+      font-weight: 700;
+      padding: 4px 12px;
+      border-radius: 20px;
+      margin-bottom: 12px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    .play-btn {
+      width: 100%;
+      background: linear-gradient(135deg, var(--primary), #6366f1);
+      color: white;
+      border: none;
+      padding: 16px;
+      border-radius: var(--radius-md);
+      font-size: 18px;
+      font-weight: 800;
+      cursor: pointer;
+      box-shadow: 0 8px 24px var(--primary-glow);
+      transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 10px;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .play-btn::after {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background: linear-gradient(rgba(255,255,255,0.2), transparent);
+      opacity: 0;
+      transition: opacity 0.2s;
+    }
+
+    .play-btn:active {
+      transform: scale(0.98);
+    }
+    .play-btn:active::after { opacity: 1; }
+
+    .play-btn.played {
+      background: rgba(255, 255, 255, 0.05);
+      box-shadow: none;
+      border: 1px solid var(--glass-border);
+      color: var(--text-muted);
+      cursor: default;
+    }
+
+    /* --- Hall of Fame (Leaderboard) --- */
+    .lb-header {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 16px;
+      padding: 0 4px;
+    }
+
+    .lb-title {
+      font-size: 16px;
+      font-weight: 700;
+      flex: 1;
+      color: var(--text);
+    }
+
+    .lb-icon {
+      font-size: 20px;
+    }
+
+    .lb-list {
+      list-style: none;
+      padding: 0;
+      margin: 0;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+    
+    .lb-item {
+      display: flex;
+      align-items: center;
+      padding: 10px 14px;
+      background: rgba(255, 255, 255, 0.03);
+      border-radius: var(--radius-sm);
+      transition: background 0.2s;
+    }
+    
+    .lb-item:first-child { background: linear-gradient(90deg, rgba(251, 191, 36, 0.1), transparent); border-left: 2px solid var(--gold); }
+    .lb-item:nth-child(2) { border-left: 2px solid #94a3b8; }
+    .lb-item:nth-child(3) { border-left: 2px solid #b45309; }
+
+    .lb-rank {
+      width: 24px;
+      font-weight: 700;
+      font-size: 14px;
+      color: var(--text-muted);
+      text-align: center;
+      margin-right: 12px;
+    }
+    
+    .lb-item:first-child .lb-rank { color: var(--gold); font-size: 18px; }
+
+    .lb-name {
+      flex: 1;
+      font-weight: 600;
+      font-size: 14px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .lb-score {
+      font-family: 'Courier New', monospace;
+      font-weight: 700;
+      color: var(--primary);
+      font-size: 15px;
+    }
+
+    .lb-empty {
+      text-align: center;
+      padding: 30px;
+      color: var(--text-muted);
+      font-size: 14px;
+      font-style: italic;
+    }
+
+    /* --- Dialog --- */
+    .dialog-backdrop {
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.8);
+      backdrop-filter: blur(4px);
+      display: none;
+      align-items: center;
+      justify-content: center;
+      z-index: 100;
+      opacity: 0;
+      transition: opacity 0.2s;
+    }
+    
+    .dialog-backdrop.visible { opacity: 1; }
+
+    .dialog {
+      background: #1e293b;
+      width: 85%;
+      max-width: 320px;
+      border-radius: var(--radius-lg);
+      padding: 24px;
+      text-align: center;
+      border: 1px solid var(--glass-border);
+      transform: scale(0.9);
+      transition: transform 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+    }
+    
+    .dialog-backdrop.visible .dialog { transform: scale(1); }
+
+    .dialog h3 { margin: 0 0 8px; color: white; }
+    .dialog p { color: var(--text-muted); font-size: 14px; line-height: 1.5; margin: 0 0 20px; }
+    
+    .dialog-btn {
+      background: var(--primary);
+      color: white;
+      border: none;
+      padding: 12px 24px;
+      border-radius: 99px;
+      font-weight: 600;
+      width: 100%;
+      font-size: 14px;
+      cursor: pointer;
+    }
+
+    /* --- Secondary Button (Removed) --- */
+
+    /* --- Footer --- */
+    .footer {
+      text-align: center;
+      font-size: 11px;
+      color: rgba(255,255,255,0.2);
+      letter-spacing: 1px;
+      margin-top: auto;
+    }
+
+  </style>
+</head>
+<body>
+
+  <!-- Animated Background -->
+  <div class="space-bg" id="starfield"></div>
+
+  <div class="container">
+    <!-- Header -->
+    <header class="header">
+      <div class="nav-bar">
+        <div id="backBtn" class="nav-btn">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path><polyline points="9 22 9 12 15 12 15 22"></polyline></svg>
+        </div>
+      </div>
+
+      <div class="mascot-container">
+        <!-- Cute Astronaut SVG -->
+        <svg class="astro-svg" viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg">
+           <!-- Glow -->
+           <circle cx="100" cy="100" r="60" fill="rgba(129, 140, 248, 0.2)" />
+           <!-- Backpack -->
+           <rect x="50" y="70" width="100" height="80" rx="15" fill="#e2e8f0" />
+           <!-- Body -->
+           <circle cx="100" cy="95" r="55" fill="#f8fafc" />
+           <!-- Visor Reflection/Shadow -->
+           <path d="M100 40c-30.3 0-55 24.7-55 55s24.7 55 55 55 55-24.7 55-55-24.7-55-55-55zm0 95c-22 0-40-18-40-40s18-40 40-40 40 18 40 40-18 40-40 40z" fill="#cbd5e1" opacity="0.2"/>
+           <!-- Visor -->
+           <rect x="60" y="65" width="80" height="50" rx="25" fill="#1e1b4b" />
+           <!-- Visor Glare -->
+           <ellipse cx="115" cy="75" rx="10" ry="5" fill="rgba(255,255,255,0.8)" transform="rotate(-15 115 75)" />
+           <circle cx="75" cy="100" r="3" fill="rgba(255,255,255,0.5)" />
+           <!-- Antenna -->
+           <line x1="100" y1="40" x2="100" y2="20" stroke="#f8fafc" stroke-width="4" stroke-linecap="round"/>
+           <circle cx="100" cy="15" r="5" fill="#f472b6" />
+        </svg>
+      </div>
+      <h1 class="title">AstroByte</h1>
+      <div class="subtitle">Arcade Command Center</div>
+    </header>
+
+    <!-- Pilot Profile -->
+    <div class="card" style="padding: 0; overflow: hidden;">
+      <div class="pilot-card" style="border-radius: 0;">
+        <div class="pilot-avatar">
+          <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="12" cy="8" r="5" />
+            <path d="M20 21a8 8 0 1 0-16 0" />
+            <line x1="3.1" y1="6.9" x2="7" y2="10.5" />
+            <line x1="20.9" y1="6.9" x2="17" y2="10.5" />
+          </svg>
+        </div>
+        <div class="pilot-info">
+          <div class="pilot-label">Pilot License</div>
+          <input type="text" id="pilotName" class="pilot-name-input" placeholder="Enter Name..." maxlength="20" autocomplete="off" spellcheck="false">
+        </div>
+        <div class="pilot-edit-icon">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg>
+        </div>
+      </div>
+      <div class="lb-toggle-row">
+        <span class="lb-toggle-label">Show on Leaderboard</span>
+        <div class="toggle-switch active" id="lbToggle"></div>
+      </div>
+    </div>
+
+    <!-- Play Action -->
+    <div class="card mission-card">
+      <div class="daily-badge">Daily Mission</div>
+      <h2 style="margin:0 0 8px; font-size:20px;">SuperBugz Defense</h2>
+      <p style="margin:0 0 20px; font-size:13px; color:var(--text-muted);">Defend the station from alien swarms!</p>
+      
+      <button id="playBtn" class="play-btn">
+        <span class="icon">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+             <path d="M4.5 16.5c-1.5 1.26-2 5-2 5s3.74-.5 5-2c.71-.84.7-2.13-.09-2.91a2.18 2.18 0 0 0-2.91-.09z"/>
+             <path d="M12 15l-3-3a22 22 0 0 1 2-3.95A12.88 12.88 0 0 1 22 2c0 2.72-.78 7.5-6 11a22.35 22.35 0 0 1-4 2z"/>
+             <path d="M9 12H4s.55-3.03 2-4c1.62-1.08 5 0 5 0"/>
+             <path d="M12 15v5s3.03-.55 4-2c1.08-1.62 0-5 0-5"/>
+          </svg>
+        </span>
+        <span class="text">Launch Mission</span>
+      </button>
+    </div>
+
+    <!-- Leaderboard -->
+    <div class="card">
+      <div class="lb-header">
+        <span class="lb-icon">
+           <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#fbbf24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+             <path d="M6 9H4.5a2.5 2.5 0 0 1 0-5H6"/>
+             <path d="M18 9h1.5a2.5 2.5 0 0 0 0-5H18"/>
+             <path d="M4 22h16"/>
+             <path d="M10 14.66V17c0 .55-.47.98-.97 1.21C7.85 18.75 7 20.24 7 22"/>
+             <path d="M14 14.66V17c0 .55.47.98.97 1.21C16.15 18.75 17 20.24 17 22"/>
+             <path d="M18 2H6v7a6 6 0 0 0 12 0V2z"/>
+           </svg>
+        </span>
+        <span class="lb-title">Daily Aces</span>
+        <span style="font-size:11px; color:var(--text-muted);">Top 10</span>
+      </div>
+      <ul id="leaderboardList" class="lb-list">
+        <li class="lb-empty">Loading flight data...</li>
+      </ul>
+    </div>
+
+    <footer class="footer">
+      ASTROBYTE SYSTEMS v2.5
+    </footer>
+  </div>
+
+  <!-- Simple Modal for alerts -->
+  <div id="dialogBackdrop" class="dialog-backdrop">
+    <div class="dialog">
+      <h3 id="dialogTitle">Alert</h3>
+      <p id="dialogMessage">Message goes here.</p>
+      <button class="dialog-btn" onclick="closeDialog()">Understood</button>
+    </div>
+  </div>
+
+  <script>
+    // --- Logic ---
+    const tg = window.Telegram && window.Telegram.WebApp ? window.Telegram.WebApp : null;
+    let playedToday = false;
+    
+    // Initialize
+    (function init(){
+      // Generate stars
+      const bg = document.getElementById('starfield');
+      for(let i=0; i<50; i++){
+        const s = document.createElement('div');
+        s.className = 'star';
+        s.style.left = Math.random() * 100 + '%';
+        s.style.top = Math.random() * 100 + '%';
+        s.style.width = Math.random() * 3 + 'px';
+        s.style.height = s.style.width;
+        s.style.setProperty('--duration', (Math.random() * 3 + 2) + 's');
+        bg.appendChild(s);
+      }
+
+      // Platform Detection
+      let detectedPlatform = '';
+      if (window.tg && window.tg.platform) {
+        detectedPlatform = String(window.tg.platform).toLowerCase();
+      } else {
+        const ua = navigator.userAgent.toLowerCase();
+        if (ua.includes('android')) detectedPlatform = 'android';
+        else if (ua.includes('iphone') || ua.includes('ipad') || ua.includes('ios')) detectedPlatform = 'ios';
+      }
+
+      if (detectedPlatform.includes('android')) {
+        document.body.classList.add('platform-android');
+      } else if (detectedPlatform.includes('ios')) {
+        document.body.classList.add('platform-ios');
+      }
+
+      if(tg) {
+        tg.expand();
+        tg.enableClosingConfirmation();
+        if(tg.setHeaderColor) tg.setHeaderColor('#0f172a');
+        if(tg.setBackgroundColor) tg.setBackgroundColor('#0f172a');
+      }
+      
+      setupNameInput();
+      checkStatus();
+      loadLeaderboard();
+      
+      // Re-check on focus (in case user played and came back)
+      window.addEventListener('focus', checkStatus);
+    })();
+    
+    function setupNameInput(){
+      const input = document.getElementById('pilotName');
+      
+      // Name will be loaded from server in checkStatus()
+      // Fallback to localStorage if server hasn't responded yet
+      const cached = localStorage.getItem('astro_display_name');
+      if(cached) input.value = cached;
+
+      // Auto-save on blur
+      input.addEventListener('blur', () => {
+        const val = input.value.trim();
+        if(val) {
+          saveNameToServer(val);
+        }
+      });
+      
+      // Save on enter
+      input.addEventListener('keydown', (e) => {
+        if(e.key === 'Enter') input.blur();
+      });
+    }
+
+    async function saveNameToServer(name){
+      const urlParams = new URLSearchParams(window.location.search);
+      const auth = urlParams.get('auth') || '';
+      
+      try{
+        const res = await fetch(`/api/arcade/save-name?auth=${encodeURIComponent(auth)}`, {
+          method: 'POST',
+          headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify({ display_name: name })
+        });
+        const data = await res.json();
+        
+        if(data.ok){
+          // Update local cache
+          localStorage.setItem('astro_display_name', data.display_name);
+          console.log('[ARCADE] Name saved:', data.display_name);
+        }
+      } catch(e) { 
+        console.error('[ARCADE] Failed to save name:', e);
+      }
+    }
+    
+    async function checkStatus(){
+      // Optimistic check
+      const lastPlayed = localStorage.getItem('astro_last_played_date');
+      const today = new Date().toDateString();
+      if(lastPlayed === today) setPlayedState(true);
+
+      // Server check
+      try {
+        const urlParams = new URLSearchParams(window.location.search);
+        const auth = urlParams.get('auth') || '';
+        const initData = tg ? (tg.initData||'') : '';
+        
+        const res = await fetch(`/api/arcade/status?auth=${encodeURIComponent(auth)}&init_data=${encodeURIComponent(initData)}&_t=${Date.now()}`);
+        const data = await res.json();
+        
+        if(data.ok){
+          if(data.played_today){
+            localStorage.setItem('astro_last_played_date', today);
+            setPlayedState(true);
+          }
+          
+          // Load display name from server (synced across devices)
+          const input = document.getElementById('pilotName');
+          if(data.display_name && input){
+            input.value = data.display_name;
+            // Update local cache
+            localStorage.setItem('astro_display_name', data.display_name);
+          }
+          
+          // Update leaderboard toggle state
+          const lbToggle = document.getElementById('lbToggle');
+          if(lbToggle){
+            const showOnLb = data.show_on_leaderboard !== false;
+            if(showOnLb){
+              lbToggle.classList.add('active');
+            } else {
+              lbToggle.classList.remove('active');
+            }
+          }
+        }
+      } catch(e) { console.error('Status check error', e); }
+    }
+    
+    // Leaderboard toggle handler
+    (function initLbToggle(){
+      const toggle = document.getElementById('lbToggle');
+      if(!toggle) return;
+      
+      toggle.addEventListener('click', async function(){
+        const isActive = toggle.classList.contains('active');
+        const newValue = !isActive;
+        
+        // Optimistic update
+        if(newValue){
+          toggle.classList.add('active');
+        } else {
+          toggle.classList.remove('active');
+        }
+        
+        // Send to server
+        try {
+          const urlParams = new URLSearchParams(window.location.search);
+          const auth = urlParams.get('auth') || '';
+          
+          const res = await fetch(`/api/arcade/toggle-leaderboard?auth=${encodeURIComponent(auth)}`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ show_on_leaderboard: newValue })
+          });
+          const data = await res.json();
+          
+          if(data.ok){
+            console.log('[ARCADE] Leaderboard visibility updated:', data.show_on_leaderboard);
+          }
+        } catch(e){
+          console.error('Failed to toggle leaderboard', e);
+          // Revert on error
+          if(newValue){
+            toggle.classList.remove('active');
+          } else {
+            toggle.classList.add('active');
+          }
+        }
+      });
+    })();
+
+    function setPlayedState(isPlayed){
+      playedToday = isPlayed;
+      const btn = document.getElementById('playBtn');
+      if(isPlayed){
+        btn.classList.add('played');
+        btn.innerHTML = `
+          <span class="icon">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path>
+              <polyline points="22 4 12 14.01 9 11.01"></polyline>
+            </svg>
+          </span>
+          <span class="text">Mission Complete</span>
+        `;
+      } else {
+        btn.classList.remove('played');
+        btn.innerHTML = `
+          <span class="icon">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+               <path d="M4.5 16.5c-1.5 1.26-2 5-2 5s3.74-.5 5-2c.71-.84.7-2.13-.09-2.91a2.18 2.18 0 0 0-2.91-.09z"/>
+               <path d="M12 15l-3-3a22 22 0 0 1 2-3.95A12.88 12.88 0 0 1 22 2c0 2.72-.78 7.5-6 11a22.35 22.35 0 0 1-4 2z"/>
+               <path d="M9 12H4s.55-3.03 2-4c1.62-1.08 5 0 5 0"/>
+               <path d="M12 15v5s3.03-.55 4-2c1.08-1.62 0-5 0-5"/>
+            </svg>
+          </span>
+          <span class="text">Launch Mission</span>
+        `;
+      }
+    }
+
+    // Play Button Logic
+    document.getElementById('playBtn').addEventListener('click', () => {
+      if(playedToday){
+        showDialog('Mission Debrief', 'You have already completed your daily ranked mission. Come back tomorrow for a new challenge!');
+        return;
+      }
+      
+      // Navigate
+      let url = '/webapp/arcade/astrobugz/index.html?practice=0';
+      const urlParams = new URLSearchParams(window.location.search);
+      const auth = urlParams.get('auth');
+      if (auth) url += '&auth=' + encodeURIComponent(auth);
+      
+      window.location.href = url;
+    });
+
+    // Back Button Logic
+    document.getElementById('backBtn').addEventListener('click', () => {
+      let url = '/webapp/dashboard/index.html';
+      const urlParams = new URLSearchParams(window.location.search);
+      const auth = urlParams.get('auth');
+      if (auth) url += '?auth=' + encodeURIComponent(auth);
+      window.location.href = url;
+    });
+
+    async function loadLeaderboard(){
+      const list = document.getElementById('leaderboardList');
+      try {
+        const res = await fetch('/api/arcade/leaderboard?period=daily&limit=10');
+        const data = await res.json();
+        
+        if(!data.leaderboard || data.leaderboard.length === 0){
+          list.innerHTML = '<li class="lb-empty">No flight records yet.<br>Be the first to launch!</li>';
+          return;
+        }
+
+        list.innerHTML = data.leaderboard.map(item => `
+          <li class="lb-item">
+            <span class="lb-rank">${item.rank}</span>
+            <span class="lb-name">${escapeHtml(item.name)}</span>
+            <span class="lb-score">${item.score}</span>
+          </li>
+        `).join('');
+      } catch(e) {
+        list.innerHTML = '<li class="lb-empty">Comms Offline (Error loading data)</li>';
+      }
+    }
+
+    function escapeHtml(text) {
+      if(!text) return 'Unknown Pilot';
+      return text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#039;");
+    }
+
+    // Dialog logic
+    function showDialog(title, msg){
+      document.getElementById('dialogTitle').innerText = title;
+      document.getElementById('dialogMessage').innerText = msg;
+      const bd = document.getElementById('dialogBackdrop');
+      bd.style.display = 'flex';
+      // Force reflow
+      bd.offsetHeight; 
+      bd.classList.add('visible');
+        }
+    
+    window.closeDialog = function(){
+      const bd = document.getElementById('dialogBackdrop');
+      bd.classList.remove('visible');
+      setTimeout(() => {
+        bd.style.display = 'none';
+      }, 200);
+    }
+  </script>
+</body>
+</html>

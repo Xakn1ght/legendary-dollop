@@ -1,0 +1,65 @@
+"""Marzban, subscription links, and dashboard purchase/discount env configuration."""
+
+import os
+
+# Backend panel/API details
+# IMPORTANT: Set these in your .env file for security.
+MARZBAN_USERNAME = os.environ.get("MARZBAN_USERNAME", "mykp")
+MARZBAN_PASSWORD = os.environ.get("MARZBAN_PASSWORD", "")
+MARZBAN_BASE_URL = os.environ.get("MARZBAN_BASE_URL", "https://home.afffb.com:8888")
+
+# Subscription link details
+SUBLINK = os.environ.get("SUBLINK", "astrobyte.org/sub")
+# Optional: base64 of the public subscription link base (used by some legacy clients/tools)
+SUBLINK_BASE64 = os.environ.get("SUBLINK_BASE64", "")
+
+# Dashboard: subscription link restrictions
+# When enabled, the dashboard will only accept subscription links that come from
+# specific domains (e.g., astrobyte.org). Configure as a comma-separated list.
+DASHBOARD_SUBSCRIPTION_ALLOWED_DOMAINS = [
+    d.strip().lower()
+    for d in os.environ.get("DASHBOARD_SUBSCRIPTION_ALLOWED_DOMAINS", "astrobyte.org").split(",")
+    if d.strip()
+]
+DASHBOARD_SUBSCRIPTION_DOMAIN_ENFORCE = (
+    os.environ.get("DASHBOARD_SUBSCRIPTION_DOMAIN_ENFORCE", "true").lower() == "true"
+)
+
+# Purchase: automatic discounts (VIP / global events)
+VIP_PURCHASE_DISCOUNT_ENABLED = os.environ.get("VIP_PURCHASE_DISCOUNT_ENABLED", "true").lower() == "true"
+try:
+    VIP_PURCHASE_DISCOUNT_PERCENT = int(os.environ.get("VIP_PURCHASE_DISCOUNT_PERCENT", "20"))
+except Exception:
+    VIP_PURCHASE_DISCOUNT_PERCENT = 20
+VIP_PURCHASE_DISCOUNT_PERCENT = max(0, min(VIP_PURCHASE_DISCOUNT_PERCENT, 90))
+
+# JSON list of global discounts applied to everyone, e.g.:
+#   [{"percent":10,"label_en":"New Year","label_fa":"تخفیف نوروز"}]
+GLOBAL_PURCHASE_DISCOUNTS: list = []
+try:
+    import json as _json
+
+    raw = (os.environ.get("GLOBAL_PURCHASE_DISCOUNTS_JSON", "") or "").strip()
+    if raw:
+        parsed = _json.loads(raw)
+        if isinstance(parsed, list):
+            for item in parsed:
+                if not isinstance(item, dict):
+                    continue
+                pct = item.get("percent", 0)
+                try:
+                    pct = int(pct)
+                except Exception:
+                    pct = 0
+                pct = max(0, min(pct, 90))
+                if pct <= 0:
+                    continue
+                GLOBAL_PURCHASE_DISCOUNTS.append(
+                    {
+                        "percent": pct,
+                        "label_en": str(item.get("label_en") or item.get("label") or "Discount"),
+                        "label_fa": str(item.get("label_fa") or item.get("label") or "تخفیف"),
+                    }
+                )
+except Exception:
+    GLOBAL_PURCHASE_DISCOUNTS = []

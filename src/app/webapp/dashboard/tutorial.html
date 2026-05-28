@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, viewport-fit=cover" />
+  <meta name="referrer" content="no-referrer" />
+  <title>Tutorial - AstroByte</title>
+  <script>
+    (function(){
+      try{
+        let platform = 'unknown';
+        if (window.Telegram?.WebApp?.platform) {
+          platform = window.Telegram.WebApp.platform.toLowerCase();
+        } else {
+          const ua = (navigator.userAgent || '').toLowerCase();
+          if (ua.includes('android')) platform = 'android';
+          else if (ua.includes('iphone') || ua.includes('ipad')) platform = 'ios';
+        }
+        // Apply to documentElement since body doesn't exist yet in <head>
+        if (platform === 'android') document.documentElement.classList.add('platform-android');
+        else if (platform === 'ios') document.documentElement.classList.add('platform-ios');
+      }catch(_){}
+      try {
+        const savedTheme = localStorage.getItem('theme');
+        if (savedTheme === 'light' || savedTheme === 'dark') {
+          document.documentElement.setAttribute('data-theme', savedTheme);
+        }
+      } catch(_) {}
+      try {
+        const savedLang = localStorage.getItem('lang');
+        if (savedLang === 'fa' || savedLang === 'en') {
+          document.documentElement.lang = savedLang;
+          document.documentElement.dir = savedLang === 'fa' ? 'rtl' : 'ltr';
+        }
+      } catch(_) {}
+    })();
+  </script>
+  <script src="https://telegram.org/js/telegram-web-app.js"></script>
+  <script>
+    // Security: stash `?auth=...` into sessionStorage and remove it from the visible URL ASAP.
+    (function () {
+      try {
+        const url = new URL(window.location.href);
+        const auth = url.searchParams.get('auth');
+        if (auth && auth.length > 10) {
+          let stored = false;
+          try {
+            sessionStorage.setItem('tma_url_auth', auth);
+            stored = (sessionStorage.getItem('tma_url_auth') === auth);
+          } catch (_) {}
+          if (stored) {
+            url.searchParams.delete('auth');
+            window.history.replaceState({}, document.title, url.pathname + (url.searchParams.toString() ? ('?' + url.searchParams.toString()) : '') + (url.hash || ''));
+          }
+        }
+      } catch (_) {}
+    })();
+  </script>
+  <script src="/webapp/dashboard/ui.js" defer></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Urbanist:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/rastikerdar/vazirmatn@v33.003/Vazirmatn-font-face.css">
+  <link rel="stylesheet" href="/webapp/dashboard/css/tutorial.css?v=1">
+  <link rel="stylesheet" href="/webapp/dashboard/css/glass.css?v=12">
+</head>
+<body>
+  <div id="astro-lava" aria-hidden="true"><div class="lava-blob lava-blob-1"></div><div class="lava-blob lava-blob-2"></div><div class="lava-blob lava-blob-3"></div><div class="lava-blob lava-blob-4"></div><div class="lava-blob lava-blob-5"></div></div>
+  <header class="header">
+    <div class="header-row">
+      <button class="btn" type="button" id="backBtn">Back</button>
+      <div class="header-title">Tutorial</div>
+      <div style="width:74px;"></div>
+    </div>
+  </header>
+  <div class="wrap">
+    <div class="card">
+      <div class="title">Tutorial (Placeholder)</div>
+      <div class="muted">
+        Use this page to build your onboarding/tutorial flow. This placeholder is here so routing + theme/lang wiring is ready.
+      </div>
+      <div class="list">
+	        <div class="item">
+	          <div class="h">1) Add a subscription</div>
+	          <div class="p">Explain where to paste the subscription link and how to switch between subscriptions.</div>
+	        </div>
+        <div class="item">
+          <div class="h">2) Check usage</div>
+          <div class="p">Describe remaining, used, expiry, and the connection ring.</div>
+        </div>
+        <div class="item">
+          <div class="h">3) Buy / Charge</div>
+          <div class="p">Link to purchase and charging pages, and outline common troubleshooting.</div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <script src="/webapp/dashboard/js/tutorial-main.js?v=1"></script>
+</body>
+</html>

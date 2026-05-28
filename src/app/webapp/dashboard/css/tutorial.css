@@ -1,0 +1,77 @@
+@import url("./tokens.css");
+
+*{ box-sizing:border-box; margin:0; padding:0; }
+html, body{
+  height: 100%;
+  color: var(--text);
+  font-family: 'Urbanist', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
+  background: linear-gradient(145deg, var(--bg2), var(--bg1));
+}
+html[lang="fa"], html[lang="fa"] body{
+  font-family: 'Vazirmatn', 'Urbanist', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  direction: rtl;
+}
+.wrap{ max-width: 440px; margin: 0 auto; padding: 18px; padding-bottom: calc(18px + env(safe-area-inset-bottom)); }
+.header{
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  margin: 0 auto;
+  max-width: 440px;
+  padding: 16px 18px;
+  padding-top: calc(env(safe-area-inset-top) + 16px);
+  background: rgba(13, 26, 34, 0.92);
+  backdrop-filter: blur(18px) saturate(180%);
+  border-bottom: 1px solid rgba(255,255,255,0.06);
+}
+/* Platform-specific header padding - Applied to html element */
+html.platform-android .header{
+  padding-top: calc(env(safe-area-inset-top) + 80px) !important;
+}
+html.platform-ios .header{
+  padding-top: calc(env(safe-area-inset-top) + 50px) !important;
+}
+.header-row{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap: 10px;
+}
+.header-title{
+  font-size: 14px;
+  font-weight: 900;
+  letter-spacing: .2px;
+  color: var(--text);
+}
+.wrap{ padding-top: 0; }
+.card{
+  margin-top: 14px;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 20px;
+  padding: 16px;
+  box-shadow: 0 10px 28px rgba(0,0,0,0.18);
+}
+.title{ font-size: 18px; font-weight: 900; letter-spacing: .2px; }
+.btn{
+  border-radius: 14px;
+  border: 1px solid var(--line);
+  background: var(--chip);
+  color: var(--text);
+  font-weight: 900;
+  font-size: 13px;
+  padding: 10px 12px;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+.btn:hover{ background: var(--chipHover); }
+.muted{ color: var(--muted); font-size: 13px; line-height: 1.6; margin-top: 10px; }
+.list{ margin-top: 12px; display:grid; gap: 10px; }
+.item{
+  border: 1px solid var(--line);
+  background: var(--panel2);
+  border-radius: 16px;
+  padding: 12px;
+}
+.item .h{ font-weight: 900; font-size: 13px; margin-bottom: 6px; }
+.item .p{ color: var(--muted); font-size: 12px; line-height: 1.6; }

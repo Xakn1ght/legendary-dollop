@@ -1,0 +1,23 @@
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "asstroo"
+version = "0.1.0"
+description = "Telegram bot + web dashboard platform (ASSTROO)"
+requires-python = ">=3.10"
+# Install runtime deps: pip install -r config/requirements.txt
+# Then editable package: pip install -e .
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.ruff]
+line-length = 120
+target-version = "py310"
+src = ["src/app"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I"]
+ignore = ["E501"]

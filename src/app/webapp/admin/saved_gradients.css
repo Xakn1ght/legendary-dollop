@@ -1,0 +1,68 @@
+/* ========================================
+   SAVED GRADIENT BACKGROUNDS
+   These are custom gradient presets saved for future use.
+   To use: add data-v3-bg="gradient1|gradient2|gradient3" to body
+   ======================================== */
+
+/* Gradient 1: Yellow-green smooth gradient (bright lime to deep green) */
+body.admin-panel[data-v3-bg="gradient1"]::before {
+  background: 
+    linear-gradient(145deg, 
+      #d4e157 0%,
+      #c6dc3a 15%,
+      #a4d025 35%,
+      #7cb342 55%,
+      #558b2f 75%,
+      #33691e 100%
+    );
+  opacity: 1;
+}
+
+/* Gradient 2: Dark forest green gradient (muted, black-heavy) */
+body.admin-panel[data-v3-bg="gradient2"]::before {
+  background:
+    radial-gradient(ellipse 120% 80% at 45% 30%, rgba(76, 139, 52, 0.3), transparent 50%),
+    radial-gradient(ellipse 100% 90% at 60% 70%, rgba(33, 94, 33, 0.25), transparent 55%),
+    radial-gradient(ellipse 80% 60% at 25% 55%, rgba(56, 100, 40, 0.2), transparent 45%),
+    linear-gradient(160deg, 
+      #0a1a0a 0%,
+      #0d2010 15%,
+      #142914 30%,
+      #1a3a1a 45%,
+      #1e4620 55%,
+      #1a3a1a 65%,
+      #142914 78%,
+      #0d2010 88%,
+      #050d05 100%
+    );
+  opacity: 1;
+}
+
+/* Gradient 3: Organic yellow-green blobs (dynamic, natural feel) */
+@keyframes v3Gradient3Shift {
+  0% { background-position: 0% 50%, 100% 50%, 50% 0%; }
+  50% { background-position: 100% 50%, 0% 50%, 50% 100%; }
+  100% { background-position: 0% 50%, 100% 50%, 50% 0%; }
+}
+
+body.admin-panel[data-v3-bg="gradient3"]::before {
+  background:
+    radial-gradient(ellipse 70% 60% at 30% 25%, rgba(212, 225, 87, 0.9), transparent 50%),
+    radial-gradient(ellipse 80% 70% at 70% 65%, rgba(139, 195, 74, 0.75), transparent 50%),
+    radial-gradient(ellipse 90% 80% at 55% 40%, rgba(174, 213, 129, 0.6), transparent 55%),
+    radial-gradient(ellipse 60% 50% at 80% 20%, rgba(205, 220, 57, 0.5), transparent 45%),
+    radial-gradient(ellipse 50% 40% at 15% 70%, rgba(104, 159, 56, 0.7), transparent 40%),
+    linear-gradient(135deg, 
+      #1b5e20 0%,
+      #2e7d32 25%,
+      #388e3c 45%,
+      #43a047 60%,
+      #388e3c 75%,
+      #2e7d32 90%,
+      #1b5e20 100%
+    );
+  background-size: 200% 200%, 200% 200%, 150% 150%, 180% 180%, 160% 160%, 100% 100%;
+  animation: v3Gradient3Shift 15s ease-in-out infinite;
+  opacity: 1;
+}
+

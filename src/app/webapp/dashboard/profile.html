@@ -1,0 +1,608 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, viewport-fit=cover" />
+  <meta name="referrer" content="no-referrer" />
+  <script src="https://telegram.org/js/telegram-web-app.js"></script>
+  <script src="/webapp/dashboard/js/head-boot.js"></script>
+  <link rel="stylesheet" href="/webapp/dashboard/scrollbar-hide.css">
+</head>
+<body>
+  <div id="astro-lava" aria-hidden="true"><div class="lava-blob lava-blob-1"></div><div class="lava-blob lava-blob-2"></div><div class="lava-blob lava-blob-3"></div><div class="lava-blob lava-blob-4"></div><div class="lava-blob lava-blob-5"></div></div>
+  <div class="content">
+    <!-- ALL STYLES MUST BE INSIDE .content FOR DASHBOARD INJECTION -->
+    <link rel="stylesheet" href="/webapp/dashboard/css/profile.css">
+    <link rel="stylesheet" href="/webapp/dashboard/css/glass.css?v=12">
+    
+    <!-- Profile Hero Card -->
+    <section class="profile-hero">
+      <div class="profile-header">
+        <div class="profile-avatar-wrapper">
+          <div class="profile-avatar-orbit">
+            <span class="orbit-icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24">
+                <path d="M12 2l1.8 6.2L20 10l-6.2 1.8L12 18l-1.8-6.2L4 10l6.2-1.8L12 2z"/>
+                <path d="M19 13l.9 3.1L23 17l-3.1.9L19 21l-.9-3.1L15 17l3.1-.9L19 13z"/>
+              </svg>
+            </span>
+          </div>
+          <div class="profile-avatar" id="userAvatar">?</div>
+        </div>
+        <div class="profile-info">
+          <div class="profile-name" id="userName">...</div>
+          <div class="profile-username" id="userUsername">@username</div>
+          <div class="profile-badges" id="userBadges">
+            <span class="profile-badge" id="userLevel">
+              <span class="svg-icon" aria-hidden="true">
+                <svg viewBox="0 0 24 24"><path d="M12 2l2.2 7.2L22 12l-7.8 2.8L12 22l-2.2-7.2L2 12l7.8-2.8L12 2z"/></svg>
+              </span>
+              <span id="userLevelText">Level 1</span>
+            </span>
+            <span class="profile-badge" id="userCategory" style="background:rgba(52, 211, 153, 0.16);">
+              <span class="svg-icon" aria-hidden="true">
+                <svg viewBox="0 0 24 24"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><path d="M12 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8z"/></svg>
+              </span>
+              <span id="userCategoryText">Free</span>
+            </span>
+          </div>
+        </div>
+      </div>
+      
+      <div class="profile-stats-grid">
+        <div class="profile-stat-item">
+          <div class="profile-stat-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0z"/><path d="M12 7v10"/><path d="M9.5 9.5c0-1.1 1.1-2 2.5-2s2.5.9 2.5 2-1.1 2-2.5 2-2.5.9-2.5 2 1.1 2 2.5 2 2.5-.9 2.5-2"/></svg></div>
+          <div class="profile-stat-value" id="statCredit">0</div>
+          <div class="profile-stat-label" data-i18n="credit">Credit</div>
+        </div>
+        <div class="profile-stat-item">
+          <div class="profile-stat-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></svg></div>
+          <div class="profile-stat-value" id="statLevel">1</div>
+          <div class="profile-stat-label" data-i18n="level">Level</div>
+        </div>
+        <div class="profile-stat-item">
+          <div class="profile-stat-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M12 2l2.9 6.6 7.1.6-5.4 4.6 1.6 7-6.2-3.7-6.2 3.7 1.6-7-5.4-4.6 7.1-.6L12 2z"/></svg></div>
+          <div class="profile-stat-value" id="statStars">0</div>
+          <div class="profile-stat-label" data-i18n="stars">Stars</div>
+        </div>
+        <div class="profile-stat-item">
+          <div class="profile-stat-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><path d="M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8z"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg></div>
+          <div class="profile-stat-value" id="statReferrals">0</div>
+          <div class="profile-stat-label" data-i18n="referrals">Referrals</div>
+        </div>
+      </div>
+      
+      <!-- VIP Purchase Section -->
+      <div class="vip-promo-section" id="vipPromoSection">
+        <div class="vip-promo-content">
+          <div class="vip-promo-icon" aria-hidden="true">
+            <svg viewBox="0 0 24 24"><path d="M3 7l4 3 5-6 5 6 4-3v14H3V7z"/><path d="M3 21h18"/></svg>
+          </div>
+          <div class="vip-promo-text">
+            <div class="vip-promo-title" id="vipPromoTitle">Upgrade to VIP</div>
+            <div class="vip-promo-desc" id="vipPromoDesc">20% discount on all purchases + exclusive plans</div>
+          </div>
+        </div>
+        <button class="vip-promo-btn" id="vipPromoBtn">
+          <span id="vipBtnText">Get VIP</span>
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
+        </button>
+      </div>
+    </section>
+
+    <!-- XP Progress -->
+    <section class="profile-section">
+      <div class="profile-section-title">
+        <div class="icon-box">
+          <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+            <path d="M12 2L14.5 9.5L22 12L14.5 14.5L12 22L9.5 14.5L2 12L9.5 9.5L12 2Z"/>
+          </svg>
+        </div>
+        <span data-i18n="progressRewards">Progress & Rewards</span>
+      </div>
+      
+      <div class="xp-progress-section">
+        <div class="xp-progress-header">
+          <span class="xp-progress-title" data-i18n="experiencePoints">Experience Points</span>
+          <span class="xp-progress-value" id="xpValue">0 / 100 XP</span>
+        </div>
+        <div class="profile-progress-bar">
+          <div class="profile-progress-fill" id="xpProgress" style="width:0%"></div>
+        </div>
+        <div class="xp-progress-levels">
+          <span class="xp-level current" id="currentLevel">Level 1</span>
+          <span class="xp-level" id="nextLevel">Level 2</span>
+        </div>
+      </div>
+      
+      <div class="profile-info-row" style="margin-top:16px;">
+        <span class="profile-info-label"><span class="emoji" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M20 12v10H4V12"/><path d="M2 7h20v5H2z"/><path d="M12 22V7"/><path d="M12 7c-2.5 0-4.5-2-4.5-4.5S9.5 2 12 5c2.5-3 4.5-1.5 4.5.5S14.5 7 12 7z"/></svg></span> <span data-i18n="loyaltyPoints">Loyalty Points</span></span>
+        <span class="profile-info-value" id="infoLoyalty">0</span>
+      </div>
+      <div class="profile-info-row">
+        <span class="profile-info-label"><span class="emoji" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M21 16V8a2 2 0 0 0-1-1.73L13 2.27a2 2 0 0 0-2 0L4 6.27A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4a2 2 0 0 0 1-1.73z"/><path d="M3.3 7l8.7 5 8.7-5"/><path d="M12 22V12"/></svg></span> <span data-i18n="activeSubscriptions">Active Subscriptions</span></span>
+        <span class="profile-info-value" id="infoSubs">0</span>
+      </div>
+    </section>
+
+    <!-- Achievements Section -->
+    <section class="profile-section">
+      <div class="profile-section-title">
+        <div class="icon-box">
+          <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+            <path d="M12 2L15.09 8.26L22 9.27L17 14.14L18.18 21.02L12 17.77L5.82 21.02L7 14.14L2 9.27L8.91 8.26L12 2Z"/>
+          </svg>
+        </div>
+        <span data-i18n="achievements">Achievements</span>
+      </div>
+      
+      <div class="achievements-grid" id="achievementsGrid">
+        <div class="achievement-item">
+          <div class="achievement-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M14 9l-5 5"/><path d="M9 9h.01"/><path d="M15 15h.01"/><path d="M12 2c4 4 6 8 6 12a6 6 0 0 1-12 0c0-4 2-8 6-12z"/></svg></div>
+          <div class="achievement-name" data-i18n="firstLaunch">First Launch</div>
+        </div>
+        <div class="achievement-item">
+          <div class="achievement-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M12 2l2.9 6.6 7.1.6-5.4 4.6 1.6 7-6.2-3.7-6.2 3.7 1.6-7-5.4-4.6 7.1-.6L12 2z"/></svg></div>
+          <div class="achievement-name" data-i18n="starCollector">Star Collector</div>
+        </div>
+        <div class="achievement-item locked">
+          <div class="achievement-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M8 21h8"/><path d="M12 17v4"/><path d="M7 4h10v6a5 5 0 0 1-10 0V4z"/><path d="M5 6H3v2a4 4 0 0 0 4 4"/><path d="M19 6h2v2a4 4 0 0 1-4 4"/></svg></div>
+          <div class="achievement-name" data-i18n="champion">Champion</div>
+        </div>
+        <div class="achievement-item locked">
+          <div class="achievement-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M6 3h12l4 6-10 12L2 9l4-6z"/><path d="M2 9h20"/><path d="M12 21V9"/></svg></div>
+          <div class="achievement-name" data-i18n="vipMember">VIP Member</div>
+        </div>
+        <div class="achievement-item locked">
+          <div class="achievement-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M12 2v4"/><path d="M12 18v4"/><path d="M4 12H2"/><path d="M22 12h-2"/><path d="M19.8 4.2l-2.8 2.8"/><path d="M7 17l-2.8 2.8"/><path d="M19.8 19.8L17 17"/><path d="M7 7L4.2 4.2"/><path d="M12 8a4 4 0 1 0 0 8 4 4 0 0 0 0-8z"/><path d="M12 12l2 2"/></svg></div>
+          <div class="achievement-name" data-i18n="taskMaster">Task Master</div>
+        </div>
+        <div class="achievement-item locked">
+          <div class="achievement-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M12 2l2.2 7.2L22 12l-7.8 2.8L12 22l-2.2-7.2L2 12l7.8-2.8L12 2z"/></svg></div>
+          <div class="achievement-name" data-i18n="superStar">Super Star</div>
+        </div>
+        <div class="achievement-item locked">
+          <div class="achievement-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M3 7l4 3 5-6 5 6 4-3v14H3V7z"/><path d="M3 21h18"/></svg></div>
+          <div class="achievement-name" data-i18n="royalty">Royalty</div>
+        </div>
+        <div class="achievement-item locked">
+          <div class="achievement-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M12 22a7 7 0 0 0 7-7c0-3.6-2.3-5.8-4-7.5-1 2.3-2.7 3.8-5 5.5 0-2.7-.8-5-2.5-6.9A9 9 0 0 0 5 15a7 7 0 0 0 7 7z"/></svg></div>
+          <div class="achievement-name" data-i18n="onFire">On Fire</div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Referral Section -->
+    <section class="profile-section">
+      <div class="profile-section-title">
+        <div class="icon-box" style="background:linear-gradient(135deg, var(--ok), #10b981);">
+          <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+            <path d="M16 11c1.66 0 2.99-1.34 2.99-3S17.66 5 16 5c-1.66 0-3 1.34-3 3s1.34 3 3 3zm-8 0c1.66 0 2.99-1.34 2.99-3S9.66 5 8 5C6.34 5 5 6.34 5 8s1.34 3 3 3zm0 2c-2.33 0-7 1.17-7 3.5V19h14v-2.5c0-2.33-4.67-3.5-7-3.5zm8 0c-.29 0-.62.02-.97.05 1.16.84 1.97 1.97 1.97 3.45V19h6v-2.5c0-2.33-4.67-3.5-7-3.5z"/>
+          </svg>
+        </div>
+        <span data-i18n="referralProgram">Referral Program</span>
+      </div>
+      
+      <div class="referral-card">
+        <div class="referral-header">
+          <span class="referral-title"><span class="svg-icon" aria-hidden="true" style="font-size:16px;"><svg viewBox="0 0 24 24"><path d="M20 12v10H4V12"/><path d="M2 7h20v5H2z"/><path d="M12 22V7"/><path d="M12 7c-2.5 0-4.5-2-4.5-4.5S9.5 2 12 5c2.5-3 4.5-1.5 4.5.5S14.5 7 12 7z"/></svg></span> <span data-i18n="inviteFriends">Invite Friends & Earn</span></span>
+          <span class="referral-count" id="referralCountBadge">0 <span data-i18n="invited">invited</span></span>
+        </div>
+        <div class="referral-link-box">
+          <div class="referral-link" id="referralLinkDisplay">Loading...</div>
+          <button class="referral-copy-btn" onclick="window.copyReferralLink()" data-i18n="copyLink">Copy Link</button>
+        </div>
+        <div class="referral-stats">
+          <div class="referral-stat">
+            <div class="referral-stat-value" id="refStatTotal">0</div>
+            <div class="referral-stat-label" data-i18n="totalInvites">Total Invites</div>
+          </div>
+          <div class="referral-stat">
+            <div class="referral-stat-value" id="refStatActive">0</div>
+            <div class="referral-stat-label" data-i18n="activeUsers">Active Users</div>
+          </div>
+          <div class="referral-stat">
+            <div class="referral-stat-value" id="refStatEarned">0</div>
+            <div class="referral-stat-label" data-i18n="creditsEarned">Credits Earned</div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Account Info -->
+    <section class="profile-section">
+      <div class="profile-section-title">
+        <div class="icon-box">
+          <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+          <circle cx="12" cy="8" r="5"/>
+          <path d="M3 21C3 17.134 7.029 14 12 14C16.971 14 21 17.134 21 21"/>
+          </svg>
+      </div>
+        <span data-i18n="accountInformation">Account Information</span>
+      </div>
+      
+      <div class="profile-info-row">
+        <span class="profile-info-label"><span class="emoji" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M4 7a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V7z"/><path d="M8 11h4"/><path d="M8 15h7"/><path d="M16 9h0"/></svg></span> <span data-i18n="userId">User ID</span></span>
+        <span class="profile-info-value" id="infoUserId">-</span>
+        </div>
+      <div class="profile-info-row">
+        <span class="profile-info-label"><span class="emoji" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M21 15a4 4 0 0 1-4 4H8l-5 3V7a4 4 0 0 1 4-4h10a4 4 0 0 1 4 4v8z"/></svg></span> <span data-i18n="chatId">Chat ID</span></span>
+        <span class="profile-info-value">
+          <span id="infoChatId">-</span>
+          <button class="profile-copy-btn" onclick="window.copyProfileData('chatId')"><span class="svg-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M9 9h10v12H9z"/><path d="M5 3h10v4"/><path d="M5 7H3v14h12v-2"/></svg></span> <span data-i18n="copy">Copy</span></button>
+        </span>
+      </div>
+      <div class="profile-info-row">
+        <span class="profile-info-label"><span class="emoji" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M3 9V7a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v2"/><path d="M3 15v2a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-2"/><path d="M21 12a2 2 0 0 1 0 4"/><path d="M3 12a2 2 0 0 0 0 4"/><path d="M13 5v14"/></svg></span> <span data-i18n="referralCode">Referral Code</span></span>
+        <span class="profile-info-value">
+          <span id="infoReferralCode">-</span>
+          <button class="profile-copy-btn" onclick="window.copyProfileData('referralCode')"><span class="svg-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M9 9h10v12H9z"/><path d="M5 3h10v4"/><path d="M5 7H3v14h12v-2"/></svg></span> <span data-i18n="copy">Copy</span></button>
+        </span>
+        </div>
+      <div class="profile-info-row">
+        <span class="profile-info-label"><span class="emoji" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M8 2v4"/><path d="M16 2v4"/><path d="M3 10h18"/><path d="M5 4h14a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2z"/></svg></span> <span data-i18n="memberSince">Member Since</span></span>
+        <span class="profile-info-value" id="infoJoinDate">-</span>
+      </div>
+    </section>
+
+    <!-- Recent Activity -->
+    <section class="profile-section">
+      <div class="profile-section-title">
+        <div class="icon-box" style="background:linear-gradient(135deg, #60a5fa, #3b82f6);">
+          <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+            <path d="M13 3c-4.97 0-9 4.03-9 9H1l3.89 3.89.07.14L9 12H6c0-3.87 3.13-7 7-7s7 3.13 7 7-3.13 7-7 7c-1.93 0-3.68-.79-4.94-2.06l-1.42 1.42C8.27 19.99 10.51 21 13 21c4.97 0 9-4.03 9-9s-4.03-9-9-9zm-1 5v5l4.28 2.54.72-1.21-3.5-2.08V8H12z"/>
+          </svg>
+      </div>
+        <span data-i18n="recentActivity">Recent Activity</span>
+        </div>
+      
+      <div class="activity-timeline" id="activityTimeline">
+        <div class="activity-item success">
+          <div class="activity-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M20 6L9 17l-5-5"/></svg></div>
+          <div class="activity-content">
+            <div class="activity-title" data-i18n="accountCreated">Account Created</div>
+            <div class="activity-time" id="activityJoinDate">-</div>
+      </div>
+        </div>
+        <div class="activity-item" id="activityLogin" style="display:none;">
+          <div class="activity-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M21 2l-2 2"/><path d="M7 14a5 5 0 1 1 3.9-8.1L21 2l1 1-3.9 10.1A5 5 0 0 1 7 14z"/><path d="M10 12l2 2"/></svg></div>
+          <div class="activity-content">
+            <div class="activity-title" data-i18n="lastLogin">Last Login</div>
+            <div class="activity-time" id="activityLoginTime">-</div>
+      </div>
+        </div>
+        <div class="activity-item" id="activityPurchase" style="display:none;">
+          <div class="activity-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M2 7h20"/><path d="M2 11h20"/><path d="M4 15h6"/><path d="M4 19h4"/><path d="M4 5h16a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2z"/></svg></div>
+          <div class="activity-content">
+            <div class="activity-title" data-i18n="lastPurchase">Last Purchase</div>
+            <div class="activity-time" id="activityPurchaseTime">-</div>
+          </div>
+        </div>
+    </div>
+    </section>
+
+    <!-- Settings -->
+    <section class="profile-section">
+      <div class="profile-section-title">
+        <div class="icon-box" style="background:linear-gradient(135deg, #a78bfa, #8b5cf6);">
+          <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+            <path d="M19.14 12.94c.04-.31.06-.63.06-.94 0-.31-.02-.63-.06-.94l2.03-1.58c.18-.14.23-.41.12-.61l-1.92-3.32c-.12-.22-.37-.29-.59-.22l-2.39.96c-.5-.38-1.03-.7-1.62-.94l-.36-2.54c-.04-.24-.24-.41-.48-.41h-3.84c-.24 0-.43.17-.47.41l-.36 2.54c-.59.24-1.13.57-1.62.94l-2.39-.96c-.22-.08-.47 0-.59.22L2.74 8.87c-.12.21-.08.47.12.61l2.03 1.58c-.04.31-.06.63-.06.94s.02.63.06.94l-2.03 1.58c-.18.14-.23.41-.12.61l1.92 3.32c.12.22.37.29.59.22l2.39-.96c.5.38 1.03.7 1.62.94l.36 2.54c.05.24.24.41.48.41h3.84c.24 0 .44-.17.47-.41l.36-2.54c.59-.24 1.13-.56 1.62-.94l2.39.96c.22.08.47 0 .59-.22l1.92-3.32c.12-.22.07-.47-.12-.61l-2.01-1.58zM12 15.6c-1.98 0-3.6-1.62-3.6-3.6s1.62-3.6 3.6-3.6 3.6 1.62 3.6 3.6-1.62 3.6-3.6 3.6z"/>
+          </svg>
+        </div>
+        <span data-i18n="settings">Settings</span>
+      </div>
+      
+      <div class="settings-list">
+        <div class="settings-item" onclick="window.toggleNotifications()">
+          <div class="settings-item-left">
+            <div class="settings-item-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 7h18s-3 0-3-7"/><path d="M13.7 21a2 2 0 0 1-3.4 0"/></svg></div>
+            <div class="settings-item-text">
+              <div class="settings-item-title" data-i18n="notifications">Notifications</div>
+              <div class="settings-item-desc" data-i18n="notificationsDesc">Receive updates and alerts</div>
+            </div>
+          </div>
+          <div class="settings-item-right">
+            <div class="toggle-switch active" id="notifToggle"></div>
+          </div>
+        </div>
+        
+        <div class="settings-item" onclick="window.openLanguageSettings()">
+          <div class="settings-item-left">
+            <div class="settings-item-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M12 22a10 10 0 1 0 0-20 10 10 0 0 0 0 20z"/><path d="M2 12h20"/><path d="M12 2a15 15 0 0 1 0 20"/><path d="M12 2a15 15 0 0 0 0 20"/></svg></div>
+            <div class="settings-item-text">
+              <div class="settings-item-title" data-i18n="language">Language</div>
+              <div class="settings-item-desc" data-i18n="languageDesc">Change app language</div>
+            </div>
+          </div>
+          <div class="settings-item-right">
+            <span class="settings-item-value" id="currentLangLabel">English</span>
+            <svg class="settings-arrow" viewBox="0 0 24 24"><path d="M8.59 16.59L13.17 12 8.59 7.41 10 6l6 6-6 6-1.41-1.41z"/></svg>
+          </div>
+        </div>
+
+        <div class="settings-item settings-item--accent">
+          <div class="settings-item-left">
+            <div class="settings-item-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="13.5" cy="6.5" r="2.5"/><circle cx="19" cy="12" r="2.5"/><circle cx="17" cy="18.5" r="2.5"/><circle cx="8" cy="19" r="2.5"/><path d="M12 2a10 10 0 1 0 0 20c1.1 0 1.5-1.4.7-2.2-.8-.8-.8-2 0-2.8a2 2 0 0 1 1.4-.6h2.4a3.5 3.5 0 0 0 3.5-3.5C20 8 16.4 4 12 2z"/></svg></div>
+            <div class="settings-item-text">
+              <div class="settings-item-title" data-i18n="accentColor">Accent color</div>
+              <div class="settings-item-desc" data-i18n="accentColorDesc">Pick your highlight color</div>
+            </div>
+          </div>
+          <div class="settings-item-right">
+            <div class="accent-swatches" role="radiogroup" aria-label="Accent color">
+              <button type="button" class="accent-swatch" data-accent-key="red"     role="radio" aria-label="Red"     style="--swatch:#ec5652;"></button>
+              <button type="button" class="accent-swatch" data-accent-key="cyan"    role="radio" aria-label="Cyan"    style="--swatch:#22d3ee;"></button>
+              <button type="button" class="accent-swatch" data-accent-key="emerald" role="radio" aria-label="Emerald" style="--swatch:#34d399;"></button>
+              <button type="button" class="accent-swatch" data-accent-key="violet"  role="radio" aria-label="Violet"  style="--swatch:#a78bfa;"></button>
+              <button type="button" class="accent-swatch" data-accent-key="amber"   role="radio" aria-label="Amber"   style="--swatch:#fbbf24;"></button>
+            </div>
+          </div>
+        </div>
+
+        <div class="settings-item" onclick="window.openAutoClaimerSettings()">
+          <div class="settings-item-left">
+            <div class="settings-item-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M12 2l1.8 6.2L20 10l-6.2 1.8L12 18l-1.8-6.2L4 10l6.2-1.8L12 2z"/><path d="M19 13l.9 3.1L23 17l-3.1.9L19 21l-.9-3.1L15 17l3.1-.9L19 13z"/></svg></div>
+            <div class="settings-item-text">
+              <div class="settings-item-title" data-i18n="autoClaimer">Auto-claimer</div>
+              <div class="settings-item-desc" data-i18n="autoClaimerDesc">Auto-claim challenges & vouchers</div>
+            </div>
+          </div>
+          <div class="settings-item-right">
+            <span class="settings-item-value" id="autoClaimerValue">—</span>
+            <svg class="settings-arrow" viewBox="0 0 24 24"><path d="M8.59 16.59L13.17 12 8.59 7.41 10 6l6 6-6 6-1.41-1.41z"/></svg>
+          </div>
+        </div>
+        
+        <div class="settings-item" onclick="window.openPrivacySettings()">
+          <div class="settings-item-left">
+            <div class="settings-item-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M19 11H5a2 2 0 0 0-2 2v7a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7a2 2 0 0 0-2-2z"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg></div>
+            <div class="settings-item-text">
+              <div class="settings-item-title" data-i18n="privacySecurity">Privacy & Security</div>
+              <div class="settings-item-desc" data-i18n="privacyDesc">Manage your data</div>
+            </div>
+          </div>
+          <div class="settings-item-right">
+            <svg class="settings-arrow" viewBox="0 0 24 24"><path d="M8.59 16.59L13.17 12 8.59 7.41 10 6l6 6-6 6-1.41-1.41z"/></svg>
+          </div>
+        </div>
+        
+        <div class="settings-item" onclick="window.openHelpCenter()">
+          <div class="settings-item-left">
+            <div class="settings-item-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M12 18h.01"/><path d="M9.1 9a3 3 0 1 1 5.8 1c0 2-3 2-3 4"/></svg></div>
+            <div class="settings-item-text">
+              <div class="settings-item-title" data-i18n="helpCenter">Help Center</div>
+              <div class="settings-item-desc" data-i18n="helpDesc">Get help and support</div>
+            </div>
+          </div>
+          <div class="settings-item-right">
+            <svg class="settings-arrow" viewBox="0 0 24 24"><path d="M8.59 16.59L13.17 12 8.59 7.41 10 6l6 6-6 6-1.41-1.41z"/></svg>
+          </div>
+        </div>
+
+        <div class="settings-item" onclick="if(typeof window.startAppTutorial==='function'){window.startAppTutorial()}else{window.location.href='/webapp/dashboard#tour=1'}">
+          <div class="settings-item-left">
+            <div class="settings-item-icon" aria-hidden="true" style="color:var(--brand,#ec5652)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/></svg></div>
+            <div class="settings-item-text">
+              <div class="settings-item-title" data-i18n="appTutorial">App Tutorial</div>
+              <div class="settings-item-desc" data-i18n="appTutorialDesc">Learn how to use the app</div>
+            </div>
+          </div>
+          <div class="settings-item-right">
+            <svg class="settings-arrow" viewBox="0 0 24 24"><path d="M8.59 16.59L13.17 12 8.59 7.41 10 6l6 6-6 6-1.41-1.41z"/></svg>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Auto-claimer Settings Modal -->
+    <div id="autoClaimModalOverlay" onclick="window.closeAutoClaimerSettings(event)">
+      <div id="autoClaimModal" role="dialog" aria-modal="true" aria-labelledby="autoClaimModalTitle">
+        <div id="autoClaimModalHeader">
+          <div id="autoClaimModalTitle" data-i18n="autoClaimer">Auto-claimer</div>
+          <button id="autoClaimModalClose" type="button" onclick="window.closeAutoClaimerSettings()" data-i18n="close">Close</button>
+        </div>
+        <div id="autoClaimModalBody">
+          <div class="auto-claim-row">
+            <div class="auto-claim-text">
+              <div class="auto-claim-title" data-i18n="autoClaimerToggle">Enable auto-claimer</div>
+              <div class="auto-claim-sub" data-i18n="autoClaimerToggleDesc">VIP feature: auto-claim challenges + auto-redeem vouchers</div>
+            </div>
+            <div class="auto-claim-actions">
+              <div class="toggle-switch" id="autoClaimToggle"></div>
+            </div>
+          </div>
+          <div class="auto-claim-row">
+            <div class="auto-claim-text">
+              <div class="auto-claim-title" data-i18n="voucherAutoTarget">Voucher target subscription</div>
+              <div class="auto-claim-sub" data-i18n="voucherAutoTargetDesc">Required for auto-redeeming vouchers that add traffic/days</div>
+            </div>
+          </div>
+          <div class="auto-picker-trigger" id="voucherPickerTrigger" role="button" tabindex="0" aria-label="Voucher target subscription">
+            <div class="auto-picker-left">
+              <div class="auto-picker-label" data-i18n="selectSubscription">Select subscription</div>
+              <div class="auto-picker-value" id="voucherPickerValue">—</div>
+            </div>
+            <svg class="auto-picker-caret" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 10l5 5 5-5z"/></svg>
+          </div>
+          <input type="hidden" id="voucherAutoSubId" value="">
+          <div class="auto-claim-row" style="justify-content:flex-end;">
+            <button class="auto-claim-btn" type="button" onclick="window.closeAutoClaimerSettings()" data-i18n="cancel">Cancel</button>
+            <button class="auto-claim-btn primary" type="button" onclick="window.saveAutoClaimerSettings()" data-i18n="save">Save</button>
+          </div>
+          <div class="auto-claim-sub" id="autoClaimVipHint" style="display:none;"></div>
+        </div>
+
+        <!-- Voucher picker (bottom sheet overlay) -->
+        <div id="voucherPickerOverlay" aria-hidden="true">
+          <div id="voucherPickerSheet" role="dialog" aria-modal="true" aria-labelledby="voucherPickerHeaderTitle">
+            <div id="voucherPickerHeader">
+              <div id="voucherPickerHeaderTitle" data-i18n="selectSubscription">Select subscription</div>
+              <button id="voucherPickerClose" type="button">Close</button>
+            </div>
+            <div id="voucherPickerList"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Danger Zone -->
+    <section class="profile-section danger-zone">
+      <div class="profile-section-title">
+        <div class="icon-box">
+          <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+            <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-2h2v2zm0-4h-2V7h2v6z"/>
+          </svg>
+        </div>
+        <span data-i18n="dangerZone">Danger Zone</span>
+      </div>
+      
+      <button class="danger-btn" onclick="window.logoutAccount()">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
+          <path d="M17 7l-1.41 1.41L18.17 11H8v2h10.17l-2.58 2.58L17 17l5-5zM4 5h8V3H4c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h8v-2H4V5z"/>
+        </svg>
+        <span data-i18n="logout">Log Out</span>
+      </button>
+    </section>
+
+    <!-- VIP Purchase Modal -->
+    <div class="vip-modal-overlay" id="vipModalOverlay">
+      <div class="vip-modal">
+        <div class="vip-modal-header">
+          <div class="vip-modal-title">
+            <span class="svg-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M3 7l4 3 5-6 5 6 4-3v14H3V7z"/><path d="M3 21h18"/></svg></span>
+            <span id="vipModalTitle">Get VIP</span>
+          </div>
+          <button class="vip-modal-close" onclick="closeVipModal()">&times;</button>
+        </div>
+        <div class="vip-modal-body">
+          <!-- Step 1: Select Plan -->
+          <div class="vip-step" id="vipStep1">
+            <div class="vip-benefits">
+              <div class="vip-benefit-item">
+                <span class="vip-benefit-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0z"/><path d="M12 7v10"/><path d="M9.5 9.5c0-1.1 1.1-2 2.5-2s2.5.9 2.5 2-1.1 2-2.5 2-2.5.9-2.5 2 1.1 2 2.5 2 2.5-.9 2.5-2"/></svg></span>
+                <span class="vip-benefit-text" id="benefitDiscount">20% discount on all purchases</span>
+              </div>
+              <div class="vip-benefit-item">
+                <span class="vip-benefit-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M21 16V8a2 2 0 0 0-1-1.73L13 2.27a2 2 0 0 0-2 0L4 6.27A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4a2 2 0 0 0 1-1.73z"/><path d="M3.3 7l8.7 5 8.7-5"/><path d="M12 22V12"/></svg></span>
+                <span class="vip-benefit-text" id="benefitPlans">Access to exclusive VIP plans</span>
+              </div>
+              <div class="vip-benefit-item">
+                <span class="vip-benefit-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M3 9V7a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v2"/><path d="M3 15v2a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-2"/><path d="M21 12a2 2 0 0 1 0 4"/><path d="M3 12a2 2 0 0 0 0 4"/><path d="M13 5v14"/></svg></span>
+                <span class="vip-benefit-text" id="benefitSupport">Priority support</span>
+              </div>
+              <div class="vip-benefit-item">
+                <span class="vip-benefit-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M12 2l1.8 6.2L20 10l-6.2 1.8L12 18l-1.8-6.2L4 10l6.2-1.8L12 2z"/><path d="M19 13l.9 3.1L23 17l-3.1.9L19 21l-.9-3.1L15 17l3.1-.9L19 13z"/></svg></span>
+                <span class="vip-benefit-text" id="benefitBadge">VIP badge on profile</span>
+              </div>
+            </div>
+            <div class="vip-plans-title" id="selectPlanTitle">Select Duration</div>
+            <div class="vip-plans-grid" id="vipPlansGrid">
+              <!-- Plans loaded dynamically -->
+              <div style="text-align:center;padding:20px;color:var(--muted);">Loading plans...</div>
+            </div>
+          </div>
+          <!-- Step 2: Payment -->
+          <div class="vip-step vip-payment-step" id="vipStep2">
+            <div class="vip-card-info">
+              <div class="vip-card-label" id="cardLabel">Card Number</div>
+              <div class="vip-card-number" id="vipCardNumber" onclick="copyCardNumber()">Loading...</div>
+              <div style="font-size:11px;color:var(--muted);margin-top:6px;" id="tapToCopy">Tap to copy</div>
+            </div>
+            <div class="vip-amount-display">
+              <div class="vip-amount-label" id="amountLabel">Amount to pay</div>
+              <div class="vip-amount-value" id="vipPayAmount">0 Toman</div>
+            </div>
+            <div class="vip-receipt-upload" id="vipReceiptUpload" onclick="document.getElementById('vipReceiptInput').click()">
+              <input type="file" id="vipReceiptInput" accept="image/jpeg,image/png,.jpg,.jpeg,.png" style="display:none" onchange="handleVipReceiptSelect(event)">
+              <div id="vipReceiptPlaceholder">
+                <div style="display:flex;justify-content:center;margin-bottom:8px;color:var(--muted);" aria-hidden="true"><svg viewBox="0 0 24 24" style="width:34px;height:34px;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2h3l2-3h8l2 3h3a2 2 0 0 1 2 2z"/><path d="M12 17a4 4 0 1 0 0-8 4 4 0 0 0 0 8z"/></svg></div>
+                <div style="font-size:13px;font-weight:600;" id="uploadReceiptText">Upload Receipt</div>
+                <div style="font-size:11px;color:var(--muted);margin-top:4px;">JPG, PNG</div>
+              </div>
+              <img id="vipReceiptPreview" class="vip-receipt-preview" style="display:none;">
+            </div>
+            <button class="vip-submit-btn" id="vipSubmitBtn" onclick="submitVipPurchase()" disabled>
+              <span id="submitBtnText">Submit</span>
+            </button>
+            <button class="vip-back-btn" onclick="showVipStep(1)" id="backBtn">Back</button>
+          </div>
+          <!-- Step 3: Success -->
+          <div class="vip-step vip-payment-step" id="vipStep3">
+            <div style="text-align:center;padding:30px 0;">
+              <div style="display:flex;justify-content:center;margin-bottom:16px;color:var(--ok);" aria-hidden="true"><svg viewBox="0 0 24 24" style="width:48px;height:48px;stroke:currentColor;fill:none;stroke-width:2.5;stroke-linecap:round;stroke-linejoin:round;"><path d="M20 6L9 17l-5-5"/></svg></div>
+              <div style="font-size:18px;font-weight:700;margin-bottom:8px;" id="successTitle">Order Submitted!</div>
+              <div style="font-size:13px;color:var(--muted);line-height:1.5;" id="successDesc">
+                Your VIP purchase request has been submitted. We will review your receipt and activate your VIP membership soon.
+              </div>
+            </div>
+            <button class="vip-purchase-btn" onclick="closeVipModal()">Close</button>
+          </div>
+        </div>
+        <div class="vip-modal-footer" id="vipModalFooter">
+          <button class="vip-purchase-btn" id="vipContinueBtn" onclick="continueVipPurchase()" disabled>
+            <span id="continueBtnText">Continue</span>
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <script src="/webapp/dashboard/js/profile-main.js"></script>
+    <script>
+      // Accent color picker wiring
+      (function(){
+        const ALLOWED = ['red','cyan','emerald','violet','amber'];
+        function currentAccent(){
+          try {
+            const a = document.documentElement.getAttribute('data-accent') || localStorage.getItem('accent') || 'red';
+            return ALLOWED.indexOf(a) >= 0 ? a : 'red';
+          } catch(_) { return 'red'; }
+        }
+        function paint(active){
+          document.querySelectorAll('.accent-swatch').forEach(function(btn){
+            const k = btn.getAttribute('data-accent-key');
+            const on = (k === active);
+            btn.classList.toggle('is-active', on);
+            btn.setAttribute('aria-checked', on ? 'true' : 'false');
+            btn.tabIndex = on ? 0 : -1;
+          });
+        }
+        async function persist(accent){
+          try { localStorage.setItem('accent', accent); } catch(_){}
+          try {
+            await fetch('/api/dashboard/preferences', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              credentials: 'same-origin',
+              body: JSON.stringify({ accent: accent })
+            });
+          } catch(_){}
+        }
+        function apply(accent){
+          if (ALLOWED.indexOf(accent) < 0) accent = 'red';
+          document.documentElement.setAttribute('data-accent', accent);
+          paint(accent);
+          if (typeof window.setAccent === 'function') {
+            try { window.setAccent(accent); return; } catch(_){}
+          }
+          persist(accent);
+          try { window.dispatchEvent(new CustomEvent('astro:accent-changed', { detail: { accent: accent } })); } catch(_){}
+        }
+        function init(){
+          paint(currentAccent());
+          document.querySelectorAll('.accent-swatch').forEach(function(btn){
+            btn.addEventListener('click', function(){ apply(btn.getAttribute('data-accent-key')); });
+            btn.addEventListener('keydown', function(e){
+              if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); apply(btn.getAttribute('data-accent-key')); }
+            });
+          });
+          window.addEventListener('astro:accent-changed', function(e){
+            if (e && e.detail && e.detail.accent) paint(e.detail.accent);
+          });
+        }
+        if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init);
+        else init();
+      })();
+    </script>
+  </div>
+</body>
+</html>

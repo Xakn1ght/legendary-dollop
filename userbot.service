@@ -1,0 +1,14 @@
+[Unit]
+Description=ASSTROO user bot
+After=network.target
+
+[Service]
+WorkingDirectory=/root/pasapro/astrobot-worktree
+Environment=PYTHONUNBUFFERED=1
+Environment=PYTHONPATH=/root/pasapro/astrobot-worktree/src
+ExecStart=/root/pasapro/astrobot-worktree/.venv/bin/python -m app.main
+Restart=always
+RestartSec=3
+
+[Install]
+WantedBy=multi-user.target

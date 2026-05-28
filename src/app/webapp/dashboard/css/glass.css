@@ -1,0 +1,1991 @@
+/* ═══════════════════════════════════════════════════════════════
+   AstroBytes — 2026 Liquid Glass Design System
+   Load order: tokens.css → [page].css → glass.css (last)
+   Only overrides surface/visual properties — no layout changes.
+   ═══════════════════════════════════════════════════════════════ */
+
+/* ── 1. GLASS TOKEN EXTENSIONS ─────────────────────────────────── */
+:root {
+  --glass-bg:          rgba(10, 18, 30, 0.48);
+  --glass-bg-mid:      rgba(14, 22, 36, 0.58);
+  --glass-bg-heavy:    rgba(6, 12, 22, 0.78);
+  --glass-blur:        blur(16px) saturate(160%) brightness(1.04);
+  --glass-blur-heavy:  blur(28px) saturate(180%) brightness(1.05);
+
+  --glass-edge:        rgba(255,255,255,0.07);
+  --glass-edge-bright: rgba(255,255,255,0.15);
+
+  --glass-sheen:       inset 0 1px 0 rgba(255,255,255,0.13),
+                       inset 0 -1px 0 rgba(0,0,0,0.12);
+  --glass-sheen-up:    inset 0 1.5px 0 rgba(255,255,255,0.22),
+                       inset 0 -1px 0 rgba(0,0,0,0.14);
+
+  --glass-drop:
+    0 4px 22px rgba(0,0,0,0.32),
+    0 1px 6px  rgba(0,0,0,0.22),
+    inset 0 1px 0 rgba(255,255,255,0.13);
+  --glass-drop-md:
+    0 10px 36px rgba(0,0,0,0.42),
+    0 3px 10px  rgba(0,0,0,0.26),
+    inset 0 1px 0 rgba(255,255,255,0.15);
+  --glass-drop-lg:
+    0 22px 64px rgba(0,0,0,0.55),
+    0 8px 24px  rgba(0,0,0,0.32),
+    inset 0 1.5px 0 rgba(255,255,255,0.18);
+
+  --glass-brand-wash: rgba(var(--brandRgb),0.05);
+}
+
+[data-theme="light"] {
+  --glass-bg:          rgba(255,255,255,0.58);
+  --glass-bg-mid:      rgba(255,255,255,0.70);
+  --glass-bg-heavy:    rgba(255,255,255,0.86);
+  --glass-blur:        blur(18px) saturate(180%) brightness(1.02);
+  --glass-blur-heavy:  blur(32px) saturate(200%) brightness(1.02);
+
+  --glass-edge:        rgba(255,255,255,0.58);
+  --glass-edge-bright: rgba(255,255,255,0.88);
+
+  --glass-sheen:       inset 0 1.5px 0 rgba(255,255,255,0.96),
+                       inset 0 -1px 0 rgba(100,120,160,0.06);
+  --glass-sheen-up:    inset 0 2px 0 rgba(255,255,255,1.00),
+                       inset 0 -1px 0 rgba(100,120,160,0.08);
+
+  --glass-drop:
+    0 4px 20px rgba(70,90,140,0.09),
+    0 1px 4px  rgba(70,90,140,0.05),
+    inset 0 1.5px 0 rgba(255,255,255,0.96);
+  --glass-drop-md:
+    0 10px 36px rgba(70,90,140,0.13),
+    0 3px 8px   rgba(70,90,140,0.07),
+    inset 0 1.5px 0 rgba(255,255,255,0.96);
+  --glass-drop-lg:
+    0 22px 64px rgba(70,90,140,0.18),
+    0 8px 22px  rgba(70,90,140,0.10),
+    inset 0 2px 0 rgba(255,255,255,1.00);
+
+  --glass-brand-wash: rgba(var(--brandRgb),0.04);
+}
+
+
+/* ── 2. BACKGROUND UPGRADES ─────────────────────────────────────── */
+
+/* Dark: deepen the base so glass pops */
+html[data-theme="dark"],
+html:not([data-theme="light"]) {
+  background: #070e18 !important;
+}
+
+/* Light: do NOT touch html background — it sits below the lava blobs (z-index:-1)
+   and would bury them. Let the original body/bg-base from tokens.css handle it.
+   We only need to bump up the blobs so they show against the light bg. */
+
+/* Light lava blobs — soft pastel so they don't bleed harshly into glass cards */
+[data-theme="light"] #astro-lava {
+  filter: blur(100px) saturate(110%) !important;
+  opacity: 0.75 !important;
+}
+[data-theme="light"] .lava-blob-1 { background: rgba(240,140,150,0.40) !important; }
+[data-theme="light"] .lava-blob-2 { background: rgba(180,140,255,0.38) !important; }
+[data-theme="light"] .lava-blob-3 { background: rgba(120,180,255,0.40) !important; }
+[data-theme="light"] .lava-blob-4 { background: rgba(120,220,180,0.34) !important; }
+[data-theme="light"] .lava-blob-5 { background: rgba(255,200,140,0.36) !important; }
+
+/* GPU-promote blobs so they animate on compositor thread */
+.lava-blob-1, .lava-blob-2, .lava-blob-3, .lava-blob-4, .lava-blob-5 {
+  will-change: transform !important;
+}
+
+/* Dark blobs — a touch more vivid */
+:root .lava-blob-1,
+[data-theme="dark"] .lava-blob-1 { background: rgba(var(--brandRgb),0.42) !important; }
+:root .lava-blob-2,
+[data-theme="dark"] .lava-blob-2 { background: rgba(34,211,238,0.34) !important; }
+:root .lava-blob-3,
+[data-theme="dark"] .lava-blob-3 { background: rgba(139,92,246,0.32) !important; }
+
+
+/* ── 3. CARDS → LIQUID GLASS PANELS ────────────────────────────── */
+.card,
+.placeholder-card {
+  background: var(--glass-bg) !important;
+  backdrop-filter: var(--glass-blur) !important;
+  -webkit-backdrop-filter: var(--glass-blur) !important;
+  border: 1px solid var(--glass-edge) !important;
+  border-top-color: var(--glass-edge-bright) !important;
+  box-shadow: var(--glass-drop) !important;
+  transition:
+    background 0.3s ease,
+    box-shadow 0.3s ease,
+    transform 0.22s cubic-bezier(.22,.68,0,1.2) !important;
+}
+
+.card:hover {
+  box-shadow: var(--glass-drop-md) !important;
+  transform: translateY(-1px) !important;
+}
+
+[data-theme="light"] .card,
+[data-theme="light"] .placeholder-card {
+  background: var(--glass-bg) !important;
+  border-color: var(--glass-edge) !important;
+  border-top-color: var(--glass-edge-bright) !important;
+  box-shadow: var(--glass-drop) !important;
+}
+
+/* Speed chips */
+.speed-chip {
+  background: var(--glass-bg) !important;
+  backdrop-filter: var(--glass-blur) !important;
+  -webkit-backdrop-filter: var(--glass-blur) !important;
+  border: 1px solid var(--glass-edge) !important;
+  border-top-color: var(--glass-edge-bright) !important;
+  box-shadow: var(--glass-drop) !important;
+}
+.speed-chip:hover {
+  background: var(--glass-bg-mid) !important;
+  box-shadow: var(--glass-drop-md) !important;
+  transform: translateY(-2px) !important;
+}
+
+
+/* ── 4. HEADER → FROSTED GLASS BAR ─────────────────────────────── */
+header {
+  background: var(--glass-bg-heavy) !important;
+  backdrop-filter: var(--glass-blur-heavy) !important;
+  -webkit-backdrop-filter: var(--glass-blur-heavy) !important;
+  border-bottom: 1px solid var(--glass-edge-bright) !important;
+  box-shadow:
+    0 1px 0 var(--glass-edge-bright),
+    0 4px 24px rgba(0,0,0,0.22) !important;
+}
+
+[data-theme="light"] header {
+  background: rgba(255,255,255,0.80) !important;
+  backdrop-filter: blur(40px) saturate(240%) brightness(1.02) !important;
+  -webkit-backdrop-filter: blur(40px) saturate(240%) brightness(1.02) !important;
+  border-bottom: 1px solid rgba(255,255,255,0.90) !important;
+  box-shadow:
+    0 1px 0 rgba(255,255,255,0.95),
+    0 4px 20px rgba(70,90,140,0.08) !important;
+}
+
+header.scrolled {
+  background: var(--glass-bg-heavy) !important;
+  box-shadow:
+    0 1px 0 var(--glass-edge-bright),
+    0 8px 32px rgba(0,0,0,0.38) !important;
+}
+
+[data-theme="light"] header.scrolled {
+  background: rgba(255,255,255,0.88) !important;
+  box-shadow:
+    0 1px 0 rgba(255,255,255,0.98),
+    0 8px 28px rgba(70,90,140,0.12) !important;
+}
+
+
+/* ── 5. BOTTOM NAV → GLASS PILL ─────────────────────────────────── */
+.bottom-nav {
+  background: rgba(8, 14, 26, 0.92) !important;
+  backdrop-filter: blur(24px) saturate(180%) brightness(1.04) !important;
+  -webkit-backdrop-filter: blur(24px) saturate(180%) brightness(1.04) !important;
+  border-top: 1px solid rgba(255,255,255,0.10) !important;
+  box-shadow:
+    0 -1px 0 rgba(255,255,255,0.08),
+    0 -8px 40px rgba(0,0,0,0.55),
+    0 -2px 12px rgba(var(--brandRgb),0.12) !important;
+}
+
+[data-theme="light"] .bottom-nav {
+  background: rgba(255,255,255,0.92) !important;
+  backdrop-filter: blur(26px) saturate(200%) brightness(1.02) !important;
+  -webkit-backdrop-filter: blur(26px) saturate(200%) brightness(1.02) !important;
+  border-top: 1px solid rgba(255,255,255,0.98) !important;
+  box-shadow:
+    0 -1px 0 rgba(255,255,255,1),
+    0 -8px 32px rgba(70,90,140,0.10),
+    0 -2px 8px rgba(70,90,140,0.06) !important;
+}
+
+/* Active nav item: glass pill highlight */
+.nav-item.active:not(.nav-item-notch) {
+  background: rgba(var(--brandRgb), 0.14) !important;
+  backdrop-filter: blur(8px) !important;
+  -webkit-backdrop-filter: blur(8px) !important;
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,0.15),
+    0 4px 14px rgba(var(--brandRgb),0.18) !important;
+}
+
+[data-theme="light"] .nav-item.active:not(.nav-item-notch) {
+  background: rgba(var(--brandRgb), 0.12) !important;
+  box-shadow:
+    inset 0 1.5px 0 rgba(255,255,255,0.95),
+    0 4px 12px rgba(var(--brandRgb),0.15) !important;
+}
+
+
+/* ── 6. BUTTONS → LIQUID GLASS BUTTONS ─────────────────────────── */
+/* No backdrop-filter on small buttons — too expensive on mobile, not visible anyway */
+.btn:not(.btn-primary):not(.nav-item):not(.btn-remove) {
+  background: var(--glass-bg-mid) !important;
+  border: 1px solid var(--glass-edge) !important;
+  border-top-color: var(--glass-edge-bright) !important;
+  box-shadow: var(--glass-sheen) !important;
+  transition: all 0.18s ease !important;
+}
+
+.btn:not(.btn-primary):not(.nav-item):not(.btn-remove):hover {
+  background: var(--brand) !important;
+  border-color: var(--brand) !important;
+  box-shadow: 0 4px 18px rgba(var(--brandRgb),0.35) !important;
+}
+
+/* Primary button — keep brand gradient, add glass sheen */
+.btn-primary, button.btn-primary {
+  background: linear-gradient(
+    135deg,
+    rgba(var(--brandRgb), 0.95) 0%,
+    var(--brandDark) 100%
+  ) !important;
+  border: 1px solid rgba(255,255,255,0.18) !important;
+  box-shadow:
+    inset 0 1.5px 0 rgba(255,255,255,0.28),
+    inset 0 -1px 0 rgba(0,0,0,0.18),
+    0 4px 18px rgba(var(--brandRgb),0.38) !important;
+  transition: all 0.18s ease !important;
+}
+.btn-primary:hover, button.btn-primary:hover {
+  box-shadow:
+    inset 0 1.5px 0 rgba(255,255,255,0.32),
+    0 8px 28px rgba(var(--brandRgb),0.50) !important;
+  transform: translateY(-1px) !important;
+}
+.btn-primary:active, button.btn-primary:active {
+  transform: translateY(0) scale(0.98) !important;
+  box-shadow:
+    inset 0 2px 4px rgba(0,0,0,0.25),
+    0 2px 8px rgba(var(--brandRgb),0.25) !important;
+}
+
+[data-theme="light"] .btn:not(.btn-primary):not(.nav-item):not(.btn-remove) {
+  background: rgba(255,255,255,0.65) !important;
+  border-color: rgba(255,255,255,0.80) !important;
+  border-top-color: rgba(255,255,255,0.98) !important;
+  box-shadow:
+    inset 0 1.5px 0 rgba(255,255,255,0.98),
+    0 2px 8px rgba(70,90,140,0.08) !important;
+}
+
+
+/* ── 7. ACTION TILES → GLASS TILES ─────────────────────────────── */
+.action-tile {
+  background: var(--glass-bg) !important;
+  backdrop-filter: var(--glass-blur) !important;
+  -webkit-backdrop-filter: var(--glass-blur) !important;
+  border: 1px solid var(--glass-edge) !important;
+  border-top-color: var(--glass-edge-bright) !important;
+  box-shadow: var(--glass-drop) !important;
+  transition:
+    transform 0.18s cubic-bezier(.22,.68,0,1.3),
+    box-shadow 0.18s ease,
+    background 0.18s ease !important;
+}
+
+.action-tile:hover {
+  background: var(--glass-bg-mid) !important;
+  border-top-color: rgba(255,255,255,0.22) !important;
+  box-shadow: var(--glass-drop-md) !important;
+  transform: translateY(-3px) scale(1.02) !important;
+}
+
+.action-tile:active {
+  transform: translateY(0) scale(0.97) !important;
+  box-shadow: var(--glass-drop) !important;
+}
+
+[data-theme="light"] .action-tile {
+  background: var(--glass-bg) !important;
+  border-color: var(--glass-edge) !important;
+  border-top-color: var(--glass-edge-bright) !important;
+  box-shadow: var(--glass-drop) !important;
+}
+
+
+/* ── 8. ACTION MENU → GLASS DROPDOWN ───────────────────────────── */
+.sub-actions-menu {
+  background: var(--glass-bg-heavy) !important;
+  backdrop-filter: var(--glass-blur-heavy) !important;
+  -webkit-backdrop-filter: var(--glass-blur-heavy) !important;
+  border: 1px solid var(--glass-edge-bright) !important;
+  box-shadow: var(--glass-drop-lg) !important;
+}
+
+.sub-actions-menu .menu-item {
+  background: var(--glass-bg) !important;
+  border: 1px solid var(--glass-edge) !important;
+  backdrop-filter: blur(10px) !important;
+  -webkit-backdrop-filter: blur(10px) !important;
+  transition: all 0.15s ease !important;
+}
+
+.sub-actions-menu .menu-item:hover {
+  background: var(--glass-bg-mid) !important;
+  border-color: rgba(var(--brandRgb),0.30) !important;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.12) !important;
+}
+
+[data-theme="light"] .sub-actions-menu {
+  background: rgba(255,255,255,0.90) !important;
+  border-color: rgba(255,255,255,0.98) !important;
+  box-shadow: var(--glass-drop-lg) !important;
+}
+
+[data-theme="light"] .sub-actions-menu .menu-item {
+  background: rgba(255,255,255,0.62) !important;
+  border-color: rgba(255,255,255,0.80) !important;
+}
+
+
+/* ── 9. BOTTOM SHEET → DEEP GLASS ──────────────────────────────── */
+.sheet-panel {
+  background: var(--glass-bg-heavy) !important;
+  backdrop-filter: var(--glass-blur-heavy) !important;
+  -webkit-backdrop-filter: var(--glass-blur-heavy) !important;
+  border: 1px solid var(--glass-edge-bright) !important;
+  border-bottom: none !important;
+  box-shadow:
+    0 -12px 56px rgba(0,0,0,0.55),
+    0 -4px 20px rgba(0,0,0,0.30),
+    inset 0 1.5px 0 rgba(255,255,255,0.16) !important;
+}
+
+[data-theme="light"] .sheet-panel {
+  background: rgba(255,255,255,0.90) !important;
+  border-color: rgba(255,255,255,0.98) !important;
+  box-shadow:
+    0 -12px 56px rgba(70,90,140,0.16),
+    0 -4px 20px rgba(70,90,140,0.08),
+    inset 0 1.5px 0 rgba(255,255,255,1) !important;
+}
+
+.sheet-backdrop {
+  background: rgba(0,0,0,0.48) !important;
+  backdrop-filter: blur(6px) !important;
+  -webkit-backdrop-filter: blur(6px) !important;
+}
+
+[data-theme="light"] .sheet-backdrop {
+  background: rgba(60,80,120,0.22) !important;
+}
+
+/* Sheet inputs */
+.sheet-field input {
+  background: var(--glass-bg) !important;
+  backdrop-filter: blur(16px) !important;
+  -webkit-backdrop-filter: blur(16px) !important;
+  border: 1px solid var(--glass-edge-bright) !important;
+  box-shadow: var(--glass-sheen) !important;
+  transition: border-color 0.2s, box-shadow 0.2s !important;
+}
+
+.sheet-field input:focus {
+  border-color: rgba(var(--brandRgb),0.60) !important;
+  box-shadow:
+    var(--glass-sheen),
+    0 0 0 3px rgba(var(--brandRgb),0.18) !important;
+}
+
+[data-theme="light"] .sheet-field input {
+  background: rgba(255,255,255,0.70) !important;
+  border-color: rgba(255,255,255,0.90) !important;
+}
+
+
+/* ── 10. TOASTS → GLASS TOASTS ──────────────────────────────────── */
+.toast {
+  background: var(--glass-bg-heavy) !important;
+  backdrop-filter: var(--glass-blur-heavy) !important;
+  -webkit-backdrop-filter: var(--glass-blur-heavy) !important;
+  border: 1px solid var(--glass-edge-bright) !important;
+  box-shadow: var(--glass-drop-md) !important;
+}
+
+[data-theme="light"] .toast {
+  background: rgba(255,255,255,0.88) !important;
+  border-color: rgba(255,255,255,0.98) !important;
+}
+
+.toast.success { border-left: 3px solid var(--ok) !important; }
+.toast.error   { border-left: 3px solid var(--bad) !important; }
+.toast.info    { border-left: 3px solid var(--brand) !important; }
+
+
+/* ── 11. INPUTS → GLASS FIELDS ──────────────────────────────────── */
+.native-select,
+.subs-dd input[type="text"],
+.subs-dd select {
+  background: var(--glass-bg-mid) !important;
+  backdrop-filter: blur(16px) !important;
+  -webkit-backdrop-filter: blur(16px) !important;
+  border: 1px solid var(--glass-edge) !important;
+  border-top-color: var(--glass-edge-bright) !important;
+  box-shadow: var(--glass-sheen) !important;
+  transition: border-color 0.2s, box-shadow 0.2s !important;
+}
+
+.native-select:hover,
+.subs-dd input[type="text"]:hover {
+  border-color: rgba(var(--brandRgb),0.38) !important;
+}
+
+.native-select:focus,
+.subs-dd input[type="text"]:focus {
+  border-color: rgba(var(--brandRgb),0.60) !important;
+  box-shadow:
+    var(--glass-sheen),
+    0 0 0 3px rgba(var(--brandRgb),0.15) !important;
+}
+
+[data-theme="light"] .native-select,
+[data-theme="light"] .subs-dd input[type="text"] {
+  background: rgba(255,255,255,0.68) !important;
+  border-color: rgba(255,255,255,0.85) !important;
+  border-top-color: rgba(255,255,255,0.98) !important;
+}
+
+/* Fake select button */
+.fake-select-btn {
+  background: var(--glass-bg-mid) !important;
+  backdrop-filter: blur(16px) !important;
+  -webkit-backdrop-filter: blur(16px) !important;
+  border: 1px solid var(--glass-edge) !important;
+  border-top-color: var(--glass-edge-bright) !important;
+  box-shadow: var(--glass-sheen) !important;
+}
+.fake-select-btn:hover {
+  background: var(--glass-bg-heavy) !important;
+  border-color: rgba(var(--brandRgb),0.38) !important;
+}
+
+
+/* ── 12. SUBSCRIPTION DROPDOWN ──────────────────────────────────── */
+.subs-dd .panel {
+  background: var(--glass-bg-heavy) !important;
+  backdrop-filter: var(--glass-blur-heavy) !important;
+  -webkit-backdrop-filter: var(--glass-blur-heavy) !important;
+  border: 1px solid var(--glass-edge-bright) !important;
+  box-shadow: var(--glass-drop-lg) !important;
+}
+
+.subs-dd .item {
+  background: var(--glass-bg) !important;
+  border: 1px solid var(--glass-edge) !important;
+  transition: all 0.15s ease !important;
+}
+.subs-dd .item:hover {
+  background: var(--glass-bg-mid) !important;
+  border-color: rgba(var(--brandRgb),0.28) !important;
+  transform: translateX(2px) !important;
+}
+
+[data-theme="light"] .subs-dd .panel {
+  background: rgba(255,255,255,0.90) !important;
+  border-color: rgba(255,255,255,0.98) !important;
+}
+[data-theme="light"] .subs-dd .item {
+  background: rgba(255,255,255,0.62) !important;
+}
+
+
+/* ── 13. VPN CARD ENHANCEMENTS ──────────────────────────────────── */
+
+/* ═══════════════════════════════════════════════════════════════
+   VPN CARD — Hero Service Status Card
+   - Strong visual identity, refined hierarchy
+   - Premium feel via layered surface + accent corner glow
+   - Action buttons that actually look like buttons
+   - Both themes share structure; only surface differs
+   ═══════════════════════════════════════════════════════════════ */
+
+/* ── DARK MODE (base) — calmer, less decorated ───────────────── */
+:root .vpn-card,
+[data-theme="dark"] .vpn-card,
+html:not([data-theme="light"]) .vpn-card {
+  background:
+    /* single subtle corner glow */
+    radial-gradient(100% 75% at 95% 0%,
+      rgba(var(--brandRgb), 0.22) 0%,
+      transparent 55%),
+    /* flat-ish base */
+    linear-gradient(165deg, #0d1721 0%, #08121c 100%) !important;
+  border: 1px solid rgba(var(--brandRgb), 0.16) !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+  box-shadow:
+    0 1px 0 rgba(255,255,255,0.05) inset,
+    0 20px 44px rgba(0,0,0,0.50),
+    0 4px 12px rgba(0,0,0,0.28) !important;
+}
+
+/* ── LIGHT MODE — calm warm ivory ───────────────────────────── */
+html[data-theme="light"] .vpn-card,
+[data-theme="light"] .vpn-card {
+  background:
+    /* single soft corner glow */
+    radial-gradient(95% 75% at 96% 0%,
+      rgba(var(--brandRgb), 0.18) 0%,
+      transparent 55%),
+    /* warm ivory base, very subtle gradient */
+    linear-gradient(165deg, #fffbf4 0%, #fff5e8 100%) !important;
+  border: 1px solid rgba(var(--brandRgb), 0.16) !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+  box-shadow:
+    0 1px 0 rgba(255,255,255,0.95) inset,
+    0 8px 22px rgba(var(--brandRgb), 0.10),
+    0 2px 8px rgba(180, 100, 80, 0.06) !important;
+}
+
+/* Suppress original top-sheen pseudo — we control glow via background */
+html[data-theme="light"] .vpn-card::before,
+[data-theme="light"] .vpn-card::before {
+  background: linear-gradient(
+    180deg,
+    rgba(255,255,255,0.40) 0%,
+    transparent 30%,
+    transparent 100%
+  ) !important;
+}
+:root .vpn-card::before,
+[data-theme="dark"] .vpn-card::before {
+  background: linear-gradient(
+    180deg,
+    rgba(255,255,255,0.05) 0%,
+    transparent 30%,
+    rgba(0,0,0,0.20) 100%
+  ) !important;
+}
+
+
+/* ── ICON (top-left signal/wifi) — minimal ─────────────────── */
+.vpn-card-icon {
+  background: rgba(var(--brandRgb), 0.12) !important;
+  border: 1px solid rgba(var(--brandRgb), 0.28) !important;
+  box-shadow: none !important;
+  color: rgba(255,255,255,0.85) !important;
+}
+[data-theme="light"] .vpn-card-icon {
+  background: rgba(var(--brandRgb), 0.08) !important;
+  border-color: rgba(var(--brandRgb), 0.22) !important;
+  color: var(--brand) !important;
+  box-shadow: none !important;
+}
+
+
+/* ── DATE BADGE (top-right pill) ─────────────────────────────── */
+.vpn-card .date-badge {
+  background: rgba(255,255,255,0.05) !important;
+  border: 1px solid rgba(255,255,255,0.10) !important;
+  color: rgba(255,255,255,0.72) !important;
+  font-size: 10px !important;
+  font-weight: 600 !important;
+  letter-spacing: 0.3px !important;
+  text-transform: none !important;           /* less shouty */
+  font-feature-settings: 'tnum' 1 !important;
+  box-shadow: none !important;
+}
+[data-theme="light"] .vpn-card .date-badge {
+  background: rgba(74, 26, 26, 0.05) !important;
+  border-color: rgba(74, 26, 26, 0.10) !important;
+  color: rgba(74, 26, 26, 0.68) !important;
+  box-shadow: none !important;
+}
+
+
+/* ── BALANCE (the big number) — cleaner, less shadow stack ──── */
+.vpn-balance {
+  font-feature-settings: 'tnum' 1, 'lnum' 1 !important;
+  font-weight: 800 !important;          /* was 900 — slightly less heavy */
+  letter-spacing: -2px !important;
+  text-shadow: 0 1px 8px rgba(0,0,0,0.40) !important;  /* single shadow */
+}
+[data-theme="light"] .vpn-balance {
+  color: #1a0608 !important;
+  text-shadow: none !important;          /* no shadow on light, keep it crisp */
+}
+
+/* ── UNIT (GB) — small caps label treatment ─────────────────── */
+.vpn-balance-unit {
+  font-weight: 700 !important;
+  font-size: 11px !important;
+  letter-spacing: 1.4px !important;
+  color: rgba(255,255,255,0.40) !important;
+}
+[data-theme="light"] .vpn-balance-unit {
+  color: rgba(74, 26, 26, 0.50) !important;
+}
+
+/* ── USERNAME — refined service tag treatment ───────────────── */
+.vpn-username {
+  font-feature-settings: 'tnum' 1 !important;
+  font-size: 11.5px !important;
+  font-weight: 500 !important;
+  letter-spacing: 0.6px !important;
+  text-transform: lowercase !important;
+  color: rgba(255,255,255,0.46) !important;
+}
+[data-theme="light"] .vpn-username {
+  color: rgba(74, 26, 26, 0.55) !important;
+}
+
+/* Percentage label — smaller, calmer */
+.vpn-usage-pct {
+  font-size: 9.5px !important;
+  font-weight: 700 !important;
+  letter-spacing: 0.4px !important;
+  color: rgba(255,255,255,0.50) !important;
+  font-feature-settings: 'tnum' 1 !important;
+}
+[data-theme="light"] .vpn-usage-pct {
+  color: rgba(74, 26, 26, 0.50) !important;
+}
+
+
+/* ── USAGE PROGRESS BAR ─────────────────────────────────────── */
+.vpn-usage-track {
+  background: rgba(255,255,255,0.08) !important;
+  box-shadow: inset 0 1px 2px rgba(0,0,0,0.42) !important;
+}
+[data-theme="light"] .vpn-usage-track {
+  background: rgba(74, 26, 26, 0.10) !important;
+  box-shadow: inset 0 1px 2px rgba(74, 26, 26, 0.12) !important;
+}
+
+.vpn-usage-fill {
+  background: linear-gradient(90deg,
+    rgba(var(--brandRgb), 0.85) 0%,
+    var(--brand) 100%) !important;
+  box-shadow:
+    0 0 10px rgba(var(--brandRgb), 0.42),
+    inset 0 1px 0 rgba(255,255,255,0.22) !important;
+}
+
+
+/* ── FOOTER ────────────────────────────────────────────────── */
+.vpn-card-footer {
+  background: rgba(0,0,0,0.32) !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+  border-top: 1px solid rgba(var(--brandRgb), 0.16) !important;
+}
+[data-theme="light"] .vpn-card-footer {
+  background: rgba(74, 26, 26, 0.04) !important;
+  border-top-color: rgba(var(--brandRgb), 0.18) !important;
+}
+
+
+/* ── ACTION BUTTONS (the 3 chips at the bottom) ──────────────── */
+.vpn-action-btn {
+  min-width: 44px !important;
+  min-height: 44px !important;
+  width: 44px !important;
+  height: 44px !important;
+  background: linear-gradient(180deg,
+    rgba(255,255,255,0.11) 0%,
+    rgba(255,255,255,0.05) 100%) !important;
+  border: 1px solid rgba(255,255,255,0.18) !important;
+  border-radius: 12px !important;
+  color: rgba(255,255,255,0.88) !important;
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,0.14),
+    inset 0 -1px 0 rgba(0,0,0,0.20),
+    0 2px 6px rgba(0,0,0,0.30) !important;
+  transition:
+    background 0.18s ease,
+    border-color 0.18s ease,
+    transform 0.12s ease,
+    box-shadow 0.18s ease !important;
+}
+[data-theme="light"] .vpn-action-btn {
+  background: linear-gradient(180deg,
+    rgba(255,255,255,0.95) 0%,
+    rgba(255,245,235,0.85) 100%) !important;
+  border-color: rgba(var(--brandRgb), 0.25) !important;
+  color: #4a1a1a !important;
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,1),
+    0 2px 6px rgba(var(--brandRgb), 0.12),
+    0 1px 2px rgba(0,0,0,0.04) !important;
+}
+
+.vpn-action-btn:hover {
+  background: linear-gradient(180deg,
+    rgba(var(--brandRgb), 0.85) 0%,
+    rgba(var(--brandRgb), 0.65) 100%) !important;
+  border-color: rgba(var(--brandRgb), 0.55) !important;
+  color: #fff !important;
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,0.30),
+    0 4px 14px rgba(var(--brandRgb), 0.42),
+    0 0 0 1px rgba(var(--brandRgb), 0.20) !important;
+  transform: translateY(-1px) !important;
+}
+.vpn-action-btn:active {
+  transform: translateY(0) scale(0.94) !important;
+  box-shadow:
+    inset 0 2px 4px rgba(0,0,0,0.25),
+    0 1px 2px rgba(var(--brandRgb), 0.20) !important;
+}
+
+
+/* ── STATUS BADGE ("فعال" pill) ──────────────────────────────── */
+.vpn-card .status-badge {
+  background: rgba(74, 222, 128, 0.10) !important;
+  border: 1px solid rgba(74, 222, 128, 0.22) !important;
+  color: rgba(180, 240, 200, 0.92) !important;
+  font-size: 10px !important;
+  font-weight: 600 !important;
+  letter-spacing: 0.3px !important;
+  text-transform: none !important;
+  box-shadow: none !important;
+}
+[data-theme="light"] .vpn-card .status-badge {
+  background: rgba(74, 222, 128, 0.10) !important;
+  border-color: rgba(34, 168, 84, 0.30) !important;
+  color: #1a5a30 !important;
+  box-shadow: none !important;
+}
+
+/* Animated pulse on the active dot */
+@keyframes vpnStatusPulse {
+  0%, 100% {
+    box-shadow:
+      0 0 8px #4ade80,
+      0 0 16px rgba(74,222,128,0.45);
+  }
+  50% {
+    box-shadow:
+      0 0 14px #4ade80,
+      0 0 26px rgba(74,222,128,0.75);
+  }
+}
+.vpn-card .status-badge.active::before {
+  animation: vpnStatusPulse 2.4s ease-in-out infinite !important;
+}
+@media (prefers-reduced-motion: reduce) {
+  .vpn-card .status-badge.active::before {
+    animation: none !important;
+  }
+}
+
+
+/* ── CARD HOVER — subtle lift to confirm interactivity ───────── */
+.vpn-card {
+  transition:
+    transform 0.28s cubic-bezier(.22,.68,0,1.2),
+    box-shadow 0.28s ease !important;
+}
+.vpn-card:hover {
+  transform: translateY(-2px) !important;
+}
+.vpn-card:active {
+  transform: translateY(0) scale(0.995) !important;
+  transition-duration: 0.10s !important;
+}
+
+
+/* ── 14. NOTIFICATION BELL → GLASS BUTTON ──────────────────────── */
+.notification-bell {
+  background: var(--glass-bg-mid) !important;
+  border: 1px solid var(--glass-edge-bright) !important;
+  box-shadow: var(--glass-sheen) !important;
+}
+
+[data-theme="light"] .notification-bell {
+  background: rgba(255,255,255,0.70) !important;
+  border-color: rgba(255,255,255,0.90) !important;
+}
+
+
+/* ── 15. LANG SWITCH → GLASS PILL ──────────────────────────────── */
+.lang-switch {
+  background: var(--glass-bg-mid) !important;
+  border: 1px solid var(--glass-edge-bright) !important;
+  box-shadow: var(--glass-sheen) !important;
+}
+
+.lang-switch.active {
+  background: var(--brand) !important;
+  border-color: rgba(255,255,255,0.24) !important;
+  box-shadow:
+    inset 0 1.5px 0 rgba(255,255,255,0.28),
+    0 4px 14px rgba(var(--brandRgb),0.38) !important;
+}
+
+
+/* ── 16. BOOT SPLASH → GLASS ────────────────────────────────────── */
+#bootSplash {
+  background: var(--glass-bg-heavy) !important;
+  backdrop-filter: var(--glass-blur-heavy) !important;
+  -webkit-backdrop-filter: var(--glass-blur-heavy) !important;
+}
+
+[data-theme="light"] #bootSplash {
+  background: rgba(255,255,255,0.82) !important;
+}
+
+#bootSplash .inner {
+  box-shadow:
+    inset 0 1.5px 0 rgba(255,255,255,0.30),
+    0 16px 48px rgba(var(--brandRgb),0.50) !important;
+}
+
+
+/* ── 17. ICON BUTTONS ────────────────────────────────────────────── */
+.btn-icon:not(.btn-primary):not(.btn-remove) {
+  background: var(--glass-bg-mid) !important;
+  border: 1px solid var(--glass-edge) !important;
+  border-top-color: var(--glass-edge-bright) !important;
+  box-shadow: var(--glass-sheen) !important;
+}
+
+[data-theme="light"] .btn-icon:not(.btn-primary):not(.btn-remove) {
+  background: rgba(255,255,255,0.68) !important;
+  border-color: rgba(255,255,255,0.90) !important;
+}
+
+
+/* ── 18. MINI BUTTON ─────────────────────────────────────────────── */
+.mini-btn {
+  background: var(--glass-bg) !important;
+  border: 1px solid var(--glass-edge) !important;
+  border-top-color: var(--glass-edge-bright) !important;
+  box-shadow: var(--glass-sheen) !important;
+}
+.mini-btn:hover {
+  background: var(--glass-bg-mid) !important;
+  border-color: rgba(var(--brandRgb),0.35) !important;
+}
+
+
+/* ── 19. PLACEHOLDER ITEMS ──────────────────────────────────────── */
+.placeholder-item {
+  background: var(--glass-bg) !important;
+  backdrop-filter: blur(16px) !important;
+  -webkit-backdrop-filter: blur(16px) !important;
+  border: 1px solid var(--glass-edge) !important;
+  border-top-color: var(--glass-edge-bright) !important;
+  box-shadow: var(--glass-drop) !important;
+}
+
+[data-theme="light"] .placeholder-item {
+  background: rgba(255,255,255,0.62) !important;
+  border-color: rgba(255,255,255,0.80) !important;
+}
+
+
+/* ── 20. LIQUID PRESS ANIMATION ─────────────────────────────────── */
+@keyframes liquidPress {
+  0%   { transform: scale(1); }
+  40%  { transform: scale(0.96) translateY(1px); }
+  70%  { transform: scale(1.02) translateY(-0.5px); }
+  100% { transform: scale(1); }
+}
+
+.action-tile:active,
+.speed-chip:active,
+.card:active {
+  animation: liquidPress 0.32s cubic-bezier(.22,.68,0,1.2) !important;
+}
+
+
+/* ── 21. GLASS SHIMMER ON LOAD ───────────────────────────────────── */
+@keyframes glassShimmer {
+  0%   { background-position: -200% center; }
+  100% { background-position: 200% center; }
+}
+
+.content.loading .card::after {
+  background:
+    linear-gradient(
+      105deg,
+      transparent 30%,
+      rgba(255,255,255,0.06) 50%,
+      transparent 70%
+    ) !important;
+  background-size: 200% 100% !important;
+  animation: glassShimmer 1.4s ease-in-out infinite !important;
+}
+
+[data-theme="light"] .content.loading .card::after {
+  background:
+    linear-gradient(
+      105deg,
+      transparent 30%,
+      rgba(255,255,255,0.45) 50%,
+      transparent 70%
+    ) !important;
+  background-size: 200% 100% !important;
+  animation: glassShimmer 1.4s ease-in-out infinite !important;
+}
+
+
+/* ── 22. USAGE BADGE ─────────────────────────────────────────────── */
+.usage-badge {
+  background: var(--glass-bg-heavy) !important;
+  backdrop-filter: blur(20px) !important;
+  -webkit-backdrop-filter: blur(20px) !important;
+  border: 1.5px solid var(--glass-edge-bright) !important;
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,0.16),
+    0 6px 22px rgba(0,0,0,0.32) !important;
+}
+
+[data-theme="light"] .usage-badge {
+  background: rgba(255,255,255,0.90) !important;
+  border-color: rgba(255,255,255,0.98) !important;
+  box-shadow:
+    inset 0 1.5px 0 rgba(255,255,255,1),
+    0 6px 18px rgba(70,90,140,0.12) !important;
+}
+
+
+/* ── 23. REDUCED MOTION GUARD ───────────────────────────────────── */
+@media (prefers-reduced-motion: reduce) {
+  .card, .action-tile, .speed-chip, .btn, .bottom-nav, header {
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
+    transition-duration: 0.01ms !important;
+    animation: none !important;
+  }
+  .card { background: var(--bg-elev-1) !important; }
+  [data-theme="light"] .card { background: rgba(255,255,255,0.94) !important; }
+}
+
+
+/* ═══════════════════════════════════════════════════════════════
+   POLISH PASS — Accessibility & Interaction Quality
+   Applied per UI/UX Pro Max checklist (a11y, press feedback, focus).
+   ═══════════════════════════════════════════════════════════════ */
+
+/* ── 24. KEYBOARD FOCUS RINGS (CRITICAL: a11y §1 focus-states) ─── */
+button:focus-visible,
+a:focus-visible,
+.btn:focus-visible,
+.action-tile:focus-visible,
+.nav-item:focus-visible,
+.speed-chip:focus-visible,
+.mini-btn:focus-visible,
+.btn-icon:focus-visible,
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible,
+[role="button"]:focus-visible {
+  outline: 2px solid rgba(var(--brandRgb), 0.85) !important;
+  outline-offset: 2px !important;
+  box-shadow: 0 0 0 4px rgba(var(--brandRgb), 0.22) !important;
+}
+[data-theme="light"] button:focus-visible,
+[data-theme="light"] a:focus-visible,
+[data-theme="light"] .btn:focus-visible,
+[data-theme="light"] .action-tile:focus-visible,
+[data-theme="light"] .nav-item:focus-visible,
+[data-theme="light"] input:focus-visible {
+  outline-color: var(--brand) !important;
+  box-shadow: 0 0 0 4px rgba(var(--brandRgb), 0.18) !important;
+}
+
+
+/* ── 25. PRESS FEEDBACK (CRITICAL §2 + §7 scale-feedback) ──────── */
+/* Subtle scale on tap — confirms touch within 100ms */
+.card:active,
+.action-tile:active,
+.speed-chip:active,
+.mini-btn:active,
+.btn-icon:active,
+.btn:not(.btn-primary):active {
+  transform: scale(0.985) !important;
+  transition: transform 0.08s ease-out !important;
+}
+
+/* Active nav item press */
+.nav-item:active:not(.nav-item-notch) {
+  transform: scale(0.94) !important;
+}
+
+
+/* ── 26. LIGHT-MODE TEXT CONTRAST SAFETY (§1 + §6) ─────────────── */
+/* On translucent light-mode glass, force darker text inside cards
+   so any inherited light/white text remains >=4.5:1 contrast. */
+[data-theme="light"] .card,
+[data-theme="light"] .placeholder-card,
+[data-theme="light"] .action-tile,
+[data-theme="light"] .sub-actions-menu,
+[data-theme="light"] .sheet-panel {
+  color: var(--text-1, #1a2332) !important;
+}
+
+/* Secondary text inside light-mode cards — must still hit ≥3:1 */
+[data-theme="light"] .card .muted,
+[data-theme="light"] .card .subtitle,
+[data-theme="light"] .card .hint,
+[data-theme="light"] .action-tile .muted {
+  color: rgba(26, 35, 50, 0.68) !important;
+}
+
+
+/* ── 27. DISABLED STATE PARITY (§8 disabled-states) ────────────── */
+button:disabled,
+.btn:disabled,
+button[aria-disabled="true"],
+.btn[aria-disabled="true"] {
+  opacity: 0.42 !important;
+  cursor: not-allowed !important;
+  pointer-events: none !important;
+  box-shadow: none !important;
+  transform: none !important;
+}
+button:disabled:hover,
+.btn:disabled:hover {
+  transform: none !important;
+  background: var(--glass-bg-mid) !important;
+}
+
+
+/* ── 28. TOUCH TARGET MIN 44pt (§2 touch-target-size) ──────────── */
+.nav-item,
+.btn-icon,
+.mini-btn,
+.notification-bell,
+.lang-switch,
+.vpn-action-btn {
+  min-width: 44px !important;
+  min-height: 44px !important;
+}
+
+
+/* ── 29. TAP-DELAY REMOVAL + GESTURE CLARITY ───────────────────── */
+button, a, .btn, .action-tile, .nav-item, .card, [role="button"] {
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+}
+
+
+/* ═══════════════════════════════════════════════════════════════
+   FINAL PASS — Calm Surfaces, No GPU Heat
+   - Hide lava blobs (source of "too colorful")
+   - Remove backdrop-filter from cards/buttons (GPU heat)
+   - Keep blur only on header / bottom-nav / sheets (semantic blur)
+   - Softer text colors on light surfaces (no pure black)
+   - VPN card becomes calm + clean in both modes
+   ═══════════════════════════════════════════════════════════════ */
+
+/* ── PERF: kill lava blobs entirely ──────────────────────────── */
+#astro-lava {
+  display: none !important;
+}
+
+/* ── PERF: drop backdrop-filter from cards/tiles/buttons ─────── */
+.card,
+.placeholder-card,
+.action-tile,
+.speed-chip,
+.btn:not(.btn-primary),
+.btn-icon,
+.mini-btn,
+.notification-bell,
+.lang-switch,
+.usage-badge,
+.toast,
+.vpn-action-btn,
+.sub-actions-menu,
+.sub-actions-menu .menu-item,
+.subs-dd .panel,
+.subs-dd .item,
+.native-select,
+.fake-select-btn {
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+}
+
+
+/* ── CARDS: opaque, calm surfaces ────────────────────────────── */
+:root .card,
+[data-theme="dark"] .card,
+html:not([data-theme="light"]) .card,
+:root .placeholder-card,
+[data-theme="dark"] .placeholder-card {
+  background: #131c28 !important;
+  border: 1px solid rgba(255,255,255,0.06) !important;
+  box-shadow:
+    0 1px 0 rgba(255,255,255,0.04) inset,
+    0 4px 14px rgba(0,0,0,0.32) !important;
+}
+
+[data-theme="light"] .card,
+[data-theme="light"] .placeholder-card {
+  background: #ffffff !important;
+  border: 1px solid rgba(15,23,42,0.06) !important;
+  box-shadow:
+    0 1px 2px rgba(15,23,42,0.04),
+    0 4px 14px rgba(15,23,42,0.06) !important;
+}
+
+
+/* ── BACKGROUNDS: subtle, monochrome-leaning ────────────────── */
+html[data-theme="dark"],
+html:not([data-theme="light"]) {
+  background: #0a121c !important;
+}
+html[data-theme="light"] {
+  background: #f4f5f8 !important;
+}
+body {
+  background: transparent !important;
+}
+
+
+/* ── VPN CARD: clean, restrained, premium ────────────────────── */
+
+/* Dark — single accent, otherwise calm */
+:root .vpn-card,
+[data-theme="dark"] .vpn-card,
+html:not([data-theme="light"]) .vpn-card {
+  background: linear-gradient(165deg, #141d2a 0%, #0e1622 100%) !important;
+  border: 1px solid rgba(255,255,255,0.06) !important;
+  box-shadow:
+    0 1px 0 rgba(255,255,255,0.04) inset,
+    0 14px 32px rgba(0,0,0,0.45),
+    0 4px 10px rgba(0,0,0,0.25) !important;
+}
+
+/* Light — neutral cool surface, NO brand wash bleeding in */
+html[data-theme="light"] .vpn-card,
+[data-theme="light"] .vpn-card {
+  background: linear-gradient(165deg, #ffffff 0%, #f3f5fa 100%) !important;
+  border: 1px solid rgba(15,23,42,0.08) !important;
+  box-shadow:
+    0 1px 0 rgba(255,255,255,1) inset,
+    0 10px 26px rgba(15,23,42,0.08),
+    0 2px 6px rgba(15,23,42,0.04) !important;
+}
+
+/* No top sheen overlay — keep it flat */
+:root .vpn-card::before,
+[data-theme="dark"] .vpn-card::before,
+[data-theme="light"] .vpn-card::before {
+  background: none !important;
+}
+
+
+/* ── VPN BALANCE: softer text colors ─────────────────────────── */
+:root .vpn-balance,
+[data-theme="dark"] .vpn-balance {
+  color: rgba(255,255,255,0.95) !important;
+  text-shadow: none !important;
+}
+[data-theme="light"] .vpn-balance {
+  color: #1f2937 !important;          /* slate-800, not pure black */
+  text-shadow: none !important;
+}
+
+[data-theme="light"] .vpn-balance-unit {
+  color: rgba(31, 41, 55, 0.45) !important;
+}
+[data-theme="light"] .vpn-username {
+  color: rgba(31, 41, 55, 0.55) !important;
+}
+[data-theme="light"] .vpn-usage-pct {
+  color: rgba(31, 41, 55, 0.48) !important;
+}
+
+
+/* ── VPN ICON: accent stays, but contained ───────────────────── */
+[data-theme="light"] .vpn-card-icon {
+  background: rgba(var(--brandRgb), 0.10) !important;
+  border-color: rgba(var(--brandRgb), 0.24) !important;
+  color: var(--brand) !important;
+  box-shadow: none !important;
+}
+
+
+/* ── VPN DATE BADGE: neutral light pill ──────────────────────── */
+[data-theme="light"] .vpn-card .date-badge {
+  background: rgba(15, 23, 42, 0.05) !important;
+  border-color: rgba(15, 23, 42, 0.08) !important;
+  color: rgba(31, 41, 55, 0.68) !important;
+}
+
+
+/* ── VPN USAGE TRACK: neutral on light ───────────────────────── */
+[data-theme="light"] .vpn-usage-track {
+  background: rgba(15, 23, 42, 0.06) !important;
+  box-shadow: inset 0 1px 2px rgba(15, 23, 42, 0.05) !important;
+}
+
+
+/* ── VPN FOOTER: subtle separator, no dark strip ─────────────── */
+.vpn-card-footer {
+  background: transparent !important;
+  border-top: 1px solid rgba(255,255,255,0.05) !important;
+}
+[data-theme="light"] .vpn-card-footer {
+  background: transparent !important;
+  border-top-color: rgba(15, 23, 42, 0.06) !important;
+}
+
+
+/* ── VPN ACTION BUTTONS: clean, neutral, accent only on press ─ */
+.vpn-action-btn {
+  background: rgba(255,255,255,0.06) !important;
+  border: 1px solid rgba(255,255,255,0.10) !important;
+  box-shadow: none !important;
+  color: rgba(255,255,255,0.78) !important;
+}
+[data-theme="light"] .vpn-action-btn {
+  background: #ffffff !important;
+  border-color: rgba(15, 23, 42, 0.10) !important;
+  color: rgba(31, 41, 55, 0.72) !important;
+  box-shadow:
+    0 1px 2px rgba(15, 23, 42, 0.04) !important;
+}
+.vpn-action-btn:hover,
+.vpn-action-btn:active {
+  background: rgba(var(--brandRgb), 0.12) !important;
+  border-color: rgba(var(--brandRgb), 0.40) !important;
+  color: var(--brand) !important;
+  box-shadow: none !important;
+  transform: scale(0.96) !important;
+}
+[data-theme="light"] .vpn-action-btn:hover,
+[data-theme="light"] .vpn-action-btn:active {
+  background: rgba(var(--brandRgb), 0.10) !important;
+  color: var(--brand) !important;
+}
+
+
+/* ── VPN STATUS BADGE: subtle green tint ────────────────────── */
+.vpn-card .status-badge {
+  background: rgba(74, 222, 128, 0.10) !important;
+  border-color: rgba(74, 222, 128, 0.22) !important;
+  color: rgba(180, 240, 200, 0.92) !important;
+}
+[data-theme="light"] .vpn-card .status-badge {
+  background: rgba(34, 168, 84, 0.08) !important;
+  border-color: rgba(34, 168, 84, 0.22) !important;
+  color: #1a5a30 !important;
+}
+
+
+/* ── ACTION TILES: opaque, calm ──────────────────────────────── */
+:root .action-tile,
+[data-theme="dark"] .action-tile {
+  background: #131c28 !important;
+  border: 1px solid rgba(255,255,255,0.06) !important;
+  box-shadow:
+    0 1px 0 rgba(255,255,255,0.04) inset,
+    0 3px 10px rgba(0,0,0,0.28) !important;
+}
+[data-theme="light"] .action-tile {
+  background: #ffffff !important;
+  border: 1px solid rgba(15,23,42,0.06) !important;
+  box-shadow:
+    0 1px 2px rgba(15,23,42,0.04),
+    0 3px 10px rgba(15,23,42,0.05) !important;
+}
+
+
+/* ── HEADER + BOTTOM NAV: keep semantic blur, lighter blur radius */
+header {
+  backdrop-filter: blur(14px) saturate(160%) !important;
+  -webkit-backdrop-filter: blur(14px) saturate(160%) !important;
+  background: rgba(10,18,28, 0.78) !important;
+}
+[data-theme="light"] header {
+  background: rgba(244,245,248, 0.82) !important;
+}
+
+.bottom-nav {
+  backdrop-filter: blur(16px) saturate(160%) !important;
+  -webkit-backdrop-filter: blur(16px) saturate(160%) !important;
+  background: rgba(10,18,28, 0.85) !important;
+  border-top: 1px solid rgba(255,255,255,0.06) !important;
+}
+[data-theme="light"] .bottom-nav {
+  background: rgba(255,255,255, 0.88) !important;
+  border-top-color: rgba(15,23,42, 0.08) !important;
+}
+
+
+/* ── LIGHT MODE TEXT SAFETY: softer than pure black ──────────── */
+[data-theme="light"] .card,
+[data-theme="light"] .placeholder-card,
+[data-theme="light"] .action-tile,
+[data-theme="light"] .vpn-card {
+  color: #1f2937 !important;  /* slate-800 */
+}
+[data-theme="light"] .card .muted,
+[data-theme="light"] .card .subtitle,
+[data-theme="light"] .action-tile .muted {
+  color: rgba(31, 41, 55, 0.62) !important;
+}
+
+
+/* ═══════════════════════════════════════════════════════════════
+   COZY AMBIENT + CALM INTERACTIONS
+   - Soft warm wash for atmosphere (no busy blobs)
+   - Replace all pop/scale press feedback with opacity tints
+   ═══════════════════════════════════════════════════════════════ */
+
+/* ── AMBIENT WASH — soft drifting glow, very slow ──────────── */
+body::before {
+  content: "";
+  position: fixed;
+  inset: -10%;
+  z-index: -1;
+  pointer-events: none;
+  background:
+    radial-gradient(40% 35% at 15% 20%,
+      rgba(255, 200, 175, 0.55) 0%,
+      transparent 70%),
+    radial-gradient(45% 40% at 88% 80%,
+      rgba(210, 195, 255, 0.45) 0%,
+      transparent 72%),
+    radial-gradient(35% 30% at 75% 15%,
+      rgba(195, 230, 220, 0.35) 0%,
+      transparent 70%);
+  filter: blur(80px) saturate(115%);
+  opacity: 1;
+  animation: ambientDrift 38s ease-in-out infinite alternate;
+}
+
+/* Dark mode: warmer ember + cool indigo, much lower opacity */
+html[data-theme="dark"] body::before,
+html:not([data-theme="light"]) body::before {
+  background:
+    radial-gradient(40% 35% at 15% 20%,
+      rgba(220, 130, 80, 0.16) 0%,
+      transparent 70%),
+    radial-gradient(45% 40% at 88% 80%,
+      rgba(90, 110, 200, 0.14) 0%,
+      transparent 72%),
+    radial-gradient(35% 30% at 75% 15%,
+      rgba(80, 180, 160, 0.10) 0%,
+      transparent 70%);
+}
+
+@keyframes ambientDrift {
+  0%   { transform: translate(0, 0)       scale(1); }
+  100% { transform: translate(2%, -2%)    scale(1.04); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  body::before { animation: none !important; }
+}
+
+/* Restore html backgrounds — keep them, but ambient sits on top */
+html[data-theme="light"] {
+  background: #fafaf7 !important;        /* warmer than the gray */
+}
+
+
+/* ── KILL ALL POP/SCALE INTERACTIONS ────────────────────────── */
+/* User explicitly does not want scale-on-press feedback */
+.card:hover, .card:active,
+.placeholder-card:hover, .placeholder-card:active,
+.action-tile:hover, .action-tile:active,
+.speed-chip:hover, .speed-chip:active,
+.btn:hover, .btn:active,
+.btn-primary:hover, .btn-primary:active,
+button.btn-primary:hover, button.btn-primary:active,
+.btn-icon:hover, .btn-icon:active,
+.mini-btn:hover, .mini-btn:active,
+.vpn-card:hover, .vpn-card:active,
+.vpn-action-btn:hover, .vpn-action-btn:active,
+.nav-item:hover, .nav-item:active,
+.nav-item:active:not(.nav-item-notch),
+.notification-bell:hover, .notification-bell:active,
+.lang-switch:hover, .lang-switch:active,
+.sub-actions-menu .menu-item:hover,
+.subs-dd .item:hover {
+  transform: none !important;
+  animation: none !important;
+}
+
+/* Replace transform feedback with calm background/opacity shifts */
+.card:active,
+.placeholder-card:active,
+.action-tile:active,
+.speed-chip:active,
+.vpn-card:active {
+  opacity: 0.92 !important;
+  transition: opacity 0.12s ease !important;
+}
+
+.btn:not(.btn-primary):active,
+.btn-icon:active,
+.mini-btn:active,
+.notification-bell:active,
+.lang-switch:active {
+  opacity: 0.78 !important;
+  transition: opacity 0.10s ease !important;
+}
+
+.btn-primary:active,
+button.btn-primary:active {
+  filter: brightness(0.92) !important;
+  transition: filter 0.10s ease !important;
+}
+
+.vpn-action-btn:active {
+  background: rgba(var(--brandRgb), 0.20) !important;
+  opacity: 1 !important;
+  transition: background 0.10s ease !important;
+}
+
+
+/* ═══════════════════════════════════════════════════════════════
+   V9 — Restore Warm Blobs + Strong Ambient + VPN Card Accent
+   ═══════════════════════════════════════════════════════════════ */
+
+/* ── RESTORE lava blobs (they're free — no backdrop-filter) ──── */
+#astro-lava {
+  display: block !important;
+}
+
+/* ── DARK MODE blobs: keep existing brand ember + ocean tones ─── */
+html:not([data-theme="light"]) #astro-lava,
+[data-theme="dark"] #astro-lava {
+  filter: blur(90px) saturate(130%) !important;
+  opacity: 0.55 !important;
+}
+html:not([data-theme="light"]) .lava-blob-1,
+[data-theme="dark"] .lava-blob-1 {
+  background: rgba(var(--brandRgb), 0.38) !important;
+}
+html:not([data-theme="light"]) .lava-blob-2,
+[data-theme="dark"] .lava-blob-2 {
+  background: rgba(40, 130, 255, 0.22) !important;
+}
+html:not([data-theme="light"]) .lava-blob-3,
+[data-theme="dark"] .lava-blob-3 {
+  background: rgba(60, 190, 200, 0.16) !important;
+}
+html:not([data-theme="light"]) .lava-blob-4,
+[data-theme="dark"] .lava-blob-4 {
+  background: rgba(var(--brandRgb), 0.18) !important;
+}
+html:not([data-theme="light"]) .lava-blob-5,
+[data-theme="dark"] .lava-blob-5 {
+  background: rgba(100, 80, 220, 0.14) !important;
+}
+
+/* ── LIGHT MODE blobs: warm peach/amber ONLY — no cold purple/blue ─ */
+[data-theme="light"] #astro-lava {
+  filter: blur(110px) saturate(90%) !important;
+  opacity: 0.70 !important;
+}
+[data-theme="light"] .lava-blob-1 { background: rgba(255, 205, 170, 0.72) !important; }
+[data-theme="light"] .lava-blob-2 { background: rgba(255, 220, 185, 0.58) !important; }
+[data-theme="light"] .lava-blob-3 { background: rgba(255, 235, 200, 0.62) !important; }
+[data-theme="light"] .lava-blob-4 { background: rgba(245, 190, 145, 0.50) !important; }
+[data-theme="light"] .lava-blob-5 { background: rgba(255, 215, 180, 0.55) !important; }
+
+
+/* ── AMBIENT: brighter, faster, more perceptible ─────────────── */
+body::before {
+  background:
+    radial-gradient(55% 45% at 12% 18%,
+      rgba(255, 195, 165, 0.68) 0%,
+      transparent 65%),
+    radial-gradient(50% 45% at 90% 82%,
+      rgba(215, 200, 255, 0.50) 0%,
+      transparent 68%),
+    radial-gradient(40% 38% at 78% 12%,
+      rgba(190, 230, 215, 0.42) 0%,
+      transparent 65%) !important;
+  filter: blur(55px) saturate(120%) !important;
+  animation: ambientDrift 22s ease-in-out infinite alternate !important;
+}
+
+html[data-theme="dark"] body::before,
+html:not([data-theme="light"]) body::before {
+  background:
+    radial-gradient(50% 42% at 12% 18%,
+      rgba(var(--brandRgb), 0.13) 0%,
+      transparent 65%),
+    radial-gradient(48% 44% at 88% 82%,
+      rgba(60, 100, 220, 0.10) 0%,
+      transparent 68%),
+    radial-gradient(38% 35% at 75% 12%,
+      rgba(60, 190, 180, 0.08) 0%,
+      transparent 65%) !important;
+  filter: blur(60px) saturate(110%) !important;
+}
+
+
+/* ── VPN CARD LIGHT: warm cream with strong accent bar ────────── */
+html[data-theme="light"] .vpn-card,
+[data-theme="light"] .vpn-card {
+  background: #fefcf8 !important;
+  border: 1px solid rgba(15, 23, 42, 0.08) !important;
+  border-top: 3px solid rgba(var(--brandRgb), 0.85) !important;
+  box-shadow:
+    0 12px 32px rgba(15, 23, 42, 0.10),
+    0 3px 8px rgba(15, 23, 42, 0.05) !important;
+}
+
+/* Ensure top sheen is gone — accent bar replaces it */
+html[data-theme="light"] .vpn-card::before,
+[data-theme="light"] .vpn-card::before {
+  display: none !important;
+}
+
+/* VPN action buttons in light: warmer feel */
+[data-theme="light"] .vpn-action-btn {
+  background: rgba(255,255,255,0.90) !important;
+  border-color: rgba(15, 23, 42, 0.09) !important;
+  color: rgba(31, 41, 55, 0.72) !important;
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.06) !important;
+}
+
+/* VPN footer in light: faint separator only */
+[data-theme="light"] .vpn-card-footer {
+  background: transparent !important;
+  border-top-color: rgba(15, 23, 42, 0.06) !important;
+}
+
+/* VPN balance in light: rich dark text */
+[data-theme="light"] .vpn-balance {
+  color: #111827 !important;
+}
+
+/* VPN date badge: neutral cool pill */
+[data-theme="light"] .vpn-card .date-badge {
+  background: rgba(15, 23, 42, 0.05) !important;
+  border-color: rgba(15, 23, 42, 0.09) !important;
+  color: rgba(55, 65, 81, 0.70) !important;
+}
+
+/* VPN icon: solid brand circle */
+[data-theme="light"] .vpn-card-icon {
+  background: rgba(var(--brandRgb), 0.10) !important;
+  border-color: rgba(var(--brandRgb), 0.28) !important;
+  color: rgb(var(--brandRgb)) !important;
+}
+
+/* Status badge */
+[data-theme="light"] .vpn-card .status-badge {
+  background: rgba(34, 197, 94, 0.09) !important;
+  border-color: rgba(21, 128, 61, 0.25) !important;
+  color: #15803d !important;
+}
+
+/* Usage track */
+[data-theme="light"] .vpn-usage-track {
+  background: rgba(15, 23, 42, 0.07) !important;
+}
+
+/* All text inside light VPN card */
+[data-theme="light"] .vpn-card {
+  color: #1f2937 !important;
+}
+[data-theme="light"] .vpn-username,
+[data-theme="light"] .vpn-balance-unit,
+[data-theme="light"] .vpn-usage-pct {
+  color: rgba(55, 65, 81, 0.55) !important;
+}
+
+
+/* ── CARDS in light: let warm blob show very subtly through ──── */
+/* Cards stay opaque but get a barely-there warm base */
+[data-theme="light"] .card,
+[data-theme="light"] .placeholder-card {
+  background: rgba(255, 254, 252, 0.97) !important;
+}
+[data-theme="light"] .action-tile {
+  background: rgba(255, 254, 252, 0.97) !important;
+}
+
+/* html bg: keep warm, slightly creamy */
+html[data-theme="light"] {
+  background: #faf8f5 !important;
+}
+
+
+/* ═══════════════════════════════════════════════════════════════
+   §33 — VPN CARD COMPLETE REDESIGN — v10
+   Dark mode: deep navy credential card.
+   Light mode: clean white card, strong hierarchy, no bleed.
+
+   Design principles (Emil Kowalski):
+   - Entry: fade + translateY, cubic-bezier(0.16,1,0.3,1), 0.45s
+   - Shimmer: single-pass on load, no repeat
+   - Press: opacity tint only, no scale (user hates scale)
+   - Only transform + opacity animated (GPU-only, no heat)
+   ═══════════════════════════════════════════════════════════════ */
+
+/* ── KEYFRAMES ────────────────────────────────────────────────── */
+@keyframes vpn-card-enter {
+  from { opacity: 0; transform: translateY(14px); }
+  to   { opacity: 1; transform: translateY(0);    }
+}
+@keyframes vpn-card-shimmer {
+  0%   { transform: translateX(-100%); }
+  100% { transform: translateX(220%);  }
+}
+
+
+/* ── 1A. DARK MODE CARD SHELL ────────────────────────────────── */
+.vpn-card,
+:root .vpn-card,
+[data-theme="dark"] .vpn-card,
+html:not([data-theme="light"]) .vpn-card {
+  position: relative !important;
+  background:
+    radial-gradient(
+      ellipse 110% 55% at 50% -10%,
+      rgba(var(--brandRgb), 0.22) 0%,
+      transparent 62%
+    ),
+    linear-gradient(155deg, #1c2f48 0%, #0d1b2f 50%, #111928 100%) !important;
+  border: 1px solid rgba(255, 255, 255, 0.055) !important;
+  border-top: 2px solid rgba(var(--brandRgb), 0.76) !important;
+  border-radius: 20px !important;
+  overflow: hidden !important;
+  color: rgba(255, 255, 255, 0.92) !important;
+  box-shadow:
+    0 18px 48px rgba(0, 0, 0, 0.28),
+    0 4px 14px rgba(0, 0, 0, 0.18) !important;
+  animation: vpn-card-enter 0.45s cubic-bezier(0.23, 1, 0.32, 1) both !important;
+}
+
+/* ── 1B. LIGHT MODE CARD SHELL — clean white, strong hierarchy ── */
+[data-theme="light"] .vpn-card,
+html[data-theme="light"] .vpn-card {
+  position: relative !important;
+  background: #ffffff !important;
+  border: 1px solid rgba(15, 23, 42, 0.08) !important;
+  border-top: 2px solid rgba(var(--brandRgb), 0.80) !important;
+  border-radius: 20px !important;
+  overflow: hidden !important;
+  color: #1f2937 !important;
+  box-shadow:
+    0 12px 32px rgba(15, 23, 42, 0.10),
+    0 3px 8px rgba(15, 23, 42, 0.05) !important;
+  animation: vpn-card-enter 0.45s cubic-bezier(0.23, 1, 0.32, 1) both !important;
+}
+
+
+/* ── 2. SHIMMER OVERLAY (single pass, ::before repurposed) ────── */
+/* Dark mode shimmer */
+.vpn-card::before,
+:root .vpn-card::before,
+[data-theme="dark"] .vpn-card::before,
+html:not([data-theme="light"]) .vpn-card::before {
+  content: "" !important;
+  display: block !important;
+  position: absolute !important;
+  inset: 0 !important;
+  z-index: 5 !important;
+  pointer-events: none !important;
+  background: linear-gradient(
+    108deg,
+    transparent 25%,
+    rgba(255, 255, 255, 0.07) 50%,
+    transparent 75%
+  ) !important;
+  animation: vpn-card-shimmer 1.1s cubic-bezier(0.23, 1, 0.32, 1) 0.2s 1 both !important;
+}
+/* Light mode shimmer — subtle cool glint on white */
+[data-theme="light"] .vpn-card::before,
+html[data-theme="light"] .vpn-card::before {
+  content: "" !important;
+  display: block !important;
+  position: absolute !important;
+  inset: 0 !important;
+  z-index: 5 !important;
+  pointer-events: none !important;
+  background: linear-gradient(
+    108deg,
+    transparent 25%,
+    rgba(148, 163, 200, 0.13) 50%,
+    transparent 75%
+  ) !important;
+  animation: vpn-card-shimmer 1.1s cubic-bezier(0.23, 1, 0.32, 1) 0.2s 1 both !important;
+}
+
+/* Reduced motion: kill both animations */
+@media (prefers-reduced-motion: reduce) {
+  .vpn-card,
+  [data-theme="light"] .vpn-card,
+  html[data-theme="light"] .vpn-card {
+    animation: none !important;
+    opacity: 1 !important;
+    transform: none !important;
+  }
+  .vpn-card::before,
+  [data-theme="light"] .vpn-card::before,
+  html[data-theme="light"] .vpn-card::before,
+  :root .vpn-card::before,
+  [data-theme="dark"] .vpn-card::before,
+  html:not([data-theme="light"]) .vpn-card::before {
+    display: none !important;
+    animation: none !important;
+  }
+}
+
+/* No transform on press — opacity tint only */
+.vpn-card:hover,
+.vpn-card:active {
+  transform: none !important;
+}
+.vpn-card:active {
+  opacity: 0.93 !important;
+  transition: opacity 0.10s ease !important;
+  animation: none !important;
+}
+
+
+/* ── 3. HIDE INTERNAL BLOBS (card has its own gradient) ───────── */
+.vpn-blob-1, .vpn-blob-2,
+.vpn-blob-3, .vpn-blob-4 {
+  display: none !important;
+}
+
+
+/* ── 4. DATE BADGE ───────────────────────────────────────────── */
+/* Dark mode */
+.vpn-card .date-badge {
+  background: rgba(255, 255, 255, 0.08) !important;
+  border: 1px solid rgba(255, 255, 255, 0.11) !important;
+  color: rgba(255, 255, 255, 0.52) !important;
+  font-size: 10px !important;
+  font-weight: 600 !important;
+  letter-spacing: 0.3px !important;
+  box-shadow: none !important;
+  text-transform: none !important;
+  font-feature-settings: 'tnum' 1 !important;
+}
+/* Light mode */
+[data-theme="light"] .vpn-card .date-badge,
+html[data-theme="light"] .vpn-card .date-badge {
+  background: rgba(15, 23, 42, 0.05) !important;
+  border: 1px solid rgba(15, 23, 42, 0.09) !important;
+  color: #64748b !important;
+  box-shadow: none !important;
+}
+
+
+/* ── 5. VPN ICON ─────────────────────────────────────────────── */
+/* Dark mode */
+.vpn-card-icon {
+  background: rgba(var(--brandRgb), 0.16) !important;
+  border: 1px solid rgba(var(--brandRgb), 0.36) !important;
+  color: rgba(var(--brandRgb), 1) !important;
+  box-shadow: 0 0 14px rgba(var(--brandRgb), 0.24) !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+}
+/* Light mode */
+[data-theme="light"] .vpn-card-icon,
+html[data-theme="light"] .vpn-card-icon {
+  background: rgba(var(--brandRgb), 0.10) !important;
+  border: 1px solid rgba(var(--brandRgb), 0.24) !important;
+  color: rgb(var(--brandRgb)) !important;
+  box-shadow: none !important;
+}
+
+
+/* ── 6. BALANCE — hero number ────────────────────────────────── */
+/* Dark mode */
+.vpn-balance {
+  font-size: 52px !important;
+  font-weight: 800 !important;
+  letter-spacing: -3px !important;
+  line-height: 1 !important;
+  color: #ffffff !important;
+  text-shadow: 0 2px 16px rgba(0, 0, 0, 0.32) !important;
+  font-feature-settings: 'tnum' 1, 'lnum' 1 !important;
+}
+/* Light mode */
+[data-theme="light"] .vpn-balance,
+html[data-theme="light"] .vpn-balance {
+  color: #0f172a !important;
+  text-shadow: none !important;
+}
+
+/* GB unit — dark mode */
+.vpn-balance-unit {
+  font-size: 13px !important;
+  font-weight: 700 !important;
+  letter-spacing: 1.8px !important;
+  color: rgba(255, 255, 255, 0.40) !important;
+  text-shadow: none !important;
+}
+/* GB unit — light mode */
+[data-theme="light"] .vpn-balance-unit,
+html[data-theme="light"] .vpn-balance-unit {
+  color: #64748b !important;
+}
+
+/* Username — dark mode */
+.vpn-username {
+  font-size: 10.5px !important;
+  font-weight: 500 !important;
+  letter-spacing: 0.7px !important;
+  color: rgba(255, 255, 255, 0.38) !important;
+  text-shadow: none !important;
+}
+/* Username — light mode */
+[data-theme="light"] .vpn-username,
+html[data-theme="light"] .vpn-username {
+  color: #64748b !important;
+}
+
+
+/* ── 7. USAGE BAR ────────────────────────────────────────────── */
+/* Dark mode */
+.vpn-usage-track {
+  background: rgba(255, 255, 255, 0.09) !important;
+  box-shadow: none !important;
+}
+/* Light mode */
+[data-theme="light"] .vpn-usage-track,
+html[data-theme="light"] .vpn-usage-track {
+  background: rgba(15, 23, 42, 0.08) !important;
+  box-shadow: none !important;
+}
+
+/* Fill — same in both modes (brand color) */
+.vpn-usage-fill {
+  background: linear-gradient(
+    90deg,
+    rgba(var(--brandRgb), 0.60) 0%,
+    rgb(var(--brandRgb)) 100%
+  ) !important;
+  box-shadow: 0 0 8px rgba(var(--brandRgb), 0.44) !important;
+  transition: width 0.55s cubic-bezier(0.23, 1, 0.32, 1) !important;
+}
+[data-theme="light"] .vpn-usage-fill,
+html[data-theme="light"] .vpn-usage-fill {
+  box-shadow: 0 0 6px rgba(var(--brandRgb), 0.30) !important;
+}
+
+/* Pct label — dark mode */
+.vpn-usage-pct {
+  color: rgba(255, 255, 255, 0.46) !important;
+  font-size: 9px !important;
+  font-weight: 700 !important;
+  letter-spacing: 0.3px !important;
+  font-feature-settings: 'tnum' 1 !important;
+}
+/* Pct label — light mode */
+[data-theme="light"] .vpn-usage-pct,
+html[data-theme="light"] .vpn-usage-pct {
+  color: #64748b !important;
+}
+
+
+/* ── 8. FOOTER ───────────────────────────────────────────────── */
+/* Dark mode */
+.vpn-card-footer {
+  background: rgba(0, 0, 0, 0.18) !important;
+  border-top: 1px solid rgba(255, 255, 255, 0.055) !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+}
+/* Light mode */
+[data-theme="light"] .vpn-card-footer,
+html[data-theme="light"] .vpn-card-footer {
+  background: rgba(248, 249, 252, 0.90) !important;
+  border-top: 1px solid rgba(15, 23, 42, 0.06) !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+}
+
+
+/* ── 9. ACTION BUTTONS ───────────────────────────────────────── */
+/* Dark mode */
+.vpn-action-btn {
+  background: rgba(255, 255, 255, 0.08) !important;
+  border: 1px solid rgba(255, 255, 255, 0.12) !important;
+  color: rgba(255, 255, 255, 0.68) !important;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.07) !important;
+  transform: none !important;
+  transition:
+    background 0.15s cubic-bezier(0.23, 1, 0.32, 1),
+    border-color 0.15s cubic-bezier(0.23, 1, 0.32, 1),
+    color 0.15s cubic-bezier(0.23, 1, 0.32, 1),
+    opacity 0.08s ease !important;
+}
+/* Light mode */
+[data-theme="light"] .vpn-action-btn,
+html[data-theme="light"] .vpn-action-btn {
+  background: #ffffff !important;
+  border: 1px solid rgba(15, 23, 42, 0.09) !important;
+  color: rgba(15, 23, 42, 0.62) !important;
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.07) !important;
+  transform: none !important;
+}
+
+/* Hover: brand highlight — only real pointers, no touch flash */
+@media (hover: hover) and (pointer: fine) {
+  .vpn-action-btn:hover {
+    background: rgba(var(--brandRgb), 0.18) !important;
+    border-color: rgba(var(--brandRgb), 0.38) !important;
+    color: rgb(var(--brandRgb)) !important;
+    box-shadow: 0 0 12px rgba(var(--brandRgb), 0.20) !important;
+    transform: none !important;
+  }
+  [data-theme="light"] .vpn-action-btn:hover,
+  html[data-theme="light"] .vpn-action-btn:hover {
+    background: rgba(var(--brandRgb), 0.08) !important;
+    border-color: rgba(var(--brandRgb), 0.28) !important;
+    color: rgb(var(--brandRgb)) !important;
+    box-shadow: none !important;
+  }
+}
+
+/* Active: opacity only — no scale, ever */
+.vpn-action-btn:active {
+  opacity: 0.72 !important;
+  transform: none !important;
+  transition: opacity 0.08s ease !important;
+}
+[data-theme="light"] .vpn-action-btn:active,
+html[data-theme="light"] .vpn-action-btn:active {
+  opacity: 0.72 !important;
+  transform: none !important;
+  transition: opacity 0.08s ease !important;
+}
+
+
+/* ── 10. STATUS BADGE ────────────────────────────────────────── */
+/* Dark mode */
+.vpn-card .status-badge {
+  background: rgba(74, 222, 128, 0.11) !important;
+  border: 1px solid rgba(74, 222, 128, 0.24) !important;
+  color: rgba(180, 240, 200, 0.88) !important;
+  font-size: 10px !important;
+  font-weight: 600 !important;
+  letter-spacing: 0.3px !important;
+  box-shadow: none !important;
+}
+/* Light mode */
+[data-theme="light"] .vpn-card .status-badge,
+html[data-theme="light"] .vpn-card .status-badge {
+  background: rgba(34, 197, 94, 0.09) !important;
+  border: 1px solid rgba(21, 128, 61, 0.24) !important;
+  color: #15803d !important;
+  box-shadow: none !important;
+}
+
+
+/* ── 11. TEXT COLOR SAFETY for light mode ────────────────────── */
+[data-theme="light"] .card.vpn-card,
+html[data-theme="light"] .card.vpn-card {
+  color: #1f2937 !important;
+}

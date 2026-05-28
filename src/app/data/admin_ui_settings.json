@@ -1,0 +1,23 @@
+{
+  "v3": {
+    "bg_mode": "image",
+    "bg_image_url": "/admin/uploads/bg_0bd6f74d2a948e66.png",
+    "bg_image_opacity": 0.21,
+    "bg_image_blur": 5,
+    "grid_enabled": true,
+    "grid_opacity": 1,
+    "grid_size": 50,
+    "glass_blur": 12,
+    "glass_saturation": 176,
+    "glass_opacity": 0.09,
+    "glass_border_opacity": 0.39,
+    "chat_style": "glow",
+    "chat_glow_intensity": 0.22,
+    "chat_darkness": 1,
+    "chat_blur": 12,
+    "fab_enabled": false,
+    "chat_bg_opacity": 1,
+    "chat_messages_opacity": 0.88,
+    "chat_bubble_opacity": 0.85
+  }
+}

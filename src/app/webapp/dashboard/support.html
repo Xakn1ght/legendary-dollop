@@ -1,0 +1,1718 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="format-detection" content="telephone=no">
+  <meta name="referrer" content="no-referrer" />
+  <title>Support - AstroByte</title>
+  <script src="https://telegram.org/js/telegram-web-app.js"></script>
+  <script src="/webapp/dashboard/js/head-boot.js"></script>
+  <script src="/webapp/dashboard/ui.js" defer></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Urbanist:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/rastikerdar/vazirmatn@v33.003/Vazirmatn-font-face.css">
+  <link rel="stylesheet" href="/webapp/dashboard/scrollbar-hide.css">
+</head>
+<body>
+  <div id="astro-lava" aria-hidden="true"><div class="lava-blob lava-blob-1"></div><div class="lava-blob lava-blob-2"></div><div class="lava-blob lava-blob-3"></div><div class="lava-blob lava-blob-4"></div><div class="lava-blob lava-blob-5"></div></div>
+  <div class="content">
+    <link rel="stylesheet" href="/webapp/dashboard/css/support.css">
+    <link rel="stylesheet" href="/webapp/dashboard/css/glass.css?v=12">
+    
+    <div class="space-bg"></div>
+
+    <div class="container" id="mainContainer">
+      <div id="ticketsView" style="display: flex; flex-direction: column; height: 100%;">
+        <div class="header">
+          <button class="back-btn" onclick="goBackHome()">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M15 18l-6-6 6-6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          </button>
+          <div class="header-content">
+            <div class="header-title" id="pageTitle">Support</div>
+            <div class="header-subtitle" id="pageSubtitle">Help Center</div>
+          </div>
+        </div>
+        <div class="filter-tabs">
+          <div class="filter-tab active" onclick="filterTickets('all')" data-filter="all">All</div>
+          <div class="filter-tab" onclick="filterTickets('open')" data-filter="open">Open</div>
+          <div class="filter-tab" onclick="filterTickets('closed')" data-filter="closed">Closed</div>
+        </div>
+        <div class="tickets-list" id="ticketsList">
+          <div class="empty-state">
+            <div class="empty-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" stroke-width="2"/></svg></div>
+            <div style="font-size: 16px; font-weight: 600; margin-bottom: 6px;">No tickets yet</div>
+            <div style="font-size: 13px;">Create a ticket if you need assistance.</div>
+          </div>
+        </div>
+        <button class="fab" onclick="showCreateTicketModal()">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><line x1="12" y1="5" x2="12" y2="19" stroke-linecap="round"/><line x1="5" y1="12" x2="19" y2="12" stroke-linecap="round"/></svg>
+        </button>
+      </div>
+      
+      <div class="chat-backdrop" id="chatBackdrop" onclick="closeChat()"></div>
+      <div class="chat-view" id="chatView">
+        <div class="header">
+          <button class="back-btn" onclick="closeChat()">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M15 18l-6-6 6-6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          </button>
+          <div class="header-content">
+            <div class="header-title" id="chatTitle">Ticket #123</div>
+            <div class="header-subtitle" id="chatStatus">Open</div>
+          </div>
+          <button class="back-btn" style="color: var(--danger); border-color: rgba(239, 68, 68, 0.3);" onclick="deleteTicket()">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
+          </button>
+        </div>
+        <div class="chat-messages" id="messagesArea"></div>
+        <div class="reply-area">
+          <button class="keyboard-dismiss-btn" id="keyboardDismissBtn" type="button" title="Hide keyboard">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M4 6h16M4 10h16M4 14h16M8 18l4 3 4-3"/>
+            </svg>
+          </button>
+          <textarea class="reply-input" id="replyInput" rows="1" placeholder="Type a message..." oninput="autoResize(this)"></textarea>
+          <button class="send-btn" id="sendBtn" type="button">
+            <svg viewBox="0 0 24 24"><path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/></svg>
+          </button>
+        </div>
+      </div>
+    </div>
+    
+    <div class="modal-overlay" id="createTicketModal">
+      <div class="modal">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:20px;">
+          <h3 class="modal-title" style="margin:0">New Ticket</h3>
+          <button onclick="hideCreateTicketModal()" style="background:none; border:none; color:var(--text-muted); cursor:pointer;"><svg viewBox="0 0 24 24" width="24" height="24" stroke="currentColor" fill="none" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
+        </div>
+        <form onsubmit="createTicket(event)">
+          <div class="form-group">
+            <label class="form-label">Category</label>
+            <button type="button" class="fake-select-btn" id="ticketCategoryBtn" onclick="openSupportPicker('category')">
+              <span class="value muted" id="ticketCategoryBtnText">Select category...</span>
+              <svg class="chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            </button>
+            <select class="form-select" id="ticketCategory" required>
+              <option value="" disabled selected>Select category...</option>
+              <option value="connection">Connection Issue</option>
+              <option value="money">Payment & Billing</option>
+              <option value="other">General / Other</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Subscription (Optional)</label>
+            <button type="button" class="fake-select-btn" id="ticketSubBtn" onclick="openSupportPicker('sub')">
+              <span class="value" id="ticketSubBtnText">None</span>
+              <svg class="chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            </button>
+            <select class="form-select" id="ticketSub"><option value="">None</option></select>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Message</label>
+            <textarea class="form-textarea" id="ticketMessage" rows="4" placeholder="Describe your issue..." required></textarea>
+          </div>
+          <button type="submit" class="btn-block">Create Ticket</button>
+        </form>
+      </div>
+    </div>
+    <div class="toast" id="toast">
+      <div class="toast-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg></div>
+      <span class="toast-message">Success!</span>
+    </div>
+    <div class="loading-overlay" id="loadingOverlay">
+      <div class="loading-spinner"></div>
+      <div class="loading-text" id="loadingText">Loading...</div>
+    </div>
+
+    <!-- Designed picker (used on Telegram mobile to avoid web-style <select> dropdowns) -->
+    <div class="picker-backdrop" id="supportPickerBackdrop" onclick="closeSupportPicker()"></div>
+    <div class="picker-panel" id="supportPickerPanel" role="dialog" aria-modal="true" aria-hidden="true">
+      <div class="picker-head">
+        <div class="picker-title" id="supportPickerTitle">Select</div>
+        <button class="picker-close" type="button" onclick="closeSupportPicker()" aria-label="Close">
+          <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2">
+            <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+          </svg>
+        </button>
+      </div>
+      <div class="picker-search" id="supportPickerSearchRow" style="display:none">
+        <input id="supportPickerSearch" type="text" placeholder="Search..." autocomplete="off" />
+      </div>
+      <div class="picker-list" id="supportPickerList"></div>
+    </div>
+
+    <script>
+    // ========== Debug Mode Toggle ==========
+    // Set to true for debugging, false for production (default: false)
+    const DEBUG_MODE = false;
+    
+    // Store original console methods
+    const originalConsoleLog = console.log;
+    const originalConsoleError = console.error;
+    const originalConsoleWarn = console.warn;
+    
+    // Filter Telegram WebView logs when DEBUG_MODE is false
+    const shouldFilterLog = (args) => {
+      if (DEBUG_MODE) return false; // Don't filter when debugging
+      // Filter out Telegram WebView logs
+      const message = args.join(' ');
+      return message.includes('[Telegram.WebView]');
+    };
+    
+    // Override console.log to filter Telegram WebView logs
+    console.log = function(...args) {
+      if (!shouldFilterLog(args)) {
+        originalConsoleLog.apply(console, args);
+      }
+    };
+    
+    // Override console.error to filter Telegram WebView logs
+    console.error = function(...args) {
+      if (!shouldFilterLog(args)) {
+        originalConsoleError.apply(console, args);
+      }
+    };
+    
+    // Override console.warn to filter Telegram WebView logs
+    console.warn = function(...args) {
+      if (!shouldFilterLog(args)) {
+        originalConsoleWarn.apply(console, args);
+      }
+    };
+    
+    // Debug logging helper - only logs when DEBUG_MODE is true
+    const debugLog = (...args) => {
+      if (DEBUG_MODE) {
+        originalConsoleLog(...args);
+      }
+    };
+    const debugError = (...args) => {
+      if (DEBUG_MODE) {
+        originalConsoleError(...args);
+      }
+    };
+    const debugWarn = (...args) => {
+      if (DEBUG_MODE) {
+        originalConsoleWarn(...args);
+      }
+    };
+    
+    let allTickets = [], currentFilter = 'all', selectedTicket = null, messagePollingInterval = null, currentLang = 'en';
+    
+    // WebSocket for real-time updates
+    let ws = null;
+    let wsConnected = false;
+    let wsReconnectAttempts = 0;
+    const WS_MAX_RECONNECT = 3;
+
+    // Outgoing message dedupe: avoids "double append" when we optimistically render
+    // and then receive the same message back via WebSocket.
+    const pendingLocalMessages = new Map(); // key -> { el, expiresAt }
+    function _pendingKey(ticketId, text) { return String(ticketId) + '|' + String(text || ''); }
+
+    const i18n = {
+      en: {
+        support: 'Support',
+        helpCenter: 'Help Center',
+        all: 'All',
+        open: 'Open',
+        closed: 'Closed',
+        pending: 'Pending',
+        noTickets: 'No tickets yet',
+        createTicketPrompt: 'Create a ticket if you need assistance.',
+        noMessages: 'No messages yet.',
+        sending: 'Sending...',
+        failedToLoad: 'Failed to load tickets',
+        failedToSend: 'Failed to send',
+        ticketCreated: 'Ticket created!',
+        errorCreating: 'Error creating ticket',
+        messageTooShort: 'Message must be at least 10 characters long',
+        errorDeleting: 'Error deleting ticket',
+        ticketDeleted: 'Ticket deleted',
+        deleteConfirm: 'Delete this ticket?',
+        typeMessage: 'Type a message...',
+        categoryLabel: 'Category',
+        selectCategory: 'Select category...',
+        connection: 'Connection Issue',
+        money: 'Payment & Billing',
+        other: 'General / Other',
+        subscriptionLabel: 'Subscription (Optional)',
+        none: 'None',
+        messageLabel: 'Message',
+        describeIssue: 'Describe your issue...',
+        createTicketBtn: 'Create Ticket',
+        newTicket: 'New Ticket',
+        noMessagesYet: 'No messages',
+        loading: 'Loading...',
+        loadingTickets: 'Loading tickets...',
+        loadingMessages: 'Loading messages...',
+        creatingTicket: 'Creating ticket...',
+        deletingTicket: 'Deleting ticket...',
+        redirecting: 'Redirecting...',
+        search: 'Search...'
+      },
+      fa: {
+        support: 'پشتیبانی',
+        helpCenter: 'مرکز راهنما',
+        all: 'همه',
+        open: 'باز',
+        closed: 'بسته',
+        pending: 'در انتظار',
+        noTickets: 'هنوز تیکتی ندارید',
+        createTicketPrompt: 'در صورت نیاز یک تیکت ایجاد کنید.',
+        noMessages: 'هنوز پیامی وجود ندارد.',
+        sending: 'در حال ارسال...',
+        failedToLoad: 'خطا در بارگذاری تیکت‌ها',
+        failedToSend: 'ارسال نشد',
+        ticketCreated: 'تیکت ایجاد شد!',
+        errorCreating: 'خطا در ایجاد تیکت',
+        messageTooShort: 'پیام باید حداقل ۱۰ کاراکتر باشد',
+        errorDeleting: 'خطا در حذف تیکت',
+        ticketDeleted: 'تیکت حذف شد',
+        deleteConfirm: 'این تیکت حذف شود؟',
+        typeMessage: 'پیامی بنویسید...',
+        categoryLabel: 'دسته‌بندی',
+        selectCategory: 'انتخاب دسته‌بندی...',
+        connection: 'مشکل اتصال',
+        money: 'پرداخت و مالی',
+        other: 'سایر',
+        subscriptionLabel: 'اشتراک (اختیاری)',
+        none: 'هیچ‌کدام',
+        messageLabel: 'پیام',
+        describeIssue: 'مشکل خود را شرح دهید...',
+        createTicketBtn: 'ایجاد تیکت',
+        newTicket: 'تیکت جدید',
+        noMessagesYet: 'بدون پیام',
+        loading: 'در حال بارگذاری...',
+        loadingTickets: 'در حال بارگذاری تیکت‌ها...',
+        loadingMessages: 'در حال بارگذاری پیام‌ها...',
+        creatingTicket: 'در حال ایجاد تیکت...',
+        deletingTicket: 'در حال حذف تیکت...',
+        redirecting: 'در حال انتقال...',
+        search: 'جستجو...'
+      }
+    };
+    const t = (key) => (i18n[currentLang] && i18n[currentLang][key]) || i18n.en[key] || key;
+
+    function localizeValidationError(res) {
+      // Backend returns: { ok:false, error:'validation_error', message:'Invalid input data', details:[{field,message,type}] }
+      if (!res || res.error !== 'validation_error' || !Array.isArray(res.details) || res.details.length === 0) return null;
+
+      const first = res.details[0] || {};
+      const field = String(first.field || '');
+      const msg = String(first.message || '');
+
+      // Localize common cases
+      if (field === 'message' && /at least 10 characters/i.test(msg)) {
+        return t('messageTooShort');
+      }
+      if (field === 'message' && /cannot be empty/i.test(msg)) {
+        return currentLang === 'fa' ? 'پیام نمی‌تواند خالی باشد' : 'Message cannot be empty';
+      }
+      if (field === 'category' && /Field required/i.test(msg)) {
+        return currentLang === 'fa' ? 'لطفاً دسته‌بندی را انتخاب کنید' : 'Please select a category';
+      }
+
+      // Fallback: show backend message (safe: it is our own validation message)
+      return msg || null;
+    }
+    
+    function showLoading(text) {
+      const overlay = document.getElementById('loadingOverlay');
+      const textEl = document.getElementById('loadingText');
+      if(textEl) textEl.textContent = text || t('loading');
+      if(overlay) overlay.classList.add('active');
+    }
+    
+    function hideLoading() {
+      const overlay = document.getElementById('loadingOverlay');
+      if(overlay) overlay.classList.remove('active');
+    }
+    
+    function showSkeletonTickets() {
+      const list = document.getElementById('ticketsList');
+      list.innerHTML = Array(3).fill(0).map(() => `
+        <div class="skeleton-card">
+          <div class="skeleton-header">
+            <div class="skeleton skeleton-badge"></div>
+            <div class="skeleton skeleton-status"></div>
+          </div>
+          <div class="skeleton skeleton-line w-50 h-16"></div>
+          <div class="skeleton skeleton-line w-100"></div>
+          <div class="skeleton skeleton-line w-70"></div>
+          <div style="display:flex; justify-content:space-between; margin-top:12px;">
+            <div class="skeleton skeleton-line w-30 h-8" style="margin:0;"></div>
+            <div class="skeleton skeleton-line w-30 h-8" style="margin:0;"></div>
+          </div>
+        </div>
+      `).join('');
+    }
+    
+    function showSkeletonMessages() {
+      const container = document.getElementById('messagesArea');
+      container.innerHTML = `
+        <div class="skeleton-message">
+          <div class="skeleton skeleton-avatar"></div>
+          <div class="skeleton skeleton-bubble" style="height:60px;"></div>
+        </div>
+        <div class="skeleton-message right">
+          <div class="skeleton skeleton-avatar"></div>
+          <div class="skeleton skeleton-bubble" style="height:40px;"></div>
+        </div>
+        <div class="skeleton-message">
+          <div class="skeleton skeleton-avatar"></div>
+          <div class="skeleton skeleton-bubble" style="height:80px;"></div>
+        </div>
+      `;
+    }
+    
+    document.addEventListener('DOMContentLoaded', () => {
+      detectPlatform();
+      initLanguageSupport();
+      applyTranslationsSupport();
+      initializeSupportPage();
+      setupKeyboardHandling();
+      initSupportDesignedPickers();
+
+      // Swipe-back gesture: smart back — closes chat if open, else goes home.
+      try {
+        if (window.AstroUI && window.AstroUI.swipeBack) {
+          window.AstroUI.swipeBack.setup({
+            edgeZone: 16, threshold: 80,
+            onBack: function () {
+              var chatView = document.getElementById('chatView');
+              if (chatView && chatView.classList.contains('active')) {
+                closeChat();
+              } else {
+                try { document.querySelector('.content').style.visibility = 'hidden'; } catch(_) {}
+                goBackHome();
+              }
+            },
+            canSwipe: function () { return true; },
+            target: function () {
+              var chatView = document.getElementById('chatView');
+              if (chatView && chatView.classList.contains('active')) return chatView;
+              return document.querySelector('.content');
+            }
+          });
+        }
+      } catch (_) {}
+    });
+
+    function initLanguageSupport(){
+      const saved = localStorage.getItem('lang');
+      let guess = 'en';
+      try{
+        const lc = window.Telegram?.WebApp?.initDataUnsafe?.user?.language_code;
+        if (lc && /^fa/i.test(lc)) guess = 'fa';
+      }catch(_){}
+      currentLang = saved || guess;
+      applyLanguage(currentLang);
+      window.addEventListener('storage', (e) => {
+        if(e.key === 'lang' && e.newValue) {
+          currentLang = e.newValue;
+          applyLanguage(currentLang);
+          applyTranslationsSupport();
+          syncSupportPickerTexts();
+          renderTickets(); // Re-render with new language
+        }
+      });
+    }
+    
+    function applyLanguage(lang) {
+      currentLang = lang;
+      document.documentElement.setAttribute('dir', lang === 'fa' ? 'rtl' : 'ltr');
+      document.documentElement.setAttribute('lang', lang);
+    }
+    
+    // ========== Aggressive Keyboard Keep-Open System ==========
+    let preventBlurUntil = 0;
+    let isSending = false;
+    
+    function keepKeyboardOpen() {
+      const inputEl = document.getElementById('replyInput');
+      if (inputEl) {
+        inputEl.focus();
+        requestAnimationFrame(() => inputEl.focus());
+        setTimeout(() => inputEl.focus(), 0);
+        setTimeout(() => inputEl.focus(), 10);
+        setTimeout(() => inputEl.focus(), 50);
+        setTimeout(() => inputEl.focus(), 100);
+      }
+    }
+    
+    function dismissKeyboard() {
+      preventBlurUntil = 0;
+      const inputEl = document.getElementById('replyInput');
+      if (inputEl) inputEl.blur();
+      if (document.activeElement) document.activeElement.blur();
+      if (window.Telegram?.WebApp?.HapticFeedback) {
+        window.Telegram.WebApp.HapticFeedback.impactOccurred('light');
+      }
+    }
+    
+    // Detect if device is a phone (not tablet or desktop)
+    function isPhoneDevice() {
+      const hasTouch = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
+      const isSmallScreen = window.innerWidth <= 480;
+      const isMobileUserAgent = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+      // Exclude tablets (iPad, Android tablets typically have width > 480px)
+      const isTablet = window.innerWidth > 480 && window.innerWidth <= 768 && hasTouch;
+      return hasTouch && isSmallScreen && isMobileUserAgent && !isTablet;
+    }
+    
+    function setupKeyboardHandling() {
+      const replyInput = document.getElementById('replyInput');
+      const sendBtn = document.getElementById('sendBtn');
+      const dismissBtn = document.getElementById('keyboardDismissBtn');
+      const ticketsList = document.getElementById('ticketsList');
+      
+      // Only show keyboard dismiss button on phone devices
+      if (dismissBtn) {
+        if (isPhoneDevice()) {
+          dismissBtn.style.display = 'flex';
+        } else {
+          dismissBtn.style.display = 'none';
+        }
+        
+        // Update on resize (in case of orientation change)
+        let resizeTimeout;
+        window.addEventListener('resize', () => {
+          clearTimeout(resizeTimeout);
+          resizeTimeout = setTimeout(() => {
+            if (isPhoneDevice()) {
+              dismissBtn.style.display = 'flex';
+            } else {
+              dismissBtn.style.display = 'none';
+            }
+          }, 100);
+        });
+      }
+      
+      // Enter key creates new line, not send
+      if(replyInput) {
+        replyInput.addEventListener('keydown', (e) => {
+          if(e.key === 'Enter' && !e.shiftKey) {
+            e.preventDefault();
+            // Allow new line
+            const start = replyInput.selectionStart;
+            const end = replyInput.selectionEnd;
+            replyInput.value = replyInput.value.substring(0, start) + '\n' + replyInput.value.substring(end);
+            replyInput.selectionStart = replyInput.selectionEnd = start + 1;
+            autoResize(replyInput);
+          }
+        });
+        
+        // Prevent blur during send
+        replyInput.addEventListener('blur', (e) => {
+          if (Date.now() < preventBlurUntil) {
+            e.preventDefault();
+            setTimeout(() => replyInput.focus(), 0);
+          }
+        });
+      }
+      
+      // Keyboard dismiss button
+      if (dismissBtn) {
+        dismissBtn.addEventListener('touchend', (e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          dismissKeyboard();
+        }, { passive: false });
+        
+        dismissBtn.addEventListener('click', (e) => {
+          e.preventDefault();
+          dismissKeyboard();
+        });
+      }
+      
+      // Send button - aggressive keyboard keeping
+      if (sendBtn) {
+        sendBtn.addEventListener('touchstart', (e) => {
+          e.preventDefault();
+          preventBlurUntil = Date.now() + 2000;
+          replyInput?.focus();
+        }, { passive: false });
+        
+        sendBtn.addEventListener('touchend', (e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          sendReplyKeepKeyboard();
+        }, { passive: false });
+        
+        sendBtn.addEventListener('click', (e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          sendReplyKeepKeyboard();
+        });
+        
+        sendBtn.addEventListener('mousedown', (e) => {
+          e.preventDefault();
+          preventBlurUntil = Date.now() + 2000;
+        });
+      }
+
+      // Removed: chatMessages touch blur - keeps keyboard open while scrolling
+      
+      if(ticketsList) {
+        ticketsList.addEventListener('touchstart', () => {
+          if(document.activeElement?.tagName === 'TEXTAREA') {
+            document.activeElement.blur();
+          }
+        }, {passive: true});
+      }
+      
+      if(window.Telegram?.WebApp) window.Telegram.WebApp.expand();
+      // Swipe gesture removed - was causing issues on iPhone
+      // setupSwipeGesture();
+    }
+    // ========== End Keyboard System ==========
+
+    function applyTranslationsSupport(){
+      const setText = (selector, key) => {
+        const el = typeof selector === 'string' ? document.querySelector(selector) : selector;
+        if(el) el.textContent = t(key);
+      };
+
+      setText('#pageTitle','support');
+      setText('#pageSubtitle','helpCenter');
+      const tabAll = document.querySelector('.filter-tab[data-filter="all"]');
+      const tabOpen = document.querySelector('.filter-tab[data-filter="open"]');
+      const tabClosed = document.querySelector('.filter-tab[data-filter="closed"]');
+      setText(tabAll,'all'); setText(tabOpen,'open'); setText(tabClosed,'closed');
+      const emptyTitle = document.querySelector('.empty-state div:nth-child(2)');
+      const emptyDesc = document.querySelector('.empty-state div:nth-child(3)');
+      setText(emptyTitle,'noTickets');
+      setText(emptyDesc,'createTicketPrompt');
+      const replyInput = document.getElementById('replyInput');
+      if(replyInput) replyInput.setAttribute('placeholder', t('typeMessage'));
+      const modalTitle = document.querySelector('#createTicketModal .modal-title');
+      if(modalTitle) modalTitle.textContent = t('newTicket');
+      const labels = document.querySelectorAll('#createTicketModal .form-label');
+      if(labels[0]) labels[0].textContent = t('categoryLabel');
+      if(labels[1]) labels[1].textContent = t('subscriptionLabel');
+      if(labels[2]) labels[2].textContent = t('messageLabel');
+
+      const selectCat = document.getElementById('ticketCategory');
+      if(selectCat){
+        const placeholder = selectCat.querySelector('option[value=""]');
+        if(placeholder) placeholder.textContent = t('selectCategory');
+        const opts = selectCat.querySelectorAll('option');
+        if(opts[1]) opts[1].textContent = t('connection');
+        if(opts[2]) opts[2].textContent = t('money');
+        if(opts[3]) opts[3].textContent = t('other');
+      }
+      const selSub = document.getElementById('ticketSub');
+      if(selSub){
+        const noneOpt = selSub.querySelector('option[value=""]');
+        if(noneOpt) noneOpt.textContent = t('none');
+      }
+      
+      const ticketMsg = document.getElementById('ticketMessage');
+      if(ticketMsg) ticketMsg.setAttribute('placeholder', t('describeIssue'));
+      
+      const createBtn = document.querySelector('#createTicketModal button[type="submit"]');
+      if(createBtn) createBtn.textContent = t('createTicketBtn');
+
+      // Designed picker texts
+      const search = document.getElementById('supportPickerSearch');
+      if (search) search.setAttribute('placeholder', t('search'));
+      syncSupportPickerTexts();
+    }
+
+    // ========= Designed pickers (Telegram mobile) =========
+    let _supportPickerType = null; // 'category' | 'sub'
+    let _supportPickerSearchBound = false;
+
+    function shouldUseDesignedPicker(){
+      try{
+        return !!(window.Telegram && window.Telegram.WebApp) && window.innerWidth <= 768;
+      }catch(_){
+        return false;
+      }
+    }
+
+    function initSupportDesignedPickers(){
+      applySupportPickerMode();
+      // Keep mode in sync on resize/orientation
+      let tmr;
+      window.addEventListener('resize', () => {
+        clearTimeout(tmr);
+        tmr = setTimeout(() => applySupportPickerMode(), 80);
+      });
+      // ESC closes picker
+      document.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape') closeSupportPicker();
+      });
+      // Search input wiring once
+      if (!_supportPickerSearchBound) {
+        const inp = document.getElementById('supportPickerSearch');
+        if (inp) inp.addEventListener('input', () => {
+          if (_supportPickerType === 'sub') renderSupportPickerList('sub');
+        });
+        _supportPickerSearchBound = true;
+      }
+      // When selects change (desktop), keep button text in sync too
+      const catSel = document.getElementById('ticketCategory');
+      const subSel = document.getElementById('ticketSub');
+      if (catSel) catSel.addEventListener('change', syncSupportPickerTexts);
+      if (subSel) subSel.addEventListener('change', syncSupportPickerTexts);
+      syncSupportPickerTexts();
+    }
+
+    function applySupportPickerMode(){
+      const use = shouldUseDesignedPicker();
+      const catSel = document.getElementById('ticketCategory');
+      const subSel = document.getElementById('ticketSub');
+      const catBtn = document.getElementById('ticketCategoryBtn');
+      const subBtn = document.getElementById('ticketSubBtn');
+      if (use) {
+        if (catSel) catSel.style.display = 'none';
+        if (subSel) subSel.style.display = 'none';
+        if (catBtn) catBtn.style.display = 'flex';
+        if (subBtn) subBtn.style.display = 'flex';
+      } else {
+        if (catSel) catSel.style.display = '';
+        if (subSel) subSel.style.display = '';
+        if (catBtn) catBtn.style.display = 'none';
+        if (subBtn) subBtn.style.display = 'none';
+      }
+      syncSupportPickerTexts();
+    }
+
+    function _selectedOptionText(selectEl){
+      try{
+        if (!selectEl) return '';
+        const idx = selectEl.selectedIndex;
+        if (idx < 0) return '';
+        const opt = selectEl.options[idx];
+        return (opt && opt.textContent) ? opt.textContent.trim() : '';
+      }catch(_){
+        return '';
+      }
+    }
+
+    function syncSupportPickerTexts(){
+      const catSel = document.getElementById('ticketCategory');
+      const subSel = document.getElementById('ticketSub');
+      const catText = document.getElementById('ticketCategoryBtnText');
+      const subText = document.getElementById('ticketSubBtnText');
+
+      // Category
+      if (catText) {
+        const val = catSel ? String(catSel.value || '') : '';
+        const txt = _selectedOptionText(catSel);
+        if (!val) {
+          catText.textContent = t('selectCategory');
+          catText.classList.add('muted');
+        } else {
+          catText.textContent = txt || t(val) || val;
+          catText.classList.remove('muted');
+        }
+      }
+
+      // Subscription
+      if (subText) {
+        const val = subSel ? String(subSel.value || '') : '';
+        const txt = _selectedOptionText(subSel);
+        if (!val) subText.textContent = t('none');
+        else subText.textContent = txt || ('#' + val);
+      }
+    }
+
+    function openSupportPicker(type){
+      _supportPickerType = type;
+      renderSupportPickerList(type);
+      const titleEl = document.getElementById('supportPickerTitle');
+      const searchRow = document.getElementById('supportPickerSearchRow');
+      const search = document.getElementById('supportPickerSearch');
+      if (titleEl) titleEl.textContent = (type === 'category') ? t('categoryLabel') : t('subscriptionLabel');
+      if (searchRow) searchRow.style.display = (type === 'sub') ? '' : 'none';
+      if (search) {
+        search.value = '';
+        if (type === 'sub') setTimeout(() => { try{ search.focus(); }catch(_){ } }, 50);
+      }
+
+      const bd = document.getElementById('supportPickerBackdrop');
+      const panel = document.getElementById('supportPickerPanel');
+      if (bd) bd.classList.add('active');
+      if (panel) { panel.classList.add('active'); panel.setAttribute('aria-hidden', 'false'); }
+    }
+
+    function closeSupportPicker(){
+      _supportPickerType = null;
+      const bd = document.getElementById('supportPickerBackdrop');
+      const panel = document.getElementById('supportPickerPanel');
+      if (bd) bd.classList.remove('active');
+      if (panel) { panel.classList.remove('active'); panel.setAttribute('aria-hidden', 'true'); }
+    }
+
+    function renderSupportPickerList(type){
+      const list = document.getElementById('supportPickerList');
+      if (!list) return;
+      if (type === 'category') return renderSupportCategoryList();
+      if (type === 'sub') return renderSupportSubList();
+    }
+
+    function renderSupportCategoryList(){
+      const list = document.getElementById('supportPickerList');
+      const sel = document.getElementById('ticketCategory');
+      if (!list || !sel) return;
+      const current = String(sel.value || '');
+      // options (skip placeholder/disabled)
+      const opts = Array.from(sel.options || []).filter(o => !o.disabled && String(o.value || '').length > 0);
+      list.innerHTML = opts.map(o => {
+        const v = String(o.value || '');
+        const label = o.textContent || t(v) || v;
+        const selected = v === current;
+        return `
+          <div class="picker-item ${selected ? 'selected' : ''}" data-value="${escapeHtml(v)}">
+            <div class="label">${escapeHtml(label)}</div>
+            <svg class="check" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3">
+              <path d="M20 6 9 17l-5-5" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+          </div>
+        `;
+      }).join('');
+      Array.from(list.querySelectorAll('.picker-item')).forEach(el => {
+        el.addEventListener('click', () => {
+          const v = el.getAttribute('data-value') || '';
+          try{ sel.value = v; sel.dispatchEvent(new Event('change', { bubbles: true })); }catch(_){ sel.value = v; }
+          syncSupportPickerTexts();
+          closeSupportPicker();
+        });
+      });
+    }
+
+    function renderSupportSubList(){
+      const list = document.getElementById('supportPickerList');
+      const sel = document.getElementById('ticketSub');
+      const search = document.getElementById('supportPickerSearch');
+      if (!list || !sel) return;
+      const q = (search && search.value) ? String(search.value).toLowerCase() : '';
+      const current = String(sel.value || '');
+      const opts = Array.from(sel.options || []);
+      const filtered = q ? opts.filter(o => String(o.textContent||'').toLowerCase().includes(q) || String(o.value||'').includes(q)) : opts;
+      list.innerHTML = filtered.map(o => {
+        const v = String(o.value || '');
+        const label = (o.textContent || '').trim() || (v ? ('#' + v) : t('none'));
+        const selected = v === current;
+        return `
+          <div class="picker-item ${selected ? 'selected' : ''}" data-value="${escapeHtml(v)}">
+            <div class="label">${escapeHtml(label)}</div>
+            <svg class="check" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3">
+              <path d="M20 6 9 17l-5-5" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+          </div>
+        `;
+      }).join('');
+      Array.from(list.querySelectorAll('.picker-item')).forEach(el => {
+        el.addEventListener('click', () => {
+          const v = el.getAttribute('data-value') || '';
+          try{ sel.value = v; sel.dispatchEvent(new Event('change', { bubbles: true })); }catch(_){ sel.value = v; }
+          syncSupportPickerTexts();
+          closeSupportPicker();
+        });
+      });
+    }
+    // ========= end designed pickers =========
+    
+    // Swipe gesture removed - was causing issues on iPhone
+    // Users can use the back button instead
+    function setupSwipeGesture() {
+      // Disabled - swipe-to-go-back was messy on iPhone
+          return;
+    }
+
+    function detectPlatform() {
+      const platform = window.Telegram?.WebApp?.platform?.toLowerCase() || 
+        (navigator.userAgent.toLowerCase().includes('android') ? 'android' : 
+         navigator.userAgent.toLowerCase().match(/iphone|ipad/) ? 'ios' : 'unknown');
+      if (platform === 'android') document.body.classList.add('platform-android');
+      else if (platform === 'ios') document.body.classList.add('platform-ios');
+    }
+
+    function initializeSupportPage() {
+      const urlParams = new URLSearchParams(window.location.search);
+      const preSelectedSubId = urlParams.get('sub_id');
+      const targetTicketId = urlParams.get('ticket_id');
+      
+      // Try WebSocket for real-time updates
+      connectWebSocket();
+      
+      loadTickets().then(() => {
+        // Auto-open specific ticket if ticket_id is in URL (from notification click)
+        if(targetTicketId) {
+          const ticketId = parseInt(targetTicketId);
+          if(!isNaN(ticketId)) {
+            setTimeout(() => openTicket(ticketId), 300);
+          }
+        }
+      });
+      loadSubscriptions();
+      if(preSelectedSubId) {
+        setTimeout(() => {
+          showCreateTicketModal();
+          const subSelect = document.getElementById('ticketSub');
+          if(subSelect) subSelect.value = preSelectedSubId;
+        }, 500);
+      }
+    }
+    
+    let _ssOk = null;
+    function canUseSessionStorage() {
+      if (_ssOk !== null) return _ssOk;
+      try {
+        const k = '__tma_ss_test__';
+        sessionStorage.setItem(k, '1');
+        sessionStorage.removeItem(k);
+        _ssOk = true;
+      } catch (_) {
+        _ssOk = false;
+      }
+      return _ssOk;
+    }
+
+    function getUrlAuthToken() {
+      try {
+        if (canUseSessionStorage()) {
+          const v = sessionStorage.getItem('tma_url_auth') || '';
+          if (v && String(v).length > 10) return String(v);
+        }
+      } catch (_) {}
+      try {
+        const urlParams = new URLSearchParams(window.location.search);
+        const authToken = urlParams.get('auth');
+        return authToken ? String(authToken) : '';
+      } catch (_) {}
+      return '';
+    }
+
+    async function apiCall(endpoint, method = 'GET', body = null) {
+      const authToken = getUrlAuthToken();
+      const tg = window.Telegram?.WebApp;
+      const initData = (tg && tg.initData && tg.initData.length > 10) ? tg.initData : '';
+      const url = `/api/dashboard/${endpoint}${(!initData && authToken) ? (endpoint.includes('?') ? '&' : '?') + 'auth=' + encodeURIComponent(authToken) : ''}`;
+
+      // Bearer session token fallback
+      const SESSION_STORAGE_KEY = 'tma_bearer_token';
+      let bearerToken = '';
+      try { bearerToken = localStorage.getItem(SESSION_STORAGE_KEY) || ''; } catch(_){ bearerToken = ''; }
+      async function loginWithInitDataOnce(){
+        if (!initData) return '';
+        try{
+          const r = await fetch('/api/dashboard/login', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            credentials: 'include',
+            body: JSON.stringify({ init_data: initData })
+          });
+          const j = await r.json().catch(()=>({}));
+          if (r.ok && j && j.ok && j.token) {
+            bearerToken = String(j.token);
+            try { localStorage.setItem(SESSION_STORAGE_KEY, bearerToken); } catch(_){}
+            return bearerToken;
+          }
+          // Check if user is not registered (needs referral code)
+          if (j && j.error === 'not_registered') {
+            showNotRegisteredHelp();
+            return '';
+          }
+        }catch(_e){}
+        return '';
+      }
+      
+      // Show message for unregistered users
+      let notRegisteredHelpShown = false;
+      function showNotRegisteredHelp(){
+        if (notRegisteredHelpShown) return;
+        notRegisteredHelpShown = true;
+        const lang = localStorage.getItem('lang') || 'en';
+        try{
+          const overlay = document.createElement('div');
+          overlay.style.cssText = 'position:fixed;inset:0;z-index:9999;background:rgba(0,0,0,.85);display:flex;align-items:center;justify-content:center;padding:16px;';
+          overlay.innerHTML = `
+            <div style="width:100%;max-width:420px;background:var(--panel);border:1px solid var(--line);border-radius:20px;padding:24px;color:var(--lightText);text-align:center;">
+              <div style="font-size:48px;margin-bottom:16px;">🔐</div>
+              <div style="font-weight:800;font-size:18px;margin-bottom:12px;">${lang==='fa' ? 'کد دعوت نیاز است' : 'Referral Code Required'}</div>
+              <div style="opacity:.85;font-size:14px;line-height:1.6;margin-bottom:20px;">${lang==='fa' ? 'برای استفاده از این ربات، ابتدا باید با کد دعوت ثبت‌نام کنید.' : 'You need to register with a referral code first.'}</div>
+              <div style="background:rgba(var(--brandRgb),0.15);border:1px solid rgba(var(--brandRgb),0.3);padding:14px 16px;border-radius:12px;margin-bottom:16px;">
+                <div style="font-family:monospace;font-size:18px;font-weight:700;color:var(--brand);">/start</div>
+              </div>
+              <button onclick="try{window.Telegram?.WebApp?.close();}catch(_){this.closest('div[style*=fixed]').remove();}" style="padding:12px 24px;background:var(--brand);border:none;border-radius:10px;color:#fff;font-weight:700;cursor:pointer;">${lang==='fa' ? 'بستن' : 'Close'}</button>
+            </div>
+          `;
+          document.body.appendChild(overlay);
+        }catch(_){}
+      }
+      
+      try {
+        const opts = { method, credentials: 'include' };
+        // Always attach initData header when available so backend can authenticate without URL tokens
+        if (initData) {
+          opts.headers = Object.assign({}, opts.headers || {}, { 'X-Telegram-Init': initData });
+        }
+        if (bearerToken) {
+          opts.headers = Object.assign({}, opts.headers || {}, { 'Authorization': 'Bearer ' + bearerToken });
+        } else if (initData) {
+          const t = await loginWithInitDataOnce();
+          if (t) opts.headers = Object.assign({}, opts.headers || {}, { 'Authorization': 'Bearer ' + t });
+        }
+        if(body) {
+          opts.headers = Object.assign({}, opts.headers || {}, { 'Content-Type': 'application/json' });
+          opts.body = JSON.stringify(body);
+        }
+        let res = await fetch(url, opts);
+        if ((res.status === 401 || res.status === 403) && initData) {
+          try { localStorage.removeItem(SESSION_STORAGE_KEY); } catch(_){}
+          bearerToken = '';
+          const t2 = await loginWithInitDataOnce();
+          if (t2) {
+            opts.headers = Object.assign({}, opts.headers || {}, { 'Authorization': 'Bearer ' + t2 });
+            res = await fetch(url, opts);
+          }
+        }
+        return await res.json();
+      } catch(e) {
+        debugError('API Error:', e);
+        return { ok: false, error: e.message };
+      }
+    }
+
+    async function loadTickets(showSkeleton = true) {
+      if(showSkeleton) showSkeletonTickets();
+      const data = await apiCall('tickets');
+      if(data.ok) {
+        allTickets = (data.tickets || []).slice();
+        // Always keep newest activity first
+        allTickets.sort((a, b) => {
+          const ta = new Date(a.updated_at || a.created_at || 0).getTime();
+          const tb = new Date(b.updated_at || b.created_at || 0).getTime();
+          return (tb || 0) - (ta || 0);
+        });
+        renderTickets();
+      } else {
+        showToast(t('failedToLoad'), 'error');
+        renderTickets();
+      }
+    }
+
+    function isChatNearBottom() {
+      const container = document.getElementById('messagesArea');
+      if (!container) return true;
+      return (container.scrollHeight - container.scrollTop - container.clientHeight) < 120;
+    }
+
+    function appendMessageToChat({ from_admin, message, created_at }) {
+      const container = document.getElementById('messagesArea');
+      if (!container) return;
+
+      const getLocale = () => currentLang === 'fa' ? 'fa-IR' : 'en-US';
+      const time = created_at ? new Date(created_at).toLocaleTimeString(getLocale(), {hour: '2-digit', minute:'2-digit'}) : '';
+
+      const wrap = document.createElement('div');
+      wrap.innerHTML = `
+        <div class="message ${from_admin ? 'admin' : 'user'}">
+          <div class="message-avatar">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/>
+            </svg>
+          </div>
+          <div style="display:flex; flex-direction:column; max-width:100%;">
+            <div class="message-bubble">${escapeHtml(message || '')}</div>
+            <div class="message-time">${escapeHtml(time)}</div>
+          </div>
+        </div>
+      `;
+      container.appendChild(wrap.firstElementChild);
+    }
+
+    function updateTicketPreviewInDOM(ticketId, patch) {
+      const card = document.querySelector(`.ticket-card[data-ticket-id="${ticketId}"]`);
+      if (!card) return false;
+      const previewEl = card.querySelector('[data-role="preview"]');
+      const dateEl = card.querySelector('[data-role="date"]');
+      const statusEl = card.querySelector('.ticket-status');
+      const unreadEl = card.querySelector('[data-role="unread"]');
+      if (previewEl && patch.last_message != null) previewEl.textContent = patch.last_message;
+      if (dateEl && (patch.updated_at || patch.created_at)) {
+        const getLocale = () => currentLang === 'fa' ? 'fa-IR' : 'en-US';
+        const d = new Date(patch.updated_at || patch.created_at);
+        dateEl.textContent = isNaN(d.getTime()) ? '' : d.toLocaleDateString(getLocale());
+      }
+      if (statusEl && patch.status) {
+        const st = String(patch.status);
+        const stText = t(st) || st;
+        statusEl.textContent = stText;
+        statusEl.className = `ticket-status status-${escapeHtml(st)}`;
+      }
+      if (patch.unread_count != null) {
+        const n = Number(patch.unread_count) || 0;
+        card.classList.toggle('unread', n > 0);
+        if (unreadEl) {
+          unreadEl.style.display = n > 0 ? 'inline-flex' : 'none';
+          unreadEl.textContent = n > 99 ? '99+' : String(n);
+        }
+      }
+      return true;
+    }
+
+    function moveTicketCardToTop(ticketId) {
+      const list = document.getElementById('ticketsList');
+      if (!list) return false;
+      const card = document.querySelector(`.ticket-card[data-ticket-id="${ticketId}"]`);
+      if (!card) return false;
+      // Only move if currently visible under active filter
+      if (currentFilter !== 'all') {
+        const t = allTickets.find(x => x.id === ticketId);
+        if (t && t.status !== currentFilter) return false;
+      }
+      if (list.firstElementChild === card) return true;
+      list.insertBefore(card, list.firstElementChild);
+      return true;
+    }
+    
+    function renderTickets() {
+      const list = document.getElementById('ticketsList');
+      const filtered = currentFilter === 'all' ? allTickets : allTickets.filter(tk => tk.status === currentFilter);
+      document.querySelectorAll('.filter-tab').forEach(tab => {
+        tab.classList.toggle('active', tab.dataset.filter === currentFilter);
+      });
+      
+      if(filtered.length === 0) {
+        list.innerHTML = `
+          <div class="empty-state">
+            <div class="empty-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" stroke-width="2"/></svg></div>
+            <div style="font-size: 16px; font-weight: 600; margin-bottom: 6px;">${t('noTickets')}</div>
+            <div style="font-size: 13px;">${t('createTicketPrompt')}</div>
+          </div>`;
+        return;
+      }
+      
+      const getLocale = () => currentLang === 'fa' ? 'fa-IR' : 'en-US';
+      list.innerHTML = filtered.map(tk => {
+        const date = new Date(tk.updated_at || tk.created_at).toLocaleDateString(getLocale());
+        const icon = tk.category === 'money' ? '<path d="M12 2v20m-5-5h10M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/>' : 
+                     tk.category === 'connection' ? '<path d="M5 12.55a11 11 0 0 1 14.08 0M1.64 9.5a15 15 0 0 1 20.72 0M12 18a3 3 0 1 1 0-6 3 3 0 0 1 0 6z"/>' :
+                     '<circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/>';
+        const statusText = t(tk.status) || tk.status;
+        const categoryText = t(tk.category) || tk.category.charAt(0).toUpperCase() + tk.category.slice(1);
+        const previewText = escapeHtml(tk.last_message || t('noMessagesYet'));
+                     
+        const unreadCount = Number(tk.unread_count || 0) || 0;
+        return `
+          <div class="ticket-card ${unreadCount > 0 ? 'unread' : ''}" data-ticket-id="${escapeHtml(String(tk.id))}" onclick="openTicket(${tk.id})">
+            <div class="ticket-header">
+              <span class="ticket-id">#${escapeHtml(String(tk.user_ticket_number || tk.id))}</span>
+              <span class="ticket-header-right">
+                <span class="unread-pill" data-role="unread" style="${unreadCount > 0 ? '' : 'display:none;'}">${escapeHtml(unreadCount > 99 ? '99+' : String(unreadCount))}</span>
+                <span class="ticket-status status-${escapeHtml(tk.status)}">${escapeHtml(statusText)}</span>
+              </span>
+            </div>
+            <div class="ticket-category">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">${icon}</svg>
+              ${escapeHtml(categoryText)}
+            </div>
+            <div class="ticket-preview" data-role="preview">${previewText}</div>
+            <div class="ticket-footer">
+              <span data-role="date">${escapeHtml(date)}</span>
+              ${tk.subscription_username ? `<span>${escapeHtml(tk.subscription_username)}</span>` : ''}
+            </div>
+          </div>
+        `;
+      }).join('');
+    }
+    
+    function filterTickets(filter) {
+      currentFilter = filter;
+      renderTickets();
+    }
+    
+    async function openTicket(id) {
+      document.getElementById('chatBackdrop').classList.add('active');
+      document.getElementById('chatView').classList.add('active');
+      showSkeletonMessages();
+      const data = await apiCall(`tickets/${id}`);
+      if(data.ok) {
+        selectedTicket = data.ticket;
+        document.getElementById('chatTitle').textContent = `${t('support')} #${data.ticket.user_ticket_number || data.ticket.id}`;
+        const categoryText = t(data.ticket.category) || data.ticket.category;
+        document.getElementById('chatStatus').textContent = categoryText.toUpperCase();
+        renderMessages(data.ticket.messages);
+        // Clear unread badge locally; backend also marks admin messages read in /tickets/{id}
+        try {
+          const idx = allTickets.findIndex(x => x.id === id);
+          if (idx >= 0) {
+            allTickets[idx].unread_count = 0;
+            updateTicketPreviewInDOM(id, { unread_count: 0 });
+          }
+        } catch(_) {}
+        // Use WebSocket if available, fallback to polling
+        watchTicketViaWebSocket(id);
+      } else {
+        closeChat();
+        showToast(t('failedToLoad'), 'error');
+      }
+    }
+    
+    function closeChat() {
+      document.getElementById('chatView').classList.remove('active');
+      document.getElementById('chatBackdrop').classList.remove('active');
+      stopMessagePolling();
+      unwatchTicketViaWebSocket();
+      selectedTicket = null;
+      // Do not force a full ticket list reload here (can cause visible blink).
+    }
+    
+    function renderMessages(messages) {
+      const container = document.getElementById('messagesArea');
+      if(!messages || messages.length === 0) {
+        container.innerHTML = `<div style="text-align:center; color:var(--text-muted); margin-top:40px;">${t('noMessages')}</div>`;
+        return;
+      }
+      
+      const getLocale = () => currentLang === 'fa' ? 'fa-IR' : 'en-US';
+      
+      container.innerHTML = messages.map(m => {
+        const time = new Date(m.created_at).toLocaleTimeString(getLocale(), {hour: '2-digit', minute:'2-digit'});
+        return `
+          <div class="message ${m.from_admin ? 'admin' : 'user'}">
+            <div class="message-avatar">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                ${m.from_admin ? '<path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/>' : '<path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/>'}
+              </svg>
+            </div>
+            <div style="display:flex; flex-direction:column; max-width:100%;">
+              <div class="message-bubble">${escapeHtml(m.message)}</div>
+              <div class="message-time">${time}</div>
+            </div>
+          </div>
+        `;
+      }).join('');
+      
+      container.scrollTop = container.scrollHeight;
+    }
+    
+    async function sendReply() {
+      const input = document.getElementById('replyInput');
+      const sendBtn = document.getElementById('sendBtn');
+      const msg = input.value.trim();
+      if(!msg || !selectedTicket || isSending) return;
+      if (selectedTicket.status === 'closed' || selectedTicket.status === 'archived') {
+        showToast(currentLang === 'fa' ? 'این تیکت بسته شده است' : 'This ticket is closed', 'error');
+        return;
+      }
+      
+      isSending = true;
+      input.value = '';
+      input.style.height = 'auto';
+      if(sendBtn) sendBtn.classList.add('btn-loading');
+      
+      const container = document.getElementById('messagesArea');
+      const tempDiv = document.createElement('div');
+      const pendingId = Date.now() + '-' + Math.random().toString(16).slice(2);
+      tempDiv.innerHTML = `
+        <div class="message user pending" data-pending-id="${escapeHtml(pendingId)}" style="opacity:0.7">
+          <div class="message-avatar"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg></div>
+          <div style="display:flex; flex-direction:column; max-width:100%;">
+            <div class="message-bubble">${escapeHtml(msg)}</div>
+            <div class="message-time">${t('sending')}</div>
+          </div>
+        </div>`;
+      const pendingEl = tempDiv.firstElementChild;
+      container.appendChild(pendingEl);
+      container.scrollTop = container.scrollHeight;
+      try {
+        const key = _pendingKey(selectedTicket.id, msg);
+        pendingLocalMessages.set(key, { el: pendingEl, expiresAt: Date.now() + 15000 });
+      } catch(_) {}
+      
+      const res = await apiCall(`tickets/${selectedTicket.id}/reply`, 'POST', { message: msg });
+      if(sendBtn) sendBtn.classList.remove('btn-loading');
+      if(res.ok) {
+        // Don't refetch + full rerender (causes visible refresh). WS/poll will deliver the real timestamp.
+        try {
+          const getLocale = () => currentLang === 'fa' ? 'fa-IR' : 'en-US';
+          const time = new Date().toLocaleTimeString(getLocale(), {hour: '2-digit', minute:'2-digit'});
+          const timeEl = pendingEl.querySelector('.message-time');
+          if (timeEl) timeEl.textContent = time;
+          pendingEl.style.opacity = '1';
+          pendingEl.classList.remove('pending');
+        } catch(_) {}
+        // Update ticket preview without full reload
+        try {
+          const nowIso = new Date().toISOString();
+          updateTicketPreviewInDOM(selectedTicket.id, { last_message: msg, updated_at: nowIso });
+          const tIdx = allTickets.findIndex(x => x.id === selectedTicket.id);
+          if (tIdx >= 0) {
+            allTickets[tIdx].last_message = msg;
+            allTickets[tIdx].updated_at = nowIso;
+          }
+        } catch(_) {}
+        if (window.Telegram?.WebApp?.HapticFeedback) {
+          window.Telegram.WebApp.HapticFeedback.notificationOccurred('success');
+        }
+      } else {
+        if (res.error === 'ticket_closed') {
+          showToast(currentLang === 'fa' ? 'این تیکت بسته شده است' : 'This ticket is closed', 'error');
+        } else {
+          showToast(t('failedToSend'), 'error');
+        }
+        try {
+          const timeEl = pendingEl.querySelector('.message-time');
+          if (timeEl) timeEl.textContent = (res.error === 'ticket_closed') ? (currentLang === 'fa' ? 'بسته شده' : 'Closed') : t('failedToSend');
+          pendingEl.style.opacity = '1';
+        } catch(_) {}
+        if (window.Telegram?.WebApp?.HapticFeedback) {
+          window.Telegram.WebApp.HapticFeedback.notificationOccurred('error');
+        }
+      }
+      isSending = false;
+    }
+    
+    // Wrapper that keeps keyboard open
+    async function sendReplyKeepKeyboard() {
+      const input = document.getElementById('replyInput');
+      preventBlurUntil = Date.now() + 2000;
+      input?.focus();
+      keepKeyboardOpen();
+      
+      await sendReply();
+      
+      keepKeyboardOpen();
+    }
+    
+    async function loadSubscriptions() {
+      const res = await apiCall('subscriptions');
+      if(res.ok && res.subscriptions) {
+        const sel = document.getElementById('ticketSub');
+        sel.innerHTML = '<option value="">' + escapeHtml(t('none')) + '</option>' +
+          res.subscriptions.map(s => `<option value="${escapeHtml(String(s.id))}">${escapeHtml(s.username || 'Sub #'+s.id)}</option>`).join('');
+        // Keep designed picker button in sync
+        syncSupportPickerTexts();
+      }
+    }
+    
+    function showCreateTicketModal() {
+      document.getElementById('createTicketModal').classList.add('active');
+      // Ensure correct mode + texts when modal opens
+      applySupportPickerMode();
+      syncSupportPickerTexts();
+    }
+    
+    function hideCreateTicketModal() {
+      document.getElementById('createTicketModal').classList.remove('active');
+    }
+    
+    async function createTicket(e) {
+      e.preventDefault();
+      const cat = document.getElementById('ticketCategory').value;
+      const sub = document.getElementById('ticketSub').value;
+      const msg = (document.getElementById('ticketMessage').value || '').trim();
+      const btn = document.querySelector('#createTicketModal button[type="submit"]');
+      
+      if(!cat || !msg) return;
+      if(msg.length < 10) {
+        showToast(t('messageTooShort'), 'error');
+        return;
+      }
+      
+      btn.classList.add('btn-loading');
+      const payload = { category: cat, message: msg };
+      if(sub) payload.subscription_id = parseInt(sub);
+      
+      const res = await apiCall('tickets', 'POST', payload);
+      btn.classList.remove('btn-loading');
+      if(res.ok) {
+        hideCreateTicketModal();
+        showToast(t('ticketCreated'), 'success');
+        document.getElementById('ticketMessage').value = '';
+        document.getElementById('ticketCategory').value = '';
+        document.getElementById('ticketSub').value = '';
+        syncSupportPickerTexts();
+        // Avoid full list rerender (blink): insert new ticket card optimistically
+        try {
+          const nowIso = new Date().toISOString();
+          const newId = Number(res.ticket_id) || 0;
+          if (!newId) throw new Error('missing_ticket_id');
+          
+	          const newTicket = {
+	            id: newId,
+	            user_ticket_number: Number(res.user_ticket_number) || newId,
+	            category: cat,
+	            status: 'pending',
+	            created_at: nowIso,
+	            updated_at: nowIso,
+	            last_message: msg,
+            subscription_username: null
+          };
+          
+          try {
+            if (sub) {
+              const opt = document.querySelector(`#ticketSub option[value="${CSS.escape(String(sub))}"]`);
+              if (opt && opt.textContent && opt.textContent !== 'None') newTicket.subscription_username = opt.textContent;
+            }
+          } catch(_) {}
+          
+          allTickets = [newTicket, ...(allTickets || [])];
+          
+          const list = document.getElementById('ticketsList');
+          const shouldShow = currentFilter === 'all' || currentFilter === newTicket.status;
+          if (list && shouldShow) {
+            const emptyState = list.querySelector('.empty-state');
+            if (emptyState) list.innerHTML = '';
+            
+            const getLocale = () => currentLang === 'fa' ? 'fa-IR' : 'en-US';
+            const date = new Date(nowIso).toLocaleDateString(getLocale());
+            const icon = newTicket.category === 'money' ? '<path d="M12 2v20m-5-5h10M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/>' : 
+                         newTicket.category === 'connection' ? '<path d="M5 12.55a11 11 0 0 1 14.08 0M1.64 9.5a15 15 0 0 1 20.72 0M12 18a3 3 0 1 1 0-6 3 3 0 0 1 0 6z"/>' :
+                         '<circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/>';
+            const statusText = t(newTicket.status) || newTicket.status;
+            const categoryText = t(newTicket.category) || (newTicket.category || '').charAt(0).toUpperCase() + (newTicket.category || '').slice(1);
+            
+            const card = document.createElement('div');
+            const n = Number(newTicket.unread_count || 0) || 0;
+            card.className = `ticket-card ${n > 0 ? 'unread' : ''}`;
+            card.setAttribute('data-ticket-id', String(newTicket.id));
+            card.onclick = () => openTicket(newTicket.id);
+            card.innerHTML = `
+              <div class="ticket-header">
+                <span class="ticket-id">#${escapeHtml(String(newTicket.user_ticket_number || newTicket.id))}</span>
+                <span class="ticket-status status-${escapeHtml(newTicket.status)}">${escapeHtml(statusText)}</span>
+              </div>
+              <div class="ticket-category">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">${icon}</svg>
+                ${escapeHtml(categoryText)}
+              </div>
+              <div class="ticket-preview" data-role="preview">${escapeHtml(msg)}</div>
+              <div class="ticket-footer">
+                <span data-role="date">${escapeHtml(date)}</span>
+                ${newTicket.subscription_username ? `<span>${escapeHtml(newTicket.subscription_username)}</span>` : ''}
+              </div>
+            `;
+            list.insertBefore(card, list.firstChild);
+          }
+        } catch(_) {
+          loadTickets();
+        }
+      } else {
+        const localized = localizeValidationError(res);
+        const errMsg = localized || res.message || t('errorCreating');
+        showToast(errMsg, 'error');
+      }
+    }
+    
+    async function deleteTicket() {
+      if(!selectedTicket) return;
+      const ok = (window.AstroUI && window.AstroUI.confirm)
+        ? await window.AstroUI.confirm({
+            title: currentLang === 'fa' ? 'حذف تیکت' : 'Delete ticket',
+            message: t('deleteConfirm'),
+            okText: currentLang === 'fa' ? 'حذف' : 'Delete',
+            cancelText: currentLang === 'fa' ? 'لغو' : 'Cancel',
+            danger: true
+          })
+        : confirm(t('deleteConfirm'));
+      if (!ok) return;
+      showLoading(t('deletingTicket'));
+      const res = await apiCall(`tickets/${selectedTicket.id}`, 'DELETE');
+      hideLoading();
+      if(res.ok) {
+        showToast(t('ticketDeleted'), 'success');
+        closeChat();
+      } else {
+        showToast(t('errorDeleting'), 'error');
+      }
+    }
+    
+    function autoResize(el) {
+      el.style.height = 'auto';
+      el.style.height = Math.min(el.scrollHeight, 100) + 'px';
+    }
+    
+    function showToast(msg, type='success') {
+      const t = document.getElementById('toast');
+      t.querySelector('.toast-message').textContent = msg;
+      t.className = `toast show ${type}`;
+      setTimeout(() => t.classList.remove('show'), 3000);
+    }
+    
+	    function goBackHome() {
+	      showLoading(t('redirecting'));
+	      const authToken = (typeof getUrlAuthToken === 'function') ? getUrlAuthToken() : '';
+	      const shouldPropagate = (typeof canUseSessionStorage === 'function') ? (!canUseSessionStorage()) : true;
+	      window.location.href = `/webapp/dashboard${(authToken && shouldPropagate) ? ('?auth=' + encodeURIComponent(authToken)) : ''}`;
+	    }
+    
+    function escapeHtml(text) {
+      const div = document.createElement('div');
+      div.textContent = text;
+      return div.innerHTML;
+    }
+    
+    function startMessagePolling() {
+      // Only use polling if WebSocket is not connected
+      if (wsConnected) return;
+      
+      if(messagePollingInterval) clearInterval(messagePollingInterval);
+      messagePollingInterval = setInterval(async () => {
+        if(!selectedTicket) return;
+        const res = await apiCall(`tickets/${selectedTicket.id}`);
+        if(res.ok && res.ticket) {
+          const msgs = res.ticket.messages || [];
+          const container = document.getElementById('messagesArea');
+          const currentCount = container ? container.querySelectorAll('.message').length : 0;
+          if (msgs.length > currentCount) {
+            const shouldScroll = isChatNearBottom();
+            msgs.slice(currentCount).forEach(m => {
+              appendMessageToChat({ from_admin: !!m.from_admin, message: m.message, created_at: m.created_at });
+            });
+            if (shouldScroll && container) container.scrollTop = container.scrollHeight;
+            
+            // Update ticket preview/date without full reload
+            try {
+              const last = msgs[msgs.length - 1];
+              if (last) {
+                updateTicketPreviewInDOM(selectedTicket.id, { last_message: last.message || '', updated_at: last.created_at });
+                const tIdx = allTickets.findIndex(x => x.id === selectedTicket.id);
+                if (tIdx >= 0) {
+                  allTickets[tIdx].last_message = last.message || '';
+                  allTickets[tIdx].updated_at = last.created_at || allTickets[tIdx].updated_at;
+                }
+              }
+            } catch(_) {}
+          }
+        }
+      }, 3000);
+    }
+    
+    function stopMessagePolling() {
+      if(messagePollingInterval) clearInterval(messagePollingInterval);
+      messagePollingInterval = null;
+    }
+    
+	    // ========== WebSocket for Real-time Updates ==========
+	    let wsTicketsRefreshTimer = null;
+	    let ticketsPollingInterval = null;
+	    function startTicketsPolling() {
+	      if (ticketsPollingInterval) return;
+	      try { loadTickets(false); } catch(_) {}
+	      ticketsPollingInterval = setInterval(() => {
+	        // Only poll list updates when WS is not connected
+	        if (!wsConnected) loadTickets(false);
+	      }, 5000);
+	      try {
+	        document.addEventListener('visibilitychange', () => {
+	          try {
+	            if (!document.hidden && !wsConnected) loadTickets(false);
+	          } catch(_) {}
+	        });
+	      } catch(_) {}
+	    }
+	    function stopTicketsPolling() {
+	      if (!ticketsPollingInterval) return;
+	      clearInterval(ticketsPollingInterval);
+	      ticketsPollingInterval = null;
+	    }
+	    function scheduleTicketsRefresh() {
+	      try {
+	        if (wsTicketsRefreshTimer) return;
+	        wsTicketsRefreshTimer = setTimeout(async () => {
+	          wsTicketsRefreshTimer = null;
+	          await loadTickets(false);
+	        }, 250);
+	      } catch(_) {}
+	    }
+	    function connectWebSocket() {
+	      if (ws && ws.readyState === WebSocket.OPEN) return;
+	      if (wsReconnectAttempts >= WS_MAX_RECONNECT) {
+	        debugLog('WebSocket: Max reconnect attempts, using polling');
+	        startTicketsPolling();
+	        return;
+	      }
+      
+	      const tg = window.Telegram?.WebApp;
+	      const initData = (tg && tg.initData && tg.initData.length > 10) ? tg.initData : '';
+	      const authToken = (typeof getUrlAuthToken === 'function') ? getUrlAuthToken() : '';
+	      const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+	      const qp = new URLSearchParams();
+	      if (initData) qp.set('init_data', initData);
+	      else if (authToken) qp.set('auth', authToken);
+	      const wsUrl = `${protocol}//${window.location.host}/api/dashboard/ws/support${qp.toString() ? ('?' + qp.toString()) : ''}`;
+      
+      try {
+        ws = new WebSocket(wsUrl);
+        
+	        ws.onopen = () => {
+	          debugLog('WebSocket: Connected');
+	          wsConnected = true;
+	          wsReconnectAttempts = 0;
+	          stopTicketsPolling();
+	          
+	          if (selectedTicket) {
+	            ws.send(JSON.stringify({ action: 'watch_ticket', ticket_id: selectedTicket.id }));
+	            stopMessagePolling();
+	          }
+	        };
+        
+        ws.onmessage = async (event) => {
+          try {
+            const data = JSON.parse(event.data);
+            
+		            if (data.type === 'new_message') {
+	              // Smooth path: use WS payload to update UI without full reload
+	              const ticketId = data.ticket_id;
+	              const payload = data.data || {};
+	              const sender = payload.sender;
+	              const text = payload.text || '';
+	              const createdAt = payload.created_at;
+
+	              // Update tickets list preview/date without re-render
+	              const updated = updateTicketPreviewInDOM(ticketId, { last_message: text, updated_at: createdAt });
+	              if (!updated) scheduleTicketsRefresh();
+	              const tIdx = allTickets.findIndex(x => x.id === ticketId);
+              if (tIdx >= 0) {
+                allTickets[tIdx].last_message = text;
+                allTickets[tIdx].updated_at = createdAt || allTickets[tIdx].updated_at;
+                // Unread logic for the user: admin message while not viewing the ticket
+                try {
+                  if (sender === 'admin') {
+                    if (!selectedTicket || ticketId !== selectedTicket.id) {
+                      allTickets[tIdx].unread_count = (Number(allTickets[tIdx].unread_count) || 0) + 1;
+	                      const ok = updateTicketPreviewInDOM(ticketId, { unread_count: allTickets[tIdx].unread_count });
+	                      if (!ok) scheduleTicketsRefresh();
+	                    } else {
+	                      allTickets[tIdx].unread_count = 0;
+	                      const ok = updateTicketPreviewInDOM(ticketId, { unread_count: 0 });
+	                      if (!ok) scheduleTicketsRefresh();
+	                    }
+	                  }
+	                } catch(_) {}
+                // Keep newest-first ordering
+                const moved = allTickets.splice(tIdx, 1)[0];
+                allTickets.unshift(moved);
+                moveTicketCardToTop(ticketId);
+              }
+
+              // If viewing this ticket, append message without rerender
+              if (selectedTicket && ticketId === selectedTicket.id) {
+                const shouldScroll = isChatNearBottom();
+                // If this is an echo of our optimistic message, upgrade it instead of appending (prevents duplicates)
+                let handled = false;
+                try {
+                  if (sender === 'user') {
+                    const key = _pendingKey(ticketId, text);
+                    const pending = pendingLocalMessages.get(key);
+                    if (pending && pending.el && pending.expiresAt > Date.now()) {
+                      const timeEl = pending.el.querySelector('.message-time');
+                      if (timeEl) {
+                        const getLocale = () => currentLang === 'fa' ? 'fa-IR' : 'en-US';
+                        const time = createdAt ? new Date(createdAt).toLocaleTimeString(getLocale(), {hour: '2-digit', minute:'2-digit'}) : timeEl.textContent;
+                        timeEl.textContent = time;
+                      }
+                      pending.el.style.opacity = '1';
+                      pending.el.classList.remove('pending');
+                      pendingLocalMessages.delete(key);
+                      handled = true;
+                    }
+                  }
+                } catch(_) {}
+                if (!handled) {
+                  appendMessageToChat({ from_admin: sender === 'admin', message: text, created_at: createdAt });
+                }
+                if (shouldScroll) {
+                  const container = document.getElementById('messagesArea');
+                  container.scrollTop = container.scrollHeight;
+                }
+              }
+
+	              if (window.Telegram?.WebApp?.HapticFeedback) {
+	                window.Telegram.WebApp.HapticFeedback.notificationOccurred('success');
+	              }
+	            }
+		            else if (data.type === 'tickets_updated') {
+		              // Ticket list changed (e.g. new ticket from another device): refresh list/badges.
+		              scheduleTicketsRefresh();
+		            }
+		            else if (data.type === 'status_change') {
+	              const ticketId = data.ticket_id;
+	              const payload = data.data || {};
+	              const status = payload.status;
+	              const updatedAt = payload.updated_at;
+              
+	              // Update list card (status badge + date) without re-render
+	              const ok = updateTicketPreviewInDOM(ticketId, { status, updated_at: updatedAt });
+	              if (!ok) scheduleTicketsRefresh();
+	              const tIdx = allTickets.findIndex(x => x.id === ticketId);
+              if (tIdx >= 0) {
+                allTickets[tIdx].status = status || allTickets[tIdx].status;
+                allTickets[tIdx].updated_at = updatedAt || allTickets[tIdx].updated_at;
+                const moved = allTickets.splice(tIdx, 1)[0];
+                allTickets.unshift(moved);
+                moveTicketCardToTop(ticketId);
+              }
+              if (selectedTicket && ticketId === selectedTicket.id) {
+                selectedTicket.status = status || selectedTicket.status;
+              }
+            }
+          } catch(e) {
+            debugError('WebSocket message error', e);
+          }
+        };
+        
+	        ws.onclose = () => {
+	          debugLog('WebSocket: Disconnected');
+	          wsConnected = false;
+	          ws = null;
+	          startTicketsPolling();
+	          
+	          if (selectedTicket) startMessagePolling();
+          
+          wsReconnectAttempts++;
+          if (wsReconnectAttempts < WS_MAX_RECONNECT) {
+            setTimeout(connectWebSocket, 5000);
+          }
+        };
+        
+	        ws.onerror = () => {
+	          debugLog('WebSocket: Error, using polling');
+	          wsConnected = false;
+	          startTicketsPolling();
+	        };
+        
+	      } catch(e) {
+	        debugLog('WebSocket: Failed to connect');
+	        wsConnected = false;
+	        startTicketsPolling();
+	      }
+	    }
+    
+    function watchTicketViaWebSocket(ticketId) {
+      if (ws && ws.readyState === WebSocket.OPEN) {
+        ws.send(JSON.stringify({ action: 'watch_ticket', ticket_id: ticketId }));
+        stopMessagePolling();
+      } else {
+        startMessagePolling();
+      }
+    }
+    
+    function unwatchTicketViaWebSocket() {
+      if (ws && ws.readyState === WebSocket.OPEN) {
+        ws.send(JSON.stringify({ action: 'unwatch_ticket' }));
+      }
+    }
+    
+    async function loadTicketMessages() {
+      if (!selectedTicket) return;
+      const res = await apiCall(`tickets/${selectedTicket.id}`);
+      if (res.ok && res.ticket) {
+        renderMessages(res.ticket.messages);
+      }
+    }
+    // ========== End WebSocket ==========
+    </script>
+  </div>
+</body>
+</html>

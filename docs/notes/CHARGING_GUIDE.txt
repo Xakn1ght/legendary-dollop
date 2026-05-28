@@ -1,0 +1,95 @@
+Marzban Telegram Bot – Charging Functionality Guide
+====================================================
+
+This document summarises **how the "charge" feature works** in the Marzban Telegram integration, so you can quickly adapt or re-implement it in your own Python/Telegram bot.
+
+------------------------------------------------------
+1. Concept & Data Model
+------------------------------------------------------
+• A *User Template* (table `user_template`) represents a plan.
+  – `id`: primary key
+  – `name`: plan display name
+  – `data_limit`: bytes to add (0 = unlimited)
+  – `expire_duration`: seconds to extend validity (0 = never expires)
+  – `inbounds`: list of protocols this plan should enable (e.g. vmess, vless, trojan)
+
+• Charging = applying one of these templates to an existing user, either:
+  a) **Add** – keep the remainder of the user's quota/time and add the template on top.
+  b) **Reset** – discard the remainder and replace with template defaults.
+
+------------------------------------------------------
+2. UI Flow (callbacks in `app/telegram/handlers/admin.py`)
+------------------------------------------------------
+Step A – Admin opens a user card
+  callback → `user:<id>` → inline menu built by `BotKeyboard.user_menu()`.
+
+Step B – "Charge" button
+  callback → `charge:<username>` (handled by `charge_command`)
+  • Fetches all templates, sends new keyboard where each item triggers `template_charge:<tpl_id>:<username>`.
+
+Step C – Choose a template
+  callback → `template_charge:<tpl_id>:<username>` (handled by `template_charge_command`)
+  • Loads user + template, *previews* the future state (quota & expiry).
+  • Shows two confirm buttons built by `BotKeyboard.charge_add_or_reset()`:
+      1. `charge_add:<username>:<tpl_id>` – "Add" mode
+      2. `charge_reset:<username>:<tpl_id>` – "Reset" mode
+
+Step D – Confirm
+  callback → `charge_add…` **or** `charge_reset…` (block around line ~1600)
+  • Executes DB updates (see pseudocode below)
+  • Pushes the new user state to XRay via `xray.operations.add_user()`
+  • Answers callback with "🔋 User Successfully Charged!" and edits the message.
+
+------------------------------------------------------
+3. Core Logic (simplified pseudocode)
+------------------------------------------------------
+```
+with GetDB() as db:
+    template = crud.get_user_template(db, tpl_id)
+    user     = crud.get_user(db, username)
+
+    crud.reset_user_data_usage(db, user)  # used_traffic → 0
+
+    if mode == 'charge_reset':
+        new_limit  = template.data_limit
+        new_expire = today + template.expire_duration  (if > 0)
+    else:  # charge_add
+        new_limit  = (user.data_limit or 0) - user.used_traffic + template.data_limit
+        new_expire = (user.expire or today) + template.expire_duration  (if > 0)
+
+    modify = UserModify(
+        status=UserStatus.active,
+        data_limit=new_limit,
+        expire=int(new_expire.timestamp()) if new_expire else 0,
+    )
+    db_user = crud.update_user(db, user, modify)
+
+    xray.operations.add_user(db_user)  # hot-reload core config
+```
+
+------------------------------------------------------
+4. Feedback & Logging
+------------------------------------------------------
+• Preview message (Step C) uses helper `get_user_info_text()` so the admin sees exactly what will happen.
+• Final success toast is a simple `bot.answer_callback_query()`.
+• If you want audit logs, call one of the helpers in `app/telegram/handlers/report.py`, e.g.:
+  `report.report_user_modification(...)`.
+
+------------------------------------------------------
+5. Files of Interest
+------------------------------------------------------
+• `app/telegram/handlers/admin.py`  – all callbacks & update logic.
+• `app/telegram/utils/keyboard.py`  – functions building inline keyboards.
+• `app/models/user_template.py`     – SQLAlchemy/Pydantic model for templates.
+• `app/db/crud.py`                  – CRUD helpers (`get_user_template`, `update_user`, etc.).
+• `app/xray`                        – interface for updating the XRay/sing-box core.
+
+------------------------------------------------------
+6. How to Re-use in Another Bot
+------------------------------------------------------
+1. Copy **User Template** schema and CRUD operations.
+2. Recreate the callback flow (or regular commands) using your preferred framework (`aiogram`, `pyTelegramBotAPI`, etc.).
+3. After DB changes, call *your* core-update routine (HTTP API, shell script, etc.).
+4. (Optional) Extend with payment-gateway validation before allowing the charge.
+
+That's it – a complete blueprint for implementing quota & time top-ups via Telegram. 

@@ -1,0 +1,249 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AstroByte Cosmic Defense - Demo</title>
+    <style>
+        /* Include styles from index.html */
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #0c0c1a 0%, #1a1a2e 50%, #16213e 100%);
+            color: #ffffff;
+            overflow: hidden;
+            height: 100vh;
+            width: 100vw;
+            position: relative;
+        }
+
+        .game-container {
+            position: relative;
+            width: 100vw;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .game-header {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            right: 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            z-index: 1000;
+            background: rgba(0, 0, 0, 0.7);
+            padding: 10px 20px;
+            border-radius: 15px;
+            backdrop-filter: blur(10px);
+        }
+
+        .stats {
+            display: flex;
+            gap: 20px;
+            font-size: 16px;
+            font-weight: bold;
+        }
+
+        #game-canvas {
+            border: 3px solid #00ffff;
+            border-radius: 15px;
+            box-shadow: 0 0 30px rgba(0, 255, 255, 0.3);
+            background: #000011;
+        }
+
+        .start-screen, .game-over-screen {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: rgba(0, 0, 0, 0.9);
+            padding: 30px;
+            border-radius: 20px;
+            text-align: center;
+            z-index: 2000;
+            border: 2px solid #00ffff;
+            box-shadow: 0 0 30px rgba(0, 255, 255, 0.3);
+        }
+
+        .start-screen h1 {
+            color: #00ffff;
+            margin-bottom: 20px;
+            font-size: 28px;
+        }
+
+        .controls-info {
+            background: rgba(0, 255, 255, 0.1);
+            padding: 15px;
+            border-radius: 10px;
+            margin: 20px 0;
+            border: 1px solid #00ffff;
+        }
+
+        .controls-info h3 {
+            color: #00ffff;
+            margin-bottom: 10px;
+            font-size: 16px;
+        }
+
+        .controls-info ul {
+            list-style: none;
+            padding: 0;
+            margin: 0;
+        }
+
+        .controls-info li {
+            margin-bottom: 5px;
+            color: #ffffff;
+        }
+
+        .start-btn {
+            background: linear-gradient(135deg, #00ffff, #0080ff);
+            color: white;
+            border: none;
+            padding: 15px 30px;
+            border-radius: 25px;
+            font-size: 18px;
+            font-weight: bold;
+            cursor: pointer;
+            margin-top: 20px;
+        }
+    </style>
+    <style>
+        .demo-notice {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            right: 10px;
+            background: rgba(255, 107, 107, 0.9);
+            color: white;
+            padding: 10px;
+            border-radius: 10px;
+            text-align: center;
+            font-size: 14px;
+            z-index: 10000;
+        }
+    </style>
+</head>
+<body>
+    <div class="demo-notice">
+        🎮 DEMO MODE - For testing without Telegram
+    </div>
+
+    <!-- Include the main game -->
+    <div class="game-container">
+        <div class="game-header">
+            <div class="stats">
+                <div class="stat-item">
+                    <span>⏱️</span>
+                    <span id="time">01:00</span>
+                </div>
+                <div class="stat-item">
+                    <span>🏆</span>
+                    <span id="score">0</span>
+                </div>
+                <div class="stat-item">
+                    <span>❤️</span>
+                    <span id="lives">3</span>
+                </div>
+                <div class="stat-item">
+                    <span>🌊</span>
+                    <span id="wave">1</span>
+                </div>
+            </div>
+        </div>
+
+        <canvas id="game-canvas" width="400" height="600"></canvas>
+
+        <div class="power-up-indicator">
+            <div class="power-up-icon" id="shield">🛡️</div>
+            <div class="power-up-icon" id="multishot">💥</div>
+            <div class="power-up-icon" id="speed">🚀</div>
+        </div>
+
+        <div class="controls">
+            <button class="control-btn" id="pause-btn">⏸️ Pause</button>
+            <button class="control-btn" id="special-btn">💣 Special (3)</button>
+        </div>
+    </div>
+
+    <div class="start-screen" id="start-screen">
+        <h1>🧑‍🚀 AstroByte - Cosmic Defense</h1>
+        <p>Demo Mode - Click to Play!</p>
+        <p>Defend Earth from cosmic invaders!</p>
+
+        <div class="controls-info">
+            <h3>🎮 Controls</h3>
+            <ul>
+                <li>📱 <strong>Touch:</strong> Tap or swipe to move astronaut</li>
+                <li>🖱️ <strong>Mouse:</strong> Click or click & drag to move</li>
+                <li>⌨️ <strong>Keyboard:</strong> Arrow keys or A/D to move</li>
+                <li>🔫 <strong>Auto-fire:</strong> Lasers shoot automatically</li>
+                <li>💣 <strong>Special:</strong> Missile attack (3 uses, doubles points)</li>
+                <li>⚡ <strong>Difficulty:</strong> Gets harder every wave!</li>
+            </ul>
+        </div>
+
+        <button class="start-btn" id="start-btn">🚀 START GAME</button>
+    </div>
+
+    <div class="game-over-screen" id="game-over-screen" style="display: none;">
+        <h2>🎉 Mission Complete!</h2>
+        <div class="score-display">
+            <div class="score-item">
+                <span>🏆 Final Score:</span>
+                <span class="final-score" id="final-score">0</span>
+            </div>
+            <div class="score-item">
+                <span>💾 Bytes Destroyed:</span>
+                <span id="bytes-destroyed">0</span>
+            </div>
+            <div class="score-item">
+                <span>⭐ Stars Collected:</span>
+                <span id="stars-collected">0</span>
+            </div>
+            <div class="score-item">
+                <span>🎯 Accuracy:</span>
+                <span id="accuracy">0%</span>
+            </div>
+            <div class="score-item">
+                <span>💰 Credits Earned:</span>
+                <span id="credits-earned">0</span>
+            </div>
+        </div>
+        <button class="start-btn" id="restart-btn">🔄 PLAY AGAIN</button>
+        <button class="start-btn" id="demo-submit-btn" style="margin-top: 10px;">📤 SUBMIT SCORE</button>
+    </div>
+
+    <script>
+        // Mock Telegram Web App for demo
+        window.Telegram = {
+            WebApp: {
+                ready: function() { console.log('Demo: Telegram WebApp ready'); },
+                expand: function() { console.log('Demo: Telegram WebApp expanded'); },
+                initDataUnsafe: {
+                    user: { id: 'demo_user_123', first_name: 'Demo Player' }
+                },
+                sendData: function(data) {
+                    console.log('Demo: Score submitted', data);
+                    alert('Demo: Score would be submitted to bot!\n' + data);
+                },
+                close: function() {
+                    console.log('Demo: Would close WebApp');
+                    alert('Demo: Would close Telegram WebApp');
+                }
+            }
+        };
+    </script>
+    <script src="game.js"></script>
+</body>
+</html>

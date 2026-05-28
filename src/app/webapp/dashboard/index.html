@@ -1,0 +1,587 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, viewport-fit=cover" />
+  <title>AstroByte VPN Dashboard</title>
+  <script src="https://telegram.org/js/telegram-web-app.js"></script>
+  <script src="/webapp/dashboard/js/head-boot.js"></script>
+  <script src="/webapp/dashboard/ui.js"></script>
+  <script src="/webapp/dashboard/tour.js" defer></script>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/rastikerdar/vazirmatn@v33.003/Vazirmatn-font-face.css">
+  <link rel="stylesheet" href="/webapp/dashboard/scrollbar-hide.css">
+  <link rel="stylesheet" href="/webapp/dashboard/css/index.css?v=6">
+  <link rel="stylesheet" href="/webapp/dashboard/css/glass.css?v=12">
+  <script src="/webapp/dashboard/js/index-main.js?v=14"></script>
+</head>
+<body data-page="home">
+  <div id="astro-lava" aria-hidden="true"><div class="lava-blob lava-blob-1"></div><div class="lava-blob lava-blob-2"></div><div class="lava-blob lava-blob-3"></div><div class="lava-blob lava-blob-4"></div><div class="lava-blob lava-blob-5"></div></div>
+  <div id="bootSplash" aria-hidden="true"><div class="inner">
+    <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" aria-hidden="true" width="24" height="24" fill="none">
+      <circle cx="12" cy="10" r="6" stroke="currentColor" stroke-width="2"/>
+      <rect x="7" y="15" width="10" height="4" rx="2" fill="currentColor"/>
+      <circle cx="12" cy="10" r="3" fill="currentColor"/>
+    </svg>
+  </div></div>
+  <div class="wrap">
+    <header>
+      <div class="left">
+        <div class="toggle-container">
+          <input class="toggle-input" id="themeToggle" type="checkbox" aria-label="Theme toggle (Dark/Light)">
+          <svg class="toggle" viewBox="0 0 292 142" xmlns="http://www.w3.org/2000/svg">
+            <path class="toggle-background" d="M71 142C31.7878 142 0 110.212 0 71C0 31.7878 31.7878 0 71 0C110.212 0 119 30 146 30C173 30 182 0 221 0C260 0 292 31.7878 292 71C292 110.212 260.212 142 221 142C181.788 142 173 112 146 112C119 112 110.212 142 71 142Z" />
+            <rect class="toggle-icon on" x="64" y="39" width="12" height="64" rx="6" />
+            <path class="toggle-icon off" fill-rule="evenodd" d="M221 91C232.046 91 241 82.0457 241 71C241 59.9543 232.046 51 221 51C209.954 51 201 59.9543 201 71C201 82.0457 209.954 91 221 91ZM221 103C238.673 103 253 88.6731 253 71C253 53.3269 238.673 39 221 39C203.327 39 189 53.3269 189 71C189 88.6731 203.327 103 221 103Z" />
+            <g filter="url('#goo')">
+              <rect class="toggle-circle-center" x="13" y="42" width="116" height="58" rx="29" fill="#fff"/>
+              <rect class="toggle-circle left" x="14" y="14" width="114" height="114" rx="58" fill="#fff" />
+              <rect class="toggle-circle right" x="164" y="14" width="114" height="114" rx="58" fill="#fff" />
+            </g>
+            <filter id="goo">
+              <feGaussianBlur in="SourceGraphic" result="blur" stdDeviation="10" />
+              <feColorMatrix in="blur" mode="matrix" values="1 0 0 0 0  0 1 0 0 0  0 0 1 0 0  0 0 0 18 -7" result="goo" />
+            </filter>
+          </svg>
+        </div>
+      </div>
+      <div class="center">
+        <span class="brand-icon" aria-hidden="true">
+          <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+            <circle cx="12" cy="10" r="6" fill="none" stroke="currentColor" stroke-width="2"/>
+            <rect x="7" y="15" width="10" height="4" rx="2" fill="currentColor"/>
+            <circle cx="12" cy="10" r="3" fill="currentColor"/>
+          </svg>
+        </span>
+      </div>
+      <div class="right">
+        <!-- Notification Bell -->
+        <div class="notification-bell" id="notificationBell" title="Notifications">
+          <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+            <path d="M12 22c1.1 0 2-.9 2-2h-4c0 1.1.9 2 2 2zm6-6v-5c0-3.07-1.63-5.64-4.5-6.32V4c0-.83-.67-1.5-1.5-1.5s-1.5.67-1.5 1.5v.68C7.64 5.36 6 7.92 6 11v5l-2 2v1h16v-1l-2-2zm-2 1H8v-6c0-2.48 1.51-4.5 4-4.5s4 2.02 4 4.5v6z"/>
+          </svg>
+          <span class="badge" id="notificationBadge" style="display:none;">0</span>
+        </div>
+        
+        <button id="langSwitch" class="lang-switch" aria-pressed="false" title="Language">EN</button>
+      </div>
+      
+      <!-- Hidden refresh button for functionality -->
+      <div style="display:none;">
+        <button id="refreshBtn" aria-label="Refresh"></button>
+      </div>
+    </header>
+    
+    <!-- Welcome Screen (first-time users) -->
+    <div id="welcomeScreen" class="welcome-screen" style="display:none;" aria-modal="true" role="dialog">
+      <div class="welcome-body">
+
+        <!-- Animated logo orb -->
+        <div class="welcome-orb" aria-hidden="true">
+          <div class="welcome-orb-ring r1"></div>
+          <div class="welcome-orb-ring r2"></div>
+          <div class="welcome-orb-ring r3"></div>
+          <div class="welcome-orb-core">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <circle cx="12" cy="10" r="6"/>
+              <rect x="7" y="15" width="10" height="4" rx="2" fill="currentColor" stroke="none"/>
+              <circle cx="12" cy="10" r="3" fill="currentColor" stroke="none"/>
+            </svg>
+          </div>
+        </div>
+
+        <h1 id="welcomeTitle" class="welcome-title">Welcome to AstroByte!</h1>
+        <p id="welcomeSubtitle" class="welcome-subtitle">Your personal invite code</p>
+
+        <!-- Their own ref code -->
+        <div class="welcome-code-box">
+          <span id="welcomeCode" class="welcome-code-text">------</span>
+          <button id="welcomeCopyBtn" class="welcome-copy-btn" type="button" aria-label="Copy code">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="16" height="16"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+            <span id="welcomeCopyLabel">Copy</span>
+          </button>
+        </div>
+
+        <!-- Enter a friend's code (optional) -->
+        <div id="welcomeEnterSection" class="welcome-enter-section" style="display:none;">
+          <div class="welcome-divider"><span id="welcomeHaveFriendCode">Have a friend's invite code?</span></div>
+          <div class="welcome-input-row">
+            <input id="welcomeRefInput" class="welcome-ref-input" type="text" maxlength="6"
+              autocomplete="off" autocorrect="off" spellcheck="false"
+              placeholder="A B C 1 2 3" />
+            <button id="welcomeRefSubmit" class="welcome-ref-submit" type="button">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" width="18" height="18"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
+            </button>
+          </div>
+          <p id="welcomeRefMsg" class="welcome-ref-msg" style="display:none;"></p>
+        </div>
+
+        <!-- Success state (shown after entering code) -->
+        <div id="welcomeSuccessSection" class="welcome-success-section" style="display:none;">
+          <div class="welcome-success-icon" aria-hidden="true">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg>
+          </div>
+          <p id="welcomeSuccessMsg" class="welcome-success-msg">Code applied!</p>
+        </div>
+
+        <button id="welcomeStartBtn" class="welcome-start-btn" type="button">
+          <span id="welcomeStartLabel">Start Exploring</span>
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" width="18" height="18"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
+        </button>
+
+      </div>
+    </div>
+    
+    <div class="content">
+      <!-- Empty State (shown when no subscriptions) -->
+      <div id="emptyState" class="empty-state-container" style="display:none;">
+        <!-- Decorative rings illustration -->
+        <div class="empty-state-art" aria-hidden="true">
+          <div class="es-ring es-ring-1"></div>
+          <div class="es-ring es-ring-2"></div>
+          <div class="es-ring es-ring-3"></div>
+          <div class="es-icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M12 2L2 7l10 5 10-5-10-5z"/>
+              <path d="M2 17l10 5 10-5"/>
+              <path d="M2 12l10 5 10-5"/>
+            </svg>
+          </div>
+        </div>
+        <h2 id="emptyStateTitle" class="es-title">No Subscriptions Yet</h2>
+        <p id="emptyStateDesc" class="es-desc">Add your first subscription to start using AstroByte.</p>
+        <div class="es-actions">
+          <button id="emptyAddBtn" class="es-btn-primary">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" width="18" height="18"><path d="M12 5v14M5 12h14"/></svg>
+            <span id="emptyAddLabel">Add Subscription</span>
+          </button>
+          <button id="emptyPurchaseBtn" class="es-btn-secondary">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" width="17" height="17"><path d="M6 2L3 6v14a2 2 0 002 2h14a2 2 0 002-2V6l-3-4z"/><line x1="3" y1="6" x2="21" y2="6"/><path d="M16 10a4 4 0 01-8 0"/></svg>
+            <span id="emptyPurchaseLabel">Browse Plans</span>
+          </button>
+        </div>
+      </div>
+      
+      <!-- Subscription selector -->
+      <div class="sub-controls">
+        <div class="sub-select-wrapper">
+          <!-- Native select (built-in dropdown). -->
+          <select id="subSelect" class="native-select">
+            <option value="">Select subscription…</option>
+          </select>
+          <!-- Legacy custom dropdown button (kept for compatibility, hidden by default) -->
+          <button id="subsOpenBtn" type="button" class="fake-select-btn" aria-haspopup="listbox" aria-expanded="false" style="display:none">
+            <span id="subsOpenBtnText">Select subscription…</span>
+            <svg viewBox="0 0 24 24" width="16" height="16" xmlns="http://www.w3.org/2000/svg"><path d="M6 9l6 6 6-6" fill="none" stroke="currentColor" stroke-width="2"/></svg>
+          </button>
+        </div>
+        <button id="removeSubBtn" class="btn btn-icon btn-remove" title="Remove subscription" style="display:none">
+          <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" style="width:20px !important;height:20px !important;display:block;flex:none;">
+            <path d="M10 12V17" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+            <path d="M14 12V17" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+            <path d="M4 7H20" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+            <path d="M6 10V18C6 19.6569 7.34315 21 9 21H15C16.6569 21 18 19.6569 18 18V10" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+            <path d="M9 5C9 3.89543 9.89543 3 11 3H13C14.1046 3 15 3.89543 15 5V7H9V5Z" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+        </button>
+        <button id="addSubBtn" class="btn btn-icon">
+          <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" style="width:20px !important;height:20px !important;display:block;flex:none;">
+            <path d="M7 12L12 12M12 12L17 12M12 12V7M12 12L12 17" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+            <circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+        </button>
+        <div id="subActionsMenu" class="sub-actions-menu" role="menu" aria-hidden="true">
+          <div class="menu-head">
+            <div class="menu-title">
+              <span style="display:inline-flex;width:18px;height:18px;align-items:center;justify-content:center;" aria-hidden="true">+</span>
+              <span id="subActionsTitle">Actions</span>
+            </div>
+            <button id="subActionsClose" class="mini-btn" type="button">×</button>
+          </div>
+          <div class="menu-list">
+            <button class="menu-item" type="button" data-action="add">
+              <span class="mi-ic" aria-hidden="true">
+                <svg viewBox="0 0 24 24" fill="currentColor" width="18" height="18">
+                  <path d="M12 5v14M5 12h14" />
+                </svg>
+              </span>
+              <span class="mi-text">
+                <span class="title" id="miAddSub">Add Subscription</span>
+	                <span class="sub" id="miAddSubHint">Paste subscription link</span>
+              </span>
+            </button>
+            <button class="menu-item" type="button" data-action="buy">
+              <span class="mi-ic" aria-hidden="true">
+                <svg viewBox="0 0 24 24" fill="currentColor" width="18" height="18">
+                  <path d="M20 4H4c-1.11 0-1.99.89-1.99 2L2 18c0 1.11.89 2 2 2h16c1.11 0 2-.89 2-2V6c0-1.11-.89-2-2-2zm0 14H4v-6h16v6zm0-10H4V6h16v2z"/>
+                </svg>
+              </span>
+              <span class="mi-text">
+                <span class="title" id="miBuy">Buy service</span>
+                <span class="sub" id="miBuyHint">New subscription</span>
+              </span>
+            </button>
+            <button class="menu-item" type="button" data-action="charge">
+              <span class="mi-ic secondary" aria-hidden="true">
+                <svg viewBox="0 0 24 24" fill="currentColor" width="18" height="18">
+                  <path d="M11 9h2V6h3V4h-3V1h-2v3H8v2h3v3z"/>
+                  <path d="M7 18c-1.1 0-1.99.9-1.99 2S5.9 22 7 22s2-.9 2-2-.9-2-2-2zm10 0c-1.1 0-1.99.9-1.99 2s.89 2 1.99 2 2-.9 2-2-.9-2-2-2z"/>
+                </svg>
+              </span>
+              <span class="mi-text">
+                <span class="title" id="miCharge">Charge service</span>
+                <span class="sub" id="miChargeHint">Top up data</span>
+              </span>
+            </button>
+            <button class="menu-item" type="button" data-action="support">
+              <span class="mi-ic blue" aria-hidden="true">
+                <svg viewBox="0 0 24 24" fill="currentColor" width="18" height="18">
+                  <path d="M20 2H4c-1.1 0-2 .9-2 2v18l4-4h14c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2zm0 14H6l-2 2V4h16v12z"/>
+                </svg>
+              </span>
+              <span class="mi-text">
+                <span class="title" id="miSupport">Support</span>
+                <span class="sub" id="miSupportHint">Tickets / help</span>
+              </span>
+            </button>
+            <button class="menu-item" type="button" data-action="tutorial">
+              <span class="mi-ic gray" aria-hidden="true">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="18" height="18">
+                  <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/>
+                  <path d="M4 4.5A2.5 2.5 0 0 1 6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15Z"/>
+                  <path d="M8 6h8"/>
+                  <path d="M8 10h8"/>
+                </svg>
+              </span>
+              <span class="mi-text">
+                <span class="title" id="miTutorial">Tutorial</span>
+                <span class="sub" id="miTutorialHint">How to use the app</span>
+              </span>
+            </button>
+          </div>
+        </div>
+        <button id="purchaseBtn" class="btn btn-primary" style="display:none"></button>
+      </div>
+      <!-- Subscriptions dropdown panel -->
+      <div id="subsDropdown" class="subs-dd" style="display:none">
+        <div class="panel">
+          <div class="row">
+            <input id="subsSearch" type="text" placeholder="Search…" />
+          </div>
+          <div id="subsList" class="list"></div>
+          <div class="footer">
+            <button id="exportCurrentBtn" class="btn">Export current</button>
+            <button id="qrCurrentBtn" class="btn">QR</button>
+            <button id="importFromClipboardBtn" class="btn">Import from clipboard</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- VPN Card -->
+      <div class="card vpn-card">
+        <!-- Magma lamp blobs -->
+        <div class="vpn-blob vpn-blob-1" aria-hidden="true"></div>
+        <div class="vpn-blob vpn-blob-2" aria-hidden="true"></div>
+        <div class="vpn-blob vpn-blob-3" aria-hidden="true"></div>
+        <div class="vpn-blob vpn-blob-4" aria-hidden="true"></div>
+
+        <!-- Top row: date badge + icon -->
+        <div class="vpn-card-top">
+          <div class="date-badge" id="currentDate">—</div>
+          <div class="vpn-card-icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" width="22" height="22">
+              <circle cx="12" cy="12" r="2"/>
+              <path d="M16.24 7.76a6 6 0 0 1 0 8.49"/>
+              <path d="M7.76 16.24a6 6 0 0 1 0-8.49"/>
+              <path d="M19.07 4.93a10 10 0 0 1 0 14.14"/>
+              <path d="M4.93 19.07a10 10 0 0 1 0-14.14"/>
+            </svg>
+          </div>
+        </div>
+
+        <!-- Body: balance + username -->
+        <div class="vpn-card-body">
+          <div class="vpn-balance-row">
+            <span class="vpn-balance" id="balance">—</span>
+            <span class="vpn-balance-unit" id="balanceUnit">GB</span>
+          </div>
+          <div class="vpn-username" id="username">Loading...</div>
+        </div>
+
+        <!-- Usage bar -->
+        <div class="vpn-usage-track" id="vpnUsageTrack" style="display:none;">
+          <div class="vpn-usage-fill" id="vpnUsageFill" style="width:0%"></div>
+          <span class="vpn-usage-pct" id="vpnUsagePct"></span>
+        </div>
+
+        <!-- Footer: actions + status -->
+        <div class="vpn-card-footer">
+          <div class="vpn-card-actions">
+            <button id="cardCopyBtn" class="vpn-action-btn" title="Copy Link">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="17" height="17"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+            </button>
+            <button id="cardQRBtn" class="vpn-action-btn" title="QR Code">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="17" height="17"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="3" height="3" rx="0.5"/><rect x="18" y="14" width="3" height="3" rx="0.5"/><rect x="14" y="18" width="3" height="3" rx="0.5"/><rect x="18" y="18" width="3" height="3" rx="0.5"/></svg>
+            </button>
+            <button id="cardRefreshBtn" class="vpn-action-btn" title="Refresh">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="17" height="17"><path d="M21 12a9 9 0 1 1-2.64-6.36"/><path d="M21 3v6h-6"/></svg>
+            </button>
+          </div>
+          <span class="status-badge" id="statusBadge">Inactive</span>
+        </div>
+      </div>
+
+      <!-- Quick Actions -->
+      <div class="card quick-actions-card" id="quickActionsCard">
+        <div class="quick-actions-head">
+          <div class="quick-actions-title" id="quickActionsTitle">Quick actions</div>
+        </div>
+        <div class="action-grid">
+          <button class="action-tile" type="button" onclick="openPurchasePage()">
+            <div class="action-ic" aria-hidden="true">
+              <svg viewBox="0 0 24 24" fill="currentColor">
+                <path d="M20 4H4c-1.11 0-1.99.89-1.99 2L2 18c0 1.11.89 2 2 2h16c1.11 0 2-.89 2-2V6c0-1.11-.89-2-2-2zm0 14H4v-6h16v6zm0-10H4V6h16v2z"/>
+              </svg>
+            </div>
+            <div class="action-label" id="btnBuyService">Buy Service</div>
+          </button>
+          <button class="action-tile" type="button" onclick="openChargePage()">
+            <div class="action-ic green" aria-hidden="true">
+              <svg viewBox="0 0 24 24" fill="currentColor">
+                <path d="M11 9h2V6h3V4h-3V1h-2v3H8v2h3v3zm-4 9c-1.1 0-1.99.9-1.99 2S5.9 22 7 22s2-.9 2-2-.9-2-2-2zm10 0c-1.1 0-1.99.9-1.99 2s.89 2 1.99 2 2-.9 2-2-.9-2-2-2zm-9.83-3.25l.03-.12.9-1.63h7.45c.75 0 1.41-.41 1.75-1.03l3.86-7.01L19.42 4h-.01l-1.1 2-2.76 5H8.53l-.13-.27L6.16 6l-.95-2-.94-2H1v2h2l3.6 7.59-1.35 2.45c-.16.28-.25.61-.25.96 0 1.1.9 2 2 2h12v-2H7.42c-.13 0-.25-.11-.25-.25z"/>
+              </svg>
+            </div>
+            <div class="action-label" id="btnChargeService">Charge Service</div>
+          </button>
+          <button class="action-tile" type="button" onclick="openSupportPage()">
+            <div class="action-ic blue" aria-hidden="true">
+              <svg viewBox="0 0 24 24" fill="currentColor">
+                <path d="M20 2H4c-1.1 0-2 .9-2 2v18l4-4h14c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2zm0 14H6l-2 2V4h16v12z"/>
+              </svg>
+            </div>
+            <div class="action-label" id="btnSupport">Support</div>
+          </button>
+        </div>
+      </div>
+
+      <!-- Connection -->
+      <div class="card center" id="connectionCard">
+        <div class="power-wrap">
+          <svg class="usage-ring-svg" id="usageRingSvg" viewBox="0 0 130 130" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+            <defs>
+              <linearGradient id="usageGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+                <stop offset="0%" stop-color="var(--brand)"/>
+                <stop offset="100%" stop-color="var(--brandDark)"/>
+              </linearGradient>
+            </defs>
+            <circle class="track" cx="65" cy="65" r="56" fill="none" stroke-width="8" />
+            <circle class="progress" id="usageRing" cx="65" cy="65" r="56" fill="none" stroke="url(#usageGrad)" stroke-width="8" stroke-linecap="round" />
+          </svg>
+          <button id="powerBtn" class="power-btn inactive">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M18,8.5A2.5,2.5,0,1,1,15.5,6,2.5,2.5,0,0,1,18,8.5Zm-1.341,9.213a11.038,11.038,0,0,1-.828,2.222A7.634,7.634,0,0,1,9,24H8V19.143A3.214,3.214,0,0,0,4.857,16H0V15A7.634,7.634,0,0,1,4.065,8.169a11.038,11.038,0,0,1,2.222-.828C9.96,2.38,14.221.178,20.458,0H20.5A3.489,3.489,0,0,1,24,3.551C23.82,9.877,21.686,14,16.659,17.713ZM21,3.508A.5.5,0,0,0,20.515,3c-5.461.162-8.839,1.966-12.038,6.431a28.441,28.441,0,0,0-2.206,3.737,6.287,6.287,0,0,1,4.561,4.561,28.376,28.376,0,0,0,3.737-2.206C19.042,12.317,20.846,8.949,21,3.508ZM1.631,18.728C.857,19.5.38,21.831.211,22.8L0,24l1.2-.212c.961-.17,3.278-.649,4.052-1.425a2.58,2.58,0,0,0,0-3.635A2.613,2.613,0,0,0,1.631,18.728Z"/>
+            </svg>
+          </button>
+          <div class="usage-badge" id="usageBadge" aria-live="polite">—</div>
+        </div>
+        <div class="location">
+          <span class="flag" id="flag"></span>
+          <span class="name" id="locName">—</span>
+        </div>
+        <div class="usage-meta">
+          <div class="updated"><span id="overviewUpdatedLabel">Updated</span> <strong id="overviewUpdated">—</strong></div>
+          <button id="autoRefreshBtn" class="mini-btn" type="button">Auto: Off</button>
+        </div>
+
+        <div class="stats-grid" style="width:100%;margin-top:12px;">
+          <div class="stat-item">
+            <div class="stat-label" id="labelAvailable">Available</div>
+            <div class="stat-value" id="balance2">—</div>
+          </div>
+          <div class="stat-item">
+            <div class="stat-label" id="labelUsed">Used</div>
+            <div class="stat-value" id="usedVal">—</div>
+          </div>
+          <div class="stat-item">
+            <div class="stat-label" id="labelExpires">Expires in</div>
+            <div class="stat-value" id="expireVal">—</div>
+            <div class="stat-sub" id="daysLabel">days</div>
+          </div>
+        </div>
+
+        <div class="usage-extra" style="width:100%;">
+          <div class="info-row">
+            <div class="label" id="labelTotalLimit">Total limit</div>
+            <div class="value" id="limitVal">—</div>
+          </div>
+          <div class="info-row">
+            <div class="label" id="labelLocation">Location</div>
+            <div class="value" id="locName2">—</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Speed -->
+      <div class="card" id="speedCard">
+        <div class="card-head">
+          <div class="card-title" id="speedTitle">Speed test</div>
+          <button id="speedToggleBtn" class="mini-btn" type="button" aria-expanded="false">Show</button>
+        </div>
+        <div id="speedPanel" class="speed-panel" hidden>
+          <div class="speed-chips">
+            <div class="speed-chip">
+              <div class="label" id="labelDownload">Download</div>
+              <div class="value" id="downv">—</div>
+            </div>
+            <div class="speed-chip">
+              <div class="label" id="labelUpload">Upload</div>
+              <div class="value" id="upv">—</div>
+            </div>
+            <div class="speed-chip">
+              <div class="label" id="labelPing">Ping</div>
+              <div class="value" id="pingv">—</div>
+            </div>
+          </div>
+          <canvas id="chart"></canvas>
+          <div class="chart-meta" id="speedUpdated">—</div>
+        </div>
+      </div>
+    </div>
+    
+    <footer id="appFooter">© <span id="footerYear"></span> AstroBytech Team</footer>
+  </div>
+  
+  <!-- Toasts and Bottom Sheet -->
+  <div id="toastContainer" class="toasts" aria-live="polite" aria-atomic="true"></div>
+  <div class="sheet-backdrop" id="addSubSheetBackdrop" aria-hidden="true"></div>
+  <div class="sheet-panel" id="addSubSheet" role="dialog" aria-modal="true" aria-labelledby="addSubTitle" aria-hidden="true">
+    <div class="sheet-handle"></div>
+    <div class="sheet-content">
+      <h2 id="addSubTitle">Add Subscription</h2>
+      <p class="sheet-subtitle" id="addSubSubtitle"></p>
+      <div class="sheet-field">
+        <input id="addSubInput" type="text" placeholder="" inputmode="text" autocapitalize="none" autocomplete="off" spellcheck="false">
+      </div>
+      <div class="sheet-actions">
+        <button id="addSubCancel" class="btn">Cancel</button>
+        <button id="addSubConfirm" class="btn btn-primary">Add</button>
+      </div>
+    </div>
+  </div>
+  <!-- Confirm Remove Sheet -->
+  <div class="sheet-backdrop" id="confirmSheetBackdrop" aria-hidden="true"></div>
+  <div class="sheet-panel" id="confirmSheet" role="dialog" aria-modal="true" aria-labelledby="confirmRemoveTitle" aria-hidden="true">
+    <div class="sheet-handle"></div>
+    <div class="sheet-content">
+      <h2 id="confirmRemoveTitle">Remove subscription</h2>
+      <p class="sheet-subtitle" id="confirmRemoveText">
+        <span>Remove subscription</span>
+        <strong style="margin:0 6px" id="confirmRemoveName">—</strong>?
+      </p>
+      <div class="sheet-actions">
+        <button id="confirmRemoveCancel" class="btn">Cancel</button>
+        <button id="confirmRemoveConfirm" class="btn btn-primary">Remove subscription</button>
+      </div>
+    </div>
+  </div>
+  
+  <!-- Export Modal -->
+  <div class="sheet-backdrop" id="exportModalBackdrop" aria-hidden="true"></div>
+  <div class="sheet-panel" id="exportModal" role="dialog" aria-modal="true" aria-labelledby="exportModalTitle" aria-hidden="true">
+    <div class="sheet-handle"></div>
+    <div class="sheet-content">
+      <h2 id="exportModalTitle">Export Subscription</h2>
+      <p class="sheet-subtitle" style="word-break:break-all;font-size:12px;font-family:monospace;background:var(--chip);padding:10px;border-radius:8px;margin-top:12px;direction:ltr;text-align:left;" id="exportLinkText">—</p>
+      <div id="exportQRContainer" style="display:none;flex-direction:column;align-items:center;margin-top:16px;">
+        <img id="exportQRImg" src="" alt="QR Code" style="width:300px;height:300px;border-radius:12px;background:#fff;padding:10px;" />
+      </div>
+      <div class="sheet-actions" style="margin-top:16px;justify-content:center;">
+        <button id="exportAddBtn" class="btn btn-primary">Add to App</button>
+        <button id="exportQRBtn" class="btn">Show QR Code</button>
+        <button id="exportModalClose" class="btn">Close</button>
+      </div>
+    </div>
+  </div>
+  
+  <!-- Bottom Navigation -->
+  <nav class="bottom-nav">
+    <div class="nav-container">
+      <!-- Home -->
+      <div class="nav-item" data-page="home" data-url="/webapp/dashboard">
+        <div class="nav-item-icon">
+          <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="currentColor" viewBox="0 0 24 24">
+            <path fill-rule="evenodd" d="M11.293 3.293a1 1 0 0 1 1.414 0l6 6 2 2a1 1 0 0 1-1.414 1.414L19 12.414V19a2 2 0 0 1-2 2h-3a1 1 0 0 1-1-1v-3h-2v3a1 1 0 0 1-1 1H7a2 2 0 0 1-2-2v-6.586l-.293.293a1 1 0 0 1-1.414-1.414l2-2 6-6Z" clip-rule="evenodd"/>
+          </svg>
+        </div>
+        <div class="nav-item-label" id="navHomeLabel">Home</div>
+      </div>
+      
+      <!-- Tasks/Challenges -->
+      <div class="nav-item" data-page="tasks" data-url="/webapp/dashboard/tasks.html">
+        <div class="nav-item-icon">
+          <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="currentColor" viewBox="0 0 24 24">
+            <path d="M13.849 4.22c-.684-1.626-3.014-1.626-3.698 0L8.397 8.387l-4.552.361c-1.775.14-2.495 2.331-1.142 3.477l3.468 2.937-1.06 4.392c-.413 1.713 1.472 3.067 2.992 2.149L12 19.35l3.897 2.354c1.52.918 3.405-.436 2.992-2.15l-1.06-4.39 3.468-2.938c1.353-1.146.633-3.336-1.142-3.477l-4.552-.36-1.754-4.17Z"/>
+          </svg>
+        </div>
+        <div class="nav-item-label" id="navTasksLabel">Rewards</div>
+      </div>
+      
+      <!-- Game (NOTCH) -->
+      <div class="nav-item nav-item-notch" data-page="arcade" data-url="/webapp/arcade">
+        <div class="nav-item-icon">
+          <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <line x1="6" y1="11" x2="10" y2="11"></line>
+            <line x1="8" y1="9" x2="8" y2="13"></line>
+            <line x1="15" y1="12" x2="15.01" y2="12"></line>
+            <line x1="18" y1="10" x2="18.01" y2="10"></line>
+            <path d="M17.32 5H6.68a4 4 0 0 0-3.978 3.59c-.006.052-.01.101-.017.152C2.604 9.416 2 14.456 2 16a3 3 0 0 0 3 3c1 0 1.5-.5 2-1l1.414-1.414A2 2 0 0 1 9.828 16h4.344a2 2 0 0 1 1.414.586L17 18c.5.5 1 1 2 1a3 3 0 0 0 3-3c0-1.545-.604-6.584-.685-7.258-.007-.05-.011-.1-.017-.151A4 4 0 0 0 17.32 5z"></path>
+          </svg>
+        </div>
+        <div class="nav-item-label" id="navArcadeLabel">Game</div>
+      </div>
+      
+      <!-- Shop -->
+      <div class="nav-item" data-page="shop" data-url="/webapp/dashboard/shop.html">
+        <div class="nav-item-icon">
+          <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="9" cy="21" r="1"></circle>
+            <circle cx="20" cy="21" r="1"></circle>
+            <path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"></path>
+          </svg>
+        </div>
+        <div class="nav-item-label" id="navShopLabel">Shop</div>
+      </div>
+      
+      <!-- Profile -->
+      <div class="nav-item" data-page="profile" data-url="/webapp/dashboard/profile.html">
+        <div class="nav-item-icon">
+          <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
+            <circle cx="12" cy="7" r="4"></circle>
+          </svg>
+        </div>
+        <div class="nav-item-label" id="navProfileLabel">Profile</div>
+      </div>
+    </div>
+  </nav>
+
+  <div class="page-transition-layer" id="pageTransitionLayer" aria-hidden="true"></div>
+
+  <!-- Notifications Panel -->
+  <div class="sheet-backdrop" id="notificationsBackdrop" onclick="closeNotificationsPanel()" aria-hidden="true"></div>
+  <div class="sheet-panel" id="notificationsPanel" role="dialog" aria-modal="true" aria-labelledby="notificationsPanelTitle" aria-hidden="true">
+    <div class="sheet-handle"></div>
+    <div class="sheet-content">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;">
+        <h2 id="notificationsPanelTitle" style="font-size:18px;font-weight:800;">Notifications</h2>
+        <div style="display:flex;gap:12px;">
+          <button id="clearHistoryBtn" onclick="clearNotificationHistory()" style="background:none;border:none;color:var(--muted);font-size:13px;font-weight:600;cursor:pointer;transition:color 0.2s;">Clear history</button>
+          <button id="markAllReadBtn" onclick="markNotificationAsRead();closeNotificationsPanel();" style="background:none;border:none;color:var(--brand);font-size:13px;font-weight:600;cursor:pointer;">Mark all as read</button>
+        </div>
+      </div>
+      <div id="notificationsList" style="max-height:400px;overflow-y:auto;overflow-x:hidden;"></div>
+    </div>
+  </div>
+
+
+</body>
+</html>

@@ -1,0 +1,451 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, viewport-fit=cover" />
+  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
+  <meta http-equiv="Pragma" content="no-cache" />
+  <meta http-equiv="Expires" content="0" />
+  <meta name="referrer" content="no-referrer" />
+  <title>AstroByte Rewards</title>
+  <!-- Unified language system - applies language BEFORE content renders -->
+  <script src="/webapp/dashboard/lang.js"></script>
+  <script src="https://telegram.org/js/telegram-web-app.js"></script>
+  <script src="/webapp/dashboard/js/head-boot.js"></script>
+  <script src="/webapp/dashboard/ui.js" defer></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Urbanist:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/rastikerdar/vazirmatn@v33.003/Vazirmatn-font-face.css">
+  <link rel="stylesheet" href="/webapp/dashboard/scrollbar-hide.css">
+  <link rel="stylesheet" href="/webapp/dashboard/css/tasks-shell.css">
+  <link rel="stylesheet" href="/webapp/dashboard/css/glass.css?v=12">
+</head>
+<body data-page="tasks">
+  <div id="astro-lava" aria-hidden="true"><div class="lava-blob lava-blob-1"></div><div class="lava-blob lava-blob-2"></div><div class="lava-blob lava-blob-3"></div><div class="lava-blob lava-blob-4"></div><div class="lava-blob lava-blob-5"></div></div>
+  <div class="wrap">
+    <!-- Header -->
+    <header>
+      <div class="left">
+        <div class="toggle-container">
+          <input class="toggle-input" id="themeToggle" type="checkbox" aria-label="Theme toggle">
+          <svg class="toggle" viewBox="0 0 292 142" xmlns="http://www.w3.org/2000/svg">
+            <path class="toggle-background" d="M71 142C31.7878 142 0 110.212 0 71C0 31.7878 31.7878 0 71 0C110.212 0 119 30 146 30C173 30 182 0 221 0C260 0 292 31.7878 292 71C292 110.212 260.212 142 221 142C181.788 142 173 112 146 112C119 112 110.212 142 71 142Z" />
+            <rect class="toggle-icon on" x="64" y="39" width="12" height="64" rx="6" />
+            <path class="toggle-icon off" fill-rule="evenodd" d="M221 91C232.046 91 241 82.0457 241 71C241 59.9543 232.046 51 221 51C209.954 51 201 59.9543 201 71C201 82.0457 209.954 91 221 91ZM221 103C238.673 103 253 88.6731 253 71C253 53.3269 238.673 39 221 39C203.327 39 189 53.3269 189 71C189 88.6731 203.327 103 221 103Z" />
+            <g filter="url('#goo')">
+              <rect class="toggle-circle-center" x="13" y="42" width="116" height="58" rx="29" fill="#fff"/>
+              <rect class="toggle-circle left" x="14" y="14" width="114" height="114" rx="58" fill="#fff" />
+              <rect class="toggle-circle right" x="164" y="14" width="114" height="114" rx="58" fill="#fff" />
+            </g>
+            <filter id="goo">
+              <feGaussianBlur in="SourceGraphic" result="blur" stdDeviation="10" />
+              <feColorMatrix in="blur" mode="matrix" values="1 0 0 0 0  0 1 0 0 0  0 0 1 0 0  0 0 0 18 -7" result="goo" />
+            </filter>
+          </svg>
+        </div>
+      </div>
+      <div class="center">
+        <span class="brand-icon">
+          <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+            <circle cx="12" cy="10" r="6" fill="none" stroke="currentColor" stroke-width="2"/>
+            <rect x="7" y="15" width="10" height="4" rx="2" fill="currentColor"/>
+            <circle cx="12" cy="10" r="3" fill="currentColor"/>
+          </svg>
+        </span>
+      </div>
+      <div class="right">
+        <button id="langSwitch" class="lang-switch" title="Language">EN</button>
+      </div>
+    </header>
+
+    <!-- Stats Header -->
+	    <div class="stats-header">
+	      <div class="stat-item">
+	        <div class="stat-value" id="statStars">0</div>
+	        <div class="stat-label" id="statStarsLabel">Stars</div>
+	      </div>
+	      <div class="stat-item">
+	        <div class="stat-value" id="statCredits">0</div>
+	        <div class="stat-label" id="statCreditsLabel">Credit</div>
+	      </div>
+	    </div>
+
+    <!-- Main Content -->
+    <main class="content">
+      <!-- Task Page Styles (must be inside .content for shell loading) -->
+      <link rel="stylesheet" href="/webapp/dashboard/css/tasks-content.css">
+
+      <div class="main-tabs" id="mainTabs">
+        <div class="main-tabs-inner">
+          <button class="main-tab-btn active" id="mainTabRewards" type="button">Rewards</button>
+          <button class="main-tab-btn" id="mainTabChallenges" type="button">Challenges</button>
+        </div>
+      </div>
+
+	      <div id="rewardsSection">
+	      <!-- Coming soon (Rewards system UI) -->
+	      <div class="referral-card" id="comingSoonCard" style="display:none;" data-collapsible="true" data-default-open="true">
+	        <div class="referral-header">
+	          <div>
+	            <div class="referral-title" id="comingSoonTitle">Coming soon</div>
+	            <div class="referral-subtitle" id="comingSoonSubtitle">Rewards are being rebuilt</div>
+	          </div>
+	          <div class="referral-actions">
+	            <button class="reward-toggle" type="button" aria-label="Collapse section" aria-expanded="true" data-toggle="collapse">
+	              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+	                <polyline points="6 9 12 15 18 9"></polyline>
+	              </svg>
+	            </button>
+	          </div>
+	        </div>
+	        <div class="reward-body">
+	          <div class="referral-list" style="display:block;">
+	            <div class="referral-item" style="align-items:flex-start;">
+	              <div style="flex:1;">
+	                <div class="referral-item-name" id="comingSoonBodyTitle">⏳ Rewards are temporarily disabled</div>
+	                <div class="referral-item-meta" id="comingSoonBodyText" style="margin-top:8px; line-height:1.6;">
+	                  We’re rebuilding the rewards system for stability and fairness. Referral tracking is still active.
+	                </div>
+	              </div>
+	              <div class="referral-item-meta">🚧</div>
+	            </div>
+	          </div>
+	        </div>
+	      </div>
+
+	      <div class="jump-row" id="rewardsJumpRow" style="display:none;">
+	        <button class="jump-chip" type="button" data-target="walletCard" style="--accent: rgba(139,92,246,0.95);">
+	          <span class="jump-dot" aria-hidden="true"></span>
+	          <span id="jumpWalletLabel">Wallet</span>
+	        </button>
+	        <button class="jump-chip" type="button" data-target="voucherCard" style="--accent: rgba(255,202,40,0.95);">
+	          <span class="jump-dot" aria-hidden="true"></span>
+	          <span id="jumpVouchersLabel">Vouchers</span>
+	        </button>
+	        <button class="jump-chip" type="button" data-target="referralCard" style="--accent: rgba(59,130,246,0.95);">
+	          <span class="jump-dot" aria-hidden="true"></span>
+	          <span id="jumpReferralsLabel">Referrals</span>
+	        </button>
+	        <button class="jump-chip span-2" type="button" data-target="milestoneCard" style="--accent: rgba(20,184,166,0.95);">
+	          <span class="jump-dot" aria-hidden="true"></span>
+	          <span id="jumpMilestonesLabel">Milestones</span>
+	        </button>
+	      </div>
+
+      <!-- Daily Game -->
+		      <div class="referral-card" id="dailyGameCard" style="display:none;" data-collapsible="true" data-default-open="true">
+		        <div class="referral-header">
+		          <div>
+		            <div class="referral-title" id="dailyGameTitle">Daily Game</div>
+		            <div class="referral-subtitle" id="dailyGameSubtitle">Play once per day to keep your streak</div>
+		          </div>
+		          <div class="referral-actions">
+		            <button class="reward-toggle" type="button" aria-label="Collapse section" aria-expanded="true" data-toggle="collapse">
+		              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+		                <polyline points="6 9 12 15 18 9"></polyline>
+		              </svg>
+		            </button>
+		          </div>
+		        </div>
+		        <div class="reward-body">
+		          <div class="card-actions grid-1" id="dailyGameActions">
+		            <button class="ref-btn primary" id="dailyGamePlayBtn" type="button">Play</button>
+		          </div>
+		          <div class="referral-stats">
+		            <div class="ref-stat">
+		              <div class="ref-stat-value" id="dailyGameStreak">0</div>
+		              <div class="ref-stat-label" id="dailyGameStreakLabel">Streak</div>
+	            </div>
+	            <div class="ref-stat">
+	              <div class="ref-stat-value" id="dailyGamePieces">0/10</div>
+	              <div class="ref-stat-label" id="dailyGamePiecesLabel">Star pieces</div>
+	            </div>
+	            <div class="ref-stat">
+	              <div class="ref-stat-value" id="dailyGameMonthly">0/6</div>
+	              <div class="ref-stat-label" id="dailyGameMonthlyLabel">Monthly cap</div>
+	            </div>
+	          </div>
+	          <div class="referral-subtitle" id="dailyGameStatus" style="margin-top:12px;">—</div>
+	        </div>
+	      </div>
+
+      <!-- Wallet -->
+		      <div class="referral-card collapsed" id="walletCard" style="display:none;" data-collapsible="true" data-default-open="false">
+		        <div class="referral-header">
+		          <div>
+		            <div class="referral-title" id="walletTitle">Wallet</div>
+		            <div class="referral-subtitle" id="walletSubtitle">Your balance and stars</div>
+		          </div>
+		          <div class="referral-actions">
+		            <button class="reward-toggle" type="button" aria-label="Expand section" aria-expanded="false" data-toggle="collapse">
+		              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+		                <polyline points="6 9 12 15 18 9"></polyline>
+		              </svg>
+		            </button>
+		          </div>
+		        </div>
+		        <div class="reward-body">
+		          <div class="card-actions grid-2" id="walletActions">
+		            <button class="ref-btn primary" id="walletCashoutBtn" type="button">Cash out</button>
+		          </div>
+		          <div class="referral-stats">
+		            <div class="ref-stat">
+		              <div class="ref-stat-value" id="walletCredit">0</div>
+		              <div class="ref-stat-label" id="walletCreditLabel">Credit</div>
+	            </div>
+	            <div class="ref-stat">
+	              <div class="ref-stat-value" id="walletSubCredit">0</div>
+	              <div class="ref-stat-label" id="walletSubCreditLabel">Sub credit</div>
+	            </div>
+	            <div class="ref-stat">
+	              <div class="ref-stat-value" id="walletStars">0</div>
+	              <div class="ref-stat-label" id="walletStarsLabel">Stars</div>
+	            </div>
+	          </div>
+	          <div class="referral-subtitle" id="walletHint" style="margin-top:12px;">—</div>
+	        </div>
+	      </div>
+
+      <!-- Referral Vouchers -->
+	      <div class="referral-card" id="voucherCard" style="display:none;" data-collapsible="true" data-default-open="true">
+	        <div class="referral-header">
+	          <div>
+	            <div class="referral-title" id="voucherTitle">Referral Rewards</div>
+	            <div class="referral-subtitle" id="voucherSubtitle">Redeem your vouchers</div>
+	          </div>
+	          <div class="referral-actions">
+	            <button class="reward-toggle" type="button" aria-label="Collapse section" aria-expanded="true" data-toggle="collapse">
+	              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+	                <polyline points="6 9 12 15 18 9"></polyline>
+	              </svg>
+	            </button>
+	          </div>
+	        </div>
+	        <div class="reward-body">
+	          <div class="referral-list" id="voucherListWrap" style="display:block;">
+	            <div class="referral-list-title" id="voucherRecentLabel">Available</div>
+	            <div id="voucherList"></div>
+	          </div>
+	        </div>
+	      </div>
+
+	      <!-- Referrals (must be accessible from Rewards page) - open by default so four reward choices are visible -->
+		      <div class="referral-card" id="referralCard" style="display:none;" data-collapsible="true" data-default-open="true">
+		        <div class="referral-header">
+		          <div>
+		            <div class="referral-title" id="referralTitle">Referrals</div>
+		            <div class="referral-subtitle" id="referralSubtitle">Invite friends and earn rewards</div>
+		          </div>
+		          <div class="referral-actions">
+		            <button class="reward-toggle" type="button" aria-label="Expand section" aria-expanded="false" data-toggle="collapse">
+		              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+		                <polyline points="6 9 12 15 18 9"></polyline>
+		              </svg>
+		            </button>
+		          </div>
+		        </div>
+		        <div class="reward-body">
+		          <div class="referral-reward-options" id="referralRewardOptions"></div>
+		          <div class="card-actions grid-2" id="referralActions">
+		            <button class="ref-btn primary" id="referralShareBtn" type="button">Share</button>
+		            <button class="ref-btn" id="referralCopyBtn" type="button">Copy</button>
+		          </div>
+		          <div class="referral-code-row">
+		            <div class="referral-code" id="referralCode">—</div>
+		          </div>
+		          <div class="referral-stats">
+		            <div class="ref-stat">
+		              <div class="ref-stat-value" id="refTotal">0</div>
+		              <div class="ref-stat-label" id="refTotalLabel">Total</div>
+		            </div>
+		            <div class="ref-stat">
+		              <div class="ref-stat-value" id="refActive">0</div>
+		              <div class="ref-stat-label" id="refActiveLabel">Active</div>
+		            </div>
+		            <div class="ref-stat">
+		              <div class="ref-stat-value" id="refEarned">0</div>
+		              <div class="ref-stat-label" id="refEarnedLabel">Earned</div>
+		            </div>
+		          </div>
+		          <div class="referral-list" id="referralListWrap" style="display:none;">
+		            <div class="referral-list-title" id="refRecentLabel">Recent</div>
+		            <div id="referralList"></div>
+		          </div>
+		        </div>
+		      </div>
+
+	      <!-- Milestones -->
+		      <div class="referral-card collapsed" id="milestoneCard" style="display:none;" data-collapsible="true" data-default-open="false">
+		        <div class="referral-header">
+		          <div>
+		            <div class="referral-title" id="milestoneTitle">Milestones</div>
+		            <div class="referral-subtitle" id="milestoneSubtitle">Progress boosts & long-term goals</div>
+		          </div>
+		          <div class="referral-actions">
+		            <button class="reward-toggle" type="button" aria-label="Expand section" aria-expanded="false" data-toggle="collapse">
+		              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+		                <polyline points="6 9 12 15 18 9"></polyline>
+		              </svg>
+		            </button>
+		          </div>
+		        </div>
+		        <div class="reward-body">
+		          <div class="referral-list" id="starTierWrap" style="display:none; margin-bottom: 14px;">
+		            <div class="referral-list-title" id="starTierTitle">Star rewards</div>
+		            <div id="starTierList"></div>
+		          </div>
+		          <div class="referral-list" id="milestoneListWrap" style="display:block;">
+		            <div id="milestoneList"></div>
+		          </div>
+		        </div>
+		      </div>
+
+      <!-- Redeem Sheet -->
+      <div class="sheet-backdrop" id="redeemBackdrop" aria-hidden="true"></div>
+      <div class="sheet-panel" id="redeemPanel" role="dialog" aria-modal="true" aria-labelledby="redeemTitle" aria-hidden="true">
+        <div class="sheet-handle"></div>
+        <div class="sheet-content">
+          <div class="sheet-title-row">
+            <h3 class="sheet-title" id="redeemTitle">Redeem</h3>
+            <button class="sheet-close" id="redeemCloseBtn" type="button">Close</button>
+          </div>
+          <p class="sheet-subtitle" id="redeemSubtitle">Choose where to apply this voucher.</p>
+          <div id="redeemVoucherMeta" class="referral-item" style="display:none;">
+            <div class="referral-item-name" id="redeemVoucherMetaText">—</div>
+            <div class="referral-item-meta">🎟️</div>
+          </div>
+          <div id="redeemChoiceSection">
+            <div class="referral-list-title" id="redeemChoiceLabel">Choose reward</div>
+            <div class="sheet-list" id="redeemChoiceList"></div>
+          </div>
+          <div id="redeemSubsSection">
+            <div class="referral-list-title" id="redeemPickLabel">Select subscription</div>
+            <div class="sheet-list" id="redeemSubsList"></div>
+          </div>
+          <div id="redeemNoSubs" style="display:none;">
+            <p class="sheet-subtitle" id="redeemNoSubsText">No subscriptions found. You can add an existing subscription token or buy a new one.</p>
+          </div>
+          <div class="sheet-actions">
+            <input class="sheet-input" id="redeemAddTokenInput" type="text" placeholder="Paste subscription token..." inputmode="text" autocapitalize="none" autocomplete="off" spellcheck="false">
+            <button class="ref-btn" id="redeemAddTokenBtn" type="button">Add</button>
+            <button class="ref-btn" id="redeemBuyBtn" type="button">Buy new</button>
+            <button class="ref-btn primary" id="redeemConfirmBtn" type="button">Redeem</button>
+          </div>
+        </div>
+      </div>
+      </div>
+      
+      <!-- Challenges removed (stars-only rewards policy) -->
+      <div id="challengesSection" style="display:none;">
+      <div class="challenge-tabs">
+        <button class="tab-btn active" data-type="all" id="tabAll">All</button>
+        <button class="tab-btn" data-type="daily" id="tabDaily">Daily</button>
+        <button class="tab-btn" data-type="weekly" id="tabWeekly">Weekly</button>
+            </div>
+
+      <!-- # VIP / Auto-claim disabled - uncomment to show
+      <div class="auto-claim-row vip-coming-soon-row" id="vipComingSoonRow" style="display:none;">
+        <div class="auto-claim-text">
+          <div class="auto-claim-title" id="vipComingSoonTitle">VIP</div>
+          <div class="auto-claim-sub" id="vipComingSoonSub">Coming soon</div>
+        </div>
+        <span class="vip-coming-soon-badge" aria-hidden="true">🚧</span>
+      </div>
+      <div class="auto-claim-row locked" id="autoClaimRow" style="display:none;">
+        <button class="auto-claim-info" id="autoClaimInfoBtn" type="button">?</button>
+        <div class="auto-claim-text">
+          <div class="auto-claim-title" id="autoClaimTitle">Auto-claimer</div>
+          <div class="auto-claim-sub" id="autoClaimSub">VIP feature: auto-claim completed challenges</div>
+        </div>
+        <label class="switch" aria-label="Auto-claimer">
+          <input type="checkbox" id="autoClaimToggle" />
+          <span class="slider"></span>
+        </label>
+      </div>
+      -->
+
+      <!-- Challenges Container -->
+      <div id="challengesContainer">
+        <div class="loading-spinner">
+          <div class="spinner"></div>
+	          <div style="margin-top: 16px; color: var(--muted); font-size: 14px;" id="loadingStatus">Loading...</div>
+            </div>
+          </div>
+      </div>
+      
+      <!-- Data attribute to trigger initialization -->
+      <div id="tasksPageInit" style="display:none;" data-init="tasks"></div>
+      
+      <!-- JavaScript must be inside .content for shell loading -->
+      <script src="/webapp/dashboard/js/tasks-inject.js"></script>
+    </main>
+  </div>
+
+  <!-- Bottom Navigation -->
+  <nav class="bottom-nav">
+    <div class="nav-container">
+      <!-- Home -->
+      <div class="nav-item" data-page="home" data-url="/webapp/dashboard">
+        <div class="nav-item-icon">
+          <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="currentColor" viewBox="0 0 24 24">
+            <path fill-rule="evenodd" d="M11.293 3.293a1 1 0 0 1 1.414 0l6 6 2 2a1 1 0 0 1-1.414 1.414L19 12.414V19a2 2 0 0 1-2 2h-3a1 1 0 0 1-1-1v-3h-2v3a1 1 0 0 1-1 1H7a2 2 0 0 1-2-2v-6.586l-.293.293a1 1 0 0 1-1.414-1.414l2-2 6-6Z" clip-rule="evenodd"/>
+          </svg>
+        </div>
+        <div class="nav-item-label" id="navHomeLabel">Home</div>
+      </div>
+      
+      <!-- Rewards -->
+      <div class="nav-item active" data-page="tasks" data-url="/webapp/dashboard/tasks.html">
+        <div class="nav-item-icon">
+          <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="currentColor" viewBox="0 0 24 24">
+            <path d="M13.849 4.22c-.684-1.626-3.014-1.626-3.698 0L8.397 8.387l-4.552.361c-1.775.14-2.495 2.331-1.142 3.477l3.468 2.937-1.06 4.392c-.413 1.713 1.472 3.067 2.992 2.149L12 19.35l3.897 2.354c1.52.918 3.405-.436 2.992-2.15l-1.06-4.39 3.468-2.938c1.353-1.146.633-3.336-1.142-3.477l-4.552-.36-1.754-4.17Z"/>
+          </svg>
+        </div>
+        <div class="nav-item-label" id="navTasksLabel">Rewards</div>
+      </div>
+      
+      <!-- Game (NOTCH) -->
+      <div class="nav-item nav-item-notch" data-page="arcade" data-url="/webapp/arcade">
+        <div class="nav-item-icon">
+          <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <line x1="6" y1="11" x2="10" y2="11"></line>
+            <line x1="8" y1="9" x2="8" y2="13"></line>
+            <line x1="15" y1="12" x2="15.01" y2="12"></line>
+            <line x1="18" y1="10" x2="18.01" y2="10"></line>
+            <path d="M17.32 5H6.68a4 4 0 0 0-3.978 3.59c-.006.052-.01.101-.017.152C2.604 9.416 2 14.456 2 16a3 3 0 0 0 3 3c1 0 1.5-.5 2-1l1.414-1.414A2 2 0 0 1 9.828 16h4.344a2 2 0 0 1 1.414.586L17 18c.5.5 1 1 2 1a3 3 0 0 0 3-3c0-1.545-.604-6.584-.685-7.258-.007-.05-.011-.1-.017-.151A4 4 0 0 0 17.32 5z"></path>
+          </svg>
+        </div>
+        <div class="nav-item-label" id="navArcadeLabel">Game</div>
+      </div>
+      
+      <!-- Shop -->
+      <div class="nav-item" data-page="shop" data-url="/webapp/dashboard/shop.html">
+        <div class="nav-item-icon">
+          <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="9" cy="21" r="1"></circle>
+            <circle cx="20" cy="21" r="1"></circle>
+            <path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"></path>
+          </svg>
+        </div>
+        <div class="nav-item-label" id="navShopLabel">Shop</div>
+      </div>
+      
+      <!-- Profile -->
+      <div class="nav-item" data-page="profile" data-url="/webapp/dashboard/profile.html">
+        <div class="nav-item-icon">
+          <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
+            <circle cx="12" cy="7" r="4"></circle>
+          </svg>
+        </div>
+        <div class="nav-item-label" id="navProfileLabel">Profile</div>
+      </div>
+    </div>
+  </nav>
+
+  <div class="page-transition-layer" id="pageTransitionLayer"></div>
+
+  <script src="/webapp/dashboard/js/tasks-page.js"></script>
+	</body>
+	</html>
