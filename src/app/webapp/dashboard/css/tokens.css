@@ -199,16 +199,16 @@ html[data-theme="light"] {
   opacity: 0;
   transition: opacity 1.2s ease;
 }
-/* Dark mode — accent color glow against dark canvas */
+/* Dark mode — accent color glow, contrast() for water-drop merge */
 :root #astro-lava,
 [data-theme="dark"] #astro-lava {
   opacity: 1;
-  filter: blur(72px) saturate(160%);
+  filter: blur(72px) saturate(160%) contrast(1.8);
 }
-/* Light mode — Liquid Aurora: vivid 5-color lava lamp, less blur so blobs show clearly */
+/* Light mode — Liquid Aurora: vivid lava lamp, contrast() for water-drop merge */
 [data-theme="light"] #astro-lava {
   opacity: 1;
-  filter: blur(68px) saturate(155%);
+  filter: blur(72px) saturate(160%) contrast(1.8);
 }
 .lava-blob {
   position: absolute;
@@ -258,67 +258,87 @@ html[data-theme="light"] {
 /* --- SHARED blob sizes & positions & animations --- */
 .lava-blob-1 {
   width: 55vw; height: 55vw;
-  max-width: 400px; max-height: 400px;
+  max-width: 420px; max-height: 420px;
   top: -8%; left: -6%;
-  animation: lava1 40s ease-in-out infinite;
+  animation: lava1 44s cubic-bezier(0.45, 0.05, 0.55, 0.95) infinite;
+  will-change: transform, border-radius;
 }
 .lava-blob-2 {
-  width: 48vw; height: 48vw;
-  max-width: 360px; max-height: 360px;
+  width: 50vw; height: 50vw;
+  max-width: 380px; max-height: 380px;
   top: -6%; right: -8%;
-  animation: lava2 52s ease-in-out infinite;
+  animation: lava2 58s cubic-bezier(0.45, 0.05, 0.55, 0.95) infinite;
+  will-change: transform, border-radius;
 }
 .lava-blob-3 {
-  width: 52vw; height: 52vw;
-  max-width: 390px; max-height: 390px;
+  width: 54vw; height: 54vw;
+  max-width: 400px; max-height: 400px;
   bottom: 8%; left: 4%;
-  animation: lava3 36s ease-in-out infinite;
+  animation: lava3 38s cubic-bezier(0.45, 0.05, 0.55, 0.95) infinite;
+  will-change: transform, border-radius;
 }
 .lava-blob-4 {
-  width: 44vw; height: 44vw;
-  max-width: 330px; max-height: 330px;
+  width: 46vw; height: 46vw;
+  max-width: 350px; max-height: 350px;
   bottom: -4%; right: 4%;
-  animation: lava4 48s ease-in-out infinite;
+  animation: lava4 50s cubic-bezier(0.45, 0.05, 0.55, 0.95) infinite;
+  will-change: transform, border-radius;
 }
 .lava-blob-5 {
-  width: 38vw; height: 38vw;
-  max-width: 290px; max-height: 290px;
+  width: 42vw; height: 42vw;
+  max-width: 310px; max-height: 310px;
   top: 38%; left: 28%;
-  animation: lava5 56s ease-in-out infinite;
+  animation: lava5 62s cubic-bezier(0.45, 0.05, 0.55, 0.95) infinite;
+  will-change: transform, border-radius;
 }
 
+/* Jellyfish / water-drop animations
+   border-radius morphs create the organic squish-and-stretch
+   Paths are wide arcs so blobs drift across and merge */
 @keyframes lava1 {
-  0%   { transform: translate(0, 0) scale(1); }
-  20%  { transform: translate(20vw, 18vh) scale(1.14); }
-  40%  { transform: translate(6vw, 50vh) scale(0.90); }
-  60%  { transform: translate(32vw, 32vh) scale(1.10); }
-  80%  { transform: translate(-4vw, 22vh) scale(1.06); }
-  100% { transform: translate(0, 0) scale(1); }
+  0%   { transform: translate(0,0) scale(1);          border-radius: 50%; }
+  12%  { transform: translate(14vw,10vh) scale(1.10);  border-radius: 44% 56% 52% 48% / 54% 46% 58% 42%; }
+  25%  { transform: translate(8vw,36vh) scale(0.92);   border-radius: 58% 42% 46% 54% / 46% 54% 44% 56%; }
+  38%  { transform: translate(26vw,24vh) scale(1.14);  border-radius: 46% 54% 60% 40% / 52% 48% 44% 56%; }
+  52%  { transform: translate(18vw,54vh) scale(0.88);  border-radius: 54% 46% 44% 56% / 44% 56% 52% 48%; }
+  65%  { transform: translate(34vw,34vh) scale(1.08);  border-radius: 40% 60% 50% 50% / 58% 42% 54% 46%; }
+  78%  { transform: translate(4vw,18vh) scale(1.04);   border-radius: 56% 44% 48% 52% / 42% 58% 46% 54%; }
+  90%  { transform: translate(20vw,6vh) scale(0.96);   border-radius: 48% 52% 54% 46% / 56% 44% 50% 50%; }
+  100% { transform: translate(0,0) scale(1);           border-radius: 50%; }
 }
 @keyframes lava2 {
-  0%   { transform: translate(0, 0) scale(1); }
-  25%  { transform: translate(-24vw, 28vh) scale(1.12); }
-  50%  { transform: translate(-10vw, 60vh) scale(0.88); }
-  75%  { transform: translate(-20vw, 14vh) scale(1.16); }
-  100% { transform: translate(0, 0) scale(1); }
+  0%   { transform: translate(0,0) scale(1);           border-radius: 50%; }
+  14%  { transform: translate(-18vw,14vh) scale(1.12); border-radius: 56% 44% 52% 48% / 46% 54% 48% 52%; }
+  28%  { transform: translate(-8vw,46vh) scale(0.90);  border-radius: 44% 56% 46% 54% / 54% 46% 56% 44%; }
+  44%  { transform: translate(-30vw,30vh) scale(1.16); border-radius: 52% 48% 56% 44% / 48% 52% 44% 56%; }
+  58%  { transform: translate(-12vw,64vh) scale(0.86); border-radius: 62% 38% 48% 52% / 42% 58% 52% 48%; }
+  72%  { transform: translate(-24vw,14vh) scale(1.10); border-radius: 46% 54% 44% 56% / 56% 44% 50% 50%; }
+  88%  { transform: translate(-6vw,4vh) scale(1.02);   border-radius: 50% 50% 54% 46% / 44% 56% 46% 54%; }
+  100% { transform: translate(0,0) scale(1);           border-radius: 50%; }
 }
 @keyframes lava3 {
-  0%   { transform: translate(0, 0) scale(1); }
-  30%  { transform: translate(22vw, -22vh) scale(1.12); }
-  60%  { transform: translate(38vw, -6vh) scale(0.86); }
-  80%  { transform: translate(12vw, -32vh) scale(1.07); }
-  100% { transform: translate(0, 0) scale(1); }
+  0%   { transform: translate(0,0) scale(1);           border-radius: 50%; }
+  18%  { transform: translate(18vw,-16vh) scale(1.10); border-radius: 52% 48% 44% 56% / 44% 56% 52% 48%; }
+  35%  { transform: translate(34vw,-6vh) scale(0.88);  border-radius: 46% 54% 58% 42% / 56% 44% 46% 54%; }
+  52%  { transform: translate(22vw,-32vh) scale(1.14); border-radius: 58% 42% 46% 54% / 46% 54% 56% 44%; }
+  70%  { transform: translate(10vw,-14vh) scale(0.92); border-radius: 44% 56% 52% 48% / 54% 46% 44% 56%; }
+  88%  { transform: translate(28vw,-4vh) scale(1.06);  border-radius: 50% 50% 48% 52% / 48% 52% 54% 46%; }
+  100% { transform: translate(0,0) scale(1);           border-radius: 50%; }
 }
 @keyframes lava4 {
-  0%   { transform: translate(0, 0) scale(1); }
-  33%  { transform: translate(-28vw, -18vh) scale(1.14); }
-  66%  { transform: translate(-12vw, -44vh) scale(0.88); }
-  100% { transform: translate(0, 0) scale(1); }
+  0%   { transform: translate(0,0) scale(1);            border-radius: 50%; }
+  20%  { transform: translate(-22vw,-10vh) scale(1.12); border-radius: 48% 52% 56% 44% / 54% 46% 48% 52%; }
+  40%  { transform: translate(-10vw,-38vh) scale(0.88); border-radius: 56% 44% 44% 56% / 44% 56% 54% 46%; }
+  60%  { transform: translate(-32vw,-22vh) scale(1.16); border-radius: 42% 58% 52% 48% / 52% 48% 46% 54%; }
+  80%  { transform: translate(-16vw,-6vh) scale(0.94);  border-radius: 54% 46% 48% 52% / 46% 54% 56% 44%; }
+  100% { transform: translate(0,0) scale(1);            border-radius: 50%; }
 }
 @keyframes lava5 {
-  0%   { transform: translate(0, 0) scale(1); }
-  25%  { transform: translate(-16vw, 22vh) scale(1.18); }
-  50%  { transform: translate(20vw, -18vh) scale(0.82); }
-  75%  { transform: translate(-10vw, -28vh) scale(1.12); }
-  100% { transform: translate(0, 0) scale(1); }
+  0%   { transform: translate(0,0) scale(1);           border-radius: 50%; }
+  16%  { transform: translate(-14vw,18vh) scale(1.20); border-radius: 54% 46% 50% 50% / 48% 52% 56% 44%; }
+  32%  { transform: translate(18vw,-14vh) scale(0.82); border-radius: 46% 54% 44% 56% / 56% 44% 48% 52%; }
+  50%  { transform: translate(10vw,30vh) scale(1.16);  border-radius: 60% 40% 52% 48% / 44% 56% 50% 50%; }
+  66%  { transform: translate(-10vw,-26vh) scale(0.88); border-radius: 44% 56% 58% 42% / 52% 48% 46% 54%; }
+  82%  { transform: translate(-20vw,14vh) scale(1.10); border-radius: 50% 50% 46% 54% / 46% 54% 54% 46%; }
+  100% { transform: translate(0,0) scale(1);           border-radius: 50%; }
 }

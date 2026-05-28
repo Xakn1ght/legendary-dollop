@@ -2036,7 +2036,7 @@ html[data-theme="light"] {
 /* ── 3. LAVA BLOBS — accent color only, different opacities ─── */
 [data-theme="light"] #astro-lava {
   display: block !important;
-  filter: blur(72px) saturate(160%) !important;
+  filter: blur(72px) saturate(160%) contrast(1.8) !important;
   opacity: 1 !important;
 }
 [data-theme="light"] .lava-blob-1 { background: rgba(var(--brandRgb), 0.72) !important; }
@@ -2606,10 +2606,12 @@ html:not([data-theme="light"]) {
 }
 
 /* ── 2. LAVA BLOBS — accent color, glow against dark ─────────── */
+/* contrast() = CSS metaball trick: overlapping blurred blobs
+   amplify at merge points → they pull together like water drops  */
 html:not([data-theme="light"]) #astro-lava,
 html[data-theme="dark"] #astro-lava {
   display: block !important;
-  filter: blur(72px) saturate(160%) !important;
+  filter: blur(72px) saturate(160%) contrast(1.8) !important;
   opacity: 1 !important;
 }
 html:not([data-theme="light"]) .lava-blob-1,
