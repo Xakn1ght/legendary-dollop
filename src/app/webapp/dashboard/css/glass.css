@@ -2462,75 +2462,18 @@ html[data-theme="light"] .card.vpn-card {
     inset 0 1.5px 0 rgba(255, 255, 255, 0.98) !important;
 }
 
-/* shop plan cards */
-[data-theme="light"] .shop-plan-card {
-  background: rgba(255, 255, 255, 0.44) !important;
+/* shop elements — only add backdrop-filter (shop-content.css owns colors/borders) */
+[data-theme="light"] .shop-plan-card,
+[data-theme="light"] .shop-charge-card {
   backdrop-filter: blur(18px) saturate(180%) !important;
   -webkit-backdrop-filter: blur(18px) saturate(180%) !important;
-  border: 1px solid rgba(255, 255, 255, 0.58) !important;
-  border-top-color: rgba(255, 255, 255, 0.88) !important;
-  box-shadow:
-    0 4px 18px rgba(20, 40, 100, 0.08),
-    inset 0 1px 0 rgba(255, 255, 255, 0.90) !important;
   color: #0d1b2e !important;
 }
-/* keep the left accent bar, but make sure it's sharp and clean */
-[data-theme="light"] .shop-plan-card::before {
-  background: linear-gradient(
-    180deg,
-    rgba(var(--brandRgb), 0.80) 0%,
-    rgba(var(--brandRgb), 0.15) 100%
-  ) !important;
-  opacity: 0.90 !important;
-}
-
-/* shop tabs container */
-[data-theme="light"] .shop-tabs {
-  background: rgba(255, 255, 255, 0.42) !important;
-  backdrop-filter: blur(16px) !important;
-  -webkit-backdrop-filter: blur(16px) !important;
-  border: 1px solid rgba(255, 255, 255, 0.62) !important;
-}
-/* shop filter chips (حداقل گیگ, حداکثر قیمت, etc.) */
-[data-theme="light"] .shop-chip {
-  background: rgba(255, 255, 255, 0.50) !important;
-  border: 1px solid rgba(255, 255, 255, 0.70) !important;
-  backdrop-filter: blur(12px) !important;
-  -webkit-backdrop-filter: blur(12px) !important;
-  color: #0d1b2e !important;
-}
-/* shop sort pills */
-[data-theme="light"] .shop-sort-pills {
-  background: rgba(255, 255, 255, 0.38) !important;
-  border: 1px solid rgba(255, 255, 255, 0.58) !important;
-  backdrop-filter: blur(12px) !important;
-  -webkit-backdrop-filter: blur(12px) !important;
-}
-[data-theme="light"] .shop-sort-pill {
-  color: #0d1b2e !important;
-}
-[data-theme="light"] .shop-sort-pill.active {
-  background: rgba(var(--brandRgb), 0.12) !important;
-  color: rgb(var(--brandRgb)) !important;
-  border-color: rgba(var(--brandRgb), 0.30) !important;
-}
-/* search input */
-[data-theme="light"] .shop-input,
+[data-theme="light"] .shop-tabs,
+[data-theme="light"] .shop-sort-pills,
 [data-theme="light"] .shop-field {
-  background: rgba(255, 255, 255, 0.58) !important;
-  border: 1px solid rgba(255, 255, 255, 0.78) !important;
-  border-top-color: rgba(255, 255, 255, 0.96) !important;
   backdrop-filter: blur(14px) !important;
   -webkit-backdrop-filter: blur(14px) !important;
-  color: #0d1b2e !important;
-}
-/* charge cards */
-[data-theme="light"] .shop-charge-card {
-  background: rgba(255, 255, 255, 0.44) !important;
-  backdrop-filter: blur(18px) saturate(180%) !important;
-  -webkit-backdrop-filter: blur(18px) saturate(180%) !important;
-  border: 1px solid rgba(255, 255, 255, 0.62) !important;
-  border-top-color: rgba(255, 255, 255, 0.90) !important;
 }
 
 /* profile hero */
@@ -2694,49 +2637,20 @@ html:not([data-theme="light"]) .speed-chip {
   border-top-color: rgba(255, 255, 255, 0.13) !important;
 }
 
-/* Shop plan cards */
+/* Shop — dark mode: only backdrop-filter (shop-content.css owns colors) */
 html[data-theme="dark"] .shop-plan-card,
 html:not([data-theme="light"]) .shop-plan-card {
-  background: rgba(10, 18, 34, 0.58) !important;
   backdrop-filter: blur(22px) saturate(160%) !important;
   -webkit-backdrop-filter: blur(22px) saturate(160%) !important;
-  border: 1px solid rgba(255, 255, 255, 0.07) !important;
-  border-top-color: rgba(255, 255, 255, 0.13) !important;
-  box-shadow:
-    0 4px 20px rgba(0, 0, 0, 0.40),
-    inset 0 1px 0 rgba(255, 255, 255, 0.08) !important;
 }
-
-/* Shop tabs, chips, sort pills */
 html[data-theme="dark"] .shop-tabs,
-html:not([data-theme="light"]) .shop-tabs {
-  background: rgba(10, 18, 34, 0.52) !important;
-  backdrop-filter: blur(18px) !important;
-  -webkit-backdrop-filter: blur(18px) !important;
-  border: 1px solid rgba(255, 255, 255, 0.07) !important;
-}
-html[data-theme="dark"] .shop-chip,
-html:not([data-theme="light"]) .shop-chip {
-  background: rgba(10, 18, 34, 0.50) !important;
-  backdrop-filter: blur(14px) !important;
-  -webkit-backdrop-filter: blur(14px) !important;
-  border: 1px solid rgba(255, 255, 255, 0.08) !important;
-}
+html:not([data-theme="light"]) .shop-tabs,
 html[data-theme="dark"] .shop-sort-pills,
-html:not([data-theme="light"]) .shop-sort-pills {
-  background: rgba(10, 18, 34, 0.45) !important;
-  backdrop-filter: blur(14px) !important;
-  -webkit-backdrop-filter: blur(14px) !important;
-  border: 1px solid rgba(255, 255, 255, 0.07) !important;
-}
-html[data-theme="dark"] .shop-input,
+html:not([data-theme="light"]) .shop-sort-pills,
 html[data-theme="dark"] .shop-field,
-html:not([data-theme="light"]) .shop-input,
 html:not([data-theme="light"]) .shop-field {
-  background: rgba(10, 18, 34, 0.55) !important;
   backdrop-filter: blur(14px) !important;
   -webkit-backdrop-filter: blur(14px) !important;
-  border: 1px solid rgba(255, 255, 255, 0.08) !important;
 }
 
 /* Sheet panels */
@@ -2758,31 +2672,18 @@ html:not([data-theme="light"]) .usage-badge {
   border: 1.5px solid rgba(255, 255, 255, 0.10) !important;
 }
 
-/* ── 5. LIGHT MODE SHOP — replace inner bar with border-left ──
-   The ::before accent bar inside glass cards looks cluttered.
-   Swap to a clean border-left so it's part of the card edge.  */
-[data-theme="light"] .shop-plan-card {
-  border-left: 3px solid rgba(var(--brandRgb), 0.65) !important;
-  border-top-color: rgba(255, 255, 255, 0.92) !important;
-  padding-left: 16px !important;
-}
-html[dir="rtl"][data-theme="light"] .shop-plan-card,
-[data-theme="light"] html[dir="rtl"] .shop-plan-card {
-  border-left: 1px solid rgba(255, 255, 255, 0.58) !important;
-  border-right: 3px solid rgba(var(--brandRgb), 0.65) !important;
-  padding-left: 16px !important;
-  padding-right: 16px !important;
-}
+/* ── 5. SHOP — shop-content.css owns all visual design.
+   glass.css only adds backdrop-filter and dark-mode ::before glow. */
 [data-theme="light"] .shop-plan-card::before {
   display: none !important;
 }
 
-/* Dark mode: keep ::before bar, make it glass-aware */
+/* Dark mode: accent bar glow */
 html[data-theme="dark"] .shop-plan-card::before,
 html:not([data-theme="light"]) .shop-plan-card::before {
   background: linear-gradient(
     180deg,
-    rgba(var(--brandRgb), 0.75) 0%,
+    rgba(var(--brandRgb), 0.80) 0%,
     rgba(var(--brandRgb), 0.12) 100%
   ) !important;
   opacity: 0.90 !important;
