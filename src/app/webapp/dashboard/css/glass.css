@@ -1810,10 +1810,12 @@ html[data-theme="light"] .vpn-card-icon {
   text-shadow: 0 2px 16px rgba(0, 0, 0, 0.32) !important;
   font-feature-settings: 'tnum' 1, 'lnum' 1 !important;
 }
-/* Light mode */
+/* Light mode — softer, part of the glass */
 [data-theme="light"] .vpn-balance,
 html[data-theme="light"] .vpn-balance {
-  color: #0f172a !important;
+  color: rgba(13, 27, 46, 0.70) !important;
+  font-weight: 700 !important;
+  letter-spacing: -1.5px !important;
   text-shadow: none !important;
 }
 
@@ -2188,12 +2190,14 @@ html[data-theme="light"] .vpn-card::before {
 /* text in vpn card — reset gradient-clip text from index.css */
 [data-theme="light"] .vpn-balance,
 html[data-theme="light"] .vpn-balance {
-  color: #0d1b2e !important;
+  color: rgba(13, 27, 46, 0.70) !important;
   background: none !important;
   -webkit-background-clip: unset !important;
   background-clip: unset !important;
-  -webkit-text-fill-color: #0d1b2e !important;
+  -webkit-text-fill-color: rgba(13, 27, 46, 0.70) !important;
   text-shadow: none !important;
+  font-weight: 700 !important;
+  letter-spacing: -1.5px !important;
 }
 [data-theme="light"] .vpn-balance-unit,
 html[data-theme="light"] .vpn-balance-unit {
