@@ -2591,4 +2591,53 @@ html[data-theme="light"] .card.vpn-card {
   --cardGlass: rgba(255, 255, 255, 0.45);
   --cardBorder: rgba(255, 255, 255, 0.68);
 }
+
+
+/* ═══════════════════════════════════════════════════════════════
+   DARK MODE — Liquid Nebula (mirrors Liquid Aurora)
+   Same accent-color lava lamp logic as light mode.
+   Canvas stays deep navy; blobs glow against darkness.
+   ═══════════════════════════════════════════════════════════════ */
+
+/* ── 1. DARK CANVAS ──────────────────────────────────────────── */
+html[data-theme="dark"],
+html:not([data-theme="light"]) {
+  background: #08101e !important;
+}
+
+/* ── 2. LAVA BLOBS — accent color, glow against dark ─────────── */
+html:not([data-theme="light"]) #astro-lava,
+html[data-theme="dark"] #astro-lava {
+  display: block !important;
+  filter: blur(72px) saturate(160%) !important;
+  opacity: 1 !important;
+}
+html:not([data-theme="light"]) .lava-blob-1,
+html[data-theme="dark"] .lava-blob-1 { background: rgba(var(--brandRgb), 0.58) !important; }
+html:not([data-theme="light"]) .lava-blob-2,
+html[data-theme="dark"] .lava-blob-2 { background: rgba(var(--brandRgb), 0.42) !important; }
+html:not([data-theme="light"]) .lava-blob-3,
+html[data-theme="dark"] .lava-blob-3 { background: rgba(var(--brandRgb), 0.30) !important; }
+html:not([data-theme="light"]) .lava-blob-4,
+html[data-theme="dark"] .lava-blob-4 { background: rgba(var(--brandRgb), 0.48) !important; }
+html:not([data-theme="light"]) .lava-blob-5,
+html[data-theme="dark"] .lava-blob-5 { background: rgba(var(--brandRgb), 0.24) !important; }
+
+/* ── 3. AMBIENT BODY WASH — dark accent corona ───────────────── */
+html[data-theme="dark"] body::before,
+html:not([data-theme="light"]) body::before {
+  background:
+    radial-gradient(52% 48% at 10% 15%,
+      rgba(var(--brandRgb), 0.22) 0%,
+      transparent 65%),
+    radial-gradient(48% 44% at 90% 85%,
+      rgba(var(--brandRgb), 0.16) 0%,
+      transparent 68%),
+    radial-gradient(42% 38% at 80% 10%,
+      rgba(var(--brandRgb), 0.14) 0%,
+      transparent 65%) !important;
+  filter: blur(50px) saturate(130%) !important;
+  opacity: 1 !important;
+  animation: ambientDrift 24s ease-in-out infinite alternate !important;
+}
 }

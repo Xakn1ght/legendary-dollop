@@ -199,11 +199,11 @@ html[data-theme="light"] {
   opacity: 0;
   transition: opacity 1.2s ease;
 }
-/* Dark mode — nebula: moody deep-space atmosphere */
+/* Dark mode — accent color glow against dark canvas */
 :root #astro-lava,
 [data-theme="dark"] #astro-lava {
   opacity: 1;
-  filter: blur(85px) saturate(115%);
+  filter: blur(72px) saturate(160%);
 }
 /* Light mode — Liquid Aurora: vivid 5-color lava lamp, less blur so blobs show clearly */
 [data-theme="light"] #astro-lava {
@@ -233,26 +233,26 @@ html[data-theme="light"] {
   background: rgba(var(--brandRgb), 0.35);
 }
 
-/* --- DARK MODE blobs (deep-space nebula — visible but not harsh) --- */
+/* --- DARK MODE blobs (accent color, glowing against dark canvas) --- */
 :root .lava-blob-1,
 [data-theme="dark"] .lava-blob-1 {
-  background: rgba(var(--brandRgb), 0.36);
+  background: rgba(var(--brandRgb), 0.58);
 }
 :root .lava-blob-2,
 [data-theme="dark"] .lava-blob-2 {
-  background: rgba(34, 211, 238, 0.30);
+  background: rgba(var(--brandRgb), 0.42);
 }
 :root .lava-blob-3,
 [data-theme="dark"] .lava-blob-3 {
-  background: rgba(139, 92, 246, 0.28);
+  background: rgba(var(--brandRgb), 0.30);
 }
 :root .lava-blob-4,
 [data-theme="dark"] .lava-blob-4 {
-  background: rgba(16, 185, 129, 0.24);
+  background: rgba(var(--brandRgb), 0.48);
 }
 :root .lava-blob-5,
 [data-theme="dark"] .lava-blob-5 {
-  background: rgba(56, 120, 200, 0.30);
+  background: rgba(var(--brandRgb), 0.24);
 }
 
 /* --- SHARED blob sizes & positions & animations --- */
