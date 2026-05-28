@@ -169,7 +169,7 @@ html[data-theme] body {
   background: transparent;
 }
 html[data-theme="light"] {
-  background: #c8d6f8;
+  background: #8fa8d8;
 }
 
 /* Profile section glass — only where tokens.css applies */
