@@ -79,40 +79,41 @@
 }
 
 /* ============================================================
-   LIGHT THEME
+   LIGHT THEME — Liquid Aurora
+   Canvas: periwinkle · Glass: translucent white · Text: deep navy
    ============================================================ */
 [data-theme="light"] {
-  --bg-base:    rgba(255,255,255,0.22);
-  --bg-elev-1:  rgba(255,255,255,0.28);
-  --bg-elev-2:  rgba(255,255,255,0.18);
-  --bg-elev-3:  rgba(255,255,255,0.12);
-  --surface-overlay: rgba(255,255,255,0.55);
+  --bg-base:    rgba(220, 232, 255, 0.28);
+  --bg-elev-1:  rgba(255, 255, 255, 0.54);
+  --bg-elev-2:  rgba(255, 255, 255, 0.42);
+  --bg-elev-3:  rgba(255, 255, 255, 0.30);
+  --surface-overlay: rgba(255, 255, 255, 0.72);
 
-  --text:       #1a2535;
-  --text-muted: #556070;
-  --text-soft:  #344056;
+  --text:       #0d1b2e;
+  --text-muted: #3e5570;
+  --text-soft:  #1e3450;
 
-  --line:        rgba(255,255,255,0.42);
-  --line-strong: rgba(255,255,255,0.65);
-  --divider:     rgba(255,255,255,0.30);
+  --line:        rgba(255, 255, 255, 0.58);
+  --line-strong: rgba(255, 255, 255, 0.82);
+  --divider:     rgba(255, 255, 255, 0.40);
 
-  --shadow-1: 0 2px 8px rgba(15,23,42,0.08);
-  --shadow-2: 0 8px 24px rgba(15,23,42,0.10), 0 2px 8px rgba(15,23,42,0.06);
-  --shadow-3: 0 20px 48px rgba(15,23,42,0.14), 0 6px 16px rgba(15,23,42,0.08);
+  --shadow-1: 0 2px 10px rgba(14, 26, 60, 0.10);
+  --shadow-2: 0 8px 28px rgba(14, 26, 60, 0.14), 0 2px 8px rgba(14, 26, 60, 0.07);
+  --shadow-3: 0 20px 52px rgba(14, 26, 60, 0.18), 0 6px 16px rgba(14, 26, 60, 0.09);
 
-  --ok:   #10b981;
-  --warn: #f59e0b;
-  --bad:  #ef4444;
-  --okRgb: 16, 185, 129;
+  --ok:   #059669;
+  --warn: #d97706;
+  --bad:  #dc2626;
+  --okRgb: 5, 150, 105;
 
-  --purple: #8b5cf6;
-  --blue:   #3b82f6;
+  --purple: #7c3aed;
+  --blue:   #2563eb;
 
   --transition-gradient: radial-gradient(
     circle at center,
-    rgba(255, 255, 255, 0.50) 0%,
-    rgba(var(--brandRgb), 0.18) 38%,
-    rgba(244, 246, 251, 0.95) 100%
+    rgba(255, 255, 255, 0.65) 0%,
+    rgba(var(--brandRgb), 0.22) 38%,
+    rgba(200, 216, 248, 0.95) 100%
   );
 }
 
@@ -168,7 +169,7 @@ html[data-theme] body {
   background: transparent;
 }
 html[data-theme="light"] {
-  background: #d4dff0;
+  background: #c8d6f8;
 }
 
 /* Profile section glass — only where tokens.css applies */
@@ -204,10 +205,10 @@ html[data-theme="light"] {
   opacity: 1;
   filter: blur(85px) saturate(115%);
 }
-/* Light mode — watercolor: soft drifting pastel washes */
+/* Light mode — Liquid Aurora: vivid 5-color lava lamp, less blur so blobs show clearly */
 [data-theme="light"] #astro-lava {
   opacity: 1;
-  filter: blur(105px) saturate(88%);
+  filter: blur(68px) saturate(155%);
 }
 .lava-blob {
   position: absolute;
@@ -215,21 +216,21 @@ html[data-theme="light"] {
   will-change: transform;
 }
 
-/* --- LIGHT MODE blobs (watercolor palette — warm rose, lavender, sky, mint, peach) --- */
+/* --- LIGHT MODE blobs (aurora palette — vivid rose, violet, sky, aqua, amber) --- */
 [data-theme="light"] .lava-blob-1 {
-  background: rgba(255, 168, 180, 0.48);  /* soft rose / blush */
+  background: rgba(249, 115, 148, 0.78);  /* vivid rose-coral */
 }
 [data-theme="light"] .lava-blob-2 {
-  background: rgba(180, 160, 255, 0.42);  /* soft lavender */
+  background: rgba(147, 112, 255, 0.72);  /* rich violet */
 }
 [data-theme="light"] .lava-blob-3 {
-  background: rgba(130, 200, 255, 0.44);  /* soft sky blue */
+  background: rgba(56,  182, 255, 0.75);  /* vivid sky blue */
 }
 [data-theme="light"] .lava-blob-4 {
-  background: rgba(140, 230, 200, 0.38);  /* soft mint / aqua */
+  background: rgba(52,  211, 170, 0.65);  /* aquamarine */
 }
 [data-theme="light"] .lava-blob-5 {
-  background: rgba(255, 210, 170, 0.40);  /* warm peach */
+  background: rgba(251, 191,  36, 0.68);  /* warm amber */
 }
 
 /* --- DARK MODE blobs (deep-space nebula — visible but not harsh) --- */
