@@ -2031,29 +2031,29 @@ html[data-theme="light"] {
     inset 0 2px 0 rgba(255, 255, 255, 1);
 }
 
-/* ── 3. LAVA BLOBS — vivid, alive ────────────────────────────── */
+/* ── 3. LAVA BLOBS — accent color only, different opacities ─── */
 [data-theme="light"] #astro-lava {
   display: block !important;
-  filter: blur(68px) saturate(155%) !important;
+  filter: blur(72px) saturate(160%) !important;
   opacity: 1 !important;
 }
-[data-theme="light"] .lava-blob-1 { background: rgba(249, 115, 148, 0.78) !important; }
-[data-theme="light"] .lava-blob-2 { background: rgba(147, 112, 255, 0.72) !important; }
-[data-theme="light"] .lava-blob-3 { background: rgba(56,  182, 255, 0.75) !important; }
-[data-theme="light"] .lava-blob-4 { background: rgba(52,  211, 170, 0.65) !important; }
-[data-theme="light"] .lava-blob-5 { background: rgba(251, 191,  36, 0.68) !important; }
+[data-theme="light"] .lava-blob-1 { background: rgba(var(--brandRgb), 0.72) !important; }
+[data-theme="light"] .lava-blob-2 { background: rgba(var(--brandRgb), 0.52) !important; }
+[data-theme="light"] .lava-blob-3 { background: rgba(var(--brandRgb), 0.42) !important; }
+[data-theme="light"] .lava-blob-4 { background: rgba(var(--brandRgb), 0.62) !important; }
+[data-theme="light"] .lava-blob-5 { background: rgba(var(--brandRgb), 0.35) !important; }
 
-/* ── 4. AMBIENT BODY WASH — aurora corona ────────────────────── */
+/* ── 4. AMBIENT BODY WASH — accent-tinted corona ─────────────── */
 html[data-theme="light"] body::before {
   background:
     radial-gradient(52% 48% at 10% 15%,
-      rgba(249, 115, 148, 0.40) 0%,
+      rgba(var(--brandRgb), 0.32) 0%,
       transparent 65%),
     radial-gradient(48% 44% at 90% 85%,
-      rgba(147, 112, 255, 0.34) 0%,
+      rgba(var(--brandRgb), 0.24) 0%,
       transparent 68%),
     radial-gradient(42% 38% at 80% 10%,
-      rgba(56, 182, 255, 0.32) 0%,
+      rgba(var(--brandRgb), 0.20) 0%,
       transparent 65%) !important;
   filter: blur(50px) saturate(130%) !important;
   opacity: 1 !important;
@@ -2464,41 +2464,73 @@ html[data-theme="light"] .card.vpn-card {
 
 /* shop plan cards */
 [data-theme="light"] .shop-plan-card {
-  background: rgba(255, 255, 255, 0.42) !important;
+  background: rgba(255, 255, 255, 0.44) !important;
   backdrop-filter: blur(18px) saturate(180%) !important;
   -webkit-backdrop-filter: blur(18px) saturate(180%) !important;
-  border: 1px solid rgba(255, 255, 255, 0.65) !important;
+  border: 1px solid rgba(255, 255, 255, 0.58) !important;
+  border-top-color: rgba(255, 255, 255, 0.88) !important;
   box-shadow:
-    0 4px 18px rgba(20, 40, 100, 0.09),
-    inset 0 1.5px 0 rgba(255, 255, 255, 0.95) !important;
+    0 4px 18px rgba(20, 40, 100, 0.08),
+    inset 0 1px 0 rgba(255, 255, 255, 0.90) !important;
   color: #0d1b2e !important;
+}
+/* keep the left accent bar, but make sure it's sharp and clean */
+[data-theme="light"] .shop-plan-card::before {
+  background: linear-gradient(
+    180deg,
+    rgba(var(--brandRgb), 0.80) 0%,
+    rgba(var(--brandRgb), 0.15) 100%
+  ) !important;
+  opacity: 0.90 !important;
 }
 
-/* shop tabs and chips */
+/* shop tabs container */
 [data-theme="light"] .shop-tabs {
-  background: rgba(255, 255, 255, 0.45) !important;
+  background: rgba(255, 255, 255, 0.42) !important;
   backdrop-filter: blur(16px) !important;
   -webkit-backdrop-filter: blur(16px) !important;
-  border: 1px solid rgba(255, 255, 255, 0.68) !important;
+  border: 1px solid rgba(255, 255, 255, 0.62) !important;
 }
+/* shop filter chips (حداقل گیگ, حداکثر قیمت, etc.) */
 [data-theme="light"] .shop-chip {
   background: rgba(255, 255, 255, 0.50) !important;
-  border: 1px solid rgba(255, 255, 255, 0.72) !important;
-  backdrop-filter: blur(14px) !important;
-  -webkit-backdrop-filter: blur(14px) !important;
+  border: 1px solid rgba(255, 255, 255, 0.70) !important;
+  backdrop-filter: blur(12px) !important;
+  -webkit-backdrop-filter: blur(12px) !important;
+  color: #0d1b2e !important;
 }
-[data-theme="light"] .shop-input {
-  background: rgba(255, 255, 255, 0.60) !important;
-  border: 1px solid rgba(255, 255, 255, 0.82) !important;
+/* shop sort pills */
+[data-theme="light"] .shop-sort-pills {
+  background: rgba(255, 255, 255, 0.38) !important;
+  border: 1px solid rgba(255, 255, 255, 0.58) !important;
+  backdrop-filter: blur(12px) !important;
+  -webkit-backdrop-filter: blur(12px) !important;
+}
+[data-theme="light"] .shop-sort-pill {
+  color: #0d1b2e !important;
+}
+[data-theme="light"] .shop-sort-pill.active {
+  background: rgba(var(--brandRgb), 0.12) !important;
+  color: rgb(var(--brandRgb)) !important;
+  border-color: rgba(var(--brandRgb), 0.30) !important;
+}
+/* search input */
+[data-theme="light"] .shop-input,
+[data-theme="light"] .shop-field {
+  background: rgba(255, 255, 255, 0.58) !important;
+  border: 1px solid rgba(255, 255, 255, 0.78) !important;
+  border-top-color: rgba(255, 255, 255, 0.96) !important;
   backdrop-filter: blur(14px) !important;
   -webkit-backdrop-filter: blur(14px) !important;
   color: #0d1b2e !important;
 }
+/* charge cards */
 [data-theme="light"] .shop-charge-card {
-  background: rgba(255, 255, 255, 0.42) !important;
+  background: rgba(255, 255, 255, 0.44) !important;
   backdrop-filter: blur(18px) saturate(180%) !important;
   -webkit-backdrop-filter: blur(18px) saturate(180%) !important;
-  border: 1px solid rgba(255, 255, 255, 0.65) !important;
+  border: 1px solid rgba(255, 255, 255, 0.62) !important;
+  border-top-color: rgba(255, 255, 255, 0.90) !important;
 }
 
 /* profile hero */

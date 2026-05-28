@@ -216,21 +216,21 @@ html[data-theme="light"] {
   will-change: transform;
 }
 
-/* --- LIGHT MODE blobs (aurora palette — vivid rose, violet, sky, aqua, amber) --- */
+/* --- LIGHT MODE blobs (accent color, 5 opacity levels for depth) --- */
 [data-theme="light"] .lava-blob-1 {
-  background: rgba(249, 115, 148, 0.78);  /* vivid rose-coral */
+  background: rgba(var(--brandRgb), 0.72);
 }
 [data-theme="light"] .lava-blob-2 {
-  background: rgba(147, 112, 255, 0.72);  /* rich violet */
+  background: rgba(var(--brandRgb), 0.52);
 }
 [data-theme="light"] .lava-blob-3 {
-  background: rgba(56,  182, 255, 0.75);  /* vivid sky blue */
+  background: rgba(var(--brandRgb), 0.42);
 }
 [data-theme="light"] .lava-blob-4 {
-  background: rgba(52,  211, 170, 0.65);  /* aquamarine */
+  background: rgba(var(--brandRgb), 0.62);
 }
 [data-theme="light"] .lava-blob-5 {
-  background: rgba(251, 191,  36, 0.68);  /* warm amber */
+  background: rgba(var(--brandRgb), 0.35);
 }
 
 /* --- DARK MODE blobs (deep-space nebula — visible but not harsh) --- */
