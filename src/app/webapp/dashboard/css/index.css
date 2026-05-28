@@ -1053,9 +1053,6 @@
     [data-theme="light"] .nav-container{
       padding:0 8px;
     }
-    .nav-bubble{
-      display:none; /* Not used in notch design */
-    }
     @keyframes gentleRotate{
       0%{filter:hue-rotate(0deg) brightness(1) saturate(100%);}
       33%{filter:hue-rotate(3deg) brightness(1.08) saturate(110%);}
@@ -1064,23 +1061,6 @@
     }
     [data-theme="light"] .nav-item-notch{
       animation:notchFloat 3s ease-in-out infinite;
-    }
-    .nav-bubble-center{
-      display:none; /* Not used in notch design */
-    }
-    @keyframes subtlePulse{
-      0%, 100%{
-        opacity:0.7;
-        transform:translate(-50%, -50%) scale(1);
-      }
-      50%{
-        opacity:0.95;
-        transform:translate(-50%, -50%) scale(1.15);
-      }
-    }
-    .nav-bubble::before,
-    .nav-bubble::after{
-      display:none; /* Not used in notch design */
     }
     @keyframes pulseRing{
       0%, 100%{
@@ -1092,90 +1072,6 @@
         transform:translate(-50%, -50%) scale(1.08);
       }
     }
-    .nav-bubble.moving{
-      display:none; /* Not used in notch design */
-    }
-    @keyframes squashStretch{
-      0%{
-        transform:scale(1, 1) translateY(0);
-        filter:brightness(1);
-      }
-      15%{
-        transform:scale(1.15, 0.88) translateY(-2px);
-        filter:brightness(1.15);
-      }
-      35%{
-        transform:scale(0.88, 1.12) translateY(1px);
-        filter:brightness(1.08);
-      }
-      55%{
-        transform:scale(1.08, 0.92) translateY(-1px);
-        filter:brightness(1.05);
-      }
-      75%{
-        transform:scale(0.96, 1.04) translateY(0.5px);
-        filter:brightness(1.02);
-      }
-      100%{
-        transform:scale(1, 1) translateY(0);
-        filter:brightness(1);
-      }
-    }
-    .nav-bubble-particles{
-      display:none;
-    }
-    .nav-particle{
-      display:none;
-    }
-    .nav-particle:nth-child(1){left:50%; top:50%; animation-delay:0s;}
-    .nav-particle:nth-child(2){left:50%; top:50%; animation-delay:0.02s;}
-    .nav-particle:nth-child(3){left:50%; top:50%; animation-delay:0.04s;}
-    .nav-particle:nth-child(4){left:50%; top:50%; animation-delay:0.06s;}
-    .nav-particle:nth-child(5){left:50%; top:50%; animation-delay:0.01s;}
-    .nav-particle:nth-child(6){left:50%; top:50%; animation-delay:0.03s;}
-    .nav-particle:nth-child(7){left:50%; top:50%; animation-delay:0.05s;}
-    .nav-particle:nth-child(8){left:50%; top:50%; animation-delay:0.07s;}
-    @keyframes particleBurst{
-      0%{
-        opacity:1;
-        transform:translate(-50%, -50%) scale(1);
-      }
-      100%{
-        opacity:0;
-      }
-    }
-    .nav-bubble.moving ~ .nav-bubble-particles .nav-particle:nth-child(1){
-      animation:particle1 0.6s ease-out forwards;
-    }
-    .nav-bubble.moving ~ .nav-bubble-particles .nav-particle:nth-child(2){
-      animation:particle2 0.6s ease-out forwards;
-    }
-    .nav-bubble.moving ~ .nav-bubble-particles .nav-particle:nth-child(3){
-      animation:particle3 0.6s ease-out forwards;
-    }
-    .nav-bubble.moving ~ .nav-bubble-particles .nav-particle:nth-child(4){
-      animation:particle4 0.6s ease-out forwards;
-    }
-    .nav-bubble.moving ~ .nav-bubble-particles .nav-particle:nth-child(5){
-      animation:particle5 0.6s ease-out forwards;
-    }
-    .nav-bubble.moving ~ .nav-bubble-particles .nav-particle:nth-child(6){
-      animation:particle6 0.6s ease-out forwards;
-    }
-    .nav-bubble.moving ~ .nav-bubble-particles .nav-particle:nth-child(7){
-      animation:particle7 0.6s ease-out forwards;
-    }
-    .nav-bubble.moving ~ .nav-bubble-particles .nav-particle:nth-child(8){
-      animation:particle8 0.6s ease-out forwards;
-    }
-    @keyframes particle1{0%{opacity:1;transform:translate(-50%,-50%) scale(0.5)}50%{opacity:0.8;transform:translate(-50%,-50%) translate(18px,0) scale(1.2)}100%{opacity:0;transform:translate(-50%,-50%) translate(35px,0) scale(0.3)}}
-    @keyframes particle2{0%{opacity:1;transform:translate(-50%,-50%) scale(0.5)}50%{opacity:0.8;transform:translate(-50%,-50%) translate(13px,-13px) scale(1.2)}100%{opacity:0;transform:translate(-50%,-50%) translate(25px,-25px) scale(0.3)}}
-    @keyframes particle3{0%{opacity:1;transform:translate(-50%,-50%) scale(0.5)}50%{opacity:0.8;transform:translate(-50%,-50%) translate(0,-18px) scale(1.2)}100%{opacity:0;transform:translate(-50%,-50%) translate(0,-35px) scale(0.3)}}
-    @keyframes particle4{0%{opacity:1;transform:translate(-50%,-50%) scale(0.5)}50%{opacity:0.8;transform:translate(-50%,-50%) translate(-13px,-13px) scale(1.2)}100%{opacity:0;transform:translate(-50%,-50%) translate(-25px,-25px) scale(0.3)}}
-    @keyframes particle5{0%{opacity:1;transform:translate(-50%,-50%) scale(0.5)}50%{opacity:0.8;transform:translate(-50%,-50%) translate(-18px,0) scale(1.2)}100%{opacity:0;transform:translate(-50%,-50%) translate(-35px,0) scale(0.3)}}
-    @keyframes particle6{0%{opacity:1;transform:translate(-50%,-50%) scale(0.5)}50%{opacity:0.8;transform:translate(-50%,-50%) translate(-13px,13px) scale(1.2)}100%{opacity:0;transform:translate(-50%,-50%) translate(-25px,25px) scale(0.3)}}
-    @keyframes particle7{0%{opacity:1;transform:translate(-50%,-50%) scale(0.5)}50%{opacity:0.8;transform:translate(-50%,-50%) translate(0,18px) scale(1.2)}100%{opacity:0;transform:translate(-50%,-50%) translate(0,35px) scale(0.3)}}
-    @keyframes particle8{0%{opacity:1;transform:translate(-50%,-50%) scale(0.5)}50%{opacity:0.8;transform:translate(-50%,-50%) translate(13px,13px) scale(1.2)}100%{opacity:0;transform:translate(-50%,-50%) translate(25px,25px) scale(0.3)}}
     .nav-item{
       position:relative;
       display:flex;
@@ -1404,15 +1300,12 @@
     }
     @media (prefers-reduced-motion: reduce){
       .page-transition-layer{display:none !important;}
-      .nav-bubble,
       .nav-item,
       .nav-item::before,
       .nav-item-icon,
       .nav-item-icon svg,
       .nav-item-label,
-      .bottom-nav,
-      .nav-bubble-center,
-      .nav-bubble-particles .nav-particle{
+      .bottom-nav{
         transition:none !important;
         animation:none !important;
       }
