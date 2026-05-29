@@ -3,6 +3,9 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
+  <meta http-equiv="Pragma" content="no-cache" />
+  <meta http-equiv="Expires" content="0" />
   <title>AstroByte Arcade</title>
   <script src="https://telegram.org/js/telegram-web-app.js"></script>
   <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700;800&display=swap" rel="stylesheet">
@@ -713,8 +716,13 @@
           if(data.played_today){
             localStorage.setItem('astro_last_played_date', today);
             setPlayedState(true);
+          } else {
+            // Server says the user can play (e.g. an admin reset the daily limit).
+            // Clear the stale optimistic lock so the button actually unlocks.
+            localStorage.removeItem('astro_last_played_date');
+            setPlayedState(false);
           }
-          
+
           // Load display name from server (synced across devices)
           const input = document.getElementById('pilotName');
           if(data.display_name && input){
@@ -818,7 +826,7 @@
       }
       
       // Navigate
-      let url = '/webapp/arcade/astrobugz/index.html?practice=0';
+      let url = '/webapp/arcade/astrobugz2/index.html?practice=0';
       const urlParams = new URLSearchParams(window.location.search);
       const auth = urlParams.get('auth');
       if (auth) url += '&auth=' + encodeURIComponent(auth);

@@ -1,6 +1,7 @@
 """Import game route callables for registration."""
 
 from app.api.routes.game import (
+    handle_arcade_game2_index,
     handle_arcade_game_index,
     handle_arcade_status,
     handle_arcade_submit,
@@ -12,6 +13,7 @@ from app.api.routes.game import (
 )
 
 __all__ = [
+    "handle_arcade_game2_index",
     "handle_arcade_game_index",
     "handle_arcade_status",
     "handle_arcade_submit",

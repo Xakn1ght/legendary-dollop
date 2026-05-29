@@ -1,5 +1,9 @@
 from .common import *  # noqa: F403
 
+# `from .common import *` skips underscore-prefixed names, so import explicitly
+# (otherwise these handlers 500 with NameError on _verify_webapp_auth).
+from app.api.deps import _extract_user_id_from_init, _verify_webapp_auth  # noqa: E402
+
 
 async def handle_arcade_status(request: web.Request):
     """Return user's arcade game status - can they play today, best score, etc."""

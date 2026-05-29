@@ -7,6 +7,7 @@ from aiohttp import web
 from app.core.settings import GAME_SUBMIT_API_PATH, GAME_WEBAPP_BASE_PATH
 
 from .handlers import (
+    handle_arcade_game2_index,
     handle_arcade_game_index,
     handle_arcade_status,
     handle_arcade_submit,
@@ -21,6 +22,7 @@ from .handlers import (
 def register_game_routes(app: web.Application, wd: Path) -> None:
     app.router.add_get(GAME_WEBAPP_BASE_PATH, handle_index)
     app.router.add_get(GAME_WEBAPP_BASE_PATH + "/astrobugz/index.html", handle_arcade_game_index)
+    app.router.add_get(GAME_WEBAPP_BASE_PATH + "/astrobugz2/index.html", handle_arcade_game2_index)
     app.router.add_static(GAME_WEBAPP_BASE_PATH + "/", path=str(wd / "arcade"), name="arcade_static")
     app.router.add_post(GAME_SUBMIT_API_PATH, handle_submit)
     app.router.add_post("/api/arcade/submit", handle_arcade_submit)

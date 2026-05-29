@@ -3,7 +3,11 @@
 from app.api.routes.game.arcade_submit import handle_arcade_submit
 from app.api.routes.game.leaderboard import handle_leaderboard
 from app.api.routes.game.legacy_submit import handle_submit
-from app.api.routes.game.pages import handle_arcade_game_index, handle_index
+from app.api.routes.game.pages import (
+    handle_arcade_game2_index,
+    handle_arcade_game_index,
+    handle_index,
+)
 from app.api.routes.game.profile import (
     handle_arcade_status,
     handle_save_display_name,
@@ -11,6 +15,7 @@ from app.api.routes.game.profile import (
 )
 
 __all__ = [
+    "handle_arcade_game2_index",
     "handle_arcade_game_index",
     "handle_arcade_status",
     "handle_arcade_submit",
