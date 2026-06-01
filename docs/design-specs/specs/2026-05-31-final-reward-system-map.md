@@ -89,23 +89,26 @@ no cashout). Dedup `star_season:{season}:milestone:{n}:user:{id}`.
 Optional: tiny 1★ "First Referral" badge for instant gratification. Top tiers
 (40/50) are aspirational whale prizes — rarely paid, great for hype.
 
-**Recommended pack contents (2026-06-01).** These reward users who brought ~3.6M /
-4.5M in referral revenue, so real cost is tiny (one renewal + cosmetics):
+**Seasonal Star Packs — finalized 2026-06-01.** The 40★/50★ tiers are *seasonal
+trophies* (winnable each 90-day season). Cosmetics (badge/theme) are **kept forever**
+once earned; tangible items are one-time coupons. (Economic perks live in the
+permanent Promoter Tiers, §6 — not here.)
 
-*VIP Pack (40★):*
-- 1 free auto-renewal, ≤100GB / 35d (headline tangible value, one-time)
-- Permanent **VIP badge** + exclusive **VIP dashboard theme** (cosmetic, free)
+*40★ — Season Champion:*
+- Season Champion badge (kept) + exclusive dashboard theme (kept)
+- 1 free renewal coupon (≤100GB / 35d)
 - 30 days priority support
-- "VIP" flair on the leaderboard
-- One-time **+20GB bonus** on their next purchase
+- Season crown on the leaderboard
 
-*Legend Pack (50★) — strictly better, max prestige:*
-- 1 free auto-renewal, ≤100GB / 35d
+*50★ — Season Legend:*
+- Animated Legend theme (kept) + Season Legend badge (kept)
+- 1 free renewal coupon (≤100GB / 35d)
 - **+100GB bonus traffic** coupon
-- Rare **Legend badge** + animated **Legend theme** (prestige cosmetic)
-- 60 days priority support + top leaderboard flair
-- **Custom username/color** unlock + early access to new servers/features
-- (Recurring perks like a standing discount intentionally avoided — keep cost one-time)
+- 60 days priority support
+- Top season crown on the leaderboard
+
+Naming avoids collision with permanent tiers: Seasonal = *Champion / Legend*;
+Permanent = *VIP Promoter / Elite Partner* (§6).
 
 ## 4. Cashback (loyalty to payers)
 After every 5 eligible purchases: GB-keyed rate {20:7.7%,40:9%,60:10%,100:12%} of
@@ -132,12 +135,25 @@ Marketing actions (join channel, share to story, enable DMs) additionally grant 
 (you can only join once). Reuse XP infra but **neuter the old `LEVEL_REWARDS` credit**
 (see §8). Cosmetics unlock directly at levels — no coin economy needed yet.
 
-## 6. VIP Promoter Cashout (gated real money)
-20+ active referrals (referred bought ≥20GB) + account ≥30d + no abuse + manual
-approval. 5% of eligible referral revenue → pending → monthly admin-approved payout.
-Min 100k, max 1M/mo, 7-day hold, ignore refunded/cancelled/self. Stars/coupons NEVER
-convert to cash. New tables: `vip_cashout_transactions`, pending-balance.
-⚠️ Reconcile with existing `repos/cashout.py` — restrict it to this gated path only.
+## 6. Permanent Promoter Tiers (lifetime active referrals — never reset)
+The *career* ladder, separate from seasonal packs. Based on lifetime **active
+referrals** (referred user bought a ≥20GB plan). Persistent status + economic perks.
+Finalized 2026-06-01.
+
+| Active refs | Tier | Perks |
+|---|---|---|
+| 20 | **VIP Promoter** | cash-out unlocked (5%) · referral **credit** cut 10%→**12%** · permanent VIP badge · public Top-Promoter board |
+| 50 | **Elite Partner** | referral **credit** cut 12%→**15%** · higher cash-out cap · permanent crown + #1 board · direct support line · early access to new servers |
+
+**Referral cut applies to the store-credit choice only** (revenue-funded — you only
+pay the higher % on real sales they bring). **Cash-out stays flat 5%** at both tiers
+(real money out → kept low). Cut: normal 10% → VIP 12% → Elite 15%.
+
+**Cash-out mechanics:** account ≥30d + no abuse + manual approval. Eligible referral
+revenue → pending balance → monthly admin-approved payout. Min 100k, base max 1M/mo
+(higher for Elite), 7-day hold, ignore refunded/cancelled/self. **Stars/coupons NEVER
+convert to cash.** New tables: `vip_cashout_transactions`, pending-balance.
+⚠️ Reconcile existing `repos/cashout.py` — restrict to this gated path only.
 
 ## 7. Deferred (explicitly NOT now)
 - **Coins + mini-shop** (digital cosmetics for coins) — design later; the level
