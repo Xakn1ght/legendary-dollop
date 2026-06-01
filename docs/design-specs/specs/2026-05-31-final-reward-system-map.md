@@ -39,21 +39,23 @@ Plans: 20→90k · 40→180k · 60→250k · 100→400k, **35 days**. Delete jun
 Custom GB (aligned curve hitting all anchors): 5000/GB(1–10) → 4000(10–20) →
 4500(20–40) → 3500(40–60) → 3750(60–100) → 4000(100+). Range 1–300GB.
 
-**Custom days (Boom+ style).** Two dials: GB (quota = the cost driver) and days
-(validity window = cheap to provide, but affects rebuy frequency). Formula keeps 35
-days as the anchor so base plans stay the sweet spot:
+**Custom days (Boom+ style). Decided 2026-06-01: protective 0.7 split, min 15 days.**
+Two dials: GB (quota = the cost driver) and days (validity window = cheap to provide,
+but affects rebuy frequency). 35 days is the anchor so base plans stay the sweet spot:
 ```python
-DAYS_MIN, DAYS_MAX = 7, 90
+DAYS_MIN, DAYS_MAX = 15, 90               # no sub-15-day plans (anti-farm)
 def custom_price(gb, days):
-    factor = 0.6 + 0.4 * (days / 35)        # 35d → ×1.0 ; tunable split
+    factor = 0.7 + 0.3 * (days / 35)      # 35d → ×1.0 ; protective split
     return round_price(custom_gb_price(gb) * factor)
 ```
-Why this is beneficial: the 0.6 base means GB-quota cost is mostly fixed regardless
-of window, the 0.4 scales with time. So **short plans get only a small discount**
-(7d ≈ ×0.68 — protects rebuy revenue, keeps 35d attractive) while **longer plans add
-real revenue** (70d ≈ ×1.4) with a modest per-day discount that rewards commitment.
-Examples: 100GB/35d=400k · 100GB/70d=560k · 100GB/7d=272k · 50GB/60d≈276k.
-The 0.6/0.4 split is the revenue knob (raise base → days matter less).
+Protective 0.7 base = short windows barely cheaper, pushing users toward ~35 days and
+protecting rebuy revenue; longer windows still add absolute revenue.
+Examples: 100GB/35d=400k · 100GB/15d≈331k · 100GB/90d≈589k · 50GB/60d≈261k.
+
+**Anti-farm rule (required):** cashback ("every 5 purchases") and referral stars
+("per purchase") must count by **spend / qualifying plan size, not raw purchase
+count** — otherwise cheap short plans could be spammed to farm milestones. Combined
+with the 15-day minimum, this closes the loophole.
 
 ## 2. Referral rewards — choose ONE per referred ≥20GB purchase
 | Choice | Value |
