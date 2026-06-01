@@ -34,10 +34,26 @@ is what makes the system un-farmable. (Decided 2026-05-31.)
 
 ---
 
-## 1. Pricing (carried from 2026-05-30)
+## 1. Pricing (carried from 2026-05-30) + custom days (new 2026-06-01)
 Plans: 20→90k · 40→180k · 60→250k · 100→400k, **35 days**. Delete junk plan.
 Custom GB (aligned curve hitting all anchors): 5000/GB(1–10) → 4000(10–20) →
 4500(20–40) → 3500(40–60) → 3750(60–100) → 4000(100+). Range 1–300GB.
+
+**Custom days (Boom+ style).** Two dials: GB (quota = the cost driver) and days
+(validity window = cheap to provide, but affects rebuy frequency). Formula keeps 35
+days as the anchor so base plans stay the sweet spot:
+```python
+DAYS_MIN, DAYS_MAX = 7, 90
+def custom_price(gb, days):
+    factor = 0.6 + 0.4 * (days / 35)        # 35d → ×1.0 ; tunable split
+    return round_price(custom_gb_price(gb) * factor)
+```
+Why this is beneficial: the 0.6 base means GB-quota cost is mostly fixed regardless
+of window, the 0.4 scales with time. So **short plans get only a small discount**
+(7d ≈ ×0.68 — protects rebuy revenue, keeps 35d attractive) while **longer plans add
+real revenue** (70d ≈ ×1.4) with a modest per-day discount that rewards commitment.
+Examples: 100GB/35d=400k · 100GB/70d=560k · 100GB/7d=272k · 50GB/60d≈276k.
+The 0.6/0.4 split is the revenue knob (raise base → days matter less).
 
 ## 2. Referral rewards — choose ONE per referred ≥20GB purchase
 | Choice | Value |
@@ -47,8 +63,10 @@ Custom GB (aligned curve hitting all anchors): 5000/GB(1–10) → 4000(10–20)
 | 10% of bought days | bonus days |
 | Stars | +1 (normal) / +2 (with reserved auto-renew); season stars |
 + **50 XP** to referrer regardless of choice. All revenue-funded. `referral_rewards`
-table + existing redeem/notify path. VIP Promoters (20+ active refs) also see a 5%
-**cashout** choice (see §6).
+table + existing redeem/notify path. **Locked (2026-06-01):** for non-VIP users the
+credit choice is **store credit — usable for direct VPN purchases only, never cash.**
+Real cash exists ONLY via the VIP Promoter path. VIP Promoters (20+ active refs) also
+see a 5% **cashout** choice (see §6).
 
 ## 3. Star Season → coupon ladder (referral-only, 90-day, resets)
 Stars come **only** from the referral star-choice. Seasonal; reset to 0 every 90
@@ -68,6 +86,24 @@ no cashout). Dedup `star_season:{season}:milestone:{n}:user:{id}`.
 | 50 | Legend Pack (renew+100GB+60d support+badge+theme) | ~4.5M | mostly cosmetic |
 Optional: tiny 1★ "First Referral" badge for instant gratification. Top tiers
 (40/50) are aspirational whale prizes — rarely paid, great for hype.
+
+**Recommended pack contents (2026-06-01).** These reward users who brought ~3.6M /
+4.5M in referral revenue, so real cost is tiny (one renewal + cosmetics):
+
+*VIP Pack (40★):*
+- 1 free auto-renewal, ≤100GB / 35d (headline tangible value, one-time)
+- Permanent **VIP badge** + exclusive **VIP dashboard theme** (cosmetic, free)
+- 30 days priority support
+- "VIP" flair on the leaderboard
+- One-time **+20GB bonus** on their next purchase
+
+*Legend Pack (50★) — strictly better, max prestige:*
+- 1 free auto-renewal, ≤100GB / 35d
+- **+100GB bonus traffic** coupon
+- Rare **Legend badge** + animated **Legend theme** (prestige cosmetic)
+- 60 days priority support + top leaderboard flair
+- **Custom username/color** unlock + early access to new servers/features
+- (Recurring perks like a standing discount intentionally avoided — keep cost one-time)
 
 ## 4. Cashback (loyalty to payers)
 After every 5 eligible purchases: GB-keyed rate {20:7.7%,40:9%,60:10%,100:12%} of
@@ -113,6 +149,10 @@ convert to cash. New tables: `vip_cashout_transactions`, pending-balance.
    #1 hole.) Levels keep XP thresholds; rewards become status.
 2. **Cut arcade credit** (`core/settings/web_game.py`): arcade gives **XP + score/
    leaderboard only — no credit**. (Was 100–4,000/play.)
+   - 🔖 **Open tab (Pasha, 2026-06-01):** keep the game able to *pay* later. Two
+     lanes: **digital/cosmetic** payouts (coins → themes/badges) are iron-rule-safe —
+     do anytime (Phase E). **Real** payouts (credit/GB) would break the iron rule and
+     reopen farming — only with a hard monthly cap + anti-farm design, decided later.
 3. **Lock cash-out** (`repos/cashout.py`) to the §6 VIP-promoter path only.
 4. **Re-rate / retire loyalty 1:1** — with coins deferred and play giving no money,
    loyalty_points lose their role; stop minting them from play, or convert remaining
