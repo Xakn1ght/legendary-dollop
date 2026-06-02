@@ -120,6 +120,21 @@ class _SeasonMixin:
         return unlocked
 
     @staticmethod
+    async def get_season_progress(db, user_id: int):
+        """Return (season, season_stars) for the user's active season (read-only-ish;
+        creates a season if none is active so the UI always has a window to show)."""
+        from app.database.repos.reward import RewardRepository as _RR
+
+        season = await _RR.get_or_create_active_season(db)
+        prog = (await db.execute(
+            select(UserStarProgress).filter(
+                UserStarProgress.user_id == user_id,
+                UserStarProgress.season_id == season.id,
+            )
+        )).scalars().first()
+        return season, (prog.season_stars if prog else 0)
+
+    @staticmethod
     async def get_active_coupons(db, user_id: int):
         """Active, non-expired coupons in the user's wallet (also lazily expires stale ones)."""
         now = datetime.datetime.utcnow()

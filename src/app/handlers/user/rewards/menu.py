@@ -5,12 +5,13 @@ from aiogram.exceptions import TelegramBadRequest
 from aiogram.types import CallbackQuery, InlineKeyboardButton, InlineKeyboardMarkup, Message
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.rewards_config import STAR_SEASON_MILESTONES
 from app.database.crud import (
+    get_active_coupons,
     get_active_user_discounts,
-    get_all_star_reward_tiers,
+    get_season_progress,
     get_unspent_rewards_by_referrer,
     get_user,
-    get_user_unclaimed_rewards,
 )
 from app.utils.bot_i18n import get_cached_lang, normalize_lang, set_cached_lang, t, text_matches
 from app.utils.text_format import to_persian_digits
@@ -48,28 +49,27 @@ async def show_enhanced_rewards_menu(target, session: AsyncSession):
 
     # Wallet snapshot
     credit = user.credit or 0
-    stars = user.stars or 0
     vouchers = await get_unspent_rewards_by_referrer(session, user.id)
     discounts = await get_active_user_discounts(session, user.id)
-
-    # Dynamically determine the next star tier for progress display
-    tiers = await get_all_star_reward_tiers(session)
-    next_tier = next((t for t in sorted(tiers, key=lambda x: x.star_threshold) if t.star_threshold > stars), None)
 
     def fmt_num(n):
         return to_persian_digits(n) if lang == "fa" else str(n)
 
-    if next_tier:
+    # Season stars + next milestone (referral-only, resets each season).
+    _season, season_stars = await get_season_progress(session, user.id)
+    coupons = await get_active_coupons(session, user.id)
+    next_ms = next((m for m in sorted(STAR_SEASON_MILESTONES) if m > season_stars), None)
+    if next_ms:
         stars_line = (
-            f"⭐ <b>ستاره‌ها:</b> {fmt_num(stars)} / {fmt_num(next_tier.star_threshold)}\n"
+            f"⭐ <b>ستاره‌های فصل:</b> {fmt_num(season_stars)} / {fmt_num(next_ms)}\n"
             if lang == "fa"
-            else f"⭐ <b>Stars:</b> {fmt_num(stars)} / {fmt_num(next_tier.star_threshold)}\n"
+            else f"⭐ <b>Season stars:</b> {fmt_num(season_stars)} / {fmt_num(next_ms)}\n"
         )
     else:
         stars_line = (
-            f"⭐ <b>ستاره‌ها:</b> {fmt_num(stars)} (حداکثر سطح)\n"
+            f"⭐ <b>ستاره‌های فصل:</b> {fmt_num(season_stars)} (همه باز شد)\n"
             if lang == "fa"
-            else f"⭐ <b>Stars:</b> {fmt_num(stars)} (max)\n"
+            else f"⭐ <b>Season stars:</b> {fmt_num(season_stars)} (all unlocked)\n"
         )
 
     discount_line = "🏷️ <b>تخفیف‌های فعال:</b> ندارد" if lang == "fa" else "🏷️ <b>Active discounts:</b> none"
@@ -93,9 +93,6 @@ async def show_enhanced_rewards_menu(target, session: AsyncSession):
         except Exception:
             discount_line = f"🏷️ <b>تخفیف‌های فعال:</b> {len(discounts)} عدد" if lang == "fa" else f"🏷️ <b>Active discounts:</b> {len(discounts)}"
 
-    # Check unclaimed star rewards
-    unclaimed = await get_user_unclaimed_rewards(session, user.id)
-
     menu_text = (
         t(lang, "rewards_title")
         + "\n\n"
@@ -106,18 +103,17 @@ async def show_enhanced_rewards_menu(target, session: AsyncSession):
         )
         + stars_line
         + (
+        f"🎁 <b>کوپن‌های فعال:</b> {to_persian_digits(len(coupons))} عدد\n"
+            if lang == "fa"
+            else f"🎁 <b>Active coupons:</b> {len(coupons)}\n"
+        )
+        + (
         f"🎟️ <b>بن‌های استفاده‌نشده:</b> {to_persian_digits(len(vouchers))} عدد\n"
             if lang == "fa"
             else f"🎟️ <b>Unused vouchers:</b> {len(vouchers)}\n"
         )
         + f"{discount_line}\n"
     )
-    if unclaimed:
-        menu_text += (
-            f"🟢 جوایز ستاره‌ایِ قابل دریافت: {to_persian_digits(len(unclaimed))} — برای دریافت دکمه زیر را بزنید.\n"
-            if lang == "fa"
-            else f"🟢 Unclaimed star rewards: {len(unclaimed)} — tap the button below to claim.\n"
-        )
 
     keyboard = InlineKeyboardMarkup(
         inline_keyboard=[
@@ -127,8 +123,8 @@ async def show_enhanced_rewards_menu(target, session: AsyncSession):
                     callback_data="enhanced_wallet_rewards",
                 ),
                 InlineKeyboardButton(
-                    text=t(lang, "rewards_star_levels"),
-                    callback_data="show_star_levels",
+                    text=("🎁 کوپن‌های من" if lang == "fa" else "🎁 My coupons"),
+                    callback_data="show_season_coupons",
                 ),
             ],
             [
@@ -158,6 +154,69 @@ async def enhanced_rewards_menu_cmd(message: Message, session: AsyncSession):
 @router.callback_query(F.data == "enhanced_rewards_menu")
 async def enhanced_rewards_menu_cb(callback: CallbackQuery, session: AsyncSession):
     await show_enhanced_rewards_menu(callback, session)
+
+
+def _coupon_label(coupon, lang):
+    """Human-readable one-line label for a season coupon."""
+    import json
+    try:
+        p = json.loads(coupon.payload or "{}")
+    except Exception:
+        p = {}
+    ct = coupon.coupon_type
+    if ct == "discount_percent":
+        return (f"٪{_to_persian_digits(p.get('discount_percent', 0))} تخفیف" if lang == "fa"
+                else f"{p.get('discount_percent', 0)}% discount")
+    if ct == "free_gb":
+        return (f"{_to_persian_digits(p.get('gb', 0))}GB رایگان" if lang == "fa"
+                else f"{p.get('gb', 0)}GB free")
+    if ct == "free_plan":
+        return (f"پلن {_to_persian_digits(p.get('plan_gb', 0))}GB رایگان" if lang == "fa"
+                else f"Free {p.get('plan_gb', 0)}GB plan")
+    if ct == "free_autorenew":
+        return ("تمدید خودکار رایگان" if lang == "fa" else "Free auto-renewal")
+    if ct == "vip_pack":
+        return ("پک VIP فصلی" if lang == "fa" else "Season VIP Pack")
+    if ct == "legend_pack":
+        return ("پک افسانه فصلی" if lang == "fa" else "Season Legend Pack")
+    return ct
+
+
+@router.callback_query(F.data == "show_season_coupons")
+async def show_season_coupons(callback: CallbackQuery, session: AsyncSession):
+    """Coupon wallet: list the user's active (unlocked, unexpired) season coupons."""
+    user = await get_user(session, callback.from_user.id)
+    if not user:
+        await callback.answer()
+        return
+    lang = normalize_lang(getattr(user, "language", None))
+    coupons = await get_active_coupons(session, user.id)
+
+    title = "🎁 <b>کیف کوپن شما</b>" if lang == "fa" else "🎁 <b>Your coupon wallet</b>"
+    if not coupons:
+        body = ("\n\nهنوز کوپنی ندارید. با دعوت دوستان ستاره جمع کنید تا کوپن باز شود."
+                if lang == "fa" else "\n\nNo coupons yet. Earn season stars by referring friends to unlock them.")
+    else:
+        lines = []
+        for c in coupons:
+            exp = _format_jalali(c.expires_at) if lang == "fa" else (c.expires_at.strftime('%Y-%m-%d') if c.expires_at else "-")
+            star = _to_persian_digits(c.milestone_stars or 0) if lang == "fa" else (c.milestone_stars or 0)
+            if lang == "fa":
+                lines.append(f"• {_coupon_label(c, lang)} — ⭐{star} — تا {exp}")
+            else:
+                lines.append(f"• {_coupon_label(c, lang)} — ⭐{star} — exp {exp}")
+        body = "\n\n" + "\n".join(lines)
+        body += ("\n\nℹ️ هر کوپن فقط یک‌بار و روی یک خرید قابل استفاده است." if lang == "fa"
+                 else "\n\nℹ️ Each coupon is one-time, one per purchase.")
+
+    kb = InlineKeyboardMarkup(inline_keyboard=[[
+        InlineKeyboardButton(text=("⬅️ بازگشت" if lang == "fa" else "⬅️ Back"), callback_data="enhanced_rewards_menu"),
+    ]])
+    try:
+        await callback.message.edit_text(title + body, reply_markup=kb, parse_mode="HTML")
+    except TelegramBadRequest:
+        await callback.message.answer(title + body, reply_markup=kb, parse_mode="HTML")
+    await callback.answer()
 
 
 @router.callback_query(F.data == "enhanced_close")

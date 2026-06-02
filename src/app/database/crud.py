@@ -91,6 +91,7 @@ add_stars = RewardRepository.add_stars
 # permanent star/tier balance.
 add_season_stars = RewardRepository.add_season_stars
 get_or_create_active_season = RewardRepository.get_or_create_active_season
+get_season_progress = RewardRepository.get_season_progress
 get_active_coupons = RewardRepository.get_active_coupons
 end_active_season = RewardRepository.end_active_season
 reset_stars = RewardRepository.reset_stars
