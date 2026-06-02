@@ -32,6 +32,7 @@ from app.jobs.enhanced_rewards import reminder_unclaimed_star_rewards_job, updat
 from app.jobs.expire_claims import expire_star_reward_claims_job
 from app.jobs.notifications import check_low_data_job
 from app.jobs.renewal import renewal_job
+from app.jobs.season_reset import season_reset_job
 from app.services.marzban import marzban_api
 from app.utils.banned_user_middleware import BannedUserMiddleware
 from app.utils.error_middleware import (
@@ -300,6 +301,7 @@ async def main():
         (expire_star_reward_claims_job, 'expire_claims_job'),
         (reminder_unclaimed_star_rewards_job, 'reminder_unclaimed_star_rewards_job'),
         (cleanup_draft_orders_job, 'cleanup_draft_orders_job'),
+        (season_reset_job, 'season_reset_job'),
     ]
     
     # Add jobs with error handling

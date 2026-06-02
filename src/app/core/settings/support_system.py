@@ -55,6 +55,7 @@ JOB_SCHEDULES = {
     "expire_claims_job": {"type": "interval", "minutes": 15},
     "reminder_unclaimed_star_rewards_job": {"type": "interval", "hours": 12},
     "cleanup_draft_orders_job": {"type": "interval", "minutes": 10},
+    "season_reset_job": {"type": "interval", "hours": 12},  # rotate season + expire coupons
 }
 
 _job_schedules_path = str(CORE_DIR / "job_schedules.json")
