@@ -2,6 +2,12 @@ import sqlalchemy
 
 from ._base import AsyncSessionLocal, Base, engine
 from ._referral import Referral, ReferralReward
+from ._season import (
+    RewardCoupon,
+    StarMilestoneClaim,
+    StarSeason,
+    UserStarProgress,
+)
 from ._reward import (
     Achievement,
     Challenge,
@@ -63,6 +69,10 @@ __all__ = [
     "UserDiscount",
     "StarHistory",
     "DailyStarCap",
+    "StarSeason",
+    "UserStarProgress",
+    "StarMilestoneClaim",
+    "RewardCoupon",
     "Ticket",
     "TicketMessage",
     "Notification",
@@ -152,6 +162,8 @@ def _migrate(connection):
             reward_cols = {col["name"] for col in inspector.get_columns("referral_rewards")}
             if "reward_value" not in reward_cols:
                 connection.exec_driver_sql("ALTER TABLE referral_rewards ADD COLUMN reward_value INTEGER;")
+            if "stars" not in reward_cols:
+                connection.exec_driver_sql("ALTER TABLE referral_rewards ADD COLUMN stars INTEGER;")
 
     if "tickets" in inspector.get_table_names():
         ticket_cols = {col["name"] for col in inspector.get_columns("tickets")}
