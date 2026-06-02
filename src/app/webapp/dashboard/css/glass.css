@@ -4,13 +4,26 @@
    Only overrides surface/visual properties — no layout changes.
    ═══════════════════════════════════════════════════════════════ */
 
+/* ── 0. HEAT/BATTERY SAVER ─────────────────────────────────────────
+   When the WebApp is hidden (set by head-boot.js), freeze every
+   animation — including the background blobs — so the GPU stops
+   compositing off-screen. Purely off-screen; no visible change. */
+html.astro-hidden *,
+html.astro-hidden *::before,
+html.astro-hidden *::after {
+  animation-play-state: paused !important;
+}
+
 /* ── 1. GLASS TOKEN EXTENSIONS ─────────────────────────────────── */
 :root {
   --glass-bg:          rgba(10, 18, 30, 0.48);
   --glass-bg-mid:      rgba(14, 22, 36, 0.58);
   --glass-bg-heavy:    rgba(6, 12, 22, 0.78);
-  --glass-blur:        blur(16px) saturate(160%) brightness(1.04);
-  --glass-blur-heavy:  blur(28px) saturate(180%) brightness(1.05);
+  /* Perf: blur radius trimmed (16→12 / 28→20) and saturate eased a touch.
+     backdrop-filter cost scales with blur radius × area, recomputed every
+     frame because the blobs animate behind it. Glass still clearly frosted. */
+  --glass-blur:        blur(12px) saturate(150%) brightness(1.04);
+  --glass-blur-heavy:  blur(20px) saturate(165%) brightness(1.05);
 
   --glass-edge:        rgba(255,255,255,0.07);
   --glass-edge-bright: rgba(255,255,255,0.15);
@@ -40,8 +53,8 @@
   --glass-bg:          rgba(255,255,255,0.58);
   --glass-bg-mid:      rgba(255,255,255,0.70);
   --glass-bg-heavy:    rgba(255,255,255,0.86);
-  --glass-blur:        blur(18px) saturate(180%) brightness(1.02);
-  --glass-blur-heavy:  blur(32px) saturate(200%) brightness(1.02);
+  --glass-blur:        blur(13px) saturate(160%) brightness(1.02);
+  --glass-blur-heavy:  blur(22px) saturate(175%) brightness(1.02);
 
   --glass-edge:        rgba(255,255,255,0.58);
   --glass-edge-bright: rgba(255,255,255,0.88);
@@ -1980,8 +1993,8 @@ html[data-theme="light"] {
   --glass-bg:          rgba(255, 255, 255, 0.45);
   --glass-bg-mid:      rgba(255, 255, 255, 0.60);
   --glass-bg-heavy:    rgba(255, 255, 255, 0.84);
-  --glass-blur:        blur(22px) saturate(200%) brightness(1.03);
-  --glass-blur-heavy:  blur(36px) saturate(220%) brightness(1.02);
+  --glass-blur:        blur(15px) saturate(175%) brightness(1.03);
+  --glass-blur-heavy:  blur(24px) saturate(185%) brightness(1.02);
   --glass-edge:        rgba(255, 255, 255, 0.62);
   --glass-edge-bright: rgba(255, 255, 255, 0.94);
   --glass-sheen:       inset 0 1.5px 0 rgba(255, 255, 255, 0.98),

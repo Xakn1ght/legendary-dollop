@@ -1105,7 +1105,10 @@
         inset 0 3px 16px rgba(255, 255, 255, 0.3),
         inset 0 -4px 12px rgba(0, 0, 0, 0.4),
         0 0 0 4px rgba(255, 255, 255, 0.15);
-      animation:notchFloat 3s ease-in-out infinite, gentleRotate 10s ease-in-out infinite;
+      /* gentleRotate (animated filter:hue-rotate) removed — it forced a full
+         repaint every frame on mobile for a near-invisible hue shift. The
+         gentle vertical float (notchFloat) is kept. */
+      animation:notchFloat 3s ease-in-out infinite;
       border:3px solid rgba(255, 255, 255, 0.25) !important;
     }
     [data-theme="light"] .nav-item-notch{

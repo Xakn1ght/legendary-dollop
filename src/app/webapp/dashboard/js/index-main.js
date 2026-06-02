@@ -3986,7 +3986,19 @@
       
 	      // Start notification polling
 	      startNotificationPolling();
-	      
+
+	      // Battery/heat saver: stop the 5s poll while the app is hidden, resume
+	      // (with an immediate fetch) when it returns. Event fired by head-boot.js.
+	      window.addEventListener('astro-visibility', (e) => {
+	        try {
+	          if (e.detail && e.detail.hidden) {
+	            stopNotificationPolling();
+	          } else if (!notificationPolling) {
+	            startNotificationPolling();
+	          }
+	        } catch (_) {}
+	      });
+
 	      // Restore last visited tab on reload (profile/tasks/shop/support).
 	      const requested = getRequestedDashboardPage();
 	      if (requested && requested.page && requested.page !== 'home') {

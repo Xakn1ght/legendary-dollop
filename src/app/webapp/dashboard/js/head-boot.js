@@ -194,3 +194,22 @@
         }
       }catch(_){}
     })();
+
+// Battery/heat saver: when the WebApp is hidden (user switches chats, locks the
+// phone, backgrounds Telegram), pause ALL CSS animations and signal pollers to
+// idle. Invisible to the user — they're not looking — but it stops the GPU from
+// compositing the animated background + glass blur while off-screen.
+// Adding html.astro-hidden lets CSS halt every animation in one rule.
+(function () {
+  'use strict';
+  const root = document.documentElement;
+  const apply = () => {
+    const hidden = document.hidden;
+    root.classList.toggle('astro-hidden', hidden);
+    try {
+      window.dispatchEvent(new CustomEvent('astro-visibility', { detail: { hidden } }));
+    } catch (_) {}
+  };
+  document.addEventListener('visibilitychange', apply, { passive: true });
+  apply();
+})();
