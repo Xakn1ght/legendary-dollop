@@ -160,7 +160,7 @@ async def handle_arcade_submit(request: web.Request):
                 "rewarded": True,
                 "score": score,
                 "streak_bonus": streak_bonus_percent,
-                "message": f"Earned {credits} credits, {xp} XP and {star_pieces} star pieces!",
+                "message": f"Earned {xp} XP!",  # arcade is XP-only now (see web_game.py)
                 "rewards": {
                     "credits": credits,
                     "xp": xp,

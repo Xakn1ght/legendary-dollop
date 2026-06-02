@@ -30,25 +30,22 @@ REFERRAL_REWARDS = {
 # ===========================================
 # Balanced reward system with anti-farming measures
 GAME_REWARDS = {
-    # Score thresholds and rewards (credits, XP, star pieces)
+    # Score thresholds and rewards.
+    # XP-ONLY as of 2026-06-02 (final reward map "iron rule"): the arcade gives XP
+    # (→ levels → status) and leaderboard glory, but NO credit and NO stars. Credit
+    # of 100–4,000/play (~150k/mo) was a farming hole; season stars are referral-only
+    # now. Money is minted only by referrals + cashback. credits/star_pieces kept as
+    # 0 keys so the score-tier shape stays editable if we ever add capped payouts.
     "thresholds": [
-        # Star pieces are intentionally conservative to avoid farming stars via a free game.
-        # Ranges (approx):
-        # - <5000 => 0 pieces
-        # - 5000-7999 => 1 piece
-        # - 8000-10999 => 2 pieces
-        # - 11000-13999 => 3 pieces
-        # - 14000-16999 => 4 pieces
-        # - >=17000 => 5 pieces (very hard)
-        {"min_score": 17000, "credits": 4000, "xp": 200, "star_pieces": 5},
-        {"min_score": 15000, "credits": 4000, "xp": 200, "star_pieces": 4},
-        {"min_score": 13000, "credits": 3000, "xp": 150, "star_pieces": 3},
-        {"min_score": 10000, "credits": 2000, "xp": 120, "star_pieces": 2},
-        {"min_score": 7000, "credits": 1500, "xp": 100, "star_pieces": 1},
-        {"min_score": 5000, "credits": 1000, "xp": 80, "star_pieces": 1},
-        {"min_score": 3000, "credits": 500, "xp": 50, "star_pieces": 0},
-        {"min_score": 1000, "credits": 200, "xp": 30, "star_pieces": 0},
-        {"min_score": 0, "credits": 100, "xp": 10, "star_pieces": 0},
+        {"min_score": 17000, "credits": 0, "xp": 200, "star_pieces": 0},
+        {"min_score": 15000, "credits": 0, "xp": 200, "star_pieces": 0},
+        {"min_score": 13000, "credits": 0, "xp": 150, "star_pieces": 0},
+        {"min_score": 10000, "credits": 0, "xp": 120, "star_pieces": 0},
+        {"min_score": 7000, "credits": 0, "xp": 100, "star_pieces": 0},
+        {"min_score": 5000, "credits": 0, "xp": 80, "star_pieces": 0},
+        {"min_score": 3000, "credits": 0, "xp": 50, "star_pieces": 0},
+        {"min_score": 1000, "credits": 0, "xp": 30, "star_pieces": 0},
+        {"min_score": 0, "credits": 0, "xp": 10, "star_pieces": 0},
     ],
     # Star pieces system
     "pieces_per_star": 10,  # 10 pieces = 1 full star

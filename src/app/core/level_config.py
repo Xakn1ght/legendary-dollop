@@ -27,27 +27,38 @@ LEVEL_REQUIREMENTS = {
     20: 19000, # 19000 XP to level 20
 }
 
-# Rewards given when reaching each level
+# Rewards given when reaching each level.
+#
+# STATUS / COSMETIC ONLY — no credit, loyalty, GB, or cash. (Changed 2026-06-02.)
+# The old per-level credit (cumulative ~13.96M Toman to L20) was the #1 farming
+# hole in the economy audit: daily arcade XP could reach L20 in months and mint
+# ~14M in store credit. Per the final reward map, leveling now grants only a
+# title/badge (status). Monetary value is minted ONLY by referrals + cashback.
+#
+# The level-up consumer (repos/reward/_points.py) only acts on "credit" and
+# "loyalty_points" keys, so titles below are a no-op grant for now; cosmetic
+# title/badge display is wired in a later (cosmetics) phase.
+# TODO(cosmetics-phase): render these titles/badges on profile + leaderboard.
 LEVEL_REWARDS = {
-    2: {"loyalty_points": 50, "credit": 5000},
-    3: {"loyalty_points": 100, "credit": 10000},
-    4: {"loyalty_points": 200, "credit": 20000},
-    5: {"loyalty_points": 500, "credit": 50000, "premium_features": True},
-    6: {"loyalty_points": 750, "credit": 75000},
-    7: {"loyalty_points": 1000, "credit": 100000},
-    8: {"loyalty_points": 1500, "credit": 150000},
-    9: {"loyalty_points": 2000, "credit": 200000},
-    10: {"loyalty_points": 3000, "credit": 300000, "exclusive_servers": True},
-    11: {"loyalty_points": 4000, "credit": 400000},
-    12: {"loyalty_points": 5000, "credit": 500000},
-    13: {"loyalty_points": 6500, "credit": 650000},
-    14: {"loyalty_points": 8000, "credit": 800000},
-    15: {"loyalty_points": 10000, "credit": 1000000, "vip_status": True},
-    16: {"loyalty_points": 12000, "credit": 1200000},
-    17: {"loyalty_points": 15000, "credit": 1500000},
-    18: {"loyalty_points": 18000, "credit": 1800000},
-    19: {"loyalty_points": 22000, "credit": 2200000},
-    20: {"loyalty_points": 30000, "credit": 3000000, "legendary_status": True},
+    2:  {"title": "Cadet"},
+    3:  {"title": "Pilot"},
+    4:  {"title": "Ensign"},
+    5:  {"title": "Navigator"},
+    6:  {"title": "Lieutenant"},
+    7:  {"title": "Commander"},
+    8:  {"title": "Voyager"},
+    9:  {"title": "Captain"},
+    10: {"title": "Ace"},
+    11: {"title": "Pathfinder"},
+    12: {"title": "Vanguard"},
+    13: {"title": "Pioneer"},
+    14: {"title": "Warden"},
+    15: {"title": "Star Captain"},
+    16: {"title": "Admiral"},
+    17: {"title": "Cosmonaut"},
+    18: {"title": "Galaxy Warden"},
+    19: {"title": "Starlord"},
+    20: {"title": "Legend"},
 }
 
 # Experience points earned from different activities
