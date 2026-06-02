@@ -3,6 +3,7 @@ from aiogram.fsm.context import FSMContext
 from aiogram.types import KeyboardButton, Message, ReplyKeyboardMarkup
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.coupons import coupon_discount_amount
 from app.core.settings import ADMIN_ID, PLANS
 from app.database import crud
 from app.handlers.admin.subscription import process_approved_subscription
@@ -26,6 +27,12 @@ async def process_confirmation(message: Message, state: FSMContext, session: Asy
     if total_discount_percent > 0:
         discount_amount = int(initial_price * (total_discount_percent / 100))
         price_after_discount = initial_price - discount_amount
+    # Reward coupon (one per purchase): discount capped to a ~100GB plan; free_gb adds
+    # bonus GB at provisioning via subscription.applied_coupon_id (set in summary.py).
+    coupon_id = data.get('coupon_id')
+    coupon_amount = coupon_discount_amount(data.get('coupon_discount_percent', 0), initial_price)
+    if coupon_amount > 0:
+        price_after_discount = max(0, price_after_discount - coupon_amount)
     credit_used = data.get('credit_used', 0)
     final_price = price_after_discount - credit_used
     if final_price <= 0:
@@ -39,10 +46,12 @@ async def process_confirmation(message: Message, state: FSMContext, session: Asy
             await state.clear()
             return
 
-        # Use the centralized processing function
+        # Use the centralized processing function (reads sub.applied_coupon_id for free_gb)
         success = await process_approved_subscription(sub_id, session, bot)
 
         if success:
+            if coupon_id:
+                await crud.mark_coupon_used(session, coupon_id)
             await message.answer(
                 ("✅ سفارش شما با موفقیت با اعتبار پرداخت و فعال شد." if lang == "fa" else "✅ Your order was paid with credit/discount and activated."),
                 reply_markup=get_main_keyboard(message.chat.id, lang=lang),
@@ -100,6 +109,10 @@ async def process_confirmation(message: Message, state: FSMContext, session: Asy
         reply_markup=ReplyKeyboardMarkup(keyboard=[[KeyboardButton(text=t(lang, "btn_back"))]], resize_keyboard=True, one_time_keyboard=True),
         parse_mode='HTML',
     )
+    # Consume the coupon now that the order is committed (awaiting receipt) — parity with
+    # how discounts are consumed at summary time.
+    if coupon_id:
+        await crud.mark_coupon_used(session, coupon_id)
     await state.set_state(PurchaseState.receipt)
 
 @router.callback_query(F.data == "enable_auto_renew")

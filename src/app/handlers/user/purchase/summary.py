@@ -5,6 +5,7 @@ from aiogram.types import Message
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
 
+from app.core.coupons import coupon_discount_amount
 from app.core.settings import PLANS, VIP_DISCOUNT_PERCENT
 from app.database import crud, models
 from app.database.crud import mark_user_discounts_used
@@ -79,6 +80,15 @@ async def show_order_summary(message: Message, state: FSMContext, session: Async
         await mark_user_discounts_used(session, used_discount_ids)
         await state.update_data(discount_applied_amount=discount_amount)
 
+    # Reward coupon (one per purchase). Discount is capped to a ~100GB plan's price;
+    # free_gb adds bonus GB at provisioning (no price change).
+    base_total = plan_info['price'] + (renewal_price or 0)
+    coupon_id = data.get('coupon_id')
+    coupon_amount = coupon_discount_amount(data.get('coupon_discount_percent', 0), base_total)
+    coupon_free_gb = int(data.get('coupon_free_gb', 0) or 0)
+    if coupon_amount > 0:
+        price_after_discount = max(0, price_after_discount - coupon_amount)
+
     # Use credit_used from state, do not recalculate
     credit_used = data.get('credit_used', 0)
     final_price = price_after_discount - credit_used
@@ -115,6 +125,15 @@ async def show_order_summary(message: Message, state: FSMContext, session: Async
             )
         )
 
+    if coupon_amount > 0:
+        summary_lines.append(
+            (f"🎁 <b>کوپن جایزه:</b> -{coupon_amount:,} تومان" if lang == "fa" else f"🎁 <b>Reward coupon:</b> -{coupon_amount:,} Toman")
+        )
+    if coupon_free_gb > 0:
+        summary_lines.append(
+            (f"🎁 <b>ترافیک هدیه کوپن:</b> +{coupon_free_gb} گیگابایت" if lang == "fa" else f"🎁 <b>Coupon bonus traffic:</b> +{coupon_free_gb} GB")
+        )
+
     if credit_used > 0:
         summary_lines.append(f"🔹 <b>اعتبار استفاده‌شده:</b> -{credit_used:,} تومان" if lang == "fa" else f"🔹 <b>Credit used:</b> -{credit_used:,} Toman")
 
@@ -135,6 +154,7 @@ async def show_order_summary(message: Message, state: FSMContext, session: Async
                 sub_persist.credit_used = int(credit_used or 0)
                 # store discount ids as comma-separated
                 sub_persist.applied_discount_ids = ",".join(str(i) for i in (used_discount_ids or [])) if used_discount_ids else None
+                sub_persist.applied_coupon_id = int(coupon_id) if coupon_id else None
                 await session.commit()
     except Exception:
         pass

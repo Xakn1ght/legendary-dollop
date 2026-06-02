@@ -2,6 +2,7 @@ from aiogram.fsm.context import FSMContext
 from aiogram.types import Message
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.coupons import coupon_discount_amount
 from app.core.settings import PLANS
 from app.database import crud
 from app.utils.bot_i18n import normalize_lang, set_cached_lang
@@ -31,6 +32,10 @@ async def process_credit_choice(message: Message, state: FSMContext, session: As
     if total_discount_percent > 0:
         discount_amount = int(initial_price * (total_discount_percent / 100))
         price_after_discount = initial_price - discount_amount
+    # Reward coupon discount (so credit never over-covers the real amount due).
+    coupon_amount = coupon_discount_amount(data.get('coupon_discount_percent', 0), initial_price)
+    if coupon_amount > 0:
+        price_after_discount = max(0, price_after_discount - coupon_amount)
     user_credit = user.credit or 0
     credit_used = 0
     if (message.text or "").startswith("✅ بله") or (message.text or "").startswith("✅ Yes"):

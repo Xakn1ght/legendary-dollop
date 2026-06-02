@@ -20,6 +20,7 @@ class PurchaseState(StatesGroup):
     renewal_template = State()
     name = State()
     ask_discount = State()
+    ask_coupon = State()
     ask_credit = State()
     confirmation = State()
     receipt = State()

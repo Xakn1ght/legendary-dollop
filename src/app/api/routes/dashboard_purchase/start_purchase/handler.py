@@ -10,7 +10,7 @@ from sqlalchemy.future import select
 from app.api.deps import _verify_webapp_auth, set_tma_session_cookie
 from app.api.routes.dashboard_purchase.plans_user import _generate_unique_username, _is_username_taken
 from app.api.schemas import StartPurchaseRequest, validate_request
-from app.core.rewards_config import DISCOUNT_COUPON_MAX_PLAN_GB
+from app.core.coupons import discount_price_cap as _discount_price_cap
 from app.core.settings import (
     GLOBAL_PURCHASE_DISCOUNTS,
     PLANS,
@@ -19,18 +19,6 @@ from app.core.settings import (
 )
 from app.database import crud
 from app.database.models import AsyncSessionLocal, Referral, UserDiscount
-
-
-def _discount_price_cap() -> int:
-    """Highest base-plan price at or below the coupon GB cap (the spec's 100GB cap on
-    discount coupons). Used so a percent coupon can't discount an arbitrarily large
-    custom plan beyond a ~100GB plan's worth."""
-    prices = [
-        int(p.get("price") or 0)
-        for p in PLANS.values()
-        if int(p.get("gb") or 0) <= DISCOUNT_COUPON_MAX_PLAN_GB
-    ]
-    return max(prices) if prices else 0
 
 logger = logging.getLogger(__name__)
 

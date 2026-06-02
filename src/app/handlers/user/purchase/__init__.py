@@ -6,6 +6,7 @@ from app.core.settings import PLANS
 from . import (
     common,  # noqa: F401
     confirmation,  # noqa: F401
+    coupon,  # noqa: F401
     credit,  # noqa: F401
     edit_flow,  # noqa: F401
     flow_referral_plan,  # noqa: F401

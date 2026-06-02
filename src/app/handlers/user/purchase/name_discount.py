@@ -13,6 +13,7 @@ from app.utils.bot_i18n import normalize_lang, set_cached_lang, t
 from app.utils.validation import InputValidator, sanitize_user_input
 
 from .common import PurchaseState, _get_plan_keyboard_for_user, _lang_for, _name_keyboard, router
+from .coupon import prompt_coupon_or_next
 from .summary import show_order_summary
 from .username import generate_unique_username, generate_username_suggestions, is_username_taken
 
@@ -203,24 +204,8 @@ async def process_name(message: Message, state: FSMContext, session: AsyncSessio
             reply_markup=discount_markup,
         )
         return
-    # If no discount, check for credit
-    if user and user.credit > 0:
-        await state.set_state(PurchaseState.ask_credit)
-        credit_markup = ReplyKeyboardMarkup(
-            keyboard=[
-                [KeyboardButton(text=(f"✅ بله، {user.credit:,} تومان اعتبار را استفاده کن" if lang == "fa" else f"✅ Yes, use {user.credit:,} credit"))],
-                [KeyboardButton(text=("خیر، برای بعد ذخیره کن" if lang == "fa" else "No, save for later"))],
-            ],
-            resize_keyboard=True,
-            one_time_keyboard=True,
-        )
-        await message.answer(
-            (f"شما **{user.credit:,} تومان اعتبار** دارید! آیا می‌خواهید آن را روی این خرید استفاده کنید؟" if lang == "fa" else f"You have **{user.credit:,}** credit. Do you want to use it for this purchase?"),
-            reply_markup=credit_markup,
-        )
-        return
-    # If no discount or credit, proceed to confirmation as normal
-    await show_order_summary(message, state, session)
+    # No active discounts → offer reward coupons (then credit, then summary).
+    await prompt_coupon_or_next(message, state, session, user, lang)
 
 
 @router.message(PurchaseState.ask_discount)
@@ -255,23 +240,8 @@ async def process_discount_choice(message: Message, state: FSMContext, session: 
     else:
         await state.update_data(apply_discount=False, used_discount_percents=[], used_discount_ids=[])
 
-    # After discount, check for credit
-    if user and user.credit > 0:
-        await state.set_state(PurchaseState.ask_credit)
-        credit_markup = ReplyKeyboardMarkup(
-            keyboard=[
-                [KeyboardButton(text=(f"✅ بله، {user.credit:,} تومان اعتبار را استفاده کن" if lang == "fa" else f"✅ Yes, use {user.credit:,} credit"))],
-                [KeyboardButton(text=("خیر، برای بعد ذخیره کن" if lang == "fa" else "No, save for later"))],
-            ],
-            resize_keyboard=True,
-            one_time_keyboard=True,
-        )
-        await message.answer(
-            (f"شما **{user.credit:,} تومان اعتبار** دارید! آیا می‌خواهید آن را روی این خرید استفاده کنید؟" if lang == "fa" else f"You have **{user.credit:,}** credit. Do you want to use it for this purchase?"),
-            reply_markup=credit_markup,
-        )
-        return
-    await show_order_summary(message, state, session)
+    # After discount → offer reward coupons (then credit, then summary).
+    await prompt_coupon_or_next(message, state, session, user, lang)
 
 
 # Any non-text (media, voice, sticker, etc.) in the *name* step → politely reject
