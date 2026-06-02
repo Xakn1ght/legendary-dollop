@@ -3,6 +3,7 @@ from ._challenges import _ChallengesMixin
 from ._game import _GameMixin
 from ._gifts import _GiftsMixin
 from ._points import _PointsMixin
+from ._season import _SeasonMixin
 from ._stars import _StarsMixin
 from ._tiers import _TiersMixin
 
@@ -10,6 +11,7 @@ from ._tiers import _TiersMixin
 class RewardRepository(
     _StarsMixin,
     _TiersMixin,
+    _SeasonMixin,
     _GameMixin,
     _ChallengesMixin,
     _AchievementsMixin,
