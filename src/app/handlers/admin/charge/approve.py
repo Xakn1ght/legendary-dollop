@@ -171,8 +171,17 @@ async def approve_charge(callback: CallbackQuery, session: AsyncSession, bot: Bo
                 credit_reward_amount = int(charge_req.price * cfg.credit_percent / 100)
 
             if traffic_reward_bytes or extra_days_reward or credit_reward_amount:
+                from app.core.rewards_config import (
+                    MAX_STARS_PER_REFERRED_PURCHASE,
+                    MIN_REFERRAL_STAR_PLAN_GB,
+                    REFERRAL_BONUS_XP,
+                )
+
                 traffic_bytes = int(charge_req.traffic_bytes or 0)
-                star_increment = max(0, traffic_bytes // (20 * GB))
+                # Season-star option, only for qualifying (>=20GB) charges; capped at 2.
+                star_increment = 0
+                if traffic_bytes >= MIN_REFERRAL_STAR_PLAN_GB * GB:
+                    star_increment = min(traffic_bytes // (20 * GB), MAX_STARS_PER_REFERRED_PURCHASE)
                 reward = await crud.create_referral_reward(
                     db=session,
                     subscription_id=sub.id,
@@ -180,8 +189,15 @@ async def approve_charge(callback: CallbackQuery, session: AsyncSession, bot: Bo
                     traffic_bytes=traffic_reward_bytes,
                     extra_days=extra_days_reward,
                     credit_amount=credit_reward_amount,
-                    reward_value=star_increment,
+                    reward_value=star_increment or None,
+                    stars=star_increment or None,
                 )
+
+                # +50 XP to the referrer regardless of which reward they pick.
+                try:
+                    await crud.add_experience_points(session, ref_user.id, REFERRAL_BONUS_XP, "referral")
+                except Exception:
+                    pass
 
                 stars_progress = ref_user.stars
 

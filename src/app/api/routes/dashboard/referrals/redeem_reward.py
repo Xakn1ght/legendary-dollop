@@ -46,8 +46,9 @@ async def handle_dashboard_redeem_referral_reward(request: web.Request):
             extra_days = int(reward.extra_days or 0)
             credit_amount = int(reward.credit_amount or 0)
             _rv = getattr(reward, "reward_value", None)
-            # Legacy vouchers stored NULL; default to 1 star option to match bot behavior.
-            star_increment = (int(_rv) if _rv is not None else 1)
+            _stars_col = getattr(reward, "stars", None)
+            # Prefer the stored star option; fall back to legacy reward_value, else 1.
+            star_increment = int(_stars_col if _stars_col is not None else (_rv if _rv is not None else 1))
 
             options = []
             if traffic_bytes > 0:
@@ -105,26 +106,18 @@ async def handle_dashboard_redeem_referral_reward(request: web.Request):
                 await crud.add_credit(session, user.id, chosen_credit)
                 await crud.add_reward_history(session, user.id, "credit", chosen_credit, "referral_voucher", reward.id)
 
+            season_total = 0
+            season_unlocked = []
             if chosen_stars > 0:
                 try:
-                    await crud.StarManager.add_stars(
-                        session,
-                        user.id,
-                        chosen_stars,
-                        reason="referral_voucher",
-                        source_id=reward.id,
+                    # Season stars (Phase B): feed seasonal milestone progress, which
+                    # auto-unlocks coupons into the wallet. Not permanent stars.
+                    season_total, season_unlocked = await crud.add_season_stars(
+                        session, user.id, chosen_stars
                     )
                 except Exception:
                     # If stars can't be added, do not burn the voucher.
                     return web.json_response({"ok": False, "error": "stars_add_failed"}, status=500)
-
-                # Backfill legacy vouchers so subsequent reads show the correct value.
-                try:
-                    if getattr(reward, "reward_value", None) is None:
-                        reward.reward_value = int(chosen_stars)
-                        await session.commit()
-                except Exception:
-                    pass
 
             await crud.spend_reward(session, reward.id)
 
@@ -138,6 +131,8 @@ async def handle_dashboard_redeem_referral_reward(request: web.Request):
                         "extra_days": chosen_days,
                         "credit_amount": chosen_credit,
                         "stars": chosen_stars,
+                        "season_stars_total": season_total,
+                        "unlocked_coupons": season_unlocked,
                         "subscription_id": target_sub.id if target_sub else None,
                     },
                 }

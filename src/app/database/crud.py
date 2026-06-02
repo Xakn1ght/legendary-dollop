@@ -87,6 +87,12 @@ class StarManager:
     get_daily_cap_status = RewardRepository.get_daily_cap_status
 
 add_stars = RewardRepository.add_stars
+# Star Season (Phase B): referral stars feed seasonal milestone progress, not the
+# permanent star/tier balance.
+add_season_stars = RewardRepository.add_season_stars
+get_or_create_active_season = RewardRepository.get_or_create_active_season
+get_active_coupons = RewardRepository.get_active_coupons
+end_active_season = RewardRepository.end_active_season
 reset_stars = RewardRepository.reset_stars
 log_star_change = RewardRepository.log_star_change
 get_star_history = RewardRepository.get_star_history

@@ -267,6 +267,7 @@ class SubscriptionRepository:
         extra_days: int = None,
         credit_amount: int = None,
         reward_value: int | None = None,
+        stars: int | None = None,
     ):
         reward = ReferralReward(
             subscription_id=subscription_id,
@@ -275,6 +276,7 @@ class SubscriptionRepository:
             extra_days=extra_days,
             credit_amount=credit_amount,
             reward_value=reward_value,
+            stars=stars,
             spent=False
         )
         db.add(reward)

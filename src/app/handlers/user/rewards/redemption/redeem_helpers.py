@@ -107,50 +107,28 @@ async def _redeem_star(
     increment: int,
 ):
     user = await crud.get_user(session, callback.from_user.id)
-    _, _, newly_unlocked_tiers = await crud.StarManager.add_stars(
-        session,
-        user.id,
-        increment,
-        reason="voucher_redemption",
-        source_id=reward.id,
-    )
+    # Season stars (Phase B): feed seasonal milestone progress; coupons auto-unlock
+    # into the wallet. Uses the stored star option, falling back to the callback value.
+    amount = int(reward.stars or increment or 1)
+    new_total, unlocked = await crud.add_season_stars(session, user.id, amount)
     await crud.spend_reward(session, reward.id)
     await callback.answer(
-        f"⭐ +{to_persian_digits(increment)} ستاره به کیف پول شما افزوده شد!",
+        f"⭐ +{to_persian_digits(amount)} ستاره فصلی (مجموع: {to_persian_digits(new_total)})",
         show_alert=True,
     )
     try:
         await callback.message.edit_text(
-            f"🎁 بن استفاده شد: +{to_persian_digits(increment)} ستاره افزوده شد."
+            f"🎁 بن استفاده شد: +{to_persian_digits(amount)} ستاره فصلی. "
+            f"مجموع امتیاز فصل شما: {to_persian_digits(new_total)}."
         )
     except Exception:
         pass
-    if newly_unlocked_tiers:
-        for tier in newly_unlocked_tiers:
-            claim = await session.execute(
-                select(UserStarRewardClaim).filter(
-                    UserStarRewardClaim.user_id == user.id,
-                    UserStarRewardClaim.tier_id == tier.id,
-                    UserStarRewardClaim.status == "offered",
-                )
+    for coupon in unlocked:
+        try:
+            await bot.send_message(
+                user.chat_id,
+                f"🎉 به {to_persian_digits(coupon['milestone'])} ستاره رسیدید! "
+                f"«{coupon['name']}» در کیف کوپن شما ذخیره شد.",
             )
-            claim_obj = claim.scalars().first()
-            if claim_obj:
-                kb = InlineKeyboardMarkup(
-                    inline_keyboard=[
-                        [
-                            InlineKeyboardButton(
-                                text=f"🎁 دریافت جایزه {tier.title}",
-                                callback_data=f"claim_star_reward_{claim_obj.id}",
-                            )
-                        ]
-                    ]
-                )
-                try:
-                    await bot.send_message(
-                        user.chat_id,
-                        f"🎉 شما قفل جایزه ستاره‌ای جدیدی را باز کردید: {tier.title}!",
-                        reply_markup=kb,
-                    )
-                except Exception:
-                    pass
+        except Exception:
+            pass

@@ -225,6 +225,23 @@ async def process_approved_subscription(sub_id: int, session: AsyncSession, bot:
                     extra_days = max(1, calc_days)
                 credit_amount = int(total_price * credit_pct / 100) if credit_pct else None
 
+                # Season-star option — one of the 4 referral choices (not auto-granted).
+                # Qualifying purchase = >=20GB; +1 normally, +2 if a renewal was reserved.
+                from app.core.rewards_config import (
+                    MAX_STARS_PER_REFERRED_PURCHASE,
+                    MIN_REFERRAL_STAR_PLAN_GB,
+                    NORMAL_REFERRAL_STARS,
+                    REFERRAL_BONUS_XP,
+                    RESERVED_AUTORENEW_REFERRAL_STARS,
+                )
+                star_increment = 0
+                if total_gb >= MIN_REFERRAL_STAR_PLAN_GB:
+                    star_increment = min(
+                        RESERVED_AUTORENEW_REFERRAL_STARS if subscription.renewal_paid
+                        else NORMAL_REFERRAL_STARS,
+                        MAX_STARS_PER_REFERRED_PURCHASE,
+                    )
+
                 reward = await crud.create_referral_reward(
                     db=session,
                     subscription_id=subscription.id,
@@ -232,10 +249,16 @@ async def process_approved_subscription(sub_id: int, session: AsyncSession, bot:
                     traffic_bytes=int(extra_gb * 1024 * 1024 * 1024) if extra_gb else None,
                     extra_days=extra_days,
                     credit_amount=credit_amount,
+                    reward_value=star_increment or None,
+                    stars=star_increment or None,
                 )
 
-                # Fixed: 1 star per referral subscription (not based on GB)
-                star_increment = 1
+                # +50 XP to the referrer for every referral, regardless of choice.
+                try:
+                    await crud.add_experience_points(session, ref_user.id, REFERRAL_BONUS_XP, "referral")
+                except Exception:
+                    pass
+
                 from app.keyboards.inline import get_enhanced_reward_voucher_keyboard
 
                 kb_reward = get_enhanced_reward_voucher_keyboard(
@@ -245,22 +268,11 @@ async def process_approved_subscription(sub_id: int, session: AsyncSession, bot:
                     credit_amount=credit_amount,
                     stars_progress=ref_user.stars,
                     star_increment=star_increment,
-                    show_star=False,
+                    show_star=star_increment > 0,
                     show_enhanced_stars=False,
                 )
-                if star_increment > 0:
-                    try:
-                        await crud.StarManager.add_stars(
-                            session,
-                            ref_user.id,
-                            star_increment,
-                            reason="referral_reward",
-                            source_id=reward.id,
-                        )
-                    except Exception:
-                        pass
                 try:
-                    star_line = f"\n⭐ +{star_increment} stars added" if star_increment > 0 else ""
+                    star_line = f"\n⭐ گزینه ستاره فصلی: +{star_increment}" if star_increment > 0 else ""
                     await bot.send_message(
                         ref_user.chat_id,
                         "🎉 یک کاربر با کد شما سرویس جدید خریداری کرد!\n"
