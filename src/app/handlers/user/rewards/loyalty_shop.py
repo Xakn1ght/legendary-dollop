@@ -12,6 +12,11 @@ router = Router()
 
 # Loyalty Shop Items (rebalanced: 1 loyalty point = 1 Toman)
 # Credits from shop are subscription_credit (only for subscriptions, not cashable)
+# Iron rule (2026-06-02): loyalty points are earned by play, so they must not buy VPN
+# value. These item types are retired — hidden from the shop and blocked at redemption.
+# Status/cosmetic perks (vip, priority_support, custom_username, star*) remain.
+RETIRED_LOYALTY_TYPES = {"sub_credit", "plan"}
+
 LOYALTY_SHOP = {
     "sub_credit_small": {
         "cost": 5000,
@@ -100,44 +105,25 @@ async def show_loyalty_shop(callback: CallbackQuery, session: AsyncSession):
     )
     
     keyboard = []
-    
-    # Show items in categories
-    text += "\n<b>💳 اعتبار اشتراک:</b>\n"
-    for item_id in ["sub_credit_small", "sub_credit_medium", "sub_credit_large"]:
-        item = LOYALTY_SHOP[item_id]
-        affordable = "✅" if loyalty_points >= item["cost"] else "🔒"
-        cost_str = f"{item['cost']:,}"
-        text += f"{affordable} {item['name']} - {to_persian_digits(cost_str)} امتیاز\n"
-        if loyalty_points >= item["cost"]:
-            keyboard.append([InlineKeyboardButton(
-                text=item['name'],
-                callback_data=f"loyaltyby_{item_id}"
-            )])
-    
-    text += "\n<b>⭐ ستاره:</b>\n"
-    for item_id in ["star_piece", "star_full"]:
-        item = LOYALTY_SHOP[item_id]
-        affordable = "✅" if loyalty_points >= item["cost"] else "🔒"
-        cost_str = f"{item['cost']:,}"
-        text += f"{affordable} {item['name']} - {to_persian_digits(cost_str)} امتیاز\n"
-        if loyalty_points >= item["cost"]:
-            keyboard.append([InlineKeyboardButton(
-                text=item['name'],
-                callback_data=f"loyaltyby_{item_id}"
-            )])
-    
-    text += "\n<b>🎁 ویژه:</b>\n"
-    for item_id in ["plan_10gb", "plan_20gb", "priority_support", "custom_username", "vip_90days", "vip_lifetime"]:
-        item = LOYALTY_SHOP[item_id]
-        affordable = "✅" if loyalty_points >= item["cost"] else "🔒"
-        cost_str = f"{item['cost']:,}"
-        text += f"{affordable} {item['name']} - {to_persian_digits(cost_str)} امتیاز\n"
-        if loyalty_points >= item["cost"]:
-            keyboard.append([InlineKeyboardButton(
-                text=item['name'],
-                callback_data=f"loyaltyby_{item_id}"
-            )])
-    
+
+    def _render_section(header, item_ids):
+        nonlocal text
+        rows = [iid for iid in item_ids if LOYALTY_SHOP[iid]["type"] not in RETIRED_LOYALTY_TYPES]
+        if not rows:
+            return
+        text += header
+        for item_id in rows:
+            item = LOYALTY_SHOP[item_id]
+            affordable = "✅" if loyalty_points >= item["cost"] else "🔒"
+            cost_str = f"{item['cost']:,}"
+            text += f"{affordable} {item['name']} - {to_persian_digits(cost_str)} امتیاز\n"
+            if loyalty_points >= item["cost"]:
+                keyboard.append([InlineKeyboardButton(text=item['name'], callback_data=f"loyaltyby_{item_id}")])
+
+    # sub_credit / plan items are retired (play must not mint VPN value) → not shown.
+    _render_section("\n<b>⭐ ستاره:</b>\n", ["star_piece", "star_full"])
+    _render_section("\n<b>🎁 ویژه:</b>\n", ["plan_10gb", "plan_20gb", "priority_support", "custom_username", "vip_90days", "vip_lifetime"])
+
     keyboard.append([InlineKeyboardButton(text="🔙 بازگشت", callback_data="enhanced_rewards_menu")])
     kb = InlineKeyboardMarkup(inline_keyboard=keyboard)
     
@@ -159,12 +145,18 @@ async def purchase_loyalty_item(callback: CallbackQuery, session: AsyncSession):
         return
     
     item = LOYALTY_SHOP[item_id]
+
+    # Retired (sub_credit/plan): never grant VPN value for play-earned loyalty points.
+    if item["type"] in RETIRED_LOYALTY_TYPES:
+        await callback.answer("این جایزه دیگر در دسترس نیست.", show_alert=True)
+        return
+
     user = await crud.get_user(session, callback.from_user.id)
-    
+
     if not user:
         await callback.answer("کاربر یافت نشد!", show_alert=True)
         return
-    
+
     # Check if user has enough loyalty points
     if user.loyalty_points < item["cost"]:
         await callback.answer(

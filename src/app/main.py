@@ -11,7 +11,6 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.redis_config import close_redis, init_redis
 from app.core.settings import BOT_TOKEN, DATABASE_URL, JOB_SCHEDULES, USER_STATE_FILE, security_sanity_warnings
 from app.database.models import AsyncSessionLocal, engine, init_db
-from app.database.tier_seeder import seed_star_reward_tiers
 from app.handlers.user import (
     add_subscription,
     charge,
@@ -155,9 +154,9 @@ async def main():
     try:
         await init_db()
         bot_logger.info("Database initialized successfully")
-        # Seed the database with hardcoded tiers
-        async with AsyncSessionLocal() as session:
-            await seed_star_reward_tiers(session)
+        # Legacy star-tier seeding retired (2026-06-02): the old credit/plan tier ladder is
+        # replaced by the Star Season coupon system. Existing tiers are deactivated; nothing
+        # re-seeds them. See REWARDS_HANDOFF.md / final-reward-system-map §8.5.
         print("→ Database ready (detail: logs/bot.log)", flush=True)
     except Exception as e:
         log_error(e, {"operation": "database_init"})
