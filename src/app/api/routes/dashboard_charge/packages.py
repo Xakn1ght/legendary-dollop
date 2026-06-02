@@ -1,3 +1,5 @@
+from app.api.deps import _verify_webapp_auth  # underscore name isn't pulled in by `import *`
+
 from .common import *  # noqa: F403
 
 
