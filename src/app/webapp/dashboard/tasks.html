@@ -301,6 +301,65 @@
 		        </div>
 		      </div>
 
+      <!-- Star Season -->
+      <div class="referral-card" id="seasonCard" style="display:none;" data-collapsible="true" data-default-open="true">
+        <div class="referral-header">
+          <div>
+            <div class="referral-title" id="seasonTitle">Star Season</div>
+            <div class="referral-subtitle" id="seasonSubtitle">Refer friends to climb the season ladder</div>
+          </div>
+          <div class="referral-actions">
+            <button class="reward-toggle" type="button" aria-label="Collapse section" aria-expanded="true" data-toggle="collapse">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <polyline points="6 9 12 15 18 9"></polyline>
+              </svg>
+            </button>
+          </div>
+        </div>
+        <div class="reward-body">
+          <div class="referral-stats">
+            <div class="ref-stat">
+              <div class="ref-stat-value" id="seasonStars">0</div>
+              <div class="ref-stat-label" id="seasonStarsLabel">Season stars</div>
+            </div>
+            <div class="ref-stat">
+              <div class="ref-stat-value" id="seasonNext">—</div>
+              <div class="ref-stat-label" id="seasonNextLabel">Next reward</div>
+            </div>
+            <div class="ref-stat">
+              <div class="ref-stat-value" id="seasonDaysLeft">—</div>
+              <div class="ref-stat-label" id="seasonDaysLeftLabel">Days left</div>
+            </div>
+          </div>
+          <div class="referral-list" id="seasonLadderWrap" style="display:block; margin-top:14px;">
+            <div class="referral-list-title" id="seasonLadderLabel">Reward ladder</div>
+            <div id="seasonLadderList"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- My Coupons -->
+      <div class="referral-card" id="couponsCard" style="display:none;" data-collapsible="true" data-default-open="true">
+        <div class="referral-header">
+          <div>
+            <div class="referral-title" id="couponsTitle">My Coupons</div>
+            <div class="referral-subtitle" id="couponsSubtitle">One per purchase · no stacking · 45-day expiry</div>
+          </div>
+          <div class="referral-actions">
+            <button class="reward-toggle" type="button" aria-label="Collapse section" aria-expanded="true" data-toggle="collapse">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <polyline points="6 9 12 15 18 9"></polyline>
+              </svg>
+            </button>
+          </div>
+        </div>
+        <div class="reward-body">
+          <div class="referral-list" id="couponListWrap" style="display:block;">
+            <div id="couponList"></div>
+          </div>
+        </div>
+      </div>
+
       <!-- Redeem Sheet -->
       <div class="sheet-backdrop" id="redeemBackdrop" aria-hidden="true"></div>
       <div class="sheet-panel" id="redeemPanel" role="dialog" aria-modal="true" aria-labelledby="redeemTitle" aria-hidden="true">

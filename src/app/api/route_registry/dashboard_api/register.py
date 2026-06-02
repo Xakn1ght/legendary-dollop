@@ -30,6 +30,7 @@ from .handlers import (
     handle_dashboard_remove_local,
     handle_dashboard_revoke,
     handle_dashboard_rewards_summary,
+    handle_dashboard_season,
     handle_dashboard_speed_dl,
     handle_dashboard_speed_ul,
     handle_dashboard_star_claim_apply,
@@ -108,6 +109,7 @@ def register_dashboard_api_routes(app: web.Application) -> None:
     app.router.add_get(DASHBOARD_API_BASE_PATH + "/rewards/summary", handle_dashboard_rewards_summary)
     app.router.add_post(DASHBOARD_API_BASE_PATH + "/wallet/convert-loyalty", handle_dashboard_wallet_convert_loyalty)
     app.router.add_post(DASHBOARD_API_BASE_PATH + "/wallet/cashout", handle_dashboard_wallet_cashout)
+    app.router.add_get(DASHBOARD_API_BASE_PATH + "/season", handle_dashboard_season)
     app.router.add_get(DASHBOARD_API_BASE_PATH + "/star-tiers", handle_dashboard_star_tiers)
     app.router.add_get(DASHBOARD_API_BASE_PATH + "/star-claims", handle_dashboard_star_claims)
     app.router.add_post(
