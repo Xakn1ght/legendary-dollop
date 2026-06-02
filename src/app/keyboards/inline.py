@@ -114,30 +114,30 @@ def get_enhanced_reward_voucher_keyboard(
 
     if extra_gb and extra_gb > 0:
         builder.button(
-            text=f"1️⃣ +{extra_gb:.0f} GB",
+            text=f"📦 +{extra_gb:.0f} GB",
             callback_data=f"redeem_traffic_{reward_id}",
         )
 
     if extra_days and extra_days > 0:
         builder.button(
-            text=f"2️⃣ +{extra_days} days",
+            text=f"📅 +{extra_days} روز",
             callback_data=f"redeem_days_{reward_id}",
         )
 
     if credit_amount and credit_amount > 0:
         builder.button(
-            text=f"3️⃣ +{credit_amount:,} T",
+            text=f"💰 +{credit_amount:,} تومان",
             callback_data=f"redeem_credit_{reward_id}",
         )
 
     if show_enhanced_stars:
         builder.button(
-            text=f"4️⃣ ⭐ +{star_increment} ستاره",
+            text=f"⭐ +{star_increment} ستاره",
             callback_data=f"redeem_enhanced_star_{star_increment}_{reward_id}",
         )
     elif show_star:
         builder.button(
-            text=f"4️⃣ ⭐ +{star_increment} ستاره",
+            text=f"⭐ +{star_increment} ستاره",
             callback_data=f"redeem_star_{star_increment}_{reward_id}",
         )
 
