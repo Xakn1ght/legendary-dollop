@@ -71,7 +71,7 @@ def get_reward_voucher_keyboard(
 
     if show_star:
         builder.button(
-            text=f"⭐ +{star_increment} (⭐ {stars_progress})",
+            text=f"4️⃣ ⭐ +{star_increment} ستاره",
             callback_data=f"redeem_star_{star_increment}_{reward_id}",
         )
 
@@ -132,12 +132,12 @@ def get_enhanced_reward_voucher_keyboard(
 
     if show_enhanced_stars:
         builder.button(
-            text=f"⭐ +{star_increment} (⭐ {stars_progress})",
+            text=f"4️⃣ ⭐ +{star_increment} ستاره",
             callback_data=f"redeem_enhanced_star_{star_increment}_{reward_id}",
         )
     elif show_star:
         builder.button(
-            text=f"⭐ +{star_increment} (⭐ {stars_progress})",
+            text=f"4️⃣ ⭐ +{star_increment} ستاره",
             callback_data=f"redeem_star_{star_increment}_{reward_id}",
         )
 

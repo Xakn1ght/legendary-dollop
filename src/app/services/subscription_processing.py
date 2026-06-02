@@ -272,12 +272,10 @@ async def process_approved_subscription(sub_id: int, session: AsyncSession, bot:
                     show_enhanced_stars=False,
                 )
                 try:
-                    star_line = f"\n⭐ گزینه ستاره فصلی: +{star_increment}" if star_increment > 0 else ""
                     await bot.send_message(
                         ref_user.chat_id,
                         "🎉 یک کاربر با کد شما سرویس جدید خریداری کرد!\n"
-                        "🎁 پاداش شما آماده است – یکی را انتخاب کنید:"
-                        f"{star_line}",
+                        "🎁 پاداش شما آماده است – یکی را انتخاب کنید:",
                         reply_markup=kb_reward,
                     )
                 except Exception as e:
