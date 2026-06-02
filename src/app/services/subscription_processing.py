@@ -87,6 +87,15 @@ async def process_approved_subscription(sub_id: int, session: AsyncSession, bot:
 
     plan_info = PLANS[subscription.plan_name]
 
+    # Apply a free_gb season coupon's bonus GB at provisioning so receipt/admin-approved
+    # orders get the same bonus the webapp auto-approve path applies.
+    try:
+        bonus_gb = await crud.free_gb_bonus_for_coupon(session, getattr(subscription, "applied_coupon_id", None))
+        if bonus_gb > 0:
+            plan_info = {**plan_info, "gb": int(plan_info.get("gb") or 0) + int(bonus_gb)}
+    except Exception:
+        pass
+
     try:
         marzban_user = await crud.create_subscription_on_marzban(subscription, plan_info)
     except Exception as e:

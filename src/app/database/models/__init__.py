@@ -151,6 +151,7 @@ def _migrate(connection):
             ("plan_name", "ALTER TABLE subscriptions ADD COLUMN plan_name VARCHAR;"),
             ("credit_used", "ALTER TABLE subscriptions ADD COLUMN credit_used INTEGER NOT NULL DEFAULT 0;"),
             ("applied_discount_ids", "ALTER TABLE subscriptions ADD COLUMN applied_discount_ids VARCHAR;"),
+            ("applied_coupon_id", "ALTER TABLE subscriptions ADD COLUMN applied_coupon_id INTEGER;"),
             ("admin_receipt_forward_message_id", "ALTER TABLE subscriptions ADD COLUMN admin_receipt_forward_message_id BIGINT;"),
             ("admin_request_message_id", "ALTER TABLE subscriptions ADD COLUMN admin_request_message_id BIGINT;"),
             ("receipt_image_url", "ALTER TABLE subscriptions ADD COLUMN receipt_image_url VARCHAR;"),

@@ -1,3 +1,4 @@
+import json
 import logging
 import random
 import string
@@ -9,6 +10,7 @@ from sqlalchemy.future import select
 from app.api.deps import _verify_webapp_auth, set_tma_session_cookie
 from app.api.routes.dashboard_purchase.plans_user import _generate_unique_username, _is_username_taken
 from app.api.schemas import StartPurchaseRequest, validate_request
+from app.core.rewards_config import DISCOUNT_COUPON_MAX_PLAN_GB
 from app.core.settings import (
     GLOBAL_PURCHASE_DISCOUNTS,
     PLANS,
@@ -17,6 +19,18 @@ from app.core.settings import (
 )
 from app.database import crud
 from app.database.models import AsyncSessionLocal, Referral, UserDiscount
+
+
+def _discount_price_cap() -> int:
+    """Highest base-plan price at or below the coupon GB cap (the spec's 100GB cap on
+    discount coupons). Used so a percent coupon can't discount an arbitrarily large
+    custom plan beyond a ~100GB plan's worth."""
+    prices = [
+        int(p.get("price") or 0)
+        for p in PLANS.values()
+        if int(p.get("gb") or 0) <= DISCOUNT_COUPON_MAX_PLAN_GB
+    ]
+    return max(prices) if prices else 0
 
 logger = logging.getLogger(__name__)
 
@@ -57,6 +71,7 @@ async def handle_start_purchase(request: web.Request):
     referral_code = validated.referral_code or ""
     use_credit = validated.use_credit
     discount_ids = validated.discount_ids or []
+    coupon_id = validated.coupon_id
 
     if auto_renewal and (not renewal_plan or renewal_plan not in PLANS):
         return web.json_response({"ok": False, "error": "invalid_renewal_plan", "message": "Invalid renewal plan selected"}, status=400)
@@ -124,6 +139,54 @@ async def handle_start_purchase(request: web.Request):
         if total_discount_percent > 0:
             discount_amount = int(total_price * (total_discount_percent / 100))
 
+        # ── Season reward coupon (one per purchase, no stacking) ────────────────
+        coupon = None
+        coupon_discount_amount = 0
+        coupon_free_gb = 0
+        effective_plan_info = plan_info
+        if coupon_id:
+            coupon = await crud.get_coupon_by_id(session, coupon_id)
+            now_cp = datetime.utcnow()
+            if (
+                not coupon
+                or coupon.user_id != user.id
+                or coupon.status != "active"
+                or (coupon.expires_at and coupon.expires_at < now_cp)
+            ):
+                return web.json_response(
+                    {"ok": False, "error": "invalid_coupon", "message": "Coupon not available"},
+                    status=400,
+                )
+            try:
+                payload = json.loads(coupon.payload or "{}")
+            except Exception:
+                payload = {}
+            ctype = coupon.coupon_type
+            if ctype == "discount_percent":
+                pct = int(payload.get("discount_percent") or 0)
+                cap = _discount_price_cap()
+                base = min(total_price, cap) if cap > 0 else total_price
+                coupon_discount_amount = int(base * (pct / 100))
+            elif ctype == "free_gb":
+                coupon_free_gb = int(payload.get("gb") or 0)
+                if coupon_free_gb > 0:
+                    effective_plan_info = {**plan_info, "gb": int(plan_info.get("gb") or 0) + coupon_free_gb}
+            else:
+                # free_plan / free_autorenew / vip_pack / legend_pack are not yet
+                # redeemable at checkout (deferred tier) — never silently consume them.
+                return web.json_response(
+                    {
+                        "ok": False,
+                        "error": "coupon_not_supported_yet",
+                        "message": "This coupon type is not yet redeemable at checkout.",
+                    },
+                    status=400,
+                )
+
+        discount_amount += coupon_discount_amount
+        if discount_amount > total_price:
+            discount_amount = total_price
+
         price_after_discount = total_price - discount_amount
 
         credit_used = 0
@@ -152,6 +215,7 @@ async def handle_start_purchase(request: web.Request):
 
         sub.credit_used = credit_used
         sub.applied_discount_ids = ",".join(str(i) for i in applied_discount_ids) if applied_discount_ids else None
+        sub.applied_coupon_id = coupon.id if coupon else None
         await session.commit()
         await session.refresh(sub)
 
@@ -161,10 +225,15 @@ async def handle_start_purchase(request: web.Request):
         if applied_discount_ids:
             await crud.mark_user_discounts_used(session, applied_discount_ids)
 
+        if coupon:
+            # Consume the coupon now (parity with discounts). Restored on cancel or
+            # auto-approve failure below.
+            await crud.mark_coupon_used(session, coupon.id)
+
         if final_price <= 0:
             auto_ok = False
             try:
-                marzban_info = await crud.create_subscription_on_marzban(sub, plan_info)
+                marzban_info = await crud.create_subscription_on_marzban(sub, effective_plan_info)
                 if marzban_info and marzban_info.get("subscription_url"):
                     await crud.activate_subscription(session, sub.id)
                     try:
@@ -213,6 +282,7 @@ async def handle_start_purchase(request: web.Request):
                         "total_price": total_price,
                         "discount_percent": total_discount_percent,
                         "discount_amount": discount_amount,
+                        "coupon": ({"id": coupon.id, "type": coupon.coupon_type, "free_gb": coupon_free_gb} if coupon else None),
                         "credit_used": credit_used,
                         "final_price": 0,
                     },
@@ -225,6 +295,8 @@ async def handle_start_purchase(request: web.Request):
             try:
                 if credit_used > 0:
                     await crud.add_credit(session, user.id, credit_used)
+                if sub.applied_coupon_id:
+                    await crud.restore_coupon(session, sub.applied_coupon_id)
                 if sub.applied_discount_ids:
                     try:
                         id_list = [int(x) for x in sub.applied_discount_ids.split(",") if x.strip().isdigit()]
@@ -261,6 +333,7 @@ async def handle_start_purchase(request: web.Request):
                 "total_price": total_price,
                 "discount_percent": total_discount_percent,
                 "discount_amount": discount_amount,
+                "coupon": ({"id": coupon.id, "type": coupon.coupon_type, "free_gb": coupon_free_gb} if coupon else None),
                 "credit_used": credit_used,
                 "final_price": final_price,
             },

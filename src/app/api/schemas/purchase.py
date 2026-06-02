@@ -86,7 +86,12 @@ class StartPurchaseRequest(BaseModel):
         max_length=10,
         description="List of discount IDs to apply"
     )
-    
+    coupon_id: Optional[int] = Field(
+        default=None,
+        ge=1,
+        description="Season reward coupon to apply (one per purchase, no stacking)"
+    )
+
     @field_validator('service_name')
     @classmethod
     def validate_service_name(cls, v: Optional[str]) -> Optional[str]:

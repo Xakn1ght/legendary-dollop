@@ -147,7 +147,13 @@
             <label class="form-label" data-i18n="activeDiscounts">Active Discounts</label>
             <div id="discountsList"></div>
           </div>
-          
+
+          <!-- Reward coupon (one per purchase, no stacking) -->
+          <div id="couponInfo" style="display: none; margin-bottom: 16px;">
+            <label class="form-label" data-i18n="rewardCoupon">Reward coupon</label>
+            <div id="couponList"></div>
+          </div>
+
           <!-- Summary -->
           <div class="summary" id="orderSummary">
             <div class="summary-row">
@@ -285,6 +291,9 @@
         discount: 'Discount',
         credit: 'Credit',
         amountDue: 'Amount Due',
+        rewardCoupon: 'Reward coupon',
+        couponNone: 'No coupon',
+        couponBonusGb: 'bonus GB on this plan',
         confirmPay: 'Confirm & Pay',
         uploadReceipt: 'Upload Receipt',
         cardNumber: 'Card Number',
@@ -339,6 +348,9 @@
         discount: 'تخفیف',
         credit: 'اعتبار',
         amountDue: 'مبلغ قابل پرداخت',
+        rewardCoupon: 'کوپن جایزه',
+        couponNone: 'بدون کوپن',
+        couponBonusGb: 'گیگ هدیه روی این پلن',
         confirmPay: 'تایید و پرداخت',
         uploadReceipt: 'ارسال رسید پرداخت',
         cardNumber: 'شماره کارت',
@@ -393,6 +405,8 @@
     let receiptFile = null;
     let receiptPreviewObjectUrl = null;
     let selectedDiscountIds = [];
+    let activeCoupons = [];
+    let selectedCouponId = null;
     let paymentInfo = { card_number: '6037-xxxx-xxxx-xxxx', card_holder: '' };
     
     // Get translation
@@ -700,6 +714,7 @@
           // Re-render plan cards to show VIP/event badges once userInfo is known.
           renderPlans();
         }
+        loadCoupons();
       } catch(e) {
         console.error('Failed to load user info:', e);
         // Check if user is not registered
@@ -855,6 +870,73 @@
       } else {
         selectedDiscountIds.push(id);
       }
+      updateSummary();
+    }
+
+    // ── Reward coupons (Phase 1: discount_percent + free_gb) ──────────────────
+    const COUPON_SUPPORTED = ['discount_percent', 'free_gb'];
+    const COUPON_DISCOUNT_MAX_PLAN_GB = 100;
+
+    function couponPriceCap() {
+      // Highest base-plan price at or below the 100GB cap (mirrors server).
+      const caps = (plans || [])
+        .filter(p => Number(p.gb || 0) <= COUPON_DISCOUNT_MAX_PLAN_GB)
+        .map(p => Number(p.price || 0));
+      return caps.length ? Math.max(...caps) : 0;
+    }
+
+    function couponLabel(c) {
+      const p = c.payload || {};
+      if (c.coupon_type === 'discount_percent') {
+        const n = Number(p.discount_percent || 0);
+        return currentLang === 'fa' ? ('٪' + n + ' تخفیف') : (n + '% discount');
+      }
+      if (c.coupon_type === 'free_gb') {
+        const n = Number(p.gb || 0);
+        return currentLang === 'fa' ? (n + ' گیگ رایگان') : (n + 'GB free');
+      }
+      return c.coupon_type;
+    }
+
+    async function loadCoupons() {
+      try {
+        const data = await api('/api/dashboard/season');
+        const all = (data && data.ok && Array.isArray(data.coupons)) ? data.coupons : [];
+        activeCoupons = all.filter(c => COUPON_SUPPORTED.includes(c.coupon_type));
+      } catch (_) {
+        activeCoupons = [];
+      }
+      renderCoupons();
+    }
+
+    function renderCoupons() {
+      const wrap = document.getElementById('couponInfo');
+      const list = document.getElementById('couponList');
+      if (!wrap || !list) return;
+      if (!activeCoupons.length) {
+        wrap.style.display = 'none';
+        list.innerHTML = '';
+        selectedCouponId = null;
+        return;
+      }
+      wrap.style.display = 'block';
+      const rows = [`
+        <label class="discount-tag">
+          <input type="radio" name="couponPick" value="" ${selectedCouponId === null ? 'checked' : ''} onchange="selectCoupon(null)">
+          ${t('couponNone')}
+        </label>`];
+      activeCoupons.forEach(c => {
+        rows.push(`
+          <label class="discount-tag">
+            <input type="radio" name="couponPick" value="${c.id}" ${selectedCouponId === c.id ? 'checked' : ''} onchange="selectCoupon(${c.id})">
+            🎁 ${couponLabel(c)}
+          </label>`);
+      });
+      list.innerHTML = rows.join('');
+    }
+
+    function selectCoupon(id) {
+      selectedCouponId = id;
       updateSummary();
     }
     
@@ -1024,12 +1106,36 @@
       let discountAmount = 0;
       if (discountPercent > 0) {
         discountAmount = Math.floor(totalPrice * (discountPercent / 100));
+      }
+
+      // Selected reward coupon (one per purchase; mirrors server math).
+      let couponBonusGb = 0;
+      const coupon = activeCoupons.find(c => c.id === selectedCouponId) || null;
+      if (coupon) {
+        if (coupon.coupon_type === 'discount_percent') {
+          const pct = Number(coupon.payload?.discount_percent || 0);
+          const cap = couponPriceCap();
+          const base = cap > 0 ? Math.min(totalPrice, cap) : totalPrice;
+          discountAmount += Math.floor(base * (pct / 100));
+        } else if (coupon.coupon_type === 'free_gb') {
+          couponBonusGb = Number(coupon.payload?.gb || 0);
+        }
+      }
+      if (discountAmount > totalPrice) discountAmount = totalPrice;
+
+      if (discountAmount > 0) {
         document.getElementById('summaryDiscountRow').style.display = 'flex';
-        document.getElementById('summaryDiscount').textContent = `-${formatPrice(discountAmount)} (${discountPercent}%)`;
+        document.getElementById('summaryDiscount').textContent = `-${formatPrice(discountAmount)}`;
       } else {
         document.getElementById('summaryDiscountRow').style.display = 'none';
       }
-      
+
+      // Show a +GB note on the plan line for a free_gb coupon (no price change).
+      if (couponBonusGb > 0) {
+        document.getElementById('summaryPlan').textContent =
+          `${getPlanDisplayName(selectedPlan)} - ${formatPrice(selectedPlan.price)}  (+${formatNumber(couponBonusGb)}${t('GB')} ${t('couponBonusGb')})`;
+      }
+
       let priceAfterDiscount = totalPrice - discountAmount;
       
       // Credit
@@ -1110,7 +1216,8 @@
             renewal_plan: autoRenewal ? selectedRenewalPlan?.name : null,
             referral_code: referralCode || null,
             use_credit: useCredit,
-            discount_ids: selectedDiscountIds
+            discount_ids: selectedDiscountIds,
+            coupon_id: selectedCouponId
           })
         });
         

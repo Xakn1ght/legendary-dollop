@@ -157,6 +157,55 @@ class _SeasonMixin:
         return live
 
     @staticmethod
+    async def get_coupon_by_id(db, coupon_id: int):
+        """Fetch a single coupon by id (any status). Caller checks ownership/validity."""
+        if not coupon_id:
+            return None
+        return (await db.execute(
+            select(RewardCoupon).filter(RewardCoupon.id == int(coupon_id))
+        )).scalars().first()
+
+    @staticmethod
+    async def mark_coupon_used(db, coupon_id: int) -> bool:
+        """Consume a coupon (active → used). Idempotent: a non-active coupon is left as-is
+        and returns False so callers don't double-spend."""
+        coupon = await _SeasonMixin.get_coupon_by_id(db, coupon_id)
+        if not coupon or coupon.status != "active":
+            return False
+        coupon.status = "used"
+        coupon.used_at = datetime.datetime.utcnow()
+        await db.commit()
+        return True
+
+    @staticmethod
+    async def restore_coupon(db, coupon_id: int) -> bool:
+        """Return a previously-used coupon to the wallet (used → active), e.g. when an
+        order it was attached to is cancelled or fails to provision. Expired coupons are
+        not revived."""
+        coupon = await _SeasonMixin.get_coupon_by_id(db, coupon_id)
+        if not coupon or coupon.status != "used":
+            return False
+        if coupon.expires_at and coupon.expires_at < datetime.datetime.utcnow():
+            return False
+        coupon.status = "active"
+        coupon.used_at = None
+        await db.commit()
+        return True
+
+    @staticmethod
+    async def free_gb_bonus_for_coupon(db, coupon_id: int) -> int:
+        """Bonus GB granted by a free_gb coupon (0 for any other type/missing). Used at
+        provisioning time so both the webapp auto-approve and admin-approval paths add the
+        same bonus to the new subscription."""
+        coupon = await _SeasonMixin.get_coupon_by_id(db, coupon_id)
+        if not coupon or coupon.coupon_type != "free_gb":
+            return 0
+        try:
+            return int(json.loads(coupon.payload or "{}").get("gb", 0) or 0)
+        except Exception:
+            return 0
+
+    @staticmethod
     async def end_active_season(db):
         """Deactivate the current season (used by the reset job). The next call to
         get_or_create_active_season opens a fresh window with everyone at 0 stars."""

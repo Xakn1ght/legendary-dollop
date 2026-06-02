@@ -34,6 +34,7 @@ class Subscription(Base):
     renewal_applied = Column(Boolean, default=False, nullable=False)
     credit_used = Column(Integer, default=0)
     applied_discount_ids = Column(String, nullable=True)
+    applied_coupon_id = Column(Integer, nullable=True)
     carry_over_bytes = Column(BigInteger, nullable=True)
     carry_over_reset_at = Column(DateTime, nullable=True)
 

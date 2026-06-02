@@ -44,6 +44,12 @@ async def handle_cancel_order(request: web.Request):
         if sub.credit_used and sub.credit_used > 0:
             await crud.add_credit(session, user.id, sub.credit_used)
 
+        if getattr(sub, "applied_coupon_id", None):
+            try:
+                await crud.restore_coupon(session, sub.applied_coupon_id)
+            except Exception as e:
+                logger.error(f"Failed to restore coupon: {e}")
+
         if sub.applied_discount_ids:
             try:
                 id_list = [int(x) for x in sub.applied_discount_ids.split(",") if x.strip().isdigit()]
