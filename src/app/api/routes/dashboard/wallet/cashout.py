@@ -3,11 +3,21 @@ import traceback
 
 from aiohttp import web
 
+from sqlalchemy.future import select
+
 from app.api.deps import _verify_webapp_auth, set_tma_session_cookie
 from app.database import crud
-from app.database.models import AsyncSessionLocal
+from app.database.models import AsyncSessionLocal, Referral, User
 
 logger = logging.getLogger(__name__)
+
+# Cash payout is a VIP-Promoter-only perk (final reward map §6): normal users stay
+# inside the VPN reward economy. Gate the live route on active referrals now; the
+# full flow (5% rate, monthly windows, 7-day fraud hold, exact ≥20GB definition)
+# lands in Phase D. "Active referral" here = a referred user with a live subscription
+# (same definition the referral-stats screen shows the user).
+# TODO(phase-d): move to rewards_config + apply 5% rate, caps, holds, ≥20GB rule.
+CASHOUT_MIN_ACTIVE_REFERRALS = 20
 
 
 async def handle_dashboard_wallet_cashout(request: web.Request):
@@ -39,6 +49,28 @@ async def handle_dashboard_wallet_cashout(request: web.Request):
             user = await crud.get_user(session, user_chat_id)
             if not user:
                 return web.json_response({"ok": False, "error": "user_not_found"}, status=404)
+
+            # VIP-Promoter gate: only users with enough active referrals may cash out.
+            referees = (await session.execute(
+                select(User)
+                .join(Referral, Referral.referee_id == User.id)
+                .filter(Referral.referrer_id == user.id)
+            )).scalars().all()
+            active_referrals = 0
+            for referee in referees:
+                subs = await crud.get_user_subscriptions(session, referee.id)
+                if any(s.status == "active" for s in subs):
+                    active_referrals += 1
+            if active_referrals < CASHOUT_MIN_ACTIVE_REFERRALS:
+                return web.json_response(
+                    {
+                        "ok": False,
+                        "error": "requires_vip_promoter",
+                        "min_active_referrals": CASHOUT_MIN_ACTIVE_REFERRALS,
+                        "active_referrals": active_referrals,
+                    },
+                    status=403,
+                )
 
             req = await crud.create_cashout_request(session, user.id, amount_int, destination)
             if not req:
