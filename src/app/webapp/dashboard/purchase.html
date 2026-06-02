@@ -18,7 +18,7 @@
   <link href="https://fonts.googleapis.com/css2?family=Urbanist:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/rastikerdar/vazirmatn@v33.003/Vazirmatn-font-face.css">
   <link rel="stylesheet" href="/webapp/dashboard/scrollbar-hide.css">
-  <link rel="stylesheet" href="/webapp/dashboard/css/purchase.css?v=3">
+  <link rel="stylesheet" href="/webapp/dashboard/css/purchase.css?v=4">
   <link rel="stylesheet" href="/webapp/dashboard/css/glass.css?v=26">
 </head>
 <body>
@@ -921,15 +921,17 @@
       }
       wrap.style.display = 'block';
       const rows = [`
-        <label class="discount-tag">
+        <label class="coupon-option ${selectedCouponId === null ? 'selected' : ''}">
           <input type="radio" name="couponPick" value="" ${selectedCouponId === null ? 'checked' : ''} onchange="selectCoupon(null)">
-          ${t('couponNone')}
+          <span class="coupon-radio"></span>
+          <span class="coupon-text">${t('couponNone')}</span>
         </label>`];
       activeCoupons.forEach(c => {
         rows.push(`
-          <label class="discount-tag">
+          <label class="coupon-option ${selectedCouponId === c.id ? 'selected' : ''}">
             <input type="radio" name="couponPick" value="${c.id}" ${selectedCouponId === c.id ? 'checked' : ''} onchange="selectCoupon(${c.id})">
-            🎁 ${couponLabel(c)}
+            <span class="coupon-radio"></span>
+            <span class="coupon-text">🎁 ${couponLabel(c)}</span>
           </label>`);
       });
       list.innerHTML = rows.join('');
@@ -937,6 +939,7 @@
 
     function selectCoupon(id) {
       selectedCouponId = id;
+      renderCoupons();
       updateSummary();
     }
     

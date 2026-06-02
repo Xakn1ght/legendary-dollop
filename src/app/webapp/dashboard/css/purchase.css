@@ -949,6 +949,55 @@ html[lang="fa"] .discount-tag {
   margin-left: 8px;
 }
 
+/* Reward coupon selector (matches plan-card selection language) */
+.coupon-option {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  border-radius: 12px;
+  padding: 12px 14px;
+  margin-bottom: 8px;
+  cursor: pointer;
+  border: 1.5px solid rgba(255,255,255,0.08);
+  background: linear-gradient(180deg, rgba(255,255,255,0.05), rgba(255,255,255,0.015));
+  color: var(--lightText);
+  font-size: 13px;
+  font-weight: 600;
+  transition: all 0.2s;
+}
+[data-theme="light"] .coupon-option {
+  border-color: rgba(15,23,42,0.08);
+  background: linear-gradient(180deg, rgba(15,23,42,0.015), rgba(15,23,42,0.005));
+}
+.coupon-option:hover { border-color: rgba(var(--brandRgb),0.35); }
+.coupon-option.selected {
+  border-color: var(--brand);
+  background:
+    radial-gradient(130% 140% at 20% 10%, rgba(var(--brandRgb),0.18), transparent 60%),
+    linear-gradient(180deg, rgba(var(--brandRgb),0.06), rgba(var(--brandRgb),0.02));
+  box-shadow: 0 4px 16px rgba(var(--brandRgb),0.22);
+}
+.coupon-option input { display: none; }
+.coupon-radio {
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  border: 2px solid rgba(var(--brandRgb),0.5);
+  flex-shrink: 0;
+  position: relative;
+  transition: all 0.2s;
+}
+.coupon-option.selected .coupon-radio { border-color: var(--brand); }
+.coupon-option.selected .coupon-radio::after {
+  content: '';
+  position: absolute;
+  inset: 3px;
+  border-radius: 50%;
+  background: var(--brand);
+}
+.coupon-text { flex: 1; }
+
 /* No plans message */
 .no-plans {
   text-align: center;
