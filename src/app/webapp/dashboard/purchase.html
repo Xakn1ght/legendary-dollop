@@ -931,7 +931,7 @@
           <label class="coupon-option ${selectedCouponId === c.id ? 'selected' : ''}">
             <input type="radio" name="couponPick" value="${c.id}" ${selectedCouponId === c.id ? 'checked' : ''} onchange="selectCoupon(${c.id})">
             <span class="coupon-radio"></span>
-            <span class="coupon-text">🎁 ${couponLabel(c)}</span>
+            <span class="coupon-text">${couponLabel(c)}</span>
           </label>`);
       });
       list.innerHTML = rows.join('');

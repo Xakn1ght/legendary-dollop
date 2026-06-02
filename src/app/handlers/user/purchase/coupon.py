@@ -58,7 +58,7 @@ async def prompt_coupon_or_next(message: Message, state: FSMContext, session: As
     buttons = []
     for i, c in enumerate(coupons, start=1):
         choices.append(c.id)
-        buttons.append([KeyboardButton(text=f"{i}) 🎁 {_coupon_label(c, lang)}")])
+        buttons.append([KeyboardButton(text=f"{i}) {_coupon_label(c, lang)}")])
     buttons.append([KeyboardButton(text=("بدون کوپن" if lang == "fa" else "No coupon"))])
 
     await state.update_data(coupon_choices=choices)
