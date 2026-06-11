@@ -141,8 +141,95 @@ async def back_from_package(message: Message, state: FSMContext, session: AsyncS
 @router.message(ChargeState.confirmation, text_matches("charge_confirm"))
 async def confirm_charge(message: Message, state: FSMContext, session: AsyncSession):
     lang = await _get_lang(message.chat.id, session)
+
+    # Wallet-credit option (same as the webapp charge flow). Only offered for
+    # preset packages — custom/booking paths keep their own handling.
+    data = await state.get_data()
+    user = await crud.get_user(session, message.chat.id)
+    pkg_label = data.get('package_label')
+    if user and (user.credit or 0) > 0 and pkg_label in CHARGE_PRESET_PACKAGES:
+        await state.set_state(ChargeState.ask_credit)
+        credit_kb = ReplyKeyboardMarkup(
+            keyboard=[
+                [KeyboardButton(text=(f"✅ بله، {user.credit:,} تومان اعتبار را استفاده کن" if lang == "fa" else f"✅ Yes, use {user.credit:,} credit"))],
+                [KeyboardButton(text=("خیر، برای بعد ذخیره کن" if lang == "fa" else "No, save for later"))],
+            ],
+            resize_keyboard=True,
+            one_time_keyboard=True,
+        )
+        await message.answer(
+            (f"شما **{user.credit:,} تومان اعتبار** دارید! آیا می‌خواهید آن را روی این شارژ استفاده کنید؟" if lang == "fa" else f"You have **{user.credit:,}** credit. Use it for this charge?"),
+            reply_markup=credit_kb,
+        )
+        return
+
     await message.answer(
         t(lang, "charge_request_registered"),
+        reply_markup=ReplyKeyboardMarkup(keyboard=[[KeyboardButton(text=t(lang, "btn_back"))]], resize_keyboard=True),
+        parse_mode="HTML"
+    )
+    await state.set_state(ChargeState.receipt)
+
+
+@router.message(ChargeState.ask_credit)
+async def charge_credit_choice(message: Message, state: FSMContext, session: AsyncSession):
+    lang = await _get_lang(message.chat.id, session)
+
+    if message.text and message.text.startswith("/start"):
+        await state.clear()
+        return  # Let start handler handle it
+
+    data = await state.get_data()
+    user = await crud.get_user(session, message.chat.id)
+    use_credit = (message.text or "").startswith("✅ بله") or (message.text or "").startswith("✅ Yes")
+
+    if not use_credit:
+        await message.answer(
+            t(lang, "charge_request_registered"),
+            reply_markup=ReplyKeyboardMarkup(keyboard=[[KeyboardButton(text=t(lang, "btn_back"))]], resize_keyboard=True),
+            parse_mode="HTML"
+        )
+        await state.set_state(ChargeState.receipt)
+        return
+
+    # Create the order now so the credit is reserved on the row (refunded if the
+    # user backs out at the receipt step).
+    from app.services.flows.charge import start_charge_order
+    from app.services.flows.errors import FlowError
+
+    try:
+        result = await start_charge_order(
+            session,
+            user,
+            subscription_id=data['subscription_id'],
+            package_name=data['package_label'],
+            charge_type=data.get('charge_type', 'normal'),
+            use_credit=True,
+            status="draft",
+        )
+    except FlowError:
+        await state.clear()
+        await message.answer(t(lang, "charge_error_fetch"), reply_markup=get_main_keyboard(message.chat.id, lang=lang))
+        return
+
+    if result.final_price <= 0:
+        # Fully covered by credit — already queued for admin approval by the service.
+        await state.clear()
+        await message.answer(
+            ("✅ شارژ شما به طور کامل با اعتبار پرداخت شد و پس از تایید ادمین اعمال می‌شود." if lang == "fa" else "✅ Your charge was fully paid with credit and will be applied after admin approval."),
+            reply_markup=get_main_keyboard(message.chat.id, lang=lang),
+        )
+        return
+
+    await state.update_data(charge_order_id=result.charge_request.id)
+    await message.answer(
+        (
+            f"💰 {result.credit_used:,} تومان از اعتبار شما استفاده شد.\n"
+            f"💵 مبلغ باقیمانده برای پرداخت: {result.final_price:,} تومان\n\n" + t(lang, "charge_request_registered")
+            if lang == "fa"
+            else f"💰 {result.credit_used:,} Toman of your credit was used.\n"
+            f"💵 Remaining to pay: {result.final_price:,} Toman\n\n" + t(lang, "charge_request_registered")
+        ),
         reply_markup=ReplyKeyboardMarkup(keyboard=[[KeyboardButton(text=t(lang, "btn_back"))]], resize_keyboard=True),
         parse_mode="HTML"
     )

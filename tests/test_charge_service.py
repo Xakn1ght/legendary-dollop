@@ -98,20 +98,23 @@ async def test_start_cancel_deny_credit():
     Session, fake = await _setup()
     async with Session() as db:
         user = await crud.get_user(db, CHAT)
+        user.credit = 50000  # partial coverage: order still needs a receipt
+        await db.commit()
 
         res = await start_charge_order(
             db, user, subscription_id=10, package_name="pkg30", use_credit=True, status="draft"
         )
         req = res.charge_request
-        assert req.credit_used == 120000 and req.status == "draft", (req.credit_used, req.status)
+        assert req.credit_used == 50000 and req.status == "draft", (req.credit_used, req.status)
+        assert res.final_price == 70000
         await db.refresh(user)
-        assert user.credit == 80000
+        assert user.credit == 0
 
         # Cancel refunds the reserved credit.
         refunded = await cancel_charge_order(db, user, req.id)
-        assert refunded == 120000
+        assert refunded == 50000
         await db.refresh(user)
-        assert user.credit == 200000
+        assert user.credit == 50000
 
         # Same again, but deny after receipt.
         res = await start_charge_order(
@@ -119,10 +122,38 @@ async def test_start_cancel_deny_credit():
         )
         await submit_charge_receipt(db, user, res.charge_request.id, receipt_message_id=1)
         result = await deny_charge(db, res.charge_request.id)
+        assert result.credit_refunded == 50000
+        await db.refresh(user)
+        assert user.credit == 50000
+    print("PASS test_start_cancel_deny_credit")
+
+
+async def test_full_credit_charge_goes_to_admin_queue():
+    """A charge fully covered by credit has no receipt to upload — it must land in
+    the admin approval queue immediately, not strand in draft with credit taken."""
+    import app.utils.admin_bot_helper as abh
+
+    abh.get_admin_bot = lambda: None  # no Telegram in tests
+
+    Session, fake = await _setup()
+    async with Session() as db:
+        user = await crud.get_user(db, CHAT)  # credit 200000 >= price 120000
+
+        res = await start_charge_order(
+            db, user, subscription_id=10, package_name="pkg30", use_credit=True, status="draft"
+        )
+        req = res.charge_request
+        assert res.final_price == 0
+        assert req.status == "pending" and req.receipt_message_id == -1, (req.status, req.receipt_message_id)
+        await db.refresh(user)
+        assert user.credit == 80000
+
+        # Deny returns the credit.
+        result = await deny_charge(db, req.id)
         assert result.credit_refunded == 120000
         await db.refresh(user)
         assert user.credit == 200000
-    print("PASS test_start_cancel_deny_credit")
+    print("PASS test_full_credit_charge_goes_to_admin_queue")
 
 
 async def test_gate_ownership_and_guards():
@@ -276,6 +307,7 @@ async def test_referral_reward_granted_without_bot():
 
 async def main():
     await test_start_cancel_deny_credit()
+    await test_full_credit_charge_goes_to_admin_queue()
     await test_gate_ownership_and_guards()
     await test_approve_carry_over_and_idempotency()
     await test_booking_renewal_only_at_approval()

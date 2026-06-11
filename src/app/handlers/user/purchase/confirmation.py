@@ -91,6 +91,14 @@ async def process_confirmation(message: Message, state: FSMContext, session: Asy
         await state.clear()
         return
 
+    # Same admin-configured card the webapp shows (read at call time — the admin
+    # panel can change it at runtime).
+    from app.core.settings import payment_ui as _payment
+
+    card_line = f"<code>{_payment.PAYMENT_CARD_NUMBER}</code>"
+    if _payment.PAYMENT_CARD_HOLDER:
+        card_line += f"\n{_payment.PAYMENT_CARD_HOLDER}"
+
     await message.answer(
         (
             (
@@ -101,7 +109,7 @@ async def process_confirmation(message: Message, state: FSMContext, session: Asy
                 "✅ Your order is confirmed.\n\n"
                 "Please transfer the amount to the card below, then send the receipt image:\n"
             )
-            + "<code>6037-xxxx-xxxx-xxxx</code>\n\n"
+            + card_line + "\n\n"
             + (
                 "پس از ارسال رسید، سرویس شما در اسرع وقت فعال خواهد شد."
                 if lang == "fa"
@@ -127,9 +135,11 @@ async def enable_auto_renew_callback(callback, state: FSMContext):
 
 @router.callback_query(F.data == "confirm_payment")
 async def confirm_payment_callback(callback, state: FSMContext):
+    from app.core.settings import payment_ui as _payment
+
     await callback.message.answer(
         "لطفا هزینه را به شماره کارت زیر واریز کرده و سپس تصویر رسید را ارسال کنید:\n"
-        "<code>6037-xxxx-xxxx-xxxx</code>\n\n"
+        f"<code>{_payment.PAYMENT_CARD_NUMBER}</code>\n\n"
         "پس از ارسال رسید، سرویس شما در اسرع وقت فعال خواهد شد.",
         reply_markup=KEYBOARD_MARKUP_BACK,
         parse_mode='HTML',

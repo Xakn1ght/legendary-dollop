@@ -112,6 +112,11 @@ async def process_receipt(message: Message, state: FSMContext, session: AsyncSes
         f"{charge_type_desc}\nسرویس: {sub_username}\nکاربر: {user.full_name} ({user.chat_id})\n"
         f"بسته: {' '.join(pkg_desc) or '-'}\nمبلغ: {charge_req.price:,} تومان"
     )
+    if charge_req.credit_used and charge_req.credit_used > 0:
+        charge_msg += (
+            f"\n💰 اعتبار استفاده شده: {charge_req.credit_used:,} تومان"
+            f"\n💵 پرداختی رسید: {charge_req.price - charge_req.credit_used:,} تومان"
+        )
 
     # Send to admin bot (not user bot)
     if admin_bot:

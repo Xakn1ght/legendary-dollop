@@ -138,12 +138,55 @@ async def start_charge_order(
             await session.commit()
             raise FlowError("insufficient_credit", "Not enough credit")
 
+    final_price = total_price - credit_used
+    if final_price <= 0 and total_price > 0:
+        # Fully covered by credit: there is no receipt to submit, so move the order
+        # into the admin approval queue now. (Previously it stayed in "draft" forever
+        # with the credit already deducted — the webapp skips the receipt step when
+        # nothing is due.)
+        charge_req.receipt_message_id = -1
+        charge_req.status = "pending"
+        await session.commit()
+        await session.refresh(charge_req)
+        await _notify_admin_credit_paid_charge(session, charge_req, user)
+
     return ChargeOrderResult(
         charge_request=charge_req,
         remaining_gb=remaining_gb,
         credit_used=credit_used,
-        final_price=total_price - credit_used,
+        final_price=final_price,
     )
+
+
+async def _notify_admin_credit_paid_charge(session: AsyncSession, charge_req: ChargeRequest, user) -> None:
+    """Put a fully-credit-paid charge in front of the admin (approve/deny buttons)."""
+    try:
+        from aiogram.utils.keyboard import InlineKeyboardBuilder
+
+        from app.core.settings import ADMIN_ID
+        from app.utils.admin_bot_helper import get_admin_bot
+
+        admin_bot = get_admin_bot()
+        if not admin_bot:
+            return
+        sub = await session.get(Subscription, charge_req.subscription_id)
+        kb = InlineKeyboardBuilder()
+        kb.button(text="✅ تایید شارژ", callback_data=f"approve_charge_{charge_req.id}")
+        kb.button(text="❌ رد", callback_data=f"deny_charge_{charge_req.id}")
+        kb.adjust(2)
+        gb_amount = (charge_req.traffic_bytes or 0) / GB
+        text_msg = (
+            "💳 درخواست شارژ با پرداخت کامل از اعتبار\n\n"
+            f"👤 کاربر: {user.full_name} ({user.chat_id})\n"
+            f"🔖 اشتراک: {sub.marzban_username if sub else 'N/A'}\n"
+            f"📦 بسته: {gb_amount:.0f} گیگابایت"
+            + (f" + {charge_req.extra_days} روز" if charge_req.extra_days else "")
+            + f"\n💰 اعتبار استفاده شده: {charge_req.credit_used:,} تومان"
+            + f"\n\n🆔 شماره درخواست: #{charge_req.id}"
+        )
+        await admin_bot.send_message(ADMIN_ID, text_msg, reply_markup=kb.as_markup())
+    except Exception as e:
+        logger.error(f"Failed to notify admin about credit-paid charge {charge_req.id}: {e}")
 
 
 async def start_booking_order(
