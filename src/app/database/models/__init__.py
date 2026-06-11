@@ -28,6 +28,7 @@ from ._reward import (
     UserStarRewardClaim,
 )
 from ._subscription import (
+    CashoutRequest,
     ChargeRequest,
     PendingDeletionRequest,
     Receipt,
@@ -50,6 +51,7 @@ __all__ = [
     "Referral",
     "ReferralReward",
     "RenewalHistory",
+    "CashoutRequest",
     "ChargeRequest",
     "PendingDeletionRequest",
     "RewardConfig",

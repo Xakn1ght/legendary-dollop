@@ -105,9 +105,33 @@ class ChargeRequest(Base):
     receipt_message_id = Column(Integer, nullable=True)
     receipt_image_url = Column(String, nullable=True)
     status = Column(String, default="pending")
+    # Wallet credit reserved when the order was created; must be refunded on cancel/deny.
+    credit_used = Column(Integer, nullable=True, default=0)
+    # Auto-renew intent captured at order time; applied to the subscription only when
+    # the charge is approved (never before payment is verified).
+    renewal_template = Column(String, nullable=True)
+    renewal_price = Column(Integer, nullable=True)
     created_at = Column(DateTime, default=datetime.datetime.utcnow)
 
     subscription = relationship("Subscription")
+    user = relationship("User")
+
+
+class CashoutRequest(Base):
+    """A wallet-credit withdrawal request. The amount is reserved (deducted from
+    User.credit) at creation and returned on denial."""
+    __tablename__ = "cashout_requests"
+
+    id = Column(Integer, primary_key=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    amount = Column(Integer, nullable=False)
+    destination = Column(String, nullable=True)
+    status = Column(String, default="pending")
+    requested_at = Column(DateTime, default=datetime.datetime.utcnow)
+    processed_at = Column(DateTime, nullable=True)
+    processed_by = Column(Integer, nullable=True)
+    admin_note = Column(String, nullable=True)
+
     user = relationship("User")
 
 

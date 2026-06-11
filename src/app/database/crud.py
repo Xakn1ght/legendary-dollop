@@ -1,8 +1,17 @@
 from app.database.repos.analytics import AnalyticsRepository
+from app.database.repos.cashout import CashoutRepository
 from app.database.repos.reward import RewardRepository
 from app.database.repos.subscription import SubscriptionRepository
 from app.database.repos.ticket import TicketRepository
 from app.database.repos.user import UserRepository
+
+# --- Cashout ---
+has_active_paid_subscription = CashoutRepository.has_active_paid_subscription
+create_cashout_request = CashoutRepository.create_cashout_request
+get_cashout_request = CashoutRepository.get_cashout_request
+list_cashout_requests = CashoutRepository.list_cashout_requests
+deny_cashout_request = CashoutRepository.deny_cashout_request
+mark_cashout_paid = CashoutRepository.mark_cashout_paid
 
 # --- User ---
 get_user_by_id = UserRepository.get_user_by_id
