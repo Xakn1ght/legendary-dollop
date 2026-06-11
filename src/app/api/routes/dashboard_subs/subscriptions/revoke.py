@@ -1,6 +1,12 @@
 from app.api.deps import _extract_user_id_from_init, _verify_webapp_auth
+from app.services.flows.errors import FlowError
+from app.services.flows.subs import revoke_subscription
 
 from ..common import *  # noqa: F403
+
+# Ownership failures report not_found so the API doesn't leak which ids exist.
+_ERROR_STATUS = {"not_found": 404, "unauthorized": 404, "revoke_failed": 500}
+_ERROR_CODES = {"unauthorized": "not_found"}
 
 
 async def handle_dashboard_revoke(request: web.Request):
@@ -20,6 +26,7 @@ async def handle_dashboard_revoke(request: web.Request):
         if init_data and verify_init_data(init_data, BOT_TOKEN):
             user_chat_id = _extract_user_id_from_init(init_data)
             if user_chat_id:
+                user_chat_id = int(user_chat_id)
                 new_session_token = create_session_token(user_chat_id, WEBAPP_SESSION_SECRET or BOT_TOKEN, ttl_seconds=86400)
     if not user_chat_id:
         return web.json_response({"ok": False, "error": "unauthorized"}, status=403)
@@ -28,24 +35,14 @@ async def handle_dashboard_revoke(request: web.Request):
         user = await crud.get_user(session, user_chat_id)
         if not user:
             return web.json_response({"ok": False, "error": "not_registered"}, status=403)
-        sub = await session.get(Subscription, sub_id)
-        if not sub or sub.user_id != user.id:
-            return web.json_response({"ok": False, "error": "not_found"}, status=404)
-        ok = await marzban_api.revoke_user_subscription(sub.marzban_username)
-        if not ok:
-            return web.json_response({"ok": False, "error": "revoke_failed"}, status=500)
-        # Refresh info and persist token if needed
-        info = await marzban_api.get_user_info(sub.marzban_username)
         try:
-            new_link = (info or {}).get("subscription_url")
-            if new_link:
-                import re
-                m = re.search(r"/sub/([^/]+)/?", new_link)
-                if m:
-                    sub.sub_token = m.group(1)
-                    await session.commit()
-        except Exception:
-            pass
+            await revoke_subscription(session, user, sub_id)
+        except FlowError as e:
+            return web.json_response(
+                {"ok": False, "error": _ERROR_CODES.get(e.code, e.code)},
+                status=_ERROR_STATUS.get(e.code, 400),
+            )
+
         resp = web.json_response({"ok": True})
         if new_session_token:
             set_tma_session_cookie(resp, request, new_session_token, max_age=86400)

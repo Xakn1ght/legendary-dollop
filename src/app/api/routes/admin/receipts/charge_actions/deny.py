@@ -2,6 +2,8 @@ from aiohttp import web
 
 from app.database import crud, notifications_crud
 from app.database.models import AsyncSessionLocal
+from app.services.flows.charge import deny_charge
+from app.services.flows.errors import FlowError
 from app.utils.admin_bot_helper import resolve_user_bot
 
 try:
@@ -13,7 +15,7 @@ except ImportError:
 
 
 async def handle_admin_deny_charge(request: web.Request):
-    """Deny a pending charge request"""
+    """Deny a pending charge request (refunds any reserved credit)."""
     try:
         charge_id = int(request.match_info["charge_id"])
     except (ValueError, KeyError):
@@ -22,25 +24,19 @@ async def handle_admin_deny_charge(request: web.Request):
         user_bot = resolve_user_bot(request.app.get("bot"))
 
         async with AsyncSessionLocal() as session:
-            charge_req = await crud.get_charge_request(session, charge_id)
-            if not charge_req or charge_req.status != "pending":
+            try:
+                result = await deny_charge(session, charge_id)
+            except FlowError:
                 return web.json_response({"ok": False, "error": "not_found_or_processed"}, status=404)
 
-            await session.refresh(charge_req, attribute_names=["subscription", "user"])
-            user = charge_req.user
-            sub = charge_req.subscription
-
-            if hasattr(charge_req, "credit_used") and charge_req.credit_used and charge_req.credit_used > 0:
-                if user:
-                    user.credit = (user.credit or 0) + charge_req.credit_used
-
-            await crud.update_charge_request_status(session, charge_id, "denied")
-            await session.commit()
+            user = await crud.get_user_by_id(session, result.user_id)
 
             if user_bot and user:
                 try:
-                    msg = f"❌ متاسفانه درخواست شارژ شما رد شد.\n\n"
-                    msg += f"📦 سرویس: {sub.marzban_username if sub else 'نامشخص'}\n"
+                    msg = "❌ متاسفانه درخواست شارژ شما رد شد.\n\n"
+                    msg += f"📦 سرویس: {result.service_name or 'نامشخص'}\n"
+                    if result.credit_refunded > 0:
+                        msg += f"💰 بازگشت اعتبار: {result.credit_refunded:,} تومان\n"
                     msg += "لطفاً با پشتیبانی تماس بگیرید."
                     await user_bot.send_message(user.chat_id, msg)
                 except Exception:
@@ -53,7 +49,7 @@ async def handle_admin_deny_charge(request: web.Request):
                         user_id=user.id,
                         type="charge_denied",
                         title="Charge denied",
-                        message=f"❌ Your charge request for {sub.marzban_username if sub else 'your service'} was denied.",
+                        message=f"❌ Your charge request for {result.service_name or 'your service'} was denied.",
                         sent_to_webapp=True,
                         sent_to_bot=False,
                     )

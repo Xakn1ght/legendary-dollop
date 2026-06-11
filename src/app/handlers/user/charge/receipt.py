@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-from datetime import datetime
-
 from aiogram import F
 from aiogram.fsm.context import FSMContext
 from aiogram.types import KeyboardButton, Message, ReplyKeyboardMarkup
@@ -10,6 +8,12 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.settings import ADMIN_ID, CHARGE_PRESET_PACKAGES
 from app.database import crud
 from app.keyboards.reply import get_main_keyboard
+from app.services.flows.charge import (
+    cancel_charge_order,
+    start_charge_order,
+    submit_charge_receipt,
+)
+from app.services.flows.errors import FlowError
 from app.utils.bot_i18n import t, text_matches
 
 from .common import GB, ChargeState, _get_lang, router
@@ -24,55 +28,47 @@ async def process_receipt(message: Message, state: FSMContext, session: AsyncSes
     charge_type = data.get('charge_type', 'normal')
 
     user = await crud.get_user(session, message.chat.id)
-    # Support custom extra days requests
-    if pkg_label and pkg_label in CHARGE_PRESET_PACKAGES:
-        pkg = CHARGE_PRESET_PACKAGES[pkg_label]
-        price = pkg['price']
-        traffic_bytes = int(pkg.get('gb', 0) * GB)
-        extra_days = pkg.get('days')
-    else:
-        price = int(data.get('custom_price', 0))
-        traffic_bytes = 0
-        extra_days = int(data.get('custom_extra_days', 0)) if data.get('custom_extra_days') else None
-    
-    if charge_type == 'booking':
-        # Handle booking as auto-renewal setup
-        from app.handlers.user.purchase import PLANS
-        plan_name = pkg_label  # Use package label as plan name for now
-        
-        # Update subscription with renewal settings
-        await crud.update_subscription_renewal(
-            session, sub_id, 
-            renewal_paid=True,
-            renewal_template=plan_name,
-            renewal_price=price,
-            renewal_requested_at=datetime.utcnow()
-        )
-        
+
+    try:
+        charge_order_id = data.get('charge_order_id')
+        if charge_order_id:
+            # Booking flow: the order was created when the plan was picked.
+            charge_req = await submit_charge_receipt(
+                session, user, charge_order_id, receipt_message_id=message.message_id
+            )
+        elif pkg_label and pkg_label in CHARGE_PRESET_PACKAGES:
+            # Preset packages go through the shared flow (server-side >5GB gate,
+            # ownership/active checks); receipt is attached in the same step.
+            result = await start_charge_order(
+                session,
+                user,
+                subscription_id=sub_id,
+                package_name=pkg_label,
+                charge_type=charge_type,
+                use_credit=False,
+                status="draft",
+            )
+            charge_req = await submit_charge_receipt(
+                session, user, result.charge_request.id, receipt_message_id=message.message_id
+            )
+        else:
+            # Custom extra-days request (no preset package): price comes from the
+            # admin-quoted amount held in FSM state.
+            price = int(data.get('custom_price', 0))
+            extra_days = int(data.get('custom_extra_days', 0)) if data.get('custom_extra_days') else None
+            charge_req = await crud.create_charge_request(
+                session, sub_id, user.id, 0, extra_days, price, message.message_id
+            )
+    except FlowError:
         await state.clear()
         await message.answer(
-            t(lang, "charge_booking_receipt_success").format(plan=pkg_label, price=f"{price:,}"),
-            reply_markup=get_main_keyboard(message.chat.id, lang=lang)
+            ("این درخواست قابل پردازش نیست. لطفاً دوباره تلاش کنید." if lang == "fa" else "This request can't be processed. Please try again."),
+            reply_markup=get_main_keyboard(message.chat.id, lang=lang),
         )
-        
-        # Notify admin on the **admin** bot only (separate from user bot).
-        from app.utils.admin_bot_helper import get_admin_bot
-
-        admin_bot = get_admin_bot()
-        if admin_bot:
-            try:
-                await admin_bot.send_message(
-                    ADMIN_ID,
-                    f"📅 رزرو پلن جدید\nسرویس: {data.get('subscription_username', 'unknown')}\nکاربر: {user.full_name} ({user.chat_id})\nپلن: {pkg_label}\nمبلغ: {price:,} تومان",
-                )
-            except Exception:
-                pass
         return
-    
-    # For normal and 5gb_limit charges, create ChargeRequest
-    charge_req = await crud.create_charge_request(
-        session, sub_id, user.id, traffic_bytes, extra_days, price, message.message_id
-    )
+
+    traffic_bytes = charge_req.traffic_bytes or 0
+    extra_days = charge_req.extra_days
 
     # Forward photo receipt to admin bot (not user bot)
     from app.utils.admin_bot_helper import get_admin_bot
@@ -102,16 +98,21 @@ async def process_receipt(message: Message, state: FSMContext, session: AsyncSes
         pkg_desc.append(f"{int(traffic_bytes/GB)}GB")
     if extra_days:
         pkg_desc.append(f"+{extra_days}days")
-    
+    if (charge_req.charge_type or charge_type) == 'booking' and getattr(charge_req, 'renewal_template', None):
+        pkg_desc.append(f"رزرو {charge_req.renewal_template}")
+
     # Add charge type info (admin messages stay in Farsi)
     charge_type_desc = {
         'normal': '⚡️ شارژ عادی',
         'normal_5gb_limit': '⚠️ شارژ (حد 5GB)',
         'booking': '📅 رزرو پلن'
-    }.get(charge_type, '⚡️ شارژ')
+    }.get(charge_req.charge_type or charge_type, '⚡️ شارژ')
 
-    charge_msg = f"{charge_type_desc}\nسرویس: {sub_username}\nکاربر: {user.full_name} ({user.chat_id})\nبسته: {' '.join(pkg_desc)}"
-    
+    charge_msg = (
+        f"{charge_type_desc}\nسرویس: {sub_username}\nکاربر: {user.full_name} ({user.chat_id})\n"
+        f"بسته: {' '.join(pkg_desc) or '-'}\nمبلغ: {charge_req.price:,} تومان"
+    )
+
     # Send to admin bot (not user bot)
     if admin_bot:
         try:
@@ -126,6 +127,16 @@ async def process_receipt(message: Message, state: FSMContext, session: AsyncSes
 @router.message(ChargeState.receipt, text_matches("btn_back"))
 async def cancel_receipt(message: Message, state: FSMContext, session: AsyncSession):
     lang = await _get_lang(message.chat.id, session)
+    # If a draft order was already created (booking flow), cancel it properly so any
+    # reserved credit comes back.
+    data = await state.get_data()
+    charge_order_id = data.get('charge_order_id')
+    if charge_order_id:
+        user = await crud.get_user(session, message.chat.id)
+        try:
+            await cancel_charge_order(session, user, charge_order_id)
+        except FlowError:
+            pass
     await state.clear()
     await message.answer(t(lang, "charge_cancelled"), reply_markup=get_main_keyboard(message.chat.id, lang=lang))
 
@@ -134,14 +145,14 @@ async def cancel_receipt(message: Message, state: FSMContext, session: AsyncSess
 async def receipt_catch_all(message: Message, state: FSMContext, session: AsyncSession):
     """Catch any other message in receipt state - allow /start to reset"""
     lang = await _get_lang(message.chat.id, session)
-    
+
     # Allow /start to reset flow
     if message.text and message.text.startswith("/start"):
         await state.clear()
         return  # Let start handler handle it
-    
+
     # Any other text/non-photo - remind user to send receipt or go back
     await message.answer(
         ("لطفاً تصویر رسید را ارسال کنید یا بازگشت را بزنید." if lang == "fa" else "Please send the receipt image or press back."),
         reply_markup=ReplyKeyboardMarkup(keyboard=[[KeyboardButton(text=t(lang, "btn_back"))]], resize_keyboard=True)
-    ) 
+    )

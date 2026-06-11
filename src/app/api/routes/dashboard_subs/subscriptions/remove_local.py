@@ -1,4 +1,6 @@
 from app.api.deps import _verify_webapp_auth
+from app.services.flows.errors import FlowError
+from app.services.flows.subs import remove_local_subscription
 
 from ..common import *  # noqa: F403
 
@@ -15,12 +17,10 @@ async def handle_dashboard_remove_local(request: web.Request):
         user = await crud.get_user(session, user_chat_id)
         if not user:
             return web.json_response({"ok": False, "error": "not_registered"}, status=403)
-        sub = await session.get(Subscription, sub_id)
-        if not sub or sub.user_id != user.id:
+        try:
+            await remove_local_subscription(session, user, sub_id)
+        except FlowError:
             return web.json_response({"ok": False, "error": "not_found"}, status=404)
-        # Detach from user panel only
-        sub.user_id = None
-        await session.commit()
         resp = web.json_response({"ok": True})
         if new_session_token:
             set_tma_session_cookie(resp, request, new_session_token, max_age=86400)

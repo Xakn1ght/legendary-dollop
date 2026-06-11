@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-from aiogram import F
 from aiogram.fsm.context import FSMContext
 from aiogram.types import KeyboardButton, Message, ReplyKeyboardMarkup
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -28,7 +27,6 @@ async def choose_package(message: Message, state: FSMContext, session: AsyncSess
     # Allow /start to reset flow
     if message.text and message.text.startswith("/start"):
         await state.clear()
-        from app.handlers.user.start import cmd_start
         return  # Let start handler handle it
     
     if message.text in (t("fa", "btn_back"), t("en", "btn_back")):

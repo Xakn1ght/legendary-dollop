@@ -5,13 +5,14 @@ from aiogram.fsm.context import FSMContext
 from aiogram.types import Message
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.future import select
 
 from app.core.settings import ADMIN_ID
-from app.database import crud, models
+from app.database import crud
 from app.keyboards.reply import get_main_keyboard
+from app.services.flows.errors import FlowError
+from app.services.flows.purchase import cancel_purchase_order, submit_purchase_receipt
 
-from .common import PurchaseState, _cleanup_pending_subscription, router
+from .common import PurchaseState, router
 
 
 @router.message(PurchaseState.receipt, F.photo)
@@ -22,24 +23,26 @@ async def process_receipt(message: Message, state: FSMContext, session: AsyncSes
     user_chat_id = user.chat_id
     sub_id = data.get('sub_id')
     marzban_username = data.get('marzban_username')
-    # Only update the existing subscription with the receipt message id
-    sub = None
-    if sub_id:
-        result = await session.execute(select(models.Subscription).filter(models.Subscription.id == sub_id))
-        sub = result.scalars().first()
-        if sub:
-            sub.receipt_message_id = message.message_id
-            await session.commit()
-            await session.refresh(sub)
-            # Notify admin web panel (live update)
-            try:
-                from app.api.routes.admin_ws import broadcast_admin_event
-
-                asyncio.create_task(broadcast_admin_event('receipts_updated', {'order_id': sub.id}))
-            except Exception:
-                pass
-    else:
+    if not sub_id:
         return  # Should not happen
+
+    try:
+        sub = await submit_purchase_receipt(session, user, sub_id, receipt_message_id=message.message_id)
+    except FlowError:
+        await state.clear()
+        await message.answer(
+            "این سفارش قابل پردازش نیست. لطفاً دوباره از منوی خرید اقدام کنید.",
+            reply_markup=get_main_keyboard(message.chat.id),
+        )
+        return
+
+    # Notify admin web panel (live update)
+    try:
+        from app.api.routes.admin_ws import broadcast_admin_event
+
+        asyncio.create_task(broadcast_admin_event('receipts_updated', {'order_id': sub.id}))
+    except Exception:
+        pass
 
     # Forward the receipt to admin bot (not user bot)
     from app.utils.admin_bot_helper import get_admin_bot
@@ -92,14 +95,16 @@ async def process_receipt(message: Message, state: FSMContext, session: AsyncSes
 
 @router.message(PurchaseState.receipt, F.text == 'بازگشت🔙')
 async def cancel_purchase_receipt(message: Message, state: FSMContext, session: AsyncSession):
-    # Refund credit if used and purchase cancelled
+    # Cancel the draft order: refunds credit and restores the coupon/discounts that
+    # were consumed at order creation (all inside the shared cancel service).
     data_state = await state.get_data()
-    credit_used = data_state.get('credit_used', 0)
-    if credit_used:
-        await crud.add_credit(session, message.chat.id, credit_used)
-
-    # Delete pending subscription (no receipt)
-    await _cleanup_pending_subscription(session, state)
+    sub_id = data_state.get('sub_id')
+    if sub_id:
+        user = await crud.get_user(session, message.chat.id)
+        try:
+            await cancel_purchase_order(session, user, sub_id)
+        except FlowError:
+            pass
 
     await state.clear()
     await message.answer("خرید لغو شد. به منوی اصلی بازگشتید.", )

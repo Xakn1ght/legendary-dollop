@@ -12,7 +12,9 @@ from app.api.routes.dashboard_charge.common import GB, MAX_RECEIPT_BYTES, logger
 from app.core.paths import webapp_path
 from app.core.settings import ADMIN_ID
 from app.database import crud
-from app.database.models import AsyncSessionLocal, ChargeRequest, Subscription
+from app.database.models import AsyncSessionLocal, Subscription
+from app.services.flows.charge import submit_charge_receipt
+from app.services.flows.errors import FlowError
 from app.utils.admin_bot_helper import get_admin_bot
 from app.utils.validation import detect_image_type, validate_image_bytes
 
@@ -68,14 +70,6 @@ async def handle_submit_charge_receipt(request: web.Request):
         if not user:
             return web.json_response({"ok": False, "error": "not_registered"}, status=403)
 
-        charge_req = await session.get(ChargeRequest, order_id)
-        if not charge_req:
-            return web.json_response({"ok": False, "error": "order_not_found"}, status=404)
-        if charge_req.user_id != user.id:
-            return web.json_response({"ok": False, "error": "unauthorized"}, status=403)
-        if charge_req.status not in ("draft", "pending") or charge_req.receipt_message_id is not None:
-            return web.json_response({"ok": False, "error": "order_already_processed"}, status=400)
-
         try:
             if "," in receipt_image_b64:
                 receipt_image_b64 = receipt_image_b64.split(",", 1)[1]
@@ -92,23 +86,27 @@ async def handle_submit_charge_receipt(request: web.Request):
         if receipt_ext and detected and receipt_ext != detected:
             return web.json_response({"ok": False, "error": "invalid_image", "detail": "type_mismatch"}, status=400)
 
-        sub = await session.get(Subscription, charge_req.subscription_id)
-
-        charge_req.receipt_message_id = -1
-        charge_req.status = "pending"
-
+        receipt_image_url = None
         try:
             uploads_dir = os.path.abspath(webapp_path("admin", "uploads", "receipts"))
             os.makedirs(uploads_dir, exist_ok=True)
-            fname = f"charge_receipt_{charge_req.id}_{''.join(random.choices(string.ascii_lowercase + string.digits, k=10))}.{receipt_ext}"
+            fname = f"charge_receipt_{order_id}_{''.join(random.choices(string.ascii_lowercase + string.digits, k=10))}.{receipt_ext}"
             fpath = os.path.join(uploads_dir, fname)
             with open(fpath, "wb") as f:
                 f.write(image_data)
-            charge_req.receipt_image_url = f"/admin/uploads/receipts/{fname}"
+            receipt_image_url = f"/admin/uploads/receipts/{fname}"
         except Exception as e:
-            logger.error(f"Failed to save charge receipt image for order {charge_req.id}: {e}")
+            logger.error(f"Failed to save charge receipt image for order {order_id}: {e}")
 
-        await session.commit()
+        try:
+            charge_req = await submit_charge_receipt(
+                session, user, order_id, receipt_message_id=-1, receipt_image_url=receipt_image_url
+            )
+        except FlowError as e:
+            status = {"order_not_found": 404, "unauthorized": 403}.get(e.code, 400)
+            return web.json_response({"ok": False, "error": e.code}, status=status)
+
+        sub = await session.get(Subscription, charge_req.subscription_id)
 
         try:
             photo_file = BufferedInputFile(image_data, filename="charge_receipt.jpg")

@@ -1,5 +1,4 @@
 import base64
-import logging
 import os
 import random
 import string
@@ -14,7 +13,9 @@ from app.api.schemas import SubmitReceiptRequest, validate_request
 from app.core.paths import webapp_path
 from app.core.settings import ADMIN_ID, PLANS
 from app.database import crud
-from app.database.models import AsyncSessionLocal, Subscription
+from app.database.models import AsyncSessionLocal
+from app.services.flows.errors import FlowError
+from app.services.flows.purchase import submit_purchase_receipt
 from app.utils.admin_bot_helper import get_admin_bot
 from app.utils.validation import detect_image_type, validate_image_bytes
 
@@ -70,14 +71,6 @@ async def handle_submit_receipt(request: web.Request):
         if not user:
             return web.json_response({"ok": False, "error": "not_registered"}, status=403)
 
-        sub = await session.get(Subscription, order_id)
-        if not sub:
-            return web.json_response({"ok": False, "error": "order_not_found"}, status=404)
-        if sub.user_id != user.id:
-            return web.json_response({"ok": False, "error": "unauthorized"}, status=403)
-        if (sub.status or "") not in ("draft", "pending") or sub.receipt_message_id is not None:
-            return web.json_response({"ok": False, "error": "order_already_processed"}, status=400)
-
         try:
             if "," in receipt_image_b64:
                 receipt_image_b64 = receipt_image_b64.split(",", 1)[1]
@@ -94,20 +87,25 @@ async def handle_submit_receipt(request: web.Request):
         if receipt_ext and detected and receipt_ext != detected:
             return web.json_response({"ok": False, "error": "invalid_image", "detail": "type_mismatch"}, status=400)
 
-        sub.receipt_message_id = -1
-        sub.status = "pending"
+        receipt_image_url = None
         try:
             uploads_dir = os.path.abspath(webapp_path("admin", "uploads", "receipts"))
             os.makedirs(uploads_dir, exist_ok=True)
-            fname = f"receipt_{sub.id}_{''.join(random.choices(string.ascii_lowercase + string.digits, k=10))}.{receipt_ext}"
+            fname = f"receipt_{order_id}_{''.join(random.choices(string.ascii_lowercase + string.digits, k=10))}.{receipt_ext}"
             fpath = os.path.join(uploads_dir, fname)
             with open(fpath, "wb") as f:
                 f.write(image_data)
-            sub.receipt_image_url = f"/admin/uploads/receipts/{fname}"
+            receipt_image_url = f"/admin/uploads/receipts/{fname}"
         except Exception as e:
-            logger.error(f"Failed to save receipt image for order {sub.id}: {e}")
+            logger.error(f"Failed to save receipt image for order {order_id}: {e}")
 
-        await session.commit()
+        try:
+            sub = await submit_purchase_receipt(
+                session, user, order_id, receipt_message_id=-1, receipt_image_url=receipt_image_url
+            )
+        except FlowError as e:
+            status = {"order_not_found": 404, "unauthorized": 403}.get(e.code, 400)
+            return web.json_response({"ok": False, "error": e.code}, status=status)
 
         try:
             photo_file = BufferedInputFile(image_data, filename="receipt.jpg")

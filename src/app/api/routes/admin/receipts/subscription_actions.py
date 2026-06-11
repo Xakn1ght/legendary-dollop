@@ -77,39 +77,19 @@ async def handle_admin_deny_receipt(request: web.Request):
         user_bot = resolve_user_bot(request.app.get("bot"))
 
         async with AsyncSessionLocal() as session:
-            sub = await session.get(Subscription, sub_id)
-            if not sub:
-                return web.json_response({"ok": False, "error": "not_found"}, status=404)
-            
-            if sub.status != 'pending':
-                return web.json_response({"ok": False, "error": "already_processed"}, status=400)
-            
-            user = await session.get(User, sub.user_id)
-            
-            # Refund credit if used
-            credit_refunded = 0
-            if sub.credit_used and sub.credit_used > 0:
-                await crud.add_credit(session, sub.user_id, sub.credit_used)
-                credit_refunded = sub.credit_used
-            
-            # Restore discounts
-            discounts_restored = False
-            if sub.applied_discount_ids:
-                try:
-                    from app.database.models import UserDiscount
-                    id_list = [int(x) for x in sub.applied_discount_ids.split(',') if x.strip().isdigit()]
-                    if id_list:
-                        res = await session.execute(select(UserDiscount).filter(UserDiscount.id.in_(id_list)))
-                        discounts = res.scalars().all()
-                        for d in discounts:
-                            d.used = False
-                        discounts_restored = True
-                except Exception:
-                    pass
-            
-            # Delete subscription
-            await crud.delete_subscription(session, sub_id)
-            
+            from app.services.flows.errors import FlowError
+            from app.services.flows.purchase import deny_purchase_order
+
+            try:
+                result = await deny_purchase_order(session, sub_id)
+            except FlowError as e:
+                status = 404 if e.code == "not_found" else 400
+                return web.json_response({"ok": False, "error": e.code}, status=status)
+
+            user = await session.get(User, result.user_id)
+            credit_refunded = result.credit_refunded
+            discounts_restored = result.discounts_restored
+
             # Notify user via user bot (embedded aiohttp may not set request.app["bot"])
             if user_bot and user:
                 try:
@@ -119,17 +99,19 @@ async def handle_admin_deny_receipt(request: web.Request):
                         details.append(f"بازگشت اعتبار: {credit_refunded:,} تومان")
                     if discounts_restored:
                         details.append("تخفیف‌های استفاده‌شده به حساب شما بازگردانده شد.")
+                    if result.coupon_restored:
+                        details.append("کوپن استفاده‌شده به حساب شما بازگردانده شد.")
                     if details:
                         msg += "\n" + "\n".join(details)
                     await user_bot.send_message(user.chat_id, msg)
                 except Exception:
                     pass
-            
+
             # Create dashboard notification
-            if sub.user_id:
+            if result.user_id:
                 try:
-                    service_name = sub.marzban_username
-                    plan_name = sub.plan_name
+                    service_name = result.service_name
+                    plan_name = result.plan_name
                     notif_msg = f'درخواست سرویس "{service_name}" ({plan_name}) رد شد.' if service_name else "درخواست خرید سرویس شما رد شد."
                     if credit_refunded > 0:
                         notif_msg += f" اعتبار {credit_refunded:,} تومان به حساب شما برگشت."
@@ -137,7 +119,7 @@ async def handle_admin_deny_receipt(request: web.Request):
                         notif_msg += " تخفیف‌های استفاده‌شده بازگردانده شد."
                     await notifications_crud.create_notification(
                         db=session,
-                        user_id=sub.user_id,
+                        user_id=result.user_id,
                         type='purchase_denied',
                         title='❌ درخواست رد شد',
                         message=notif_msg,

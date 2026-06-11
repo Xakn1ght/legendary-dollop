@@ -7,7 +7,6 @@ from app.keyboards.reply import get_main_keyboard
 from .common import (
     PurchaseState,
     _auto_renew_keyboard,
-    _cleanup_pending_subscription,
     _get_plan_keyboard_for_user,
     _lang_for,
     router,
@@ -16,8 +15,9 @@ from .common import (
 
 @router.message(PurchaseState.plan, lambda m: (m.text or "").strip() in {"بازگشت🔙", "Back 🔙"})
 async def cancel_from_plan(message: Message, state: FSMContext, session: AsyncSession):
-    """User chose to go back from plan selection – cancel purchase and return to main menu."""
-    await _cleanup_pending_subscription(session, state)
+    """User chose to go back from plan selection – cancel purchase and return to main menu.
+
+    No order row exists yet at this step (it is created at Confirm & Pay)."""
     await state.clear()
     lang = await _lang_for(message, session)
     await message.answer(
