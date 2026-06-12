@@ -4362,3 +4362,39 @@ html[data-perf="lite"] {
 html[data-perf="lite"] #astro-lava { filter: blur(28px) saturate(130%) !important; }
 html[data-perf="lite"] .vpn-lava   { filter: blur(28px) !important; }
 html[data-perf="lite"] body::before { filter: blur(40px) saturate(110%) !important; }
+
+/* ── PERF-LITE DEEP (v45): replace the blurred-blob stack entirely ──
+   Even static, a fullscreen filter:blur(28-72px) layer is a heavy
+   texture on old GPUs. In lite, hide the blobs and paint the same
+   mood with flat radial gradients (near-zero cost), and collapse
+   multi-layer card shadows to one cheap one. */
+html[data-perf="lite"] .lava-blob,
+html[data-perf="lite"] .vpn-lava { display: none !important; }
+
+html[data-perf="lite"] #astro-lava,
+html[data-perf="lite"][data-theme="light"] #astro-lava {
+  display: block !important;
+  filter: none !important;
+  background:
+    radial-gradient(55% 45% at 18% 12%, rgba(var(--brandRgb), 0.20), transparent 72%),
+    radial-gradient(45% 40% at 82% 65%, rgba(var(--brandRgb), 0.11), transparent 70%) !important;
+}
+
+html[data-perf="lite"] body::before { filter: none !important; }
+
+html[data-perf="lite"] .card,
+html[data-perf="lite"] .vpn-card,
+html[data-perf="lite"] .action-tile,
+html[data-perf="lite"] .placeholder-card {
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.10) !important;
+}
+html[data-perf="lite"] .bottom-nav {
+  box-shadow: 0 -4px 16px rgba(0, 0, 0, 0.12) !important;
+}
+html[data-perf="lite"] .btn,
+html[data-perf="lite"] .btn-icon,
+html[data-perf="lite"] .mini-btn,
+html[data-perf="lite"] .speed-chip,
+html[data-perf="lite"] .notification-bell {
+  box-shadow: none !important;
+}
