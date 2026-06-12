@@ -2,6 +2,10 @@ from app.utils.admin_bot_helper import resolve_user_bot
 
 from ..common import *  # noqa: F403
 
+import logging
+
+logger = logging.getLogger(__name__)
+
 
 async def handle_admin_vip_users(request: web.Request):
     """Get all VIP users"""
@@ -127,7 +131,7 @@ async def handle_admin_set_vip(request: web.Request):
                         parse_mode='Markdown'
                     )
                 except Exception as e:
-                    print(f"[VIP] Failed to send VIP notification to {user.chat_id}: {e}")
+                    logger.warning(f"[VIP] Failed to send VIP notification to {user.chat_id}: {e}")
             
             return web.json_response({
                 "ok": True,
@@ -195,7 +199,7 @@ async def handle_admin_remove_vip(request: web.Request):
                             parse_mode='Markdown'
                         )
                     except Exception as e:
-                        print(f"[VIP] Failed to send VIP removal notification to {user.chat_id}: {e}")
+                        logger.warning(f"[VIP] Failed to send VIP removal notification to {user.chat_id}: {e}")
             
             return web.json_response({
                 "ok": True,

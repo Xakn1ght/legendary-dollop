@@ -19,6 +19,10 @@ from app.core.settings import (
 
 from ... import state as st
 
+import logging
+
+logger = logging.getLogger(__name__)
+
 
 async def handle_admin_login(request: web.Request):
     """
@@ -70,18 +74,18 @@ async def handle_admin_login(request: web.Request):
                 chat_id = ADMIN_ID
             else:
                 st._record_login_attempt(ip)
-                print(f"[ADMIN AUTH] Failed login - invalid username: {chat_id_str}")
+                logger.warning(f"[ADMIN AUTH] Failed login - invalid username: {chat_id_str}")
                 return web.json_response(
                     {"ok": False, "error": "invalid_credentials", "message": "Invalid credentials"}, status=401
                 )
 
         if chat_id != ADMIN_ID:
             st._record_login_attempt(ip)
-            print(f"[ADMIN AUTH] Failed login attempt from IP {ip} - wrong chat_id: {chat_id}")
+            logger.warning(f"[ADMIN AUTH] Failed login attempt from IP {ip} - wrong chat_id: {chat_id}")
             return web.json_response({"ok": False, "error": "invalid_credentials", "message": "Invalid credentials"}, status=401)
 
         if not ADMIN_PANEL_PASSWORD_HASH:
-            print("[ADMIN AUTH] CRITICAL: No ADMIN_PANEL_PASSWORD_HASH set. Login blocked until configured.")
+            logger.critical("[ADMIN AUTH] CRITICAL: No ADMIN_PANEL_PASSWORD_HASH set. Login blocked until configured.")
             return web.json_response(
                 {"ok": False, "error": "not_configured", "message": "Admin panel is not configured. Set ADMIN_PANEL_PASSWORD_HASH in .env"},
                 status=503,
@@ -89,7 +93,7 @@ async def handle_admin_login(request: web.Request):
 
         if not verify_admin_password(password, ADMIN_PANEL_PASSWORD_HASH):
             st._record_login_attempt(ip)
-            print(f"[ADMIN AUTH] Failed login attempt from IP {ip} - wrong password")
+            logger.warning(f"[ADMIN AUTH] Failed login attempt from IP {ip} - wrong password")
             return web.json_response(
                 {"ok": False, "error": "invalid_credentials", "message": "Invalid credentials"}, status=401
             )
@@ -121,18 +125,18 @@ async def handle_admin_login(request: web.Request):
                 )
                 await admin_bot.session.close()
             except Exception as e:
-                print(f"[ADMIN AUTH] Failed to send 2FA code: {e}")
+                logger.warning(f"[ADMIN AUTH] Failed to send 2FA code: {e}")
                 return web.json_response(
                     {"ok": False, "error": "2fa_send_failed", "message": "Failed to send 2FA code. Check Telegram."},
                     status=500,
                 )
 
-            print(f"[ADMIN AUTH] 2FA code sent to admin {chat_id} from IP {ip}")
+            logger.info(f"[ADMIN AUTH] 2FA code sent to admin {chat_id} from IP {ip}")
 
             return web.json_response({"ok": True, "requires_2fa": True, "message": "2FA code sent to your Telegram"})
 
         session = st._create_session(chat_id, ip, ua)
-        print(f"[ADMIN AUTH] Successful login from IP {ip}")
+        logger.info(f"[ADMIN AUTH] Successful login from IP {ip}")
 
         response = web.json_response(
             {

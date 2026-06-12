@@ -2,6 +2,10 @@ from app.utils.admin_bot_helper import resolve_user_bot
 
 from ..common import *  # noqa: F403
 
+import logging
+
+logger = logging.getLogger(__name__)
+
 
 async def handle_admin_send_notification(request: web.Request):
     """Send notification to users (webapp/bot)"""
@@ -54,9 +58,9 @@ async def handle_admin_send_notification(request: web.Request):
                             db=session,
                             bot=bot,
                         )
-                        print(f"[NOTIF] Sent {bot_sent} bot notifications")
+                        logger.info(f"[NOTIF] Sent {bot_sent} bot notifications")
                     except Exception as e:
-                        print(f"[NOTIF] Error sending bot notifications: {e}")
+                        logger.warning(f"[NOTIF] Error sending bot notifications: {e}")
             
             return web.json_response({
                 "ok": True,

@@ -2,6 +2,10 @@ from app.utils.admin_bot_helper import resolve_user_bot
 
 from ..common import *  # noqa: F403
 
+import logging
+
+logger = logging.getLogger(__name__)
+
 
 async def handle_admin_approve_vip_order(request: web.Request):
     """Approve a pending VIP order"""
@@ -66,7 +70,7 @@ async def handle_admin_approve_vip_order(request: web.Request):
                     )
                     await bot.send_message(chat_id=user.chat_id, text=vip_msg, parse_mode='Markdown')
                 except Exception as e:
-                    print(f"[VIP] Failed to send VIP notification: {e}")
+                    logger.warning(f"[VIP] Failed to send VIP notification: {e}")
             
             # Broadcast to admin UIs
             try:
