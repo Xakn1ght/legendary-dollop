@@ -252,6 +252,30 @@
           tg.onEvent('viewportChanged', () => { tgExpandOnce(); });
         }
       }catch(_){}
+
+      // Android fullscreen puts the webview UNDER the system nav buttons and
+      // env(safe-area-inset-bottom) reports 0 there, so the bottom nav merged
+      // with the phone's buttons. Telegram reports the real overlap via
+      // safeAreaInset; feed it into --astro-safe-bottom-extra, which the CSS
+      // already adds to the nav + content padding. Android only — iOS gets the
+      // correct value from env() and would double-pad.
+      try{
+        if (platform.indexOf('android') === 0) { // covers "android" + "android_x"
+          const applySafeArea = () => {
+            try {
+              const sa = tg.safeAreaInset || {};
+              const px = Math.max(0, Math.round(sa.bottom || 0));
+              document.documentElement.style.setProperty('--astro-safe-bottom-extra', px + 'px');
+            } catch(_) {}
+          };
+          applySafeArea();
+          if (typeof tg.onEvent === 'function') {
+            tg.onEvent('safeAreaChanged', applySafeArea);
+            tg.onEvent('fullscreenChanged', applySafeArea);
+            tg.onEvent('viewportChanged', applySafeArea);
+          }
+        }
+      }catch(_){}
     })();
 
 // Battery/heat saver: when the WebApp is hidden (user switches chats, locks the
