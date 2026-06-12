@@ -9,7 +9,7 @@ letting any real user in._
 ## P0 — Blockers (security, money, config, deploy)
 
 ### Secrets & git hygiene
-- [x] ~~Live admin session tokens are committed to git.~~ **Done 2026-06-12** (commit `cc38e92`):
+- [x] ~~Live admin session tokens are committed to git.~~ **Done 2026-06-12** (commit `90f4f06`):
       `.gitignore` paths fixed (`src/` prefix), all `src/app/data/*.json` + `src/app/webapp/admin/uploads/`
       untracked (kept on disk), `ADMIN_PANEL_SECRET_KEY` rotated in `config/.env`,
       `admin_sessions.json` cleared — leaked tokens are now unverifiable; admin must re-login.
@@ -24,10 +24,10 @@ letting any real user in._
 ### Payment configuration (real money path)
 - [x] Real card is configured via `src/app/core/payment_settings.json` (admin-set; overrides
       the env default). **Verified 2026-06-12.**
-- [x] ~~Placeholder card hardcoded in user-facing strings.~~ **Done 2026-06-12** (commit `cc38e92`):
+- [x] ~~Placeholder card hardcoded in user-facing strings.~~ **Done 2026-06-12** (commit `90f4f06`):
       `bot_i18n.py` `charge_request_registered` now takes a `{card}` slot, formatted with the
       live `PAYMENT_CARD_NUMBER`/`HOLDER` in `handlers/user/charge/package_confirm.py`.
-      `confirmation.py` was already fixed in `b038304`.
+      `confirmation.py` was already fixed in `8160bb9`.
 
 ### Environment / credentials (fill every value in `config/.env`)
 - [ ] `BOT_TOKEN`, `ADMIN_BOT_TOKEN`, `ADMIN_ID`, `ADMIN_USERNAME`
@@ -52,13 +52,13 @@ letting any real user in._
 ## P1 — Before users rely on it (features, correctness, the open bug)
 
 ### Unfinished features — ship, finish, or hide
-- [x] ~~Wallet cash-out is a stub.~~ **Stale — implemented in the flows rework** (`980e3a8`):
+- [x] ~~Wallet cash-out is a stub.~~ **Stale — implemented in the flows rework** (`199be9c`):
       `cashout.py` now calls `app.services.flows.cashout.create_cashout` (VIP-Promoter gate,
       shared eligibility rules, `cashout_requests` table). Covered by `tests/test_cashout_service.py`.
 - [ ] **[verify]** Level cosmetics (titles/badges) unrendered — `src/app/core/level_config.py:41`
       TODO(cosmetics-phase). Cosmetic only; fine to defer, just confirm nothing looks broken.
 - [x] ~~Commit the uncommitted files.~~ **Done 2026-06-12**: tree committed in 3 logical commits
-      (security `cc38e92`, dashboard perf `cd9490c`, docs `98dafac`). Only local scratch
+      (security `90f4f06`, dashboard perf `ca237b6`, docs `ed192bd`). Only local scratch
       (`previews/`, `.impeccable/`, a duplicate spec md) remains untracked.
 
 ### Open dashboard issue (see `src/app/webapp/dashboard/HANDOFF.md`)
@@ -80,7 +80,7 @@ letting any real user in._
 
 ## P2 — Operational polish (can follow shortly after launch)
 
-- [x] ~~Replace stray `print(...)` debug calls in API routes.~~ **Done 2026-06-12** (`533c7fe`):
+- [x] ~~Replace stray `print(...)` debug calls in API routes.~~ **Done 2026-06-12** (`da92940`):
       send_notification, settings_vip/*, admin_auth login/2FA now use `logging` with levels.
       (Intentional console output in `setup_password.py` / password-migration banner kept.)
 - [x] Rate limiting + banned-user middleware confirmed registered in `main.py:205-208`
