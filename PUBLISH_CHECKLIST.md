@@ -9,27 +9,25 @@ letting any real user in._
 ## P0 — Blockers (security, money, config, deploy)
 
 ### Secrets & git hygiene
-- [ ] **Live admin session tokens are committed to git.** `src/app/data/admin_sessions.json`
-      is tracked (confirmed via `git ls-files`). The `.gitignore` rules are wrong: they say
-      `app/data/*.json` and `app/webapp/admin/uploads/`, but the real paths are
-      `src/app/data/…` and `src/app/webapp/admin/uploads/`, so nothing matches.
-  - Fix `.gitignore` → `src/app/data/*.json` and `src/app/webapp/admin/uploads/`.
-  - `git rm --cached src/app/data/*.json` (keep the files locally, stop tracking them).
-  - **Rotate** anything that leaked: admin session secret, `ADMIN_PANEL_SECRET_KEY`,
-    and force re-login (sessions invalidated).
-- [ ] User-uploaded **payment receipts** (`src/app/webapp/admin/uploads/receipts/*.jpg`) are
-      sitting untracked in the tree — make sure the corrected ignore covers them so a
-      `git add -A` never commits customer receipts.
-- [ ] Confirm `config/.env` is **not** tracked (the `.env` rules look OK) and never committed.
+- [x] ~~Live admin session tokens are committed to git.~~ **Done 2026-06-12** (commit `cc38e92`):
+      `.gitignore` paths fixed (`src/` prefix), all `src/app/data/*.json` + `src/app/webapp/admin/uploads/`
+      untracked (kept on disk), `ADMIN_PANEL_SECRET_KEY` rotated in `config/.env`,
+      `admin_sessions.json` cleared — leaked tokens are now unverifiable; admin must re-login.
+- [x] Receipts covered by the corrected ignore — `git add -A` can no longer commit them. **Done 2026-06-12.**
+- [x] `config/.env` confirmed not tracked.
+- [ ] **[decide] Old commits still contain the receipts + session JSONs** and are pushed to
+      `github.com/Xakn1ght/legendary-dollop`. Tokens are dead (key rotated), but ~60 customer
+      payment receipts remain in remote history. Scrubbing requires `git filter-repo` + force-push
+      (rewrites all history) — or, if the repo is private and stays private, accept the risk.
+      If the repo was ever public, scrub.
 
 ### Payment configuration (real money path)
-- [ ] Set real `PAYMENT_CARD_NUMBER` / `PAYMENT_CARD_HOLDER` in `.env`. Default is the
-      placeholder `6037-xxxx-xxxx-xxxx`.
-- [ ] **[verify]** The placeholder card number is **hardcoded** in user-facing strings, not
-      read from config, in at least: `src/app/utils/bot_i18n.py:101`,
-      `src/app/handlers/user/purchase/confirmation.py:102` & `:134`. Make these use
-      `PAYMENT_CARD_NUMBER` (from `core/settings/payment_ui.py`) or users will be told to pay
-      a fake card.
+- [x] Real card is configured via `src/app/core/payment_settings.json` (admin-set; overrides
+      the env default). **Verified 2026-06-12.**
+- [x] ~~Placeholder card hardcoded in user-facing strings.~~ **Done 2026-06-12** (commit `cc38e92`):
+      `bot_i18n.py` `charge_request_registered` now takes a `{card}` slot, formatted with the
+      live `PAYMENT_CARD_NUMBER`/`HOLDER` in `handlers/user/charge/package_confirm.py`.
+      `confirmation.py` was already fixed in `b038304`.
 
 ### Environment / credentials (fill every value in `config/.env`)
 - [ ] `BOT_TOKEN`, `ADMIN_BOT_TOKEN`, `ADMIN_ID`, `ADMIN_USERNAME`
@@ -54,13 +52,14 @@ letting any real user in._
 ## P1 — Before users rely on it (features, correctness, the open bug)
 
 ### Unfinished features — ship, finish, or hide
-- [ ] **[verify] Wallet cash-out is a stub.** `src/app/api/routes/dashboard/wallet/cashout.py:19`
-      — TODO(phase-d): 5% rate, caps, holds, ≥20GB rule not implemented. Either finish it or
-      hide the cash-out entry point so users can't hit a half-built money flow.
+- [x] ~~Wallet cash-out is a stub.~~ **Stale — implemented in the flows rework** (`980e3a8`):
+      `cashout.py` now calls `app.services.flows.cashout.create_cashout` (VIP-Promoter gate,
+      shared eligibility rules, `cashout_requests` table). Covered by `tests/test_cashout_service.py`.
 - [ ] **[verify]** Level cosmetics (titles/badges) unrendered — `src/app/core/level_config.py:41`
       TODO(cosmetics-phase). Cosmetic only; fine to defer, just confirm nothing looks broken.
-- [ ] Commit / open a PR for the **35 uncommitted files** in the working tree (this session's
-      dashboard perf work + the rewards-pricing rework). Don't publish from a dirty tree.
+- [x] ~~Commit the uncommitted files.~~ **Done 2026-06-12**: tree committed in 3 logical commits
+      (security `cc38e92`, dashboard perf `cd9490c`, docs `98dafac`). Only local scratch
+      (`previews/`, `.impeccable/`, a duplicate spec md) remains untracked.
 
 ### Open dashboard issue (see `src/app/webapp/dashboard/HANDOFF.md`)
 - [ ] Confirm on your iPhone that the **heat/lag is acceptable** after the latest changes
@@ -69,8 +68,8 @@ letting any real user in._
       Next suspect: magma `blob-1` parked at the card top. A 2–3s screen recording pins it.
 
 ### Quality gates
-- [ ] Run the test suite green: `PYTHONPATH=src python tests/test_pricing.py` (and the other 6
-      in `tests/`: economy_safety, checkout_coupon, season_*, loyalty_retired).
+- [x] Test suite green: **all 11 test files pass** (run 2026-06-12 with
+      `PYTHONPATH=src .venv/bin/python tests/<file>`).
 - [ ] Smoke-test the full happy path end-to-end on a staging bot: start → buy plan → submit
       receipt → admin approve → subscription provisions in Marzban → dashboard shows it →
       charge/top-up → support ticket round-trip.
@@ -81,9 +80,11 @@ letting any real user in._
 
 ## P2 — Operational polish (can follow shortly after launch)
 
-- [ ] Replace stray `print(...)` debug calls in API routes with the logger
-      (e.g. `api/routes/admin/messaging/send_notification.py`, `settings_vip/*`) so prod logs
-      are consistent and capturable.
+- [x] ~~Replace stray `print(...)` debug calls in API routes.~~ **Done 2026-06-12** (`533c7fe`):
+      send_notification, settings_vip/*, admin_auth login/2FA now use `logging` with levels.
+      (Intentional console output in `setup_password.py` / password-migration banner kept.)
+- [x] Rate limiting + banned-user middleware confirmed registered in `main.py:205-208`
+      (RateLimit, Validation, BannedUser, ErrorHandling all on the dispatcher).
 - [ ] Decide on error monitoring (Sentry or at minimum `journalctl` log shipping/retention).
 - [ ] Review rate limiting + banned-user middleware are enabled in the prod path
       (`utils/error_middleware.py`, `utils/banned_user_middleware.py`).
