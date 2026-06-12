@@ -4316,3 +4316,49 @@ html[data-theme="light"] .vpn-card .status-badge.active {
 button, input, select, textarea, optgroup {
   font-family: inherit;
 }
+
+/* ═══════════════════════════════════════════════════════════════
+   PERF-LITE (v44) — html[data-perf="lite"] is set by head-boot.js
+   on weak devices (low-RAM/old Android, or a failed FPS probe).
+   The lava look stays as a static frosted backdrop; what goes is
+   everything that costs per-frame: backdrop blur re-sampling and
+   the infinite decorative animations. One-shot entrance animations
+   and loading feedback are deliberately NOT touched (pausing a
+   fill-both entrance strands content at opacity 0).
+   Must stay last in this file.
+   ═══════════════════════════════════════════════════════════════ */
+html[data-perf="lite"] *,
+html[data-perf="lite"] *::before,
+html[data-perf="lite"] *::after {
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+}
+
+/* freeze the infinite decorative motion (background drift, pulses) */
+html[data-perf="lite"] .lava-blob,
+html[data-perf="lite"] .vpn-blob,
+html[data-perf="lite"] body::before,
+html[data-perf="lite"] [data-theme="light"] .vpn-card::after,
+html[data-perf="lite"][data-theme="light"] .vpn-card::after,
+html[data-perf="lite"] .page-transition-layer::after,
+html[data-perf="lite"] .nav-item-notch::before,
+html[data-perf="lite"] .nav-item-notch::after,
+html[data-perf="lite"] .welcome-orb-ring,
+html[data-perf="lite"] .es-ring-1,
+html[data-perf="lite"] .es-ring-2,
+html[data-perf="lite"] .es-ring-3,
+html[data-perf="lite"] .vpn-card .status-badge.active::before {
+  animation: none !important;
+}
+
+/* no frosting → raise glass opacity so text stays readable */
+html[data-perf="lite"] {
+  --glass-bg:       rgba(10, 18, 30, 0.82);
+  --glass-bg-mid:   rgba(14, 22, 36, 0.86);
+  --glass-bg-heavy: rgba(6, 12, 22, 0.93);
+}
+
+/* frozen background: trim the big blur radii (rendered once, lower GPU memory) */
+html[data-perf="lite"] #astro-lava { filter: blur(28px) saturate(130%) !important; }
+html[data-perf="lite"] .vpn-lava   { filter: blur(28px) !important; }
+html[data-perf="lite"] body::before { filter: blur(40px) saturate(110%) !important; }

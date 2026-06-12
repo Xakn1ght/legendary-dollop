@@ -129,6 +129,65 @@
       }
     })();
 
+    // Perf-lite for weak devices: html[data-perf="lite"] makes glass.css drop
+    // backdrop blur + freeze decorative animation (see PERF-LITE block there).
+    // Android-only heuristics; iOS always gets the full look. A one-shot FPS
+    // probe persists lite mode if the device proves slow in practice.
+    // Manual override: localStorage.astro_perf = 'lite' | 'full' (or AstroPerf.set()).
+    (function () {
+      'use strict';
+      const root = document.documentElement;
+      const apply = (lite) => { try { root.setAttribute('data-perf', lite ? 'lite' : 'full'); } catch (_) {} };
+      let forced = null;
+      try { forced = localStorage.getItem('astro_perf'); } catch (_) {}
+      if (forced === 'lite' || forced === 'full') {
+        apply(forced === 'lite');
+      } else {
+        let lite = false;
+        try {
+          const ua = navigator.userAgent || '';
+          const isAndroid = /Android/i.test(ua);
+          const andrVer = ua.match(/Android (\d+)/);
+          const mem = navigator.deviceMemory || 0;            // Chrome/Android only
+          const cores = navigator.hardwareConcurrency || 0;
+          if (isAndroid && mem && mem <= 3) lite = true;      // ≤3GB RAM
+          if (isAndroid && cores && cores <= 4) lite = true;  // weak CPU
+          if (andrVer && parseInt(andrVer[1], 10) <= 9) lite = true; // old OS = old GPU
+          if (localStorage.getItem('astro_perf_auto') === 'lite') lite = true; // earlier probe verdict
+          apply(lite);
+          if (!lite && isAndroid) {
+            // Probe after boot jank settles; abort if backgrounded (rAF pauses → fake low fps).
+            setTimeout(() => {
+              if (document.hidden) return;
+              let frames = 0;
+              const t0 = performance.now();
+              const tick = (t) => {
+                if (document.hidden) return;
+                frames++;
+                if (t - t0 < 2000) { requestAnimationFrame(tick); return; }
+                const fps = frames / ((t - t0) / 1000);
+                if (fps < 35) {
+                  try { localStorage.setItem('astro_perf_auto', 'lite'); } catch (_) {}
+                  apply(true);
+                }
+              };
+              requestAnimationFrame(tick);
+            }, 3000);
+          }
+        } catch (_) { apply(false); }
+      }
+      window.AstroPerf = {
+        mode: () => root.getAttribute('data-perf'),
+        set: (m) => {
+          try {
+            if (m === 'auto') { localStorage.removeItem('astro_perf'); localStorage.removeItem('astro_perf_auto'); }
+            else localStorage.setItem('astro_perf', m === 'lite' ? 'lite' : 'full');
+          } catch (_) {}
+          try { location.reload(); } catch (_) {}
+        }
+      };
+    })();
+
     // Telegram fullscreen/expand ASAP (before the heavy dashboard script runs) to reduce the "multi-stage" opening.
     // Global guards so tg.ready() and tg.expand() fire exactly once across all scripts.
     (function(){
