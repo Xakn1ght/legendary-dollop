@@ -16,7 +16,7 @@ from app.services.flows.charge import (
 from app.services.flows.errors import FlowError
 from app.utils.bot_i18n import t, text_matches
 
-from .common import GB, ChargeState, _get_lang, router
+from .common import ChargeState, _get_lang, router
 
 
 @router.message(ChargeState.receipt, F.photo)
@@ -66,9 +66,6 @@ async def process_receipt(message: Message, state: FSMContext, session: AsyncSes
             reply_markup=get_main_keyboard(message.chat.id, lang=lang),
         )
         return
-
-    traffic_bytes = charge_req.traffic_bytes or 0
-    extra_days = charge_req.extra_days
 
     # Forward photo receipt to admin bot (not user bot)
     from app.utils.admin_bot_helper import get_admin_bot

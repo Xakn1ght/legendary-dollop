@@ -19,10 +19,8 @@ from .common import PurchaseState, router
 async def process_receipt(message: Message, state: FSMContext, session: AsyncSession):
     data = await state.get_data()
     user = await crud.get_user(session, message.chat.id)
-    user_full_name = user.full_name
     user_chat_id = user.chat_id
     sub_id = data.get('sub_id')
-    marzban_username = data.get('marzban_username')
     if not sub_id:
         return  # Should not happen
 

@@ -2,7 +2,6 @@ from aiogram.fsm.context import FSMContext
 from aiogram.types import Message
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.settings import PLANS
 from app.database import crud
 from app.keyboards.reply import get_main_keyboard
 from app.services.flows.errors import FlowError
