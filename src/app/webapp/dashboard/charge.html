@@ -11,8 +11,8 @@
   <!-- Unified language system - applies language BEFORE content renders -->
   <script src="/webapp/dashboard/lang.js"></script>
   <script src="https://telegram.org/js/telegram-web-app.js"></script>
-  <script src="/webapp/dashboard/js/head-boot.js?v=10"></script>
-  <script src="/webapp/dashboard/ui.js" defer></script>
+  <script src="/webapp/dashboard/js/head-boot.js?v=11"></script>
+  <script src="/webapp/dashboard/ui.js?v=2" defer></script>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Urbanist:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
@@ -889,8 +889,8 @@
       // Show improved 5GB warning
       const lang = currentLang || 'fa';
       const message = lang === 'fa'
-        ? `هشدار مهم\n\nحجم باقی‌مانده: ${remainingGB.toFixed(1)} گیگابایت\n\nقانون 5 گیگابایت:\nدر شارژ فوری فقط 5 گیگابایت منتقل می‌شود و ${(remainingGB - 5).toFixed(1)} گیگابایت حذف می‌شود.\n\nتوصیه:\nاگر می‌خواهید همه حجم باقی‌مانده حفظ شود، از "رزرو پلن" استفاده کنید.\n\nادامه می‌دهید؟`
-        : `Important warning\n\nRemaining data: ${remainingGB.toFixed(1)} GB\n\n5GB rule:\nIn immediate charge, only 5GB is carried over and ${(remainingGB - 5).toFixed(1)} GB is removed.\n\nRecommendation:\nIf you want to keep all remaining data, use "Book Plan".\n\nContinue?`;
+        ? `هشدار مهم\n\nحجم باقی‌مانده: ${remainingGB.toFixed(1)} گیگابایت\n\nقانون ۵ گیگابایت:\nهنگام شارژ، حداکثر ۵ گیگابایت از حجم فعلی به پلن جدید منتقل می‌شود و باقی (${(remainingGB - 5).toFixed(1)} گیگابایت) حذف می‌گردد.\n\nتوصیه: وقتی حجمتان به زیر ۵ گیگ رسید شارژ کنید تا چیزی از دست نرود.\n\nادامه می‌دهید؟`
+        : `Important warning\n\nRemaining data: ${remainingGB.toFixed(1)} GB\n\n5GB rule:\nWhen you charge, up to 5GB of your current data carries into the new plan; the rest (${(remainingGB - 5).toFixed(1)} GB) is removed.\n\nTip: charge once you drop below 5GB so nothing is lost.\n\nContinue?`;
       
       const confirmed = (window.AstroUI && window.AstroUI.confirm)
         ? await window.AstroUI.confirm({

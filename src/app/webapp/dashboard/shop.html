@@ -9,10 +9,10 @@
   <meta name="referrer" content="no-referrer" />
   <title>Shop - AstroByte</title>
   <script src="https://telegram.org/js/telegram-web-app.js"></script>
-  <script src="/webapp/dashboard/js/head-boot.js?v=10"></script>
+  <script src="/webapp/dashboard/js/head-boot.js?v=11"></script>
   <!-- Unified language system - must load before ui.js -->
   <script src="/webapp/dashboard/lang.js"></script>
-  <script src="/webapp/dashboard/ui.js" defer></script>
+  <script src="/webapp/dashboard/ui.js?v=2" defer></script>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Urbanist:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
@@ -190,6 +190,9 @@
 		              searchPlaceholder: 'Search plan name…',
 		              sortLabel: 'Sort',
 		              sortBestValue: 'Best value',
+		              customPlanTitle: 'Custom Plan',
+		              customPlanPill: '1-300 GB',
+		              customPlanPrice: 'price by size',
 		              sortCheapest: 'Cheapest',
 		              sortMostGb: 'Most GB',
 		              minGb: 'Min GB',
@@ -241,6 +244,9 @@
 		              searchPlaceholder: 'جستجوی نام پلن…',
 		              sortLabel: 'مرتب‌سازی',
 		              sortBestValue: 'بهترین ارزش',
+		              customPlanTitle: 'پلن دلخواه',
+		              customPlanPill: '۱ تا ۳۰۰ گیگ',
+		              customPlanPrice: 'قیمت بر اساس حجم',
 		              sortCheapest: 'ارزان‌ترین',
 		              sortMostGb: 'بیشترین گیگ',
 		              minGb: 'حداقل گیگ',
@@ -657,6 +663,26 @@
 	              row.addEventListener('click', () => openPurchaseForPlan(name));
 	              grid.appendChild(row);
 	            });
+
+	            // Build-your-own plan entry — opens purchase with the custom panel open.
+	            const customRow = document.createElement('div');
+	            customRow.className = 'shop-plan-card shop-plan-custom';
+	            customRow.innerHTML = `
+	              <div class="shop-plan-top-row">
+	                <div class="shop-plan-title">📦 ${escapeHtml(tShop('customPlanTitle'))}</div>
+	                <svg class="shop-plan-chevron" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+	                  <path d="M9 18l6-6-6-6" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/>
+	                </svg>
+	              </div>
+	              <div class="shop-plan-bottom-row">
+	                <div class="shop-plan-badges">
+	                  <span class="shop-plan-pill gb">${escapeHtml(tShop('customPlanPill'))}</span>
+	                </div>
+	                <div class="shop-plan-price"><span class="new">${escapeHtml(tShop('customPlanPrice'))}</span></div>
+	              </div>
+	            `;
+	            customRow.addEventListener('click', () => openUrl('/webapp/dashboard/purchase.html', { plan: 'custom' }));
+	            grid.appendChild(customRow);
 	          }
 
 	          function setLoadingSkeleton(){

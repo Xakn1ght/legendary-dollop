@@ -330,7 +330,21 @@
         try {
           ['astro_welcome_shown', 'astro_perf', 'astro_perf_auto'].forEach((k) => localStorage.removeItem(k));
         } catch (_) {}
-        try { location.reload(); } catch (_) {}
+        // welcome_shown also lives in server prefs — clear it too or the
+        // welcome screen stays blocked after a local-only wipe.
+        const done = () => { try { location.reload(); } catch (_) {} };
+        try {
+          fetch('/api/dashboard/preferences', {
+            method: 'POST',
+            credentials: 'include',
+            headers: {
+              'Content-Type': 'application/json',
+              'X-Telegram-Init': (tg && tg.initData) || '',
+            },
+            body: JSON.stringify({ welcome_shown: false }),
+          }).then(done, done);
+          setTimeout(done, 2500);
+        } catch (_) { done(); }
       };
       if (tg && typeof tg.showPopup === 'function') {
         tg.showPopup(

@@ -50,3 +50,21 @@ async def open_enhanced_rewards_callback(callback: CallbackQuery, session: Async
 	await show_enhanced_rewards_menu(callback, session)
 
 	await callback.answer()
+
+
+@router.callback_query(lambda c: c.data == "welcome_buy")
+async def welcome_buy_callback(callback: CallbackQuery, state, session: AsyncSession):
+	"""Welcome-screen shortcut into the purchase flow."""
+	await callback.answer()
+	from app.handlers.user.purchase.flow_referral_plan import start_purchase
+
+	await start_purchase(callback.message, state, session)
+
+
+@router.callback_query(lambda c: c.data == "welcome_addsub")
+async def welcome_addsub_callback(callback: CallbackQuery, state, session: AsyncSession):
+	"""Welcome-screen shortcut into the add-subscription flow."""
+	await callback.answer()
+	from app.handlers.user.add_subscription import start_add_subscription
+
+	await start_add_subscription(callback.message, state, session)

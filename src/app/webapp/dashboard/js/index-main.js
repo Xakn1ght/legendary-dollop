@@ -3332,6 +3332,7 @@
         const prev = document.documentElement.getAttribute('data-accent') || 'red';
         if (prev === next) {
           try { localStorage.setItem('accent', next); } catch(_) {}
+          if (!opts.silent) schedulePrefsSave({ accent: next });
           return;
         }
         document.documentElement.setAttribute('data-accent', next);

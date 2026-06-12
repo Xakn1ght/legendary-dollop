@@ -1011,3 +1011,46 @@ html[lang="fa"] .discount-tag {
   fill: var(--muted);
   margin-bottom: 12px;
 }
+
+/* ── Custom (build-your-own) plan card ───────────────────────── */
+.custom-plan-pop {
+  grid-column: 1 / -1;
+  border-radius: 16px;
+  padding: 14px;
+  border: 1.5px dashed rgba(var(--brandRgb), 0.35);
+  background: linear-gradient(180deg, rgba(var(--brandRgb),0.06), rgba(var(--brandRgb),0.02));
+}
+.custom-plan-row { display: flex; align-items: center; gap: 12px; }
+.custom-gb-range { flex: 1; accent-color: var(--brand); min-width: 0; }
+.custom-gb-num {
+  width: 64px; text-align: center; font-size: 18px; font-weight: 800;
+  padding: 8px 4px; border-radius: 12px;
+  border: 1.5px solid rgba(var(--brandRgb), 0.4);
+  background: transparent; color: inherit; outline: none;
+}
+.custom-gb-num::-webkit-outer-spin-button, .custom-gb-num::-webkit-inner-spin-button { -webkit-appearance: none; }
+.custom-gb-unit { font-weight: 800; font-size: 13px; opacity: .75; }
+.custom-plan-hint { margin-top: 8px; font-size: 11px; opacity: .65; text-align: center; }
+
+/* ── Make the selected plan unmistakable ─────────────────────── */
+.plan-card.selected {
+  border-width: 2px;
+  box-shadow:
+    0 0 0 3px rgba(var(--brandRgb), 0.30),
+    0 10px 30px rgba(var(--brandRgb), 0.30);
+  transform: translateY(-2px);
+}
+.plan-card.selected::after {
+  content: '✓';
+  position: absolute;
+  top: 8px;
+  inset-inline-start: 8px;
+  width: 22px; height: 22px;
+  border-radius: 50%;
+  background: var(--brand);
+  color: #fff;
+  font-size: 13px;
+  font-weight: 900;
+  display: flex; align-items: center; justify-content: center;
+  box-shadow: 0 2px 8px rgba(var(--brandRgb), 0.5);
+}

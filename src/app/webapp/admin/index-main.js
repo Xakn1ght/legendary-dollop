@@ -455,10 +455,6 @@
           currentUser = { name: 'Admin' };
         }
         showAdminPanel();
-        // Live receipts socket from login (not just the receipts page) so the
-        // sidebar badge updates the moment a user submits a receipt.
-        startAdminEventsWs();
-        loadReceipts();
       } else {
         // Clear any stale session info
         localStorage.removeItem(SESSION_KEY);
@@ -602,6 +598,9 @@
     function showAdminPanel() {
       document.getElementById('loginScreen').style.display = 'none';
       document.getElementById('adminPanel').style.display = 'flex';
+      // Live receipts socket + initial badge from the moment the panel is visible —
+      // covers both fresh logins and restored sessions.
+      try { startAdminEventsWs(); loadReceipts(); } catch(_) {}
       if(currentUser) {
          document.getElementById('adminName').textContent = currentUser.name || 'Admin';
          document.getElementById('adminAvatar').textContent = (currentUser.name || 'A').charAt(0).toUpperCase();

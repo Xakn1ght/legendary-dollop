@@ -86,12 +86,17 @@ def get_plan_info(plan_name: str, plans: dict | None = None) -> dict | None:
     }
 
 
+_FA_DIGITS = str.maketrans("0123456789", "۰۱۲۳۴۵۶۷۸۹")
+
+
 def plan_display_name(plan_name: str, lang: str = "fa") -> str:
     """User-facing label; fixed plans keep their configured name."""
     gb = parse_custom_plan(plan_name)
     if gb is None:
         return plan_name
-    return f"{gb} گیگ | سفارشی" if lang == "fa" else f"{gb} GB | Custom"
+    if lang == "fa":
+        return f"{gb} گیگ | سفارشی".translate(_FA_DIGITS)
+    return f"{gb} GB | Custom"
 
 # Coupon types spendable at checkout today (Phase 1). Other types must be rejected,
 # never silently consumed.
