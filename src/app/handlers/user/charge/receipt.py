@@ -93,30 +93,19 @@ async def process_receipt(message: Message, state: FSMContext, session: AsyncSes
     sub_row = await session.get(db_models.Subscription, sub_id)
     sub_username = sub_row.marzban_username if sub_row else 'unknown'
 
-    pkg_desc = []
-    if traffic_bytes:
-        pkg_desc.append(f"{int(traffic_bytes/GB)}GB")
-    if extra_days:
-        pkg_desc.append(f"+{extra_days}days")
-    if (charge_req.charge_type or charge_type) == 'booking' and getattr(charge_req, 'renewal_template', None):
-        pkg_desc.append(f"رزرو {charge_req.renewal_template}")
+    from app.utils.receipt_captions import charge_receipt_caption
 
-    # Add charge type info (admin messages stay in Farsi)
-    charge_type_desc = {
-        'normal': '⚡️ شارژ عادی',
-        'normal_5gb_limit': '⚠️ شارژ (حد 5GB)',
-        'booking': '📅 رزرو پلن'
-    }.get(charge_req.charge_type or charge_type, '⚡️ شارژ')
+    charge_msg = charge_receipt_caption(charge_req, user, sub_username, source="bot")
 
-    charge_msg = (
-        f"{charge_type_desc}\nسرویس: {sub_username}\nکاربر: {user.full_name} ({user.chat_id})\n"
-        f"بسته: {' '.join(pkg_desc) or '-'}\nمبلغ: {charge_req.price:,} تومان"
-    )
-    if charge_req.credit_used and charge_req.credit_used > 0:
-        charge_msg += (
-            f"\n💰 اعتبار استفاده شده: {charge_req.credit_used:,} تومان"
-            f"\n💵 پرداختی رسید: {charge_req.price - charge_req.credit_used:,} تومان"
-        )
+    # Notify admin web panel (live receipts list + badge)
+    try:
+        import asyncio as _asyncio
+
+        from app.api.routes.admin_ws import broadcast_admin_event
+
+        _asyncio.create_task(broadcast_admin_event('receipts_updated', {'order_id': charge_req.id, 'type': 'charge'}))
+    except Exception:
+        pass
 
     # Send to admin bot (not user bot)
     if admin_bot:

@@ -117,24 +117,11 @@ async def handle_submit_charge_receipt(request: web.Request):
             builder.button(text="💬 Chat", callback_data=f"chat_with_user_{user_chat_id}")
             builder.adjust(2)
 
-            gb_amount = charge_req.traffic_bytes / GB
+            from app.utils.receipt_captions import charge_receipt_caption
 
-            charge_type_label = ""
-            if getattr(charge_req, "charge_type", "normal") == "normal_5gb_limit":
-                charge_type_label = "\n⚠️ شارژ (حد 5GB)"
-
-            admin_text = (
-                f"📱 درخواست شارژ از وب‌اپ{charge_type_label}\n\n"
-                f"👤 کاربر: {user.full_name} ({user_chat_id})\n"
-                f"🔖 اشتراک: {sub.marzban_username if sub else 'N/A'}\n"
-                f"📦 بسته: {gb_amount:.0f} گیگابایت"
+            admin_text = charge_receipt_caption(
+                charge_req, user, sub.marzban_username if sub else "N/A", source="webapp"
             )
-
-            if charge_req.extra_days:
-                admin_text += f" + {charge_req.extra_days} روز"
-
-            admin_text += f"\n💵 مبلغ: {charge_req.price:,} تومان"
-            admin_text += f"\n\n🆔 شماره درخواست: #{charge_req.id}"
 
             admin_bot = get_admin_bot()
             if admin_bot:

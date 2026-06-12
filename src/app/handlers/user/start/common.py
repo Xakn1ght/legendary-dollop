@@ -114,9 +114,16 @@ def _create_referral_link(bot, referral_code: str) -> str:
 def _create_share_button(bot, referral_code: str, lang: str) -> InlineKeyboardButton:
 	"""Create share referral link button"""
 	referral_link = _create_referral_link(bot, referral_code)
-	share_url = f"https://t.me/share/url?url={quote(referral_link)}&text=" + quote(
-		("🎁 کد دعوت من برای ربات AstroByte:\n" if lang == "fa" else "🎁 My invite code for AstroByte bot:\n") + referral_link
+	# Telegram renders the url separately below the text — never repeat the link
+	# inside the text or the shared message shows it twice.
+	share_text = (
+		"🚀 اینترنت آزاد، پرسرعت و بدون قطعی با AstroByte!\n"
+		"🎁 با لینک دعوت من عضو شو — هر دو پاداش می‌گیریم:"
+		if lang == "fa"
+		else "🚀 Fast, reliable internet with AstroByte!\n"
+		"🎁 Join with my invite link — we both get rewards:"
 	)
+	share_url = f"https://t.me/share/url?url={quote(referral_link)}&text={quote(share_text)}"
 	return InlineKeyboardButton(
 		text=("📤 اشتراک‌گذاری لینک دعوت" if lang == "fa" else "📤 Share Referral Link"),
 		url=share_url

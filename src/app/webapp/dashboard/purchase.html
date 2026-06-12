@@ -271,6 +271,8 @@
       en: {
         purchaseTitle: 'Buy Service',
         selectPlan: 'Select Plan',
+        customPlan: 'Custom Plan',
+        customPlanHint: 'Enter GB (1-300)',
         loadingPlans: 'Loading plans...',
         noPlansAvailable: 'No plans available',
         continue: 'Continue',
@@ -328,6 +330,8 @@
       fa: {
         purchaseTitle: 'خرید سرویس',
         selectPlan: 'انتخاب پلن',
+        customPlan: 'پلن دلخواه',
+        customPlanHint: 'حجم دلخواه (۱ تا ۳۰۰ گیگ)',
         loadingPlans: 'در حال بارگذاری...',
         noPlansAvailable: 'پلنی موجود نیست',
         continue: 'ادامه',
@@ -635,6 +639,7 @@
     function getPlanDisplayName(plan){
       try{
         if (!plan) return '';
+        if (plan.custom) return currentLang === 'en' ? `${plan.gb} GB | Custom` : `${plan.gb} گیگ | سفارشی`;
         const en = String(plan.name_en || '').trim();
         const fa = String(plan.name || '').trim();
         if (currentLang === 'en' && en) return en;
@@ -779,11 +784,54 @@
         if (selectedRenewalPlan && selectedRenewalPlan.name === plan.name) renewalCard.classList.add('selected');
         renewalGrid.appendChild(renewalCard);
       });
+
+      // Build-your-own plan card: type a GB amount, price is quoted server-side.
+      const customCard = document.createElement('div');
+      customCard.className = 'plan-card plan-card-custom';
+      customCard.dataset.plan = 'custom';
+      customCard.innerHTML = `
+        <div class="plan-gb-label" style="margin-bottom:6px">${t('customPlan')}</div>
+        <input type="number" inputmode="numeric" min="1" max="300" id="customGbInput"
+               placeholder="GB" autocomplete="off"
+               style="width:80px;text-align:center;font-size:20px;font-weight:700;background:transparent;
+                      border:none;border-bottom:2px solid currentColor;color:inherit;outline:none;direction:ltr">
+        <div class="plan-price"><div class="new" id="customPlanPrice">${t('customPlanHint')}</div></div>
+      `;
+      customCard.onclick = (e) => { try { document.getElementById('customGbInput').focus(); } catch(_) {} };
+      if (selectedPlan && selectedPlan.custom) customCard.classList.add('selected');
+      grid.appendChild(customCard);
+      const gbInput = customCard.querySelector('#customGbInput');
+      if (selectedPlan && selectedPlan.custom) gbInput.value = selectedPlan.gb;
+      let customQuoteTimer = null;
+      gbInput.addEventListener('input', () => {
+        clearTimeout(customQuoteTimer);
+        const gb = parseInt(gbInput.value, 10);
+        const priceEl = document.getElementById('customPlanPrice');
+        if (!gb || gb < 1 || gb > 300) {
+          priceEl.textContent = t('customPlanHint');
+          if (selectedPlan && selectedPlan.custom) { selectedPlan = null; document.getElementById('btnSelectPlan').disabled = true; }
+          return;
+        }
+        priceEl.textContent = '…';
+        customQuoteTimer = setTimeout(async () => {
+          try {
+            const data = await api(`/api/dashboard/purchase/custom-quote?gb=${gb}`);
+            if (data && data.ok && parseInt(gbInput.value, 10) === gb) {
+              priceEl.textContent = `${formatNumber(data.price)} ${t('currency')}`;
+              selectedPlan = { name: data.plan_name, gb: data.gb, price: data.price, custom: true };
+              document.querySelectorAll('#plansGrid .plan-card').forEach(c => c.classList.toggle('selected', c === customCard));
+              document.getElementById('btnSelectPlan').disabled = false;
+              if (tg?.HapticFeedback) tg.HapticFeedback.selectionChanged();
+            }
+          } catch(_) { priceEl.textContent = t('customPlanHint'); }
+        }, 350);
+      });
     }
     
     // Select plan
     function selectPlan(planName) {
       selectedPlan = plans.find(p => p.name === planName);
+      try { const ci = document.getElementById('customGbInput'); if (ci) ci.value = ''; const cp = document.getElementById('customPlanPrice'); if (cp) cp.textContent = t('customPlanHint'); } catch(_) {}
       
       document.querySelectorAll('#plansGrid .plan-card').forEach(card => {
         card.classList.toggle('selected', card.dataset.plan === planName);

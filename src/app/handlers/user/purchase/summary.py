@@ -44,21 +44,22 @@ async def show_order_summary(message: Message, state: FSMContext, session: Async
         )
         return
 
-    plan_info = PLANS[quote.plan_name]
+    from app.services.flows.pricing import get_plan_info, plan_display_name
+    plan_info = get_plan_info(quote.plan_name)
     marzban_username = data.get("marzban_username", "-")
 
     summary_lines = [
         ("<b>خلاصه سفارش شما:</b>" if lang == "fa" else "<b>Your order summary:</b>"),
-        (f"🔸 <b>پلن:</b> {quote.plan_name} ({plan_info['gb']} گیگابایت)" if lang == "fa" else f"🔸 <b>Plan:</b> {quote.plan_name} ({plan_info['gb']} GB)"),
+        (f"🔸 <b>پلن:</b> {plan_display_name(quote.plan_name)} ({plan_info['gb']} گیگابایت)" if lang == "fa" else f"🔸 <b>Plan:</b> {plan_display_name(quote.plan_name, 'en')} ({plan_info['gb']} GB)"),
         (f"🔸 <b>نام سرویس:</b> <code>{marzban_username}</code>" if lang == "fa" else f"🔸 <b>Service name:</b> <code>{marzban_username}</code>"),
     ]
     if quote.renewal_plan:
-        renewal_info = PLANS[quote.renewal_plan]
+        renewal_info = get_plan_info(quote.renewal_plan)
         summary_lines.append(
             (
-                f"🔹 <b>تمدید خودکار:</b> {quote.renewal_plan} ({renewal_info['gb']} گیگابایت) – {quote.renewal_price:,} تومان"
+                f"🔹 <b>تمدید خودکار:</b> {plan_display_name(quote.renewal_plan)} ({renewal_info['gb']} گیگابایت) – {quote.renewal_price:,} تومان"
                 if lang == "fa"
-                else f"🔹 <b>Auto-renew:</b> {quote.renewal_plan} ({renewal_info['gb']} GB) – {quote.renewal_price:,} Toman"
+                else f"🔹 <b>Auto-renew:</b> {plan_display_name(quote.renewal_plan, 'en')} ({renewal_info['gb']} GB) – {quote.renewal_price:,} Toman"
             )
         )
 

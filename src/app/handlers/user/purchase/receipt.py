@@ -66,12 +66,10 @@ async def process_receipt(message: Message, state: FSMContext, session: AsyncSes
     builder.button(text="💬 Chat", callback_data=f"chat_sub_{sub_id}_{user_chat_id}")
     builder.adjust(2)
 
-    admin_msg = (
-        f" رسید جدید برای کاربر {user_full_name} ({user_chat_id}) برای پلن {data['plan']} با نام {marzban_username}"
-    )
-    renewal_tpl = data.get('renewal_template')
-    if renewal_tpl:
-        admin_msg += f" – تمدید خودکار برای پلن {renewal_tpl}"
+    from app.core.settings import PLANS
+    from app.utils.receipt_captions import purchase_receipt_caption
+
+    admin_msg = purchase_receipt_caption(sub, user, source="bot", plans=PLANS)
 
     # Send the actionable admin message to admin bot (not user bot)
     admin_action_msg = None

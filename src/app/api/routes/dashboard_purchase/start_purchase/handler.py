@@ -9,6 +9,7 @@ from app.core.settings import PLANS
 from app.database import crud
 from app.database.models import AsyncSessionLocal, Referral
 from app.services.flows.errors import FlowError
+from app.services.flows.pricing import get_plan_info as _get_plan_info
 from app.services.flows.pricing import quote_purchase
 from app.services.flows.purchase import start_purchase_order
 
@@ -107,7 +108,7 @@ async def handle_start_purchase(request: web.Request):
 
                 admin_bot = get_admin_bot()
                 if admin_bot:
-                    plan_gb = PLANS[quote.plan_name].get("gb", 0)
+                    plan_gb = (_get_plan_info(quote.plan_name) or {}).get("gb", 0)
                     admin_text = (
                         "✅ خرید با اعتبار (خودکار)\n\n"
                         f"👤 کاربر: {user.full_name} ({user_chat_id})\n"
@@ -123,7 +124,7 @@ async def handle_start_purchase(request: web.Request):
         order_payload = {
             "id": sub.id,
             "plan": quote.plan_name,
-            "plan_gb": PLANS[quote.plan_name]["gb"],
+            "plan_gb": _get_plan_info(quote.plan_name)["gb"],
             "plan_price": quote.plan_price,
             "service_name": sub.marzban_username,
             "auto_renewal": validated.auto_renewal,

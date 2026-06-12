@@ -200,12 +200,7 @@ async def process_language_selection(callback: CallbackQuery, state: FSMContext,
 				]
 			)
 
-			await callback.message.edit_text(welcome_message, parse_mode=ParseMode.HTML)
-			await callback.message.answer(
-				welcome_message,
-				reply_markup=share_keyboard,
-				parse_mode=ParseMode.HTML,
-			)
+			await callback.message.edit_text(welcome_message, reply_markup=share_keyboard, parse_mode=ParseMode.HTML)
 			await callback.message.answer(
 				("از منوی زیر استفاده کنید:" if selected_lang == "fa" else "Use the menu below:"),
 				reply_markup=get_main_keyboard(chat_id, is_admin=user.is_admin, lang=selected_lang),

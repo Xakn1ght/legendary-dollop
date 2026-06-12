@@ -169,7 +169,9 @@ async def _auto_approve(session: AsyncSession, sub: Subscription, bot) -> None:
             # reloads) see one consistent source.
             from app.services.flows import pricing as _pricing
 
-            plan_info = _pricing.PLANS[sub.plan_name]
+            plan_info = _pricing.get_plan_info(sub.plan_name)
+            if not plan_info:
+                raise FlowError("invalid_plan", f"Unknown plan {sub.plan_name}")
             bonus_gb = await crud.free_gb_bonus_for_coupon(session, getattr(sub, "applied_coupon_id", None))
             if bonus_gb > 0:
                 plan_info = {**plan_info, "gb": int(plan_info.get("gb") or 0) + int(bonus_gb)}

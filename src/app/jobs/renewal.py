@@ -79,8 +79,8 @@ async def apply_renewal(subscription_id, session, bot: Bot):
         return
     # Fetch template info (simulate, replace with real template fetch if needed)
     template_name = subscription.renewal_template
-    from app.handlers.user.purchase import PLANS
-    raw_plan = PLANS.get(template_name)
+    from app.services.flows.pricing import get_plan_info
+    raw_plan = get_plan_info(template_name)
     if not raw_plan:
         bot_logger.error("[RENEWAL] Plan not found for template", subscription_id=subscription_id, template=template_name)
         await create_renewal_history(session, subscription.id, result="failure", details=f"Plan '{template_name}' not found in PLANS")

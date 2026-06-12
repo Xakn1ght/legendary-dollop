@@ -58,7 +58,8 @@ async def process_confirmation(message: Message, state: FSMContext, session: Asy
 
     sub = result.subscription
     await state.update_data(sub_id=sub.id, marzban_username=sub.marzban_username)
-    plan_info = PLANS[quote.plan_name]
+    from app.services.flows.pricing import get_plan_info
+    plan_info = get_plan_info(quote.plan_name)
 
     if result.auto_approved:
         # FULLY PAID BY CREDIT/DISCOUNT/COUPON

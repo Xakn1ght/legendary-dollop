@@ -33,6 +33,66 @@ from app.services.flows.errors import FlowError
 
 MAX_TOTAL_DISCOUNT_PERCENT = 90
 
+# ── custom (build-your-own) plans ────────────────────────────────────────────
+# plan_name format "custom:<gb>". Price math lives in app.core.pricing (the
+# designed curve that hits every fixed-plan anchor exactly); this is just the
+# plan-name plumbing around it.
+from app.core.pricing import (  # noqa: E402
+    CUSTOM_MAX_GB,
+    CUSTOM_MIN_GB,
+    PLAN_DURATION_DAYS,
+    custom_gb_price,
+)
+
+CUSTOM_PLAN_PREFIX = "custom:"
+
+
+def parse_custom_plan(plan_name: str) -> int | None:
+    """Return the GB for a "custom:<gb>" plan name, else None."""
+    if not isinstance(plan_name, str) or not plan_name.startswith(CUSTOM_PLAN_PREFIX):
+        return None
+    try:
+        gb = int(plan_name[len(CUSTOM_PLAN_PREFIX):])
+    except ValueError:
+        return None
+    return gb if CUSTOM_MIN_GB <= gb <= CUSTOM_MAX_GB else None
+
+
+def custom_plan_price(gb: int) -> int:
+    try:
+        return custom_gb_price(gb)
+    except ValueError as e:
+        raise QuoteError("invalid_plan", str(e))
+
+
+def get_plan_info(plan_name: str, plans: dict | None = None) -> dict | None:
+    """PLANS lookup that also resolves "custom:<gb>" virtual plans.
+
+    ``plans`` lets callers (and tests) supply their own catalog for the fixed
+    lookup; custom pricing always interpolates from the live PLANS anchors.
+    """
+    catalog = plans if plans is not None else PLANS
+    if plan_name in catalog:
+        return catalog[plan_name]
+    gb = parse_custom_plan(plan_name)
+    if gb is None:
+        return None
+    return {
+        "price": custom_plan_price(gb),
+        "gb": gb,
+        "days": PLAN_DURATION_DAYS,
+        "custom": True,
+        "name_en": f"{gb} GB | Custom",
+    }
+
+
+def plan_display_name(plan_name: str, lang: str = "fa") -> str:
+    """User-facing label; fixed plans keep their configured name."""
+    gb = parse_custom_plan(plan_name)
+    if gb is None:
+        return plan_name
+    return f"{gb} گیگ | سفارشی" if lang == "fa" else f"{gb} GB | Custom"
+
 # Coupon types spendable at checkout today (Phase 1). Other types must be rejected,
 # never silently consumed.
 SUPPORTED_COUPON_TYPES = ("discount_percent", "free_gb")
@@ -84,13 +144,15 @@ async def quote_purchase(
     Raises QuoteError(code) with codes: invalid_plan, invalid_renewal_plan,
     invalid_coupon, coupon_not_supported_yet.
     """
-    if plan_name not in PLANS:
+    plan_info = get_plan_info(plan_name)
+    if not plan_info:
         raise QuoteError("invalid_plan", "Selected plan does not exist")
-    if renewal_plan is not None and renewal_plan not in PLANS:
+    renewal_info = get_plan_info(renewal_plan) if renewal_plan is not None else None
+    if renewal_plan is not None and not renewal_info:
         raise QuoteError("invalid_renewal_plan", "Invalid renewal plan selected")
 
-    plan_price = int(PLANS[plan_name].get("price") or 0)
-    renewal_price = int(PLANS[renewal_plan].get("price") or 0) if renewal_plan else 0
+    plan_price = int(plan_info.get("price") or 0)
+    renewal_price = int(renewal_info.get("price") or 0) if renewal_info else 0
     base_total = plan_price + renewal_price
 
     total_discount_percent = 0

@@ -82,7 +82,8 @@ async def start_charge_order(
     """
     if package_name not in CHARGE_PRESET_PACKAGES:
         raise FlowError("invalid_package", "Selected package does not exist")
-    if renewal_template is not None and renewal_template not in PLANS:
+    from app.services.flows.pricing import get_plan_info as _gpi
+    if renewal_template is not None and not _gpi(renewal_template, PLANS):
         raise FlowError("invalid_renewal_plan", "Invalid renewal plan selected")
 
     sub = await session.get(Subscription, subscription_id)
@@ -115,7 +116,8 @@ async def start_charge_order(
     if use_credit and (user.credit or 0) > 0:
         credit_used = min(int(user.credit or 0), total_price)
 
-    renewal_price = int(PLANS[renewal_template].get("price") or 0) if renewal_template else None
+    from app.services.flows.pricing import get_plan_info
+    renewal_price = int((get_plan_info(renewal_template, PLANS) or {}).get("price") or 0) if renewal_template else None
 
     charge_req = await crud.create_charge_request(
         session,
@@ -203,7 +205,9 @@ async def start_booking_order(
     (Previously both surfaces set renewal_paid=True immediately — the bot without
     any payment step at all.)
     """
-    if plan_name not in PLANS:
+    from app.services.flows.pricing import get_plan_info as _gpi2
+    plan_info = _gpi2(plan_name, PLANS)
+    if not plan_info:
         raise FlowError("invalid_plan", "Selected plan does not exist")
 
     sub = await session.get(Subscription, subscription_id)
@@ -214,7 +218,6 @@ async def start_booking_order(
     if sub.status != "active":
         raise FlowError("subscription_not_active")
 
-    plan_info = PLANS[plan_name]
     price = int(plan_info.get("price") or 0)
 
     charge_req = await crud.create_charge_request(

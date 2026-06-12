@@ -455,6 +455,10 @@
           currentUser = { name: 'Admin' };
         }
         showAdminPanel();
+        // Live receipts socket from login (not just the receipts page) so the
+        // sidebar badge updates the moment a user submits a receipt.
+        startAdminEventsWs();
+        loadReceipts();
       } else {
         // Clear any stale session info
         localStorage.removeItem(SESSION_KEY);
@@ -2157,14 +2161,29 @@
         const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
         const wsUrl = `${protocol}//${window.location.host}/api/admin/ws/support`;
         adminEventsWs = new WebSocket(wsUrl);
+        // Zombie-connection guard: the server drops silent sockets ("no PONG"),
+        // but the browser can keep a dead TCP conn "open" for minutes — with
+        // polling disabled, receipts stop updating. App-level ping every 20s;
+        // no pong within 10s → force-close → onclose restarts polling+reconnect.
+        let pingTimer = null, pongDeadline = null;
+        const stopPing = () => { clearInterval(pingTimer); clearTimeout(pongDeadline); pingTimer = pongDeadline = null; };
         adminEventsWs.onopen = () => {
           adminEventsWsConnected = true;
           // When WS is up, stop fallback polling.
           stopReceiptsPolling();
+          stopPing();
+          pingTimer = setInterval(() => {
+            try {
+              adminEventsWs.send(JSON.stringify({ action: 'ping' }));
+              clearTimeout(pongDeadline);
+              pongDeadline = setTimeout(() => { try { adminEventsWs.close(); } catch(_) {} }, 10000);
+            } catch(_) { try { adminEventsWs.close(); } catch(__) {} }
+          }, 20000);
         };
 	        adminEventsWs.onmessage = (event) => {
 	          try {
 	            const msg = JSON.parse(event.data || '{}');
+	            if (msg.type === 'pong') { clearTimeout(pongDeadline); pongDeadline = null; return; }
 	            if (msg.type === 'receipts_updated') {
 	              const id = msg?.data?.order_id || msg?.data?.charge_id;
 	              const typ = msg?.data?.type || (msg?.data?.charge_id ? 'charge' : 'subscription');
@@ -2181,6 +2200,7 @@
 	          } catch(_) {}
 	        };
         adminEventsWs.onclose = () => {
+          stopPing();
           adminEventsWsStarted = false;
           adminEventsWsConnected = false;
           // WS dropped: start fallback polling so UI still updates.

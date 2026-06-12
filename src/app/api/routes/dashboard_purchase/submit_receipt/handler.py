@@ -116,33 +116,9 @@ async def handle_submit_receipt(request: web.Request):
             builder.button(text="💬 Chat", callback_data=f"chat_sub_{sub.id}_{user_chat_id}")
             builder.adjust(2)
 
-            plan_info = PLANS.get(sub.plan_name, {})
-            total = plan_info.get("price", 0)
-            if sub.renewal_paid and sub.renewal_price:
-                total += sub.renewal_price
+            from app.utils.receipt_captions import purchase_receipt_caption
 
-            discount_info = ""
-            if sub.applied_discount_ids:
-                discount_info = "\n🎟️ تخفیف اعمال شده"
-
-            credit_info = ""
-            if sub.credit_used and sub.credit_used > 0:
-                credit_info = f"\n💰 اعتبار استفاده شده: {sub.credit_used:,} تومان"
-
-            admin_text = (
-                f"📱 رسید جدید از وب‌اپ\n\n"
-                f"👤 کاربر: {user.full_name} ({user_chat_id})\n"
-                f"📦 پلن: {sub.plan_name} ({plan_info.get('gb', 0)} گیگابایت)\n"
-                f"🔖 نام سرویس: {sub.marzban_username}\n"
-                f"💵 مبلغ کل: {total:,} تومان"
-                f"{discount_info}"
-                f"{credit_info}"
-            )
-
-            if sub.renewal_paid and sub.renewal_template:
-                admin_text += f"\n🔄 تمدید خودکار: {sub.renewal_template}"
-
-            admin_text += f"\n\n🆔 شماره سفارش: #{sub.id}"
+            admin_text = purchase_receipt_caption(sub, user, source="webapp", plans=PLANS)
 
             admin_bot = get_admin_bot()
             if admin_bot:

@@ -14,6 +14,7 @@ router = Router()
 class PurchaseState(StatesGroup):
     referral_code = State()
     plan = State()
+    custom_gb = State()
     auto_renew_choice = State()
     renewal_template = State()
     name = State()
@@ -23,6 +24,10 @@ class PurchaseState(StatesGroup):
     confirmation = State()
     receipt = State()
     edit_choice = State()
+
+
+CUSTOM_PLAN_BTN_FA = "📦 پلن دلخواه"
+CUSTOM_PLAN_BTN_EN = "📦 Custom Plan"
 
 
 def _build_plan_keyboard(lang: str = "fa", is_vip: bool = False):
@@ -39,6 +44,7 @@ def _build_plan_keyboard(lang: str = "fa", is_vip: bool = False):
     for i in range(0, len(available_keys), PLANS_BUTTON_COLUMNS):
         row = [KeyboardButton(text=available_keys[j]) for j in range(i, min(i + PLANS_BUTTON_COLUMNS, len(available_keys)))]
         rows.append(row)
+    rows.append([KeyboardButton(text=CUSTOM_PLAN_BTN_FA if lang == "fa" else CUSTOM_PLAN_BTN_EN)])
     rows.append([KeyboardButton(text=t(lang, "btn_back"))])
     return ReplyKeyboardMarkup(keyboard=rows, resize_keyboard=True)
 

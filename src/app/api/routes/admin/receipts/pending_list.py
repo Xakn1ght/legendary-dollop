@@ -23,7 +23,8 @@ async def handle_admin_pending_receipts(request: web.Request):
                     user = await session.get(User, sub.user_id)
                     
                     from app.core.settings import PLANS
-                    plan_info = PLANS.get(sub.plan_name, {})
+                    from app.services.flows.pricing import get_plan_info
+                    plan_info = get_plan_info(sub.plan_name) or {}
                     
                     # Calculate original price (before discounts)
                     original_price = plan_info.get("price", 0)
