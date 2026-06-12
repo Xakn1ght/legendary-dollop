@@ -150,9 +150,9 @@
           const andrVer = ua.match(/Android (\d+)/);
           const mem = navigator.deviceMemory || 0;            // Chrome/Android only
           const cores = navigator.hardwareConcurrency || 0;
-          if (isAndroid && mem && mem <= 3) lite = true;      // ≤3GB RAM
+          if (isAndroid && mem && mem <= 4) lite = true;      // ≤4GB RAM (low/mid tier)
           if (isAndroid && cores && cores <= 4) lite = true;  // weak CPU
-          if (andrVer && parseInt(andrVer[1], 10) <= 9) lite = true; // old OS = old GPU
+          if (andrVer && parseInt(andrVer[1], 10) <= 10) lite = true; // old OS = old GPU
           if (localStorage.getItem('astro_perf_auto') === 'lite') lite = true; // earlier probe verdict
           apply(lite);
           if (!lite && isAndroid) {
@@ -166,7 +166,8 @@
                 frames++;
                 if (t - t0 < 2000) { requestAnimationFrame(tick); return; }
                 const fps = frames / ((t - t0) / 1000);
-                if (fps < 35) {
+                window.__ASTRO_PROBE_FPS = Math.round(fps);
+                if (fps < 45) {
                   try { localStorage.setItem('astro_perf_auto', 'lite'); } catch (_) {}
                   apply(true);
                 }
@@ -263,8 +264,11 @@
         if (platform.indexOf('android') === 0) { // covers "android" + "android_x"
           const applySafeArea = () => {
             try {
-              const sa = tg.safeAreaInset || {};
-              const px = Math.max(0, Math.round(sa.bottom || 0));
+              const sa = tg.safeAreaInset;
+              // Trust a reported value (0 = gesture nav, fine). If the client
+              // can't report at all while fullscreen, assume a 3-button bar.
+              let px = sa ? Math.max(0, Math.round(sa.bottom || 0)) : 0;
+              if (!sa && tg.isFullscreen) px = 48;
               document.documentElement.style.setProperty('--astro-safe-bottom-extra', px + 'px');
             } catch(_) {}
           };
@@ -277,6 +281,37 @@
         }
       }catch(_){}
     })();
+
+// Hidden diagnostics: tap the footer 5× within 2s to see what this device
+// reports (perf mode, RAM/cores, fps probe, safe-area). For debugging perf
+// and layout reports from users — no UI cost otherwise.
+(function () {
+  'use strict';
+  let taps = 0, t0 = 0;
+  document.addEventListener('click', (e) => {
+    if (!e.target || !e.target.closest || !e.target.closest('footer')) return;
+    const now = Date.now();
+    if (now - t0 > 2000) { taps = 0; t0 = now; }
+    if (++taps < 5) return;
+    taps = 0;
+    try {
+      const tg = window.Telegram && window.Telegram.WebApp;
+      const cs = getComputedStyle(document.documentElement);
+      const ua = navigator.userAgent || '';
+      const msg = [
+        'perf: ' + document.documentElement.getAttribute('data-perf'),
+        'mem: ' + (navigator.deviceMemory || '?') + 'GB, cores: ' + (navigator.hardwareConcurrency || '?'),
+        'probeFps: ' + (window.__ASTRO_PROBE_FPS || 'n/a'),
+        'tg v' + (tg && tg.version || '?') + ' ' + (tg && tg.platform || '?') + ' fs:' + (tg && tg.isFullscreen),
+        'safeArea: ' + JSON.stringify(tg && tg.safeAreaInset || null),
+        'extraVar: ' + (cs.getPropertyValue('--astro-safe-bottom-extra') || '(unset)'),
+        'ua: ' + ua.slice(0, 80),
+      ].join('\n');
+      const show = (tg && typeof tg.showAlert === 'function') ? tg.showAlert.bind(tg) : window.alert;
+      show(msg);
+    } catch (err) { try { window.alert('diag error: ' + err); } catch (_) {} }
+  }, { passive: true });
+})();
 
 // Battery/heat saver: when the WebApp is hidden (user switches chats, locks the
 // phone, backgrounds Telegram), pause ALL CSS animations and signal pollers to
