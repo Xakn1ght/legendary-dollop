@@ -326,8 +326,23 @@
         'extraVar: ' + (cs.getPropertyValue('--astro-safe-bottom-extra') || '(unset)'),
         'ua: ' + ua.slice(0, 80),
       ].join('\n');
-      const show = (tg && typeof tg.showAlert === 'function') ? tg.showAlert.bind(tg) : window.alert;
-      show(msg);
+      const wipeFirstRun = () => {
+        try {
+          ['astro_welcome_shown', 'astro_perf', 'astro_perf_auto'].forEach((k) => localStorage.removeItem(k));
+        } catch (_) {}
+        try { location.reload(); } catch (_) {}
+      };
+      if (tg && typeof tg.showPopup === 'function') {
+        tg.showPopup(
+          { title: 'Diagnostics', message: msg, buttons: [
+            { id: 'close', type: 'close' },
+            { id: 'reset', type: 'destructive', text: 'Reset first-run flags' },
+          ] },
+          (id) => { if (id === 'reset') wipeFirstRun(); }
+        );
+      } else if (window.confirm(msg + '\n\nReset first-run flags (welcome screen, perf mode)?')) {
+        wipeFirstRun();
+      }
     } catch (err) { try { window.alert('diag error: ' + err); } catch (_) {} }
   }, { passive: true });
 })();
