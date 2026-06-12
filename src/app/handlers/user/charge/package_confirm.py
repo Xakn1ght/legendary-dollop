@@ -20,6 +20,16 @@ from .common import (
 )
 
 
+def _registered_text(lang: str) -> str:
+    # Attribute access at call time: the admin panel can change the card at runtime.
+    from app.core.settings import payment_ui as _payment
+
+    msg = t(lang, "charge_request_registered").format(card=_payment.PAYMENT_CARD_NUMBER)
+    if _payment.PAYMENT_CARD_HOLDER:
+        msg += f"\n{_payment.PAYMENT_CARD_HOLDER}"
+    return msg
+
+
 @router.message(ChargeState.package)
 async def choose_package(message: Message, state: FSMContext, session: AsyncSession):
     lang = await _get_lang(message.chat.id, session)
@@ -164,7 +174,7 @@ async def confirm_charge(message: Message, state: FSMContext, session: AsyncSess
         return
 
     await message.answer(
-        t(lang, "charge_request_registered"),
+        _registered_text(lang),
         reply_markup=ReplyKeyboardMarkup(keyboard=[[KeyboardButton(text=t(lang, "btn_back"))]], resize_keyboard=True),
         parse_mode="HTML"
     )
@@ -185,7 +195,7 @@ async def charge_credit_choice(message: Message, state: FSMContext, session: Asy
 
     if not use_credit:
         await message.answer(
-            t(lang, "charge_request_registered"),
+            _registered_text(lang),
             reply_markup=ReplyKeyboardMarkup(keyboard=[[KeyboardButton(text=t(lang, "btn_back"))]], resize_keyboard=True),
             parse_mode="HTML"
         )
@@ -225,10 +235,10 @@ async def charge_credit_choice(message: Message, state: FSMContext, session: Asy
     await message.answer(
         (
             f"💰 {result.credit_used:,} تومان از اعتبار شما استفاده شد.\n"
-            f"💵 مبلغ باقیمانده برای پرداخت: {result.final_price:,} تومان\n\n" + t(lang, "charge_request_registered")
+            f"💵 مبلغ باقیمانده برای پرداخت: {result.final_price:,} تومان\n\n" + _registered_text(lang)
             if lang == "fa"
             else f"💰 {result.credit_used:,} Toman of your credit was used.\n"
-            f"💵 Remaining to pay: {result.final_price:,} Toman\n\n" + t(lang, "charge_request_registered")
+            f"💵 Remaining to pay: {result.final_price:,} Toman\n\n" + _registered_text(lang)
         ),
         reply_markup=ReplyKeyboardMarkup(keyboard=[[KeyboardButton(text=t(lang, "btn_back"))]], resize_keyboard=True),
         parse_mode="HTML"

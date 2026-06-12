@@ -35,8 +35,8 @@ backups/
 *.sqlite3
 
 # App runtime state / local data
-app/data/*.json
-app/webapp/admin/uploads/
+src/app/data/*.json
+src/app/webapp/admin/uploads/
 
 # Captured network traces / local misc
 misc/other/*.har
