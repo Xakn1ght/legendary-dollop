@@ -5,6 +5,7 @@
    - Accent: data-accent="red" (default) | "cyan" | "emerald" | "violet" | "amber"
    ============================================================ */
 
+
 :root {
   /* ---------- Surface layers (DARK is default) ---------- */
   --bg-base:    #0a141b;
@@ -83,23 +84,24 @@
    Canvas: periwinkle · Glass: translucent white · Text: deep navy
    ============================================================ */
 [data-theme="light"] {
-  --bg-base:    rgba(220, 232, 255, 0.28);
-  --bg-elev-1:  rgba(255, 255, 255, 0.54);
-  --bg-elev-2:  rgba(255, 255, 255, 0.42);
-  --bg-elev-3:  rgba(255, 255, 255, 0.30);
-  --surface-overlay: rgba(255, 255, 255, 0.72);
+  /* Frosted Paper Glass — warm-neutral canvas (no blue cast) */
+  --bg-base:    #f1ede5;
+  --bg-elev-1:  #fcfaf7;
+  --bg-elev-2:  #ffffff;
+  --bg-elev-3:  #fbf9f5;
+  --surface-overlay: rgba(250, 248, 245, 0.92);
 
-  --text:       #0d1b2e;
-  --text-muted: #3e5570;
-  --text-soft:  #1e3450;
+  --text:       #2a2620;
+  --text-muted: #6d685f;
+  --text-soft:  #4a463f;
 
-  --line:        rgba(255, 255, 255, 0.58);
-  --line-strong: rgba(255, 255, 255, 0.82);
-  --divider:     rgba(255, 255, 255, 0.40);
+  --line:        rgba(45, 38, 30, 0.08);
+  --line-strong: rgba(45, 38, 30, 0.14);
+  --divider:     rgba(45, 38, 30, 0.06);
 
-  --shadow-1: 0 2px 10px rgba(14, 26, 60, 0.10);
-  --shadow-2: 0 8px 28px rgba(14, 26, 60, 0.14), 0 2px 8px rgba(14, 26, 60, 0.07);
-  --shadow-3: 0 20px 52px rgba(14, 26, 60, 0.18), 0 6px 16px rgba(14, 26, 60, 0.09);
+  --shadow-1: 0 1px 2px rgba(60, 48, 32, 0.04), 0 4px 16px rgba(60, 48, 32, 0.05);
+  --shadow-2: 0 2px 6px rgba(60, 48, 32, 0.06), 0 8px 24px rgba(60, 48, 32, 0.07);
+  --shadow-3: 0 4px 12px rgba(60, 48, 32, 0.08), 0 16px 40px rgba(60, 48, 32, 0.10);
 
   --ok:   #059669;
   --warn: #d97706;
@@ -111,9 +113,9 @@
 
   --transition-gradient: radial-gradient(
     circle at center,
-    rgba(255, 255, 255, 0.65) 0%,
-    rgba(var(--brandRgb), 0.22) 38%,
-    rgba(200, 216, 248, 0.95) 100%
+    rgba(255, 255, 255, 0.80) 0%,
+    rgba(var(--brandRgb), 0.16) 38%,
+    rgba(243, 240, 235, 0.96) 100%
   );
 }
 
@@ -169,7 +171,7 @@ html[data-theme] body {
   background: transparent;
 }
 html[data-theme="light"] {
-  background: #8fa8d8;
+  background: #f1ede5;
 }
 
 /* Profile section glass — only where tokens.css applies */
@@ -205,32 +207,33 @@ html[data-theme="light"] {
   opacity: 1;
   filter: blur(72px) saturate(160%) contrast(1.8);
 }
-/* Light mode — Liquid Aurora: vivid lava lamp, contrast() for water-drop merge */
+/* Light mode — living aurora: soft watercolor pools, gentle contrast */
 [data-theme="light"] #astro-lava {
   opacity: 1;
-  filter: blur(72px) saturate(160%) contrast(1.8);
+  filter: blur(76px) saturate(135%) contrast(1.22) brightness(0.97);
 }
 .lava-blob {
   position: absolute;
   border-radius: 50%;
   will-change: transform;
+  contain: layout style;
 }
 
-/* --- LIGHT MODE blobs (accent color, 5 opacity levels for depth) --- */
+/* --- LIGHT MODE blobs (pastel accent, 5 opacity levels for depth) --- */
 [data-theme="light"] .lava-blob-1 {
-  background: rgba(var(--brandRgb), 0.72);
+  background: rgba(var(--brandRgb), 0.34);
 }
 [data-theme="light"] .lava-blob-2 {
-  background: rgba(var(--brandRgb), 0.52);
+  background: rgba(var(--brandRgb), 0.26);
 }
 [data-theme="light"] .lava-blob-3 {
-  background: rgba(var(--brandRgb), 0.42);
+  background: rgba(var(--brandRgb), 0.20);
 }
 [data-theme="light"] .lava-blob-4 {
-  background: rgba(var(--brandRgb), 0.62);
+  background: rgba(var(--brandRgb), 0.29);
 }
 [data-theme="light"] .lava-blob-5 {
-  background: rgba(var(--brandRgb), 0.35);
+  background: rgba(var(--brandRgb), 0.17);
 }
 
 /* --- DARK MODE blobs (accent color, glowing against dark canvas) --- */
@@ -261,35 +264,35 @@ html[data-theme="light"] {
   max-width: 420px; max-height: 420px;
   top: -8%; left: -6%;
   animation: lava1 44s cubic-bezier(0.45, 0.05, 0.55, 0.95) infinite;
-  will-change: transform, border-radius;
+  will-change: transform;
 }
 .lava-blob-2 {
   width: 50vw; height: 50vw;
   max-width: 380px; max-height: 380px;
   top: -6%; right: -8%;
   animation: lava2 58s cubic-bezier(0.45, 0.05, 0.55, 0.95) infinite;
-  will-change: transform, border-radius;
+  will-change: transform;
 }
 .lava-blob-3 {
   width: 54vw; height: 54vw;
   max-width: 400px; max-height: 400px;
   bottom: 8%; left: 4%;
   animation: lava3 38s cubic-bezier(0.45, 0.05, 0.55, 0.95) infinite;
-  will-change: transform, border-radius;
+  will-change: transform;
 }
 .lava-blob-4 {
   width: 46vw; height: 46vw;
   max-width: 350px; max-height: 350px;
   bottom: -4%; right: 4%;
   animation: lava4 50s cubic-bezier(0.45, 0.05, 0.55, 0.95) infinite;
-  will-change: transform, border-radius;
+  will-change: transform;
 }
 .lava-blob-5 {
   width: 42vw; height: 42vw;
   max-width: 310px; max-height: 310px;
   top: 38%; left: 28%;
   animation: lava5 62s cubic-bezier(0.45, 0.05, 0.55, 0.95) infinite;
-  will-change: transform, border-radius;
+  will-change: transform;
 }
 
 /* Jellyfish / water-drop animations
@@ -341,4 +344,86 @@ html[data-theme="light"] {
   66%  { transform: translate(-10vw,-26vh) scale(0.88); border-radius: 44% 56% 58% 42% / 52% 48% 46% 54%; }
   82%  { transform: translate(-20vw,14vh) scale(1.10); border-radius: 50% 50% 46% 54% / 46% 54% 54% 46%; }
   100% { transform: translate(0,0) scale(1);           border-radius: 50%; }
+}
+
+/* ============================================================
+   MOBILE PERFORMANCE — applied on phones/tablets (≤768px).
+
+   Why this is needed:
+   • contrast() on the container forces the compositor to flatten
+     all animated children into one CPU-side texture before the
+     filter is applied — GPU compositing is bypassed entirely.
+   • border-radius morphing triggers paint every frame; it cannot
+     be accelerated the way plain transforms can.
+   • 5 large blobs × heavy filters = dropped frames on Android.
+
+   What we do here:
+   1. Drop contrast() — biggest single win. Blobs still glow.
+   2. Reduce blur 72→42px (still dreamy, half the GPU fill cost).
+   3. Hide blobs 4 & 5 — 3 blobs is plenty on a small screen.
+   4. Switch to transform-only keyframes — zero paint cost,
+      fully GPU-compositable. Shape stays round (no morph) but
+      the drifting/scaling motion is preserved.
+   ============================================================ */
+@media (max-width: 768px) {
+  :root #astro-lava,
+  [data-theme="dark"] #astro-lava {
+    filter: blur(42px) saturate(140%);
+  }
+  [data-theme="light"] #astro-lava {
+    filter: blur(46px) saturate(132%) contrast(1.18) brightness(0.99);
+  }
+
+  .lava-blob-4,
+  .lava-blob-5 {
+    display: none;
+  }
+
+  .lava-blob-1 {
+    width: 72vw; height: 72vw;
+    max-width: 280px; max-height: 280px;
+    animation-name: lava1-m;
+  }
+  .lava-blob-2 {
+    width: 66vw; height: 66vw;
+    max-width: 256px; max-height: 256px;
+    animation-name: lava2-m;
+  }
+  .lava-blob-3 {
+    width: 62vw; height: 62vw;
+    max-width: 240px; max-height: 240px;
+    animation-name: lava3-m;
+  }
+}
+
+/* Transform-only mobile keyframes — no border-radius, no paint */
+@keyframes lava1-m {
+  0%   { transform: translate(0,0) scale(1); }
+  12%  { transform: translate(14vw,10vh) scale(1.10); }
+  25%  { transform: translate(8vw,36vh) scale(0.92); }
+  38%  { transform: translate(26vw,24vh) scale(1.14); }
+  52%  { transform: translate(18vw,54vh) scale(0.88); }
+  65%  { transform: translate(34vw,34vh) scale(1.08); }
+  78%  { transform: translate(4vw,18vh) scale(1.04); }
+  90%  { transform: translate(20vw,6vh) scale(0.96); }
+  100% { transform: translate(0,0) scale(1); }
+}
+@keyframes lava2-m {
+  0%   { transform: translate(0,0) scale(1); }
+  14%  { transform: translate(-18vw,14vh) scale(1.12); }
+  28%  { transform: translate(-8vw,46vh) scale(0.90); }
+  44%  { transform: translate(-30vw,30vh) scale(1.16); }
+  58%  { transform: translate(-12vw,64vh) scale(0.86); }
+  72%  { transform: translate(-24vw,14vh) scale(1.10); }
+  88%  { transform: translate(-6vw,4vh) scale(1.02); }
+  100% { transform: translate(0,0) scale(1); }
+}
+@keyframes lava3-m {
+  0%   { transform: translate(0,0) scale(1); }
+  18%  { transform: translate(18vw,-16vh) scale(1.10); }
+  35%  { transform: translate(34vw,-6vh) scale(0.88); }
+  52%  { transform: translate(22vw,-32vh) scale(1.14); }
+  70%  { transform: translate(10vw,-14vh) scale(0.92); }
+  88%  { transform: translate(28vw,-4vh) scale(1.06); }
+  100% { transform: translate(0,0) scale(1); }
 }

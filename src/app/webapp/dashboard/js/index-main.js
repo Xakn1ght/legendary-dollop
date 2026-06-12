@@ -71,10 +71,13 @@
     function getLocale(){ return currentLang==='fa' ? 'fa-IR' : 'en-US'; }
     function fmtNum(n, digits = 1){
       try{
-        const f = new Intl.NumberFormat(getLocale(), { minimumFractionDigits: digits, maximumFractionDigits: digits });
+        // Allow up to `digits` decimals but don't force trailing zeros
+        // (so 6 → "6", 6.4 → "6.4", not "6.0").
+        const f = new Intl.NumberFormat(getLocale(), { minimumFractionDigits: 0, maximumFractionDigits: digits });
         return f.format(n);
       }catch(_){
-        return (n!=null && isFinite(n)) ? Number(n).toFixed(digits) : '0';
+        if (n==null || !isFinite(n)) return '0';
+        return String(parseFloat(Number(n).toFixed(digits)));
       }
     }
     const fmtGB = (bytes) => { 
@@ -1746,7 +1749,7 @@
     }
 
     function beginDataLoading(){ try{ const c=document.querySelector('.content'); if(c) c.classList.add('loading'); }catch(_){ } }
-    function endDataLoading(){ try{ const c=document.querySelector('.content'); if(c) c.classList.remove('loading'); }catch(_){ } }
+    function endDataLoading(){ try{ const c=document.querySelector('.content'); if(c) c.classList.remove('loading'); }catch(_){ } try{ if(window.AstroSkeleton) window.AstroSkeleton.ready(); }catch(_){ } }
     
     let overviewAbort = null;
 
@@ -3269,7 +3272,6 @@
       // Read theme after prefs sync to avoid a dark→light flash.
       const savedTheme = localStorage.getItem('theme') || document.documentElement.getAttribute('data-theme') || 'dark';
       function runThemeTransition(apply){
-        // Freeze all CSS transitions for 2 frames so color vars snap instantly
         document.documentElement.setAttribute('data-no-trans', '1');
         apply();
         requestAnimationFrame(() => requestAnimationFrame(() => {
@@ -3283,33 +3285,36 @@
           const tg = (window.Telegram && window.Telegram.WebApp) ? window.Telegram.WebApp : null;
           if (!tg) return;
           const isLight = (themeName === 'light');
-          const bg       = isLight ? '#d4dff0' : '#0a141b';
-          const headerBg = isLight ? '#d4dff0' : '#10202a';
+          const bg       = isLight ? '#f1ede5' : '#0a141b';
+          const headerBg = isLight ? '#f1ede5' : '#10202a';
           try { if (typeof tg.setBackgroundColor === 'function') tg.setBackgroundColor(bg); } catch(_) {}
           try { if (typeof tg.setHeaderColor    === 'function') tg.setHeaderColor(headerBg); } catch(_) {}
           try { if (typeof tg.setBottomBarColor === 'function') tg.setBottomBarColor(bg); } catch(_) {}
         } catch(_) {}
       }
+      // Coalesce rapid toggles into one restyle on the next frame
+      let _themeRaf = 0;
+      let _themeDesired = null;
       function setTheme(theme) {
         const next = (theme === 'light') ? 'light' : 'dark';
-        const prev = document.documentElement.getAttribute('data-theme') || '';
-        const prevChecked = !!(themeToggle && themeToggle.checked);
-        const nextChecked = (next === 'light');
-        if (prev === next && prevChecked === nextChecked) {
-          try { localStorage.setItem('theme', next); } catch(_) {}
-          syncTelegramChromeToTheme(next);
-          return;
-        }
-        const apply = () => {
-          document.documentElement.setAttribute('data-theme', next);
-          try { localStorage.setItem('theme', next); } catch(_) {}
-          if(themeToggle) themeToggle.checked = nextChecked;
-          schedulePrefsSave({ theme: next });
-          // Sync Telegram chrome AFTER the attr is set so we read the right CSS vars.
-          requestAnimationFrame(() => syncTelegramChromeToTheme(next));
-        };
-        if (prev && prev !== next) runThemeTransition(apply);
-        else apply();
+        _themeDesired = next;
+        try { localStorage.setItem('theme', next); } catch(_) {}
+        if (_themeRaf) return;
+        _themeRaf = requestAnimationFrame(() => {
+          _themeRaf = 0;
+          const target = _themeDesired;
+          const prev = document.documentElement.getAttribute('data-theme') || '';
+          if (themeToggle) themeToggle.checked = (target === 'light');
+          if (prev === target) { syncTelegramChromeToTheme(target); return; }
+          const apply = () => {
+            document.documentElement.setAttribute('data-theme', target);
+            schedulePrefsSave({ theme: target });
+            // read the right CSS vars after the attr lands
+            requestAnimationFrame(() => syncTelegramChromeToTheme(target));
+          };
+          if (prev) runThemeTransition(apply);
+          else apply();
+        });
       }
       window.syncTelegramChromeToTheme = syncTelegramChromeToTheme;
       setTheme(savedTheme);
@@ -3702,17 +3707,25 @@
       const notificationBell = document.getElementById('notificationBell');
       const notificationBadge = document.getElementById('notificationBadge');
       
-      // Sticky header on scroll
+      // Sticky header on scroll (rAF-gated, passive)
       let lastScroll = 0;
+      let _scrollTicking = false;
+      let _headerScrolled = false;
       window.addEventListener('scroll', () => {
-        const currentScroll = window.pageYOffset || document.documentElement.scrollTop;
-        if (currentScroll > 50) {
-          header.classList.add('scrolled');
-        } else {
-          header.classList.remove('scrolled');
+        if (!_scrollTicking) {
+          _scrollTicking = true;
+          requestAnimationFrame(() => {
+            const currentScroll = window.pageYOffset || document.documentElement.scrollTop;
+            const shouldBeScrolled = currentScroll > 50;
+            if (shouldBeScrolled !== _headerScrolled) {
+              _headerScrolled = shouldBeScrolled;
+              if (header) header.classList.toggle('scrolled', shouldBeScrolled);
+            }
+            lastScroll = currentScroll;
+            _scrollTicking = false;
+          });
         }
-        lastScroll = currentScroll;
-      });
+      }, { passive: true });
       
       // Notification system
       let notificationCount = 0;
@@ -3866,16 +3879,15 @@
         setTimeout(() => {
           if (container.scrollHeight > container.clientHeight) {
             container.classList.add('has-more');
-            
-            // Update fade indicator on scroll
-            container.addEventListener('scroll', function checkScroll() {
-              const isNearBottom = container.scrollHeight - container.scrollTop - container.clientHeight < 20;
-              if (isNearBottom) {
-                container.classList.remove('has-more');
-              } else {
-                container.classList.add('has-more');
-              }
-            });
+
+            // bind the fade-indicator listener once, not per render
+            if (!container._notifScrollBound) {
+              container._notifScrollBound = true;
+              container.addEventListener('scroll', function checkScroll() {
+                const isNearBottom = container.scrollHeight - container.scrollTop - container.clientHeight < 20;
+                container.classList.toggle('has-more', !isNearBottom);
+              }, { passive: true });
+            }
           } else {
             container.classList.remove('has-more');
           }

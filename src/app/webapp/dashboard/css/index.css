@@ -1,4 +1,4 @@
-    @import url("./tokens.css");
+    @import url("./tokens.css?v=5");
     html[data-no-trans] *{ transition-duration:0s !important; }
     /* Keep the gooey toggle's own animation alive during theme transitions */
     html[data-no-trans] .toggle-background { transition-duration: .4s !important; }
@@ -384,18 +384,25 @@
         inset 0 1px 0 rgba(255,255,255,0.10);
     }
 
-    /* Magma blobs */
+    /* one blur on the wrapper instead of one per blob */
+    .vpn-lava{
+      position:absolute;
+      inset:0;
+      overflow:visible;
+      pointer-events:none;
+      filter:blur(42px);
+      mix-blend-mode:screen;
+    }
     .vpn-blob{
       position:absolute;
       pointer-events:none;
       will-change:transform;
-      mix-blend-mode:screen;
       border-radius:50%;
+      animation-timing-function:steps(160, end) !important;
     }
     /* Blob 1 — brand glow, top-left */
     .vpn-blob-1{
       width:260px; height:220px;
-      filter:blur(48px);
       background:radial-gradient(ellipse at 45% 40%,
         rgba(var(--brandRgb),0.38) 0%,
         rgba(var(--brandRgb),0.18) 45%,
@@ -406,7 +413,6 @@
     /* Blob 2 — brand glow, bottom-right */
     .vpn-blob-2{
       width:220px; height:200px;
-      filter:blur(42px);
       background:radial-gradient(ellipse at 52% 55%,
         rgba(var(--brandRgb),0.30) 0%,
         rgba(var(--brandRgb),0.13) 50%,
@@ -417,7 +423,6 @@
     /* Blob 3 — teal shimmer, floats center */
     .vpn-blob-3{
       width:160px; height:140px;
-      filter:blur(36px);
       background:radial-gradient(ellipse at 50% 45%,
         rgba(16,130,160,0.22) 0%,
         rgba(10,80,110,0.10)  55%,
@@ -428,7 +433,6 @@
     /* Blob 4 — brand accent, bottom-left */
     .vpn-blob-4{
       width:130px; height:120px;
-      filter:blur(30px);
       background:radial-gradient(ellipse at 48% 50%,
         rgba(var(--brandRgb),0.24) 0%,
         rgba(var(--brandRgb),0.08) 55%,
@@ -1913,8 +1917,8 @@
       mix-blend-mode: screen;
       opacity: 0.72;
     }
+    /* light-mode blob colors (blur handled once by .vpn-lava) */
     [data-theme="light"] .vpn-blob-1 {
-      filter: blur(34px);
       background: radial-gradient(ellipse at 42% 40%,
         rgba(var(--brandRgb),0.38) 0%,
         rgba(var(--brandRgb),0.16) 48%,
@@ -1922,7 +1926,6 @@
       animation: lightLavaBlob1 11s ease-in-out infinite !important;
     }
     [data-theme="light"] .vpn-blob-2 {
-      filter: blur(32px);
       background: radial-gradient(ellipse at 55% 56%,
         rgba(99,102,241,0.30) 0%,
         rgba(99,102,241,0.12) 54%,
@@ -1930,7 +1933,6 @@
       animation: lightLavaBlob2 13s ease-in-out infinite !important;
     }
     [data-theme="light"] .vpn-blob-3 {
-      filter: blur(28px);
       background: radial-gradient(ellipse at 50% 45%,
         rgba(14,165,233,0.26) 0%,
         rgba(14,165,233,0.10) 56%,
@@ -1938,7 +1940,6 @@
       animation: lightLavaBlob3 10s ease-in-out infinite !important;
     }
     [data-theme="light"] .vpn-blob-4 {
-      filter: blur(24px);
       background: radial-gradient(ellipse at 50% 50%,
         rgba(236,72,153,0.20) 0%,
         rgba(236,72,153,0.08) 56%,

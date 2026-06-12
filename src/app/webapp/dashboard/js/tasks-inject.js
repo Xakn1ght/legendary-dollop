@@ -128,6 +128,19 @@
               convertRate: 'Rate: 1 point = 1 sub credit',
               referralRewardsTitle: 'Referral Rewards',
               referralRewardsSubtitle: 'Redeem your vouchers',
+              seasonTitle: 'Star Season',
+              seasonSubtitle: 'Refer friends to climb the season ladder',
+              seasonStarsLabel: 'season stars',
+              seasonNextLabel: 'Next reward',
+              seasonLadderLabel: 'Reward ladder',
+              seasonAllUnlocked: 'All unlocked',
+              couponsTitle: 'My Coupons',
+              couponsSubtitle: 'One per purchase · no stacking · 45-day expiry',
+              couponsEmpty: 'No coupons yet. Earn season stars by referring friends to unlock them.',
+              couponExpires: 'exp',
+              couponFreeAutorenew: 'Free auto-renewal',
+              couponVipPack: 'Season VIP Pack',
+              couponLegendPack: 'Season Legend Pack',
               available: 'Available',
               redeem: 'Redeem',
               redeemed: 'Redeemed',
@@ -235,6 +248,19 @@
               convertRate: 'نرخ: هر ۱ امتیاز = ۱ اعتبار اشتراک',
               referralRewardsTitle: 'پاداش دعوت',
               referralRewardsSubtitle: 'بن‌های خود را دریافت کن',
+              seasonTitle: 'فصل ستاره',
+              seasonSubtitle: 'با دعوت دوستان در نردبان فصل بالا برو',
+              seasonStarsLabel: 'ستاره‌های فصل',
+              seasonNextLabel: 'جایزه بعدی',
+              seasonLadderLabel: 'نردبان جوایز',
+              seasonAllUnlocked: 'همه باز شد',
+              couponsTitle: 'کوپن‌های من',
+              couponsSubtitle: 'هر خرید یک کوپن · بدون ترکیب · انقضای ۴۵ روز',
+              couponsEmpty: 'هنوز کوپنی ندارید. با دعوت دوستان ستاره جمع کنید تا کوپن باز شود.',
+              couponExpires: 'تا',
+              couponFreeAutorenew: 'تمدید خودکار رایگان',
+              couponVipPack: 'پک VIP فصلی',
+              couponLegendPack: 'پک افسانه فصلی',
               available: 'در دسترس',
               redeem: 'دریافت',
               redeemed: 'دریافت شد',
@@ -346,6 +372,7 @@
 		            }catch(_){}
 		            try{ renderRewardsExtras(); }catch(_){}
 		            try{ renderReferrals(); }catch(_){}
+		            try{ renderSeason(); }catch(_){}
 		            try{ renderChallenges(); }catch(_){}
 		          };
 
@@ -596,6 +623,114 @@
               rewardsSummary = null;
             }
             renderRewardsExtras();
+          }
+
+          // ---- Star Season (referral-only seasonal stars + coupon wallet) ----
+          let seasonData = null;
+          function couponLabel(c, t, lang) {
+            const p = (c && c.payload) || {};
+            switch (c && c.coupon_type) {
+              case 'discount_percent': { const n = Number(p.discount_percent || 0); return lang === 'fa' ? ('٪' + n + ' تخفیف') : (n + '% discount'); }
+              case 'free_gb': { const n = Number(p.gb || 0); return lang === 'fa' ? (n + ' گیگ رایگان') : (n + 'GB free'); }
+              case 'free_plan': { const n = Number(p.plan_gb || 0); return lang === 'fa' ? ('پلن ' + n + ' گیگ رایگان') : ('Free ' + n + 'GB plan'); }
+              case 'free_autorenew': return t.couponFreeAutorenew || 'Free auto-renewal';
+              case 'vip_pack': return t.couponVipPack || 'Season VIP Pack';
+              case 'legend_pack': return t.couponLegendPack || 'Season Legend Pack';
+              default: return (c && c.coupon_type) || '';
+            }
+          }
+          function renderSeason() {
+            const t = i18n[currentLang] || i18n.en;
+            const lang = currentLang;
+            const seasonCard = document.getElementById('seasonCard');
+            const couponsCard = document.getElementById('couponsCard');
+            if (seasonCard) seasonCard.style.display = 'block';
+            if (couponsCard) couponsCard.style.display = 'block';
+            try {
+              const setTxt = (id, val) => { const e = document.getElementById(id); if (e && val != null) e.textContent = val; };
+              setTxt('seasonTitle', t.seasonTitle);
+              setTxt('seasonSubtitle', t.seasonSubtitle);
+              setTxt('seasonStarsLabel', t.seasonStarsLabel);
+              setTxt('seasonNextLabel', t.seasonNextLabel);
+              setTxt('seasonLadderLabel', t.seasonLadderLabel);
+              setTxt('couponsTitle', t.couponsTitle);
+              setTxt('couponsSubtitle', t.couponsSubtitle);
+            } catch (_) {}
+
+            const stars = Number(seasonData?.season_stars ?? 0);
+            const next = seasonData?.next_milestone || null;
+            const daysLeft = seasonData?.season?.days_left;
+            const ladder = Array.isArray(seasonData?.ladder) ? seasonData.ladder : [];
+            let prevStars = 0;
+            ladder.forEach((m) => { if (m.reached && Number(m.stars) > prevStars) prevStars = Number(m.stars); });
+            const nextStars = next ? Number(next.stars) : prevStars;
+            const need = next ? Math.max(0, nextStars - stars) : 0;
+            let pct = 100;
+            if (next && nextStars > prevStars) {
+              pct = Math.max(0, Math.min(100, Math.round(((stars - prevStars) / (nextStars - prevStars)) * 100)));
+            }
+            try {
+              const starsEl = document.getElementById('seasonStars');
+              const statStarsEl = document.getElementById('statStars');
+              const fillEl = document.getElementById('seasonProgressFill');
+              const toGoEl = document.getElementById('seasonToGo');
+              const numsEl = document.getElementById('seasonProgressNums');
+              const nextRewardEl = document.getElementById('seasonNextReward');
+              const endsEl = document.getElementById('seasonEnds');
+              if (starsEl) starsEl.textContent = stars.toLocaleString();
+              if (statStarsEl) statStarsEl.textContent = stars.toLocaleString();
+              if (fillEl) fillEl.style.width = pct + '%';
+              const allUnlocked = t.seasonAllUnlocked || 'All unlocked';
+              if (next) {
+                const nextRung = ladder.find((m) => Number(m.stars) === nextStars) || next;
+                const reward = couponLabel(nextRung, t, lang);
+                if (toGoEl) toGoEl.textContent = lang === 'fa' ? `${need}⭐ مانده` : `${need}⭐ to go`;
+                if (numsEl) numsEl.textContent = `${stars} / ${nextStars} ⭐`;
+                if (nextRewardEl) nextRewardEl.textContent = `🎁 ${reward}`;
+              } else {
+                if (toGoEl) toGoEl.textContent = '';
+                if (numsEl) numsEl.textContent = allUnlocked;
+                if (nextRewardEl) nextRewardEl.textContent = '🎉 ' + allUnlocked;
+              }
+              if (endsEl) endsEl.textContent = (daysLeft == null) ? '' : (lang === 'fa' ? `پایان فصل تا ${daysLeft} روز` : `Season ends in ${daysLeft} days`);
+            } catch (_) {}
+            try {
+              const list = document.getElementById('seasonLadderList');
+              if (list) {
+                list.innerHTML = ladder.map((m) => {
+                  const reached = !!m.reached;
+                  const isNext = next && Number(m.stars) === nextStars;
+                  const reward = couponLabel(m, t, lang);
+                  const cls = 'season-rung' + (reached ? ' reached' : '') + (isNext ? ' next' : '');
+                  return `<div class="${cls}"><div class="season-rung-node">${reached ? '★' : m.stars}</div><div class="season-rung-body"><div class="season-rung-reward">${reward}</div><div class="season-rung-stars">${m.stars}⭐</div></div><div class="season-rung-state">${reached ? '✅' : (isNext ? '⏳' : '🔒')}</div></div>`;
+                }).join('');
+              }
+            } catch (_) {}
+            try {
+              const list = document.getElementById('couponList');
+              const coupons = Array.isArray(seasonData?.coupons) ? seasonData.coupons : [];
+              if (list) {
+                if (!coupons.length) {
+                  list.innerHTML = `<div class="coupon-empty"><div class="coupon-empty-icon">🎁</div><div class="coupon-empty-text">${t.couponsEmpty || ''}</div></div>`;
+                } else {
+                  list.innerHTML = coupons.map((c) => {
+                    const label = couponLabel(c, t, lang);
+                    const star = Number(c.milestone_stars || 0);
+                    const dleft = c.days_left;
+                    const exp = (dleft == null) ? '' : `${t.couponExpires || 'exp'} ${dleft}d`;
+                    const soon = (dleft != null && dleft <= 7) ? ' soon' : '';
+                    return `<div class="coupon-ticket"><div class="coupon-ticket-stub">${star}⭐</div><div class="coupon-ticket-body"><div class="coupon-ticket-label">${label}</div>${exp ? `<div class="coupon-ticket-exp${soon}">${exp}</div>` : ''}</div></div>`;
+                  }).join('');
+                }
+              }
+            } catch (_) {}
+          }
+          async function fetchSeason() {
+            try {
+              seasonData = await apiJson('/api/dashboard/season');
+              if (!seasonData || seasonData.ok === false) seasonData = null;
+            } catch (_) { seasonData = null; }
+            renderSeason();
           }
 
           let voucherLoadError = '';
@@ -1641,6 +1776,18 @@
             if (redeemAddBtn) redeemAddBtn.onclick = addSubscriptionTokenFromSheet;
             if (redeemBuyBtn) redeemBuyBtn.onclick = () => { window.location.href = '/webapp/dashboard/purchase.html'; };
 
+            const seasonLadderToggle = document.getElementById('seasonLadderToggle');
+            const seasonLadderWrap = document.getElementById('seasonLadderWrap');
+            if (seasonLadderToggle && seasonLadderWrap) {
+              seasonLadderToggle.onclick = () => {
+                const open = seasonLadderWrap.style.display !== 'none';
+                seasonLadderWrap.style.display = open ? 'none' : 'block';
+                seasonLadderToggle.setAttribute('aria-expanded', open ? 'false' : 'true');
+                seasonLadderToggle.classList.toggle('open', !open);
+                if (tg?.HapticFeedback) tg.HapticFeedback.impactOccurred('light');
+              };
+            }
+
             const playBtn = document.getElementById('dailyGamePlayBtn');
             if (playBtn) {
               playBtn.onclick = () => {
@@ -1707,7 +1854,9 @@
             if (statusEl) statusEl.textContent = 'Calling API...';
             // Apply translations + coming-soon layout immediately (even when we don't fetch rewards APIs).
             try { renderRewardsExtras(); } catch (_) {}
+            try { renderSeason(); } catch (_) {}
             fetchReferrals();
+            fetchSeason();
             // Coming-soon mode: only keep referral tracking visible.
           }, 100);
         };  // End of window.initTasksPage function

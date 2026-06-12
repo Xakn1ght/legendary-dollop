@@ -183,7 +183,7 @@
 
       try{
         const theme = document.documentElement.getAttribute('data-theme') || 'dark';
-        const bg = (theme === 'light') ? '#d4dff0' : '#0a141b';
+        const bg = (theme === 'light') ? '#f1ede5' : '#0a141b';
         if (typeof tg.setBackgroundColor === 'function') tg.setBackgroundColor(bg);
         if (typeof tg.setHeaderColor === 'function') tg.setHeaderColor(bg);
       }catch(_){}
