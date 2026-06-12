@@ -282,6 +282,25 @@
       }catch(_){}
     })();
 
+// Idle freeze: pause the decorative drift after 45s without interaction
+// (html.astro-idle, see glass.css). Any touch/scroll resumes instantly —
+// the animation only stops while nobody is looking at it moving. Cuts
+// sustained GPU heat on ProMotion iPhones during reading/idle.
+(function () {
+  'use strict';
+  const root = document.documentElement;
+  let timer = null;
+  const arm = () => {
+    if (root.classList.contains('astro-idle')) root.classList.remove('astro-idle');
+    if (timer) clearTimeout(timer);
+    timer = setTimeout(() => { root.classList.add('astro-idle'); }, 45000);
+  };
+  ['pointerdown', 'touchstart', 'wheel', 'keydown', 'scroll'].forEach((ev) => {
+    document.addEventListener(ev, arm, { passive: true, capture: true });
+  });
+  arm();
+})();
+
 // Hidden diagnostics: tap the footer 5× within 2s to see what this device
 // reports (perf mode, RAM/cores, fps probe, safe-area). For debugging perf
 // and layout reports from users — no UI cost otherwise.

@@ -4063,7 +4063,7 @@ html[data-theme="light"] .vpn-card::after { opacity: 0.08 !important; }
 .lava-blob {
   will-change: transform !important;
   contain: strict !important;
-  animation-timing-function: steps(220, end) !important;
+  animation-timing-function: steps(132, end) !important;
 }
 
 /* freeze drift during theme swap */
@@ -4397,4 +4397,19 @@ html[data-perf="lite"] .mini-btn,
 html[data-perf="lite"] .speed-chip,
 html[data-perf="lite"] .notification-bell {
   box-shadow: none !important;
+}
+
+/* ── IDLE FREEZE (v46): html.astro-idle is set by head-boot.js after
+   45s without interaction; any touch/scroll lifts it instantly. The
+   drift only pauses while nobody is playing with the screen — stops
+   sustained GPU heat during reading/idle on 120Hz iPhones. */
+html.astro-idle .lava-blob,
+html.astro-idle .vpn-blob,
+html.astro-idle body::before,
+html.astro-idle[data-theme="light"] .vpn-card::after,
+html.astro-idle .nav-item-notch::before,
+html.astro-idle .nav-item-notch::after,
+html.astro-idle .welcome-orb-ring,
+html.astro-idle .vpn-card .status-badge.active::before {
+  animation-play-state: paused !important;
 }

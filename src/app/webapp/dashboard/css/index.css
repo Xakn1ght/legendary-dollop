@@ -398,7 +398,7 @@
       pointer-events:none;
       will-change:transform;
       border-radius:50%;
-      animation-timing-function:steps(160, end) !important;
+      animation-timing-function:steps(56, end) !important;
     }
     /* Blob 1 — brand glow, top-left */
     .vpn-blob-1{
