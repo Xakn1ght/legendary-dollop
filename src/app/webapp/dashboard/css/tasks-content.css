@@ -1677,3 +1677,38 @@ html[dir="rtl"] .season-progress-nums{ text-align: left; }
 .season-ladder-toggle.open svg{ transform: rotate(180deg); }
 .season-ladder{ margin-top: 12px; }
 html[data-theme="light"] .season-ladder-toggle{ background: rgba(0,0,0,0.04); border-color: rgba(0,0,0,0.08); }
+
+/* ── Referral voucher card: tinted pill chips + calm hover ───────── */
+.voucher-item { align-items: center; }
+.voucher-item:hover {
+  /* No horizontal jitter; a calm lift + soft glow that matches the gold accent. */
+  transform: translateY(-1px);
+  background: rgba(255, 255, 255, 0.06);
+  border-color: rgba(251, 191, 36, 0.30);
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.18);
+}
+.voucher-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.voucher-chip {
+  display: inline-flex;
+  align-items: center;
+  padding: 3px 9px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 800;
+  line-height: 1.6;
+  border: 1px solid transparent;
+  white-space: nowrap;
+}
+.vc-gb     { color:#7cc0ff; background:rgba(96,165,250,0.14); border-color:rgba(96,165,250,0.30); }
+.vc-days   { color:#c0a9ff; background:rgba(167,139,250,0.14); border-color:rgba(167,139,250,0.30); }
+.vc-credit { color:#5fd6a8; background:rgba(52,211,153,0.14); border-color:rgba(52,211,153,0.30); }
+.vc-star   { color:#fcd34d; background:rgba(251,191,36,0.16); border-color:rgba(251,191,36,0.34); }
+[data-theme="light"] .vc-gb     { color:#1d4ed8; background:rgba(96,165,250,0.16); }
+[data-theme="light"] .vc-days   { color:#6d28d9; background:rgba(167,139,250,0.16); }
+[data-theme="light"] .vc-credit { color:#047857; background:rgba(52,211,153,0.18); }
+[data-theme="light"] .vc-star   { color:#b45309; background:rgba(251,191,36,0.20); }
+.voucher-item .ref-btn.primary { flex-shrink: 0; font-size: 13px; padding: 8px 18px; }

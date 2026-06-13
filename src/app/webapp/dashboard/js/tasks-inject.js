@@ -1196,24 +1196,22 @@
                     `;
                   }
                 } else {
-                  // Show vouchers with improved styling
+                  // Show vouchers as clean tinted pill chips (no rainbow text / jittery hover).
                   list.innerHTML = items.slice(0, 8).map((it, idx) => {
-                    const parts = [];
+                    const chips = [];
                     const gb = (it.traffic_bytes || 0) / (1024 ** 3);
-                    if (gb >= 0.5) parts.push(`<span style="color: #60a5fa;">+${Math.round(gb)}GB</span>`);
-                    if ((it.extra_days || 0) > 0) parts.push(`<span style="color: #a78bfa;">+${it.extra_days}D</span>`);
-                    if ((it.credit_amount || 0) > 0) parts.push(`<span style="color: #34d399;">+${Number(it.credit_amount).toLocaleString()}</span>`);
-                    if ((it.star_increment || 0) > 0) parts.push(`<span style="color: #fbbf24;">+${Number(it.star_increment)}⭐</span>`);
-                    const desc = parts.join(' <span style="opacity: 0.5;">·</span> ') || '—';
+                    if (gb >= 0.5) chips.push(`<span class="voucher-chip vc-gb">+${Math.round(gb)}GB</span>`);
+                    if ((it.extra_days || 0) > 0) chips.push(`<span class="voucher-chip vc-days">+${it.extra_days}D</span>`);
+                    if ((it.credit_amount || 0) > 0) chips.push(`<span class="voucher-chip vc-credit">+${Number(it.credit_amount).toLocaleString()}</span>`);
+                    if ((it.star_increment || 0) > 0) chips.push(`<span class="voucher-chip vc-star">+${Number(it.star_increment)}⭐</span>`);
+                    const desc = chips.join('') || '—';
                     return `
-                      <div class="referral-item" style="padding: 16px; margin-bottom: ${idx === items.length - 1 ? '0' : '8px'};">
-                        <div style="flex: 1;">
-                          <div class="referral-item-name" style="margin-bottom: 6px; font-size: 14px; font-weight: 600;">#${it.id} ${t.voucherLabel || 'Voucher'}</div>
-                          <div class="referral-item-meta" style="font-size: 13px;">${desc}</div>
+                      <div class="referral-item voucher-item" style="margin-bottom: ${idx === items.length - 1 ? '0' : '8px'};">
+                        <div style="flex: 1; min-width: 0;">
+                          <div class="referral-item-name" style="margin-bottom: 8px; font-size: 14px; font-weight: 700;">#${it.id} ${t.voucherLabel || 'Voucher'}</div>
+                          <div class="voucher-chips">${desc}</div>
                         </div>
-                        <div class="referral-item-meta">
-                          <button class="ref-btn primary" type="button" onclick="window.__redeemReferralReward && window.__redeemReferralReward(${it.id})" style="font-size: 13px; padding: 8px 16px;">${t.redeem || 'Redeem'}</button>
-                        </div>
+                        <button class="ref-btn primary" type="button" onclick="window.__redeemReferralReward && window.__redeemReferralReward(${it.id})">${t.redeem || 'Redeem'}</button>
                       </div>
                     `;
                   }).join('');
