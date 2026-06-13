@@ -1696,6 +1696,8 @@
             else alert(msg);
           }
           window.claimChallenge = claimChallenge;
+          // The voucher "Redeem" button calls this — expose it or the button is dead.
+          window.__redeemReferralReward = redeemReferralReward;
 
           function showError(message) {
             console.error('[TASKS] Showing error:', message);
