@@ -850,8 +850,36 @@
     // Session token (Bearer) fallback for platforms where cookies are flaky.
     // Stored in localStorage; used only for your domain (same-origin requests).
     const SESSION_STORAGE_KEY = 'tma_bearer_token';
+    const SESSION_UID_KEY = 'tma_bearer_uid';
+    let _forceRelogin = false;
     let bearerToken = '';
     try { bearerToken = localStorage.getItem(SESSION_STORAGE_KEY) || ''; } catch(_){ bearerToken = ''; }
+
+    // Account-switch guard: a stored bearer/session is minted for one Telegram user.
+    // If the client is now a DIFFERENT user (multi-account testing, shared device),
+    // the stale token would auth the dashboard as the OLD account — showing their
+    // (empty) data while the bot is the new account. Drop it when the uid differs.
+    try {
+      const curUid = (tg && tg.initDataUnsafe && tg.initDataUnsafe.user && tg.initDataUnsafe.user.id)
+        ? String(tg.initDataUnsafe.user.id) : '';
+      const storedUid = localStorage.getItem(SESSION_UID_KEY) || '';
+      const mismatch = curUid && storedUid && curUid !== storedUid;
+      // A bearer with no companion uid is a legacy/untrusted token (minted before
+      // this guard existed) — drop it once so it can't auth as a stale account.
+      const untrusted = bearerToken && !storedUid;
+      if (mismatch || untrusted) {
+        bearerToken = '';
+        try { localStorage.removeItem(SESSION_STORAGE_KEY); } catch(_){}
+        try { localStorage.removeItem(SESSION_UID_KEY); } catch(_){}
+        // tma_session is httponly (JS can't delete it), but clearing the bearer
+        // forces a fresh loginWithInitData on the next call, which re-mints the
+        // cookie for the CURRENT account — overwriting the stale one server-side.
+        try { document.cookie = 'auth_token=; Max-Age=0; path=/'; } catch(_){}
+        _forceRelogin = true;
+      }
+      if (curUid) { try { localStorage.setItem(SESSION_UID_KEY, curUid); } catch(_){} }
+    } catch(_){}
+
     let _loginInFlight = null;
 
     async function loginWithInitData(initData){
@@ -870,6 +898,11 @@
           if (r.ok && j && j.ok && j.token) {
             bearerToken = String(j.token);
             try { localStorage.setItem(SESSION_STORAGE_KEY, bearerToken); } catch(_){}
+            // Tag the bearer with the user it was minted for (account-switch guard).
+            try {
+              const uid = getUserIdUnsafe();
+              if (uid) localStorage.setItem(SESSION_UID_KEY, uid);
+            } catch(_){}
             return bearerToken;
           }
           // Check if user is not registered (needs referral code)
@@ -935,13 +968,21 @@
         }
       } catch (_) {}
 
-      // If we have a stored bearer token, use it.
-      if (bearerToken) {
+      // Auth priority: when fresh initData is present, the X-Telegram-Init header
+      // above is authoritative (server checks it first) and always reflects the
+      // CURRENT Telegram account. Do NOT also send a stored bearer then — a stale
+      // one from a previous account would otherwise be a confusing fallback.
+      // Only fall back to the stored bearer when initData is unavailable.
+      if (initData) {
+        if (!bearerToken || _forceRelogin) {
+          // Re-mint for the current account (also overwrites a stale tma_session
+          // cookie server-side, healing an account switch).
+          _forceRelogin = false;
+          const t = await loginWithInitData(initData);
+          if (t) headers['Authorization'] = 'Bearer ' + t;
+        }
+      } else if (bearerToken) {
         headers['Authorization'] = 'Bearer ' + bearerToken;
-      } else if (initData) {
-        // If no token yet, try a one-time login to get one (prevents "stuck loading" on some platforms).
-        const t = await loginWithInitData(initData);
-        if (t) headers['Authorization'] = 'Bearer ' + t;
       }
       
       // Legacy URL auth fallback:
