@@ -1857,7 +1857,12 @@
             try { renderSeason(); } catch (_) {}
             fetchReferrals();
             fetchSeason();
-            // Coming-soon mode: only keep referral tracking visible.
+            // Referral vouchers MUST be fetched here or the voucher list renders
+            // its empty state forever (this call was missing — vouchers never
+            // loaded on open, so the bot showed "۱ بن" while the app showed none).
+            fetchReferralRewards();
+            // Delayed retry covers initData/cookies not being ready on first paint.
+            setTimeout(() => { try { fetchReferralRewards(true); } catch (_) {} }, 900);
           }, 100);
         };  // End of window.initTasksPage function
         

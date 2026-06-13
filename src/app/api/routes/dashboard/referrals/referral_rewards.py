@@ -9,18 +9,6 @@ async def handle_dashboard_referral_rewards(request: web.Request):
     if not user_chat_id:
         return web.json_response({"ok": False, "error": "unauthorized"}, status=403)
 
-    # TEMP DIAG (remove after the referral-voucher debug): which account + how it authed.
-    try:
-        logger.info(
-            "[VOUCHER-DIAG] chat_id=%s auth_method=%s has_init_header=%s has_cookie=%s",
-            user_chat_id,
-            request.get("auth_method", "?"),
-            bool(request.headers.get("X-Telegram-Init") or request.headers.get("X-Telegram-Init-Data")),
-            bool(request.cookies.get("tma_session")),
-        )
-    except Exception:
-        pass
-
     try:
         async with AsyncSessionLocal() as session:
             user = await crud.get_user(session, user_chat_id)
