@@ -26,6 +26,7 @@ from app.services.flows.charge import (  # noqa: E402
     deny_charge,
     start_booking_order,
     start_charge_order,
+    start_custom_charge_order,
     submit_charge_receipt,
 )
 from app.services.flows.errors import FlowError  # noqa: E402
@@ -305,6 +306,51 @@ async def test_referral_reward_granted_without_bot():
     print("PASS test_referral_reward_granted_without_bot")
 
 
+async def test_custom_charge_days_only_and_gate():
+    """Custom extra-days charge (admin-quoted price, no preset package) goes through
+    the flow: ownership + active gate, no traffic, days applied only at approval."""
+    Session, fake = await _setup()
+    async with Session() as db:
+        user = await crud.get_user(db, CHAT)
+
+        # Ownership gate (this was the path that previously skipped the flow).
+        db.add(User(id=2, chat_id=999, referral_code="other"))
+        await db.commit()
+        other = await crud.get_user(db, 999)
+        try:
+            await start_custom_charge_order(db, other, subscription_id=10, price=50000, extra_days=15)
+            raise AssertionError("expected unauthorized")
+        except FlowError as e:
+            assert e.code == "unauthorized"
+
+        # Happy path: draft order, no traffic, days carried on the row.
+        res = await start_custom_charge_order(db, user, subscription_id=10, price=50000, extra_days=15)
+        req = res.charge_request
+        assert req.status == "draft" and req.traffic_bytes == 0 and req.extra_days == 15
+        assert req.price == 50000 and res.final_price == 50000
+
+        await submit_charge_receipt(db, user, req.id, receipt_message_id=11)
+        before = list(fake.calls)
+        result = await approve_charge(db, req.id, user_bot=None)
+        # days-only: extend expiry via PUT, no traffic reset, no carry/loss.
+        assert result.extra_days == 15 and result.added_gb == 0 and result.carry_bytes == 0
+        assert fake.calls != before and fake.calls[-1][0] == "put"
+
+    # Active-subscription gate.
+    Session, fake = await _setup()
+    async with Session() as db:
+        user = await crud.get_user(db, CHAT)
+        sub = await db.get(Subscription, 10)
+        sub.status = "expired"
+        await db.commit()
+        try:
+            await start_custom_charge_order(db, user, subscription_id=10, price=50000, extra_days=15)
+            raise AssertionError("expected subscription_not_active")
+        except FlowError as e:
+            assert e.code == "subscription_not_active"
+    print("PASS test_custom_charge_days_only_and_gate")
+
+
 async def main():
     await test_start_cancel_deny_credit()
     await test_full_credit_charge_goes_to_admin_queue()
@@ -312,6 +358,7 @@ async def main():
     await test_approve_carry_over_and_idempotency()
     await test_booking_renewal_only_at_approval()
     await test_referral_reward_granted_without_bot()
+    await test_custom_charge_days_only_and_gate()
     print("\nAll charge-service tests passed.")
 
 

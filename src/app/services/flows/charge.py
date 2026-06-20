@@ -238,6 +238,49 @@ async def start_booking_order(
     return ChargeOrderResult(charge_request=charge_req, remaining_gb=0.0, credit_used=0, final_price=price)
 
 
+async def start_custom_charge_order(
+    session: AsyncSession,
+    user,
+    *,
+    subscription_id: int,
+    price: int,
+    extra_days: int | None = None,
+    status: str = "draft",
+) -> ChargeOrderResult:
+    """Create a custom extra-days charge order (admin-quoted price, no preset package).
+
+    Bot-only path: the admin quotes a price for some number of extra days; no traffic
+    is added. Routed through the flow so it gets the same ownership/active gate as
+    every other charge path instead of writing the row directly.
+    """
+    sub = await session.get(Subscription, subscription_id)
+    if not sub:
+        raise FlowError("subscription_not_found")
+    if sub.user_id != user.id:
+        raise FlowError("unauthorized")
+    if sub.status != "active":
+        raise FlowError("subscription_not_active")
+
+    price = int(price or 0)
+    extra_days = int(extra_days) if extra_days else None
+
+    charge_req = await crud.create_charge_request(
+        session,
+        subscription_id,
+        user.id,
+        0,  # custom days only — no traffic
+        extra_days,
+        price,
+        receipt_message_id=None,
+        credit_used=0,
+        charge_type="normal",
+        status=status,
+    )
+    return ChargeOrderResult(
+        charge_request=charge_req, remaining_gb=0.0, credit_used=0, final_price=price,
+    )
+
+
 async def cancel_charge_order(session: AsyncSession, user, order_id: int) -> int:
     """Cancel an unreceipted charge order; returns the credit amount refunded."""
     charge_req = await session.get(ChargeRequest, order_id)

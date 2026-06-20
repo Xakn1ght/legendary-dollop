@@ -11,6 +11,7 @@ from app.keyboards.reply import get_main_keyboard
 from app.services.flows.charge import (
     cancel_charge_order,
     start_charge_order,
+    start_custom_charge_order,
     submit_charge_receipt,
 )
 from app.services.flows.errors import FlowError
@@ -53,11 +54,15 @@ async def process_receipt(message: Message, state: FSMContext, session: AsyncSes
             )
         else:
             # Custom extra-days request (no preset package): price comes from the
-            # admin-quoted amount held in FSM state.
+            # admin-quoted amount held in FSM state. Routed through the flow for the
+            # same ownership/active gate as the preset path.
             price = int(data.get('custom_price', 0))
             extra_days = int(data.get('custom_extra_days', 0)) if data.get('custom_extra_days') else None
-            charge_req = await crud.create_charge_request(
-                session, sub_id, user.id, 0, extra_days, price, message.message_id
+            result = await start_custom_charge_order(
+                session, user, subscription_id=sub_id, price=price, extra_days=extra_days,
+            )
+            charge_req = await submit_charge_receipt(
+                session, user, result.charge_request.id, receipt_message_id=message.message_id
             )
     except FlowError:
         await state.clear()
