@@ -7,6 +7,7 @@ from .handlers import (
     handle_cancel_charge,
     handle_cancel_order,
     handle_check_service_name,
+    handle_custom_plan_quote,
     handle_dashboard_add_sub,
     handle_dashboard_challenges,
     handle_dashboard_challenges_claim,
@@ -135,6 +136,7 @@ def register_dashboard_api_routes(app: web.Application) -> None:
     app.router.add_post(DASHBOARD_API_BASE_PATH + "/purchase/receipt", handle_submit_receipt)
     app.router.add_post(DASHBOARD_API_BASE_PATH + "/purchase/cancel", handle_cancel_order)
     app.router.add_get(DASHBOARD_API_BASE_PATH + "/purchase/check-name", handle_check_service_name)
+    app.router.add_get(DASHBOARD_API_BASE_PATH + "/purchase/custom-quote", handle_custom_plan_quote)
     app.router.add_get(DASHBOARD_API_BASE_PATH + "/purchase/validate-referral", handle_validate_referral)
     app.router.add_get(DASHBOARD_API_BASE_PATH + "/purchase/pending-orders", handle_get_pending_orders)
 

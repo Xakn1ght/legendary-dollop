@@ -5,16 +5,22 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, viewport-fit=cover" />
   <title>AstroByte VPN Dashboard</title>
   <script src="https://telegram.org/js/telegram-web-app.js"></script>
-  <script src="/webapp/dashboard/js/head-boot.js?v=1"></script>
-  <script src="/webapp/dashboard/ui.js"></script>
+  <script src="/webapp/dashboard/js/head-boot.js?v=11"></script>
+  <script src="/webapp/dashboard/ui.js?v=2"></script>
   <script src="/webapp/dashboard/tour.js" defer></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Urbanist:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/rastikerdar/vazirmatn@v33.003/Vazirmatn-font-face.css">
   <link rel="stylesheet" href="/webapp/dashboard/scrollbar-hide.css">
-  <link rel="stylesheet" href="/webapp/dashboard/css/index.css?v=8">
-  <link rel="stylesheet" href="/webapp/dashboard/css/glass.css?v=26">
-  <script src="/webapp/dashboard/js/index-main.js?v=15"></script>
+  <link rel="stylesheet" href="/webapp/dashboard/css/index.css?v=16">
+  <link rel="stylesheet" href="/webapp/dashboard/css/glass.css?v=46">
+  <link rel="stylesheet" href="/webapp/dashboard/css/skeleton.css?v=2">
+  <script src="/webapp/dashboard/js/skeleton.js?v=1"></script>
+  <script src="/webapp/dashboard/js/index-main.js?v=101"></script>
 </head>
-<body data-page="home">
+<body data-page="home" class="skel-on">
+  <script>/* skeleton fail-safe: never leave content hidden */setTimeout(function(){try{document.body.classList.add('app-ready');}catch(e){}},8000);</script>
   <div id="astro-lava" aria-hidden="true"><div class="lava-blob lava-blob-1"></div><div class="lava-blob lava-blob-2"></div><div class="lava-blob lava-blob-3"></div><div class="lava-blob lava-blob-4"></div><div class="lava-blob lava-blob-5"></div></div>
   <div id="bootSplash" aria-hidden="true"><div class="inner">
     <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" aria-hidden="true" width="24" height="24" fill="none">
@@ -131,6 +137,45 @@
       </div>
     </div>
     
+    <!-- Skeleton loading screen (home-shaped); removed once data is ready -->
+    <div class="skel-screen" aria-hidden="true">
+      <div class="sk-row">
+        <div class="sk sk-btn"></div>
+        <div class="sk sk-btn"></div>
+        <div class="sk sk-line" style="flex:1; height:44px; border-radius:12px;"></div>
+      </div>
+      <div class="sk-card sk-hero">
+        <div class="sk-row">
+          <div class="sk sk-circle"></div>
+          <div class="sk sk-pill"></div>
+        </div>
+        <div class="sk-col gap-12">
+          <div class="sk sk-line h-40 w-60"></div>
+          <div class="sk sk-line h-8 w-40"></div>
+        </div>
+        <div class="sk sk-line h-8 w-100"></div>
+        <div class="sk-row">
+          <div class="sk sk-pill"></div>
+          <div class="sk-row start" style="gap:8px;">
+            <div class="sk sk-btn"></div><div class="sk sk-btn"></div><div class="sk sk-btn"></div>
+          </div>
+        </div>
+      </div>
+      <div class="sk-card">
+        <div class="sk sk-line w-40 h-16"></div>
+        <div class="sk-grid-4">
+          <div class="sk-tile"><div class="sk sk-circle"></div><div class="sk sk-line w-70 h-8"></div></div>
+          <div class="sk-tile"><div class="sk sk-circle"></div><div class="sk sk-line w-70 h-8"></div></div>
+          <div class="sk-tile"><div class="sk sk-circle"></div><div class="sk sk-line w-70 h-8"></div></div>
+          <div class="sk-tile"><div class="sk sk-circle"></div><div class="sk sk-line w-70 h-8"></div></div>
+        </div>
+      </div>
+      <div class="sk-card">
+        <div class="sk-row"><div class="sk sk-line w-50 h-16"></div><div class="sk sk-line w-30 h-16"></div></div>
+        <div class="sk sk-line w-100"></div>
+        <div class="sk sk-line w-85"></div>
+      </div>
+    </div>
     <div class="content">
       <!-- Empty State (shown when no subscriptions) -->
       <div id="emptyState" class="empty-state-container" style="display:none;">
@@ -279,10 +324,12 @@
       <!-- VPN Card -->
       <div class="card vpn-card">
         <!-- Magma lamp blobs -->
-        <div class="vpn-blob vpn-blob-1" aria-hidden="true"></div>
-        <div class="vpn-blob vpn-blob-2" aria-hidden="true"></div>
-        <div class="vpn-blob vpn-blob-3" aria-hidden="true"></div>
-        <div class="vpn-blob vpn-blob-4" aria-hidden="true"></div>
+        <div class="vpn-lava" aria-hidden="true">
+          <div class="vpn-blob vpn-blob-1"></div>
+          <div class="vpn-blob vpn-blob-2"></div>
+          <div class="vpn-blob vpn-blob-3"></div>
+          <div class="vpn-blob vpn-blob-4"></div>
+        </div>
 
         <!-- Top row: date badge + icon -->
         <div class="vpn-card-top">
@@ -501,7 +548,7 @@
       </div>
     </div>
   </div>
-  
+
   <!-- Bottom Navigation -->
   <nav class="bottom-nav">
     <div class="nav-container">

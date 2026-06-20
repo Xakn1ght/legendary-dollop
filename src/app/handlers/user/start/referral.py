@@ -129,10 +129,16 @@ async def process_invitation_code(message: Message, state: FSMContext, session: 
 	)
 	keyboard = InlineKeyboardMarkup(
 		inline_keyboard=[
-			[InlineKeyboardButton(
-				text=("🎁 باز کردن منوی پاداش" if lang == "fa" else "🎁 Open Rewards Menu"),
-				callback_data="open_enhanced_rewards"
-			)],
+			[
+				InlineKeyboardButton(
+					text=("🛒 خرید سرویس" if lang == "fa" else "🛒 Buy a Plan"),
+					callback_data="welcome_buy"
+				),
+				InlineKeyboardButton(
+					text=("➕ افزودن اشتراک" if lang == "fa" else "➕ Add Subscription"),
+					callback_data="welcome_addsub"
+				),
+			],
 			[_create_share_button(message.bot, user.referral_code, lang)]
 		]
 	)

@@ -1,24 +1,19 @@
 """Bot purchase flow: optional season-coupon step (one per purchase, no stacking).
 
-Phase 1 spendable types: discount_percent and free_gb — mirrors the webapp checkout
-(api/routes/dashboard_purchase/start_purchase). The chosen coupon is held in FSM state
-and applied by summary.py / credit.py / confirmation.py via app.core.coupons.
+Only the coupon_id is held in FSM state; pricing/validation/consumption all happen
+in the shared services (flows.pricing quotes it, flows.purchase consumes/restores it).
 """
-import json
-
 from aiogram.fsm.context import FSMContext
 from aiogram.types import KeyboardButton, Message, ReplyKeyboardMarkup
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import crud
 from app.handlers.user.rewards.menu import _coupon_label
-from app.utils.bot_i18n import normalize_lang, set_cached_lang, t
+from app.services.flows.pricing import SUPPORTED_COUPON_TYPES
+from app.utils.bot_i18n import normalize_lang, set_cached_lang
 
 from .common import PurchaseState, router
 from .summary import show_order_summary
-
-# Coupon types that are spendable at checkout today (Phase 1).
-SUPPORTED_COUPON_TYPES = ("discount_percent", "free_gb")
 
 
 async def _supported_coupons(session: AsyncSession, user_id: int):
@@ -50,7 +45,7 @@ async def prompt_coupon_or_next(message: Message, state: FSMContext, session: As
     """If the user holds spendable coupons, offer to apply one; otherwise continue."""
     coupons = await _supported_coupons(session, user.id)
     if not coupons:
-        await state.update_data(coupon_id=None, coupon_type=None, coupon_discount_percent=0, coupon_free_gb=0)
+        await state.update_data(coupon_id=None)
         await _prompt_credit_or_summary(message, state, session, user, lang)
         return
 
@@ -101,18 +96,7 @@ async def process_coupon_choice(message: Message, state: FSMContext, session: As
                 if c and c.user_id == user.id and c.status == "active" and not (c.expires_at and c.expires_at < _dt.datetime.utcnow()):
                     selected = c
 
-    if selected is not None:
-        try:
-            payload = json.loads(selected.payload or "{}")
-        except Exception:
-            payload = {}
-        await state.update_data(
-            coupon_id=selected.id,
-            coupon_type=selected.coupon_type,
-            coupon_discount_percent=int(payload.get("discount_percent") or 0) if selected.coupon_type == "discount_percent" else 0,
-            coupon_free_gb=int(payload.get("gb") or 0) if selected.coupon_type == "free_gb" else 0,
-        )
-    else:
-        await state.update_data(coupon_id=None, coupon_type=None, coupon_discount_percent=0, coupon_free_gb=0)
+    # Only the id matters: the shared quote re-validates and prices the coupon.
+    await state.update_data(coupon_id=selected.id if selected is not None else None)
 
     await _prompt_credit_or_summary(message, state, session, user, lang)

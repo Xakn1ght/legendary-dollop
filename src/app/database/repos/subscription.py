@@ -310,10 +310,11 @@ class SubscriptionRepository:
         extra_days: int | None,
         price: int,
         receipt_message_id: int | None = None,
-        original_price: int | None = None,
-        discount_percent: int | None = None,
-        discount_amount: int | None = None,
         credit_used: int | None = None,
+        charge_type: str = "normal",
+        renewal_template: str | None = None,
+        renewal_price: int | None = None,
+        status: str = 'pending',
     ):
         req = ChargeRequest(
             subscription_id=subscription_id,
@@ -321,12 +322,12 @@ class SubscriptionRepository:
             traffic_bytes=traffic_bytes,
             extra_days=extra_days,
             price=price,
-            original_price=original_price,
-            discount_percent=discount_percent,
-            discount_amount=discount_amount,
-            credit_used=credit_used,
+            credit_used=credit_used or 0,
+            charge_type=charge_type,
+            renewal_template=renewal_template,
+            renewal_price=renewal_price,
             receipt_message_id=receipt_message_id,
-            status='pending'
+            status=status
         )
         db.add(req)
         await db.commit()

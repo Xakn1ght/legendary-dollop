@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Legend Theme Preview</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Urbanist:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+<style>
+  /* ── THE ENTIRE "THEME" IS JUST THESE VARIABLES ───────────────── */
+  :root{
+    --brandRgb: 212,175,55;          /* gold */
+    --brand: #d4af37;
+    --brandLight: #f5d877;
+    --bg: #06070c;
+    --ink: #f3efe3;
+    --muted: #b9b08e;
+    --glass-bg: rgba(28,24,12,0.42);
+    --glass-edge: rgba(212,175,55,0.22);
+    --glass-edge-bright: rgba(245,216,119,0.55);
+  }
+  *{box-sizing:border-box; margin:0; padding:0;}
+  body{
+    font-family:'Urbanist',sans-serif;
+    background:radial-gradient(120% 90% at 50% -10%, #12100a 0%, var(--bg) 60%);
+    color:var(--ink); min-height:100vh; overflow:hidden;
+    display:flex; align-items:center; justify-content:center; padding:28px;
+  }
+
+  /* ── BLOBS: identical mechanics to your app, just gold ─────────── */
+  #lava{position:fixed; inset:0; z-index:0; overflow:hidden; pointer-events:none;}
+  .blob{position:absolute; border-radius:50%; mix-blend-mode:screen; will-change:transform;}
+  .b1{width:280px;height:240px;filter:blur(52px);top:-60px;left:-4%;
+      background:radial-gradient(ellipse at 45% 40%, rgba(var(--brandRgb),0.42) 0%, rgba(var(--brandRgb),0.18) 45%, transparent 80%);
+      animation:m1 14s ease-in-out infinite;}
+  .b2{width:240px;height:210px;filter:blur(46px);bottom:-50px;right:-2%;
+      background:radial-gradient(ellipse at 52% 55%, rgba(245,216,119,0.34) 0%, rgba(var(--brandRgb),0.13) 50%, transparent 82%);
+      animation:m2 17s ease-in-out infinite 2.4s;}
+  .b3{width:180px;height:160px;filter:blur(40px);top:24%;left:44%;
+      background:radial-gradient(ellipse at 50% 45%, rgba(184,134,11,0.30) 0%, rgba(120,90,20,0.10) 55%, transparent 85%);
+      animation:m3 11s ease-in-out infinite 4.2s;}
+  .b4{width:150px;height:140px;filter:blur(34px);bottom:14%;left:10%;
+      background:radial-gradient(ellipse at 48% 50%, rgba(var(--brandRgb),0.26) 0%, rgba(var(--brandRgb),0.08) 55%, transparent 80%);
+      animation:m4 15s ease-in-out infinite 1s;}
+  @keyframes m1{0%,100%{transform:translate(0,0) scale(1)}22%{transform:translate(32px,62px) scale(1.16)}55%{transform:translate(-18px,88px) scale(.87)}80%{transform:translate(44px,30px) scale(1.08)}}
+  @keyframes m2{0%,100%{transform:translate(0,0) scale(1)}30%{transform:translate(-42px,-52px) scale(1.2)}65%{transform:translate(22px,-72px) scale(.82)}88%{transform:translate(-24px,-20px) scale(1.06)}}
+  @keyframes m3{0%,100%{transform:translate(0,0) scale(1)}35%{transform:translate(-30px,-42px) scale(1.28)}70%{transform:translate(20px,30px) scale(.78)}}
+  @keyframes m4{0%,100%{transform:translate(0,0) scale(1)}40%{transform:translate(46px,-34px) scale(1.14)}75%{transform:translate(-10px,40px) scale(.9)}}
+
+  .phone{position:relative; z-index:1; width:380px; display:flex; flex-direction:column; gap:18px;}
+
+  /* ── Glass card: your liquid-glass, gold-tinted ────────────────── */
+  .card{
+    background:var(--glass-bg);
+    backdrop-filter:blur(20px) saturate(150%); -webkit-backdrop-filter:blur(20px) saturate(150%);
+    border:1px solid var(--glass-edge); border-top-color:var(--glass-edge-bright);
+    border-radius:24px; padding:26px 24px;
+    box-shadow:0 24px 60px rgba(0,0,0,0.6), 0 0 50px rgba(var(--brandRgb),0.10), inset 0 1px 0 rgba(245,216,119,0.18);
+  }
+
+  /* ── Legend badge with a gold shimmer sweep ────────────────────── */
+  .badge{
+    display:inline-flex; align-items:center; gap:9px;
+    padding:9px 18px; border-radius:999px; font-weight:800; font-size:13px; letter-spacing:1.5px;
+    color:#1a1405; position:relative; overflow:hidden;
+    background:linear-gradient(135deg, #f7e08a 0%, var(--brand) 45%, #9a7611 100%);
+    box-shadow:0 8px 24px rgba(var(--brandRgb),0.45), inset 0 1px 0 rgba(255,255,255,0.55);
+  }
+  .badge::after{content:''; position:absolute; inset:0; transform:translateX(-130%);
+    background:linear-gradient(105deg, transparent 35%, rgba(255,255,255,0.85) 50%, transparent 65%);
+    animation:sweep 2.6s ease-in-out infinite;}
+  @keyframes sweep{0%{transform:translateX(-130%)}60%,100%{transform:translateX(130%)}}
+
+  .crown{font-size:15px;}
+  h1{font-size:25px; font-weight:900; margin:18px 0 6px; letter-spacing:-0.5px;
+     background:linear-gradient(120deg,#fff,var(--brandLight),#fff); -webkit-background-clip:text; background-clip:text; -webkit-text-fill-color:transparent;}
+  .sub{color:var(--muted); font-size:14px; line-height:1.5; font-weight:500;}
+
+  .perks{list-style:none; margin-top:18px; display:flex; flex-direction:column; gap:11px;}
+  .perks li{display:flex; align-items:center; gap:11px; font-size:14px; font-weight:600; color:var(--ink);}
+  .dot{width:22px; height:22px; border-radius:7px; display:grid; place-items:center; font-size:12px; flex-shrink:0;
+    background:rgba(var(--brandRgb),0.16); border:1px solid rgba(var(--brandRgb),0.3); color:var(--brandLight);}
+
+  .stats{display:flex; gap:10px; margin-top:8px;}
+  .stat{flex:1; background:rgba(var(--brandRgb),0.07); border:1px solid rgba(var(--brandRgb),0.18);
+    border-radius:16px; padding:14px 10px; text-align:center;}
+  .stat b{display:block; font-size:20px; font-weight:900; color:var(--brandLight);}
+  .stat span{font-size:11px; color:var(--muted); font-weight:600; letter-spacing:.5px;}
+
+  .btn{margin-top:20px; width:100%; padding:15px; border:none; border-radius:16px; cursor:pointer;
+    font-family:inherit; font-weight:800; font-size:15px; color:#1a1405; letter-spacing:.3px;
+    background:linear-gradient(135deg,#f7e08a,var(--brand) 55%, #9a7611);
+    box-shadow:0 10px 28px rgba(var(--brandRgb),0.4), inset 0 1px 0 rgba(255,255,255,0.5);}
+
+  .tag{position:fixed; top:16px; left:50%; transform:translateX(-50%); z-index:2;
+    font-size:11px; letter-spacing:2px; color:var(--muted); font-weight:700; text-transform:uppercase;}
+</style>
+</head>
+<body>
+  <div id="lava"><div class="blob b1"></div><div class="blob b2"></div><div class="blob b3"></div><div class="blob b4"></div></div>
+  <div class="tag">Legend Theme — sample</div>
+  <div class="phone">
+    <div class="card">
+      <span class="badge"><span class="crown">👑</span> LEGEND</span>
+      <h1>Season Legend unlocked</h1>
+      <p class="sub">You hit 50 stars this season. Your Legend status, theme, and rewards are now active.</p>
+      <ul class="perks">
+        <li><span class="dot">✓</span> Free renewal · up to 100GB</li>
+        <li><span class="dot">✓</span> +100GB bonus traffic</li>
+        <li><span class="dot">✓</span> Animated Legend theme (kept forever)</li>
+        <li><span class="dot">✓</span> 60 days priority support</li>
+      </ul>
+    </div>
+    <div class="card" style="padding:18px 20px;">
+      <div class="stats">
+        <div class="stat"><b>50</b><span>STARS</span></div>
+        <div class="stat"><b>#1</b><span>SEASON RANK</span></div>
+        <div class="stat"><b>15%</b><span>REF CUT</span></div>
+      </div>
+      <button class="btn">Claim rewards →</button>
+    </div>
+  </div>
+</body>
+</html>

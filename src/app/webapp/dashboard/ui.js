@@ -362,6 +362,7 @@
         max-width: min(520px, calc(100vw - 24px));
         font-weight: 700;
         font-size: 13px;
+        text-align: center;
         opacity: 0;
         transform: translateX(-50%) translateY(8px);
         transition: opacity .18s ease, transform .18s ease;

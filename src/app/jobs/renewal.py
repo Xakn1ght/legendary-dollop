@@ -42,18 +42,16 @@ ROLLOVER_THRESHOLD_BYTES = 5 * 1024 * 1024 * 1024  # 5 GB in bytes
 async def charge_add(user_info, template_info):
     """Return (data_limit, expire_ts) for patched Marzban user.
 
-    • If the leftover traffic is < 5 GB we roll it over and add to the template limit.
-    • Otherwise we reset to the template limit (no rollover).
+    • Leftover traffic rolls over into the new plan, capped at 5 GB — the same
+      rule as manual charge approval (flows.charge) so renewals never lose more
+      than the cap.
     Expiry is always reset to 35 days from now as per requirement.
     """
     used_traffic = user_info.get('used_traffic', 0) or 0
     current_limit = user_info.get('data_limit', 0) or 0
     remaining = max(current_limit - used_traffic, 0)
 
-    if 0 < remaining < ROLLOVER_THRESHOLD_BYTES:
-        new_limit = template_info['data_limit'] + remaining
-    else:
-        new_limit = template_info['data_limit']
+    new_limit = template_info['data_limit'] + min(remaining, ROLLOVER_THRESHOLD_BYTES)
 
     new_expire = int((datetime.utcnow() + timedelta(days=35)).timestamp())
     return new_limit, new_expire
@@ -79,8 +77,8 @@ async def apply_renewal(subscription_id, session, bot: Bot):
         return
     # Fetch template info (simulate, replace with real template fetch if needed)
     template_name = subscription.renewal_template
-    from app.handlers.user.purchase import PLANS
-    raw_plan = PLANS.get(template_name)
+    from app.services.flows.pricing import get_plan_info
+    raw_plan = get_plan_info(template_name)
     if not raw_plan:
         bot_logger.error("[RENEWAL] Plan not found for template", subscription_id=subscription_id, template=template_name)
         await create_renewal_history(session, subscription.id, result="failure", details=f"Plan '{template_name}' not found in PLANS")

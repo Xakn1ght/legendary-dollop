@@ -1,4 +1,4 @@
-from aiogram import F, Router
+from aiogram import Router
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
 from aiogram.types import KeyboardButton, Message, ReplyKeyboardMarkup
@@ -6,8 +6,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.settings import PLANS
 from app.database import crud
-from app.keyboards.reply import KEYBOARD_MARKUP_BACK, KEYBOARD_MARKUP_MAIN, get_main_keyboard
-from app.services.marzban import marzban_api
+from app.keyboards.reply import KEYBOARD_MARKUP_BACK, get_main_keyboard
 from app.utils.bot_i18n import normalize_lang, set_cached_lang, t, text_matches
 
 router = Router()
@@ -104,25 +103,6 @@ async def receive_link(message: Message, state: FSMContext, session: AsyncSessio
 
     link = message.text.strip()
 
-    # Extract token from link
-    import re
-    import urllib.parse
-    token_match = re.search(r"/sub/([^/]+)/?", link)
-    if not token_match:
-        await message.answer(t(lang, "add_subscription_invalid_format"))
-        return
-    token = token_match.group(1)
-
-    sub_info = await marzban_api.get_subscription_info(token)
-    if not sub_info:
-        await message.answer(t(lang, "add_subscription_fetch_failed"))
-        return
-
-    marzban_username = sub_info.get('username')
-    if not marzban_username:
-        await message.answer(t(lang, "add_subscription_no_username"))
-        return
-
     # Ensure bot user exists in DB (needed for link regardless)
     db_user = await crud.get_user(session, message.chat.id)
     if not db_user:
@@ -134,49 +114,26 @@ async def receive_link(message: Message, state: FSMContext, session: AsyncSessio
             language=lang,
         )
 
-    # Prevent the same user from adding the same subscription twice, but allow
-    # other users to add it as well (shared account scenario).
-    from sqlalchemy import select
+    # Shared flow: domain allowlist + token extraction + Marzban verification +
+    # dedupe/shared-account linking (same rules as the dashboard).
+    from app.services.flows.errors import FlowError
+    from app.services.flows.subs import add_subscription_by_link
 
-    from app.database.models import Subscription
-    dup_check = await session.execute(
-        select(Subscription).filter(Subscription.marzban_username == marzban_username)
-    )
-    existing_sub = dup_check.scalars().first()
-
-    if existing_sub:
-        # Link to existing subscription
-        await crud.add_subscription_link(session, db_user.id, existing_sub.id)
-        await state.clear()
-        await message.answer(
-            t(lang, "add_subscription_existing_added"),
-            reply_markup=get_main_keyboard(message.chat.id, lang=lang),
-        )
+    try:
+        result = await add_subscription_by_link(session, db_user, url=link)
+    except FlowError as e:
+        if e.code in ("invalid_subscription_url", "disallowed_domain"):
+            await message.answer(t(lang, "add_subscription_invalid_format"))
+        elif e.code == "cannot_resolve_username":
+            await message.answer(t(lang, "add_subscription_no_username"))
+        elif e.code == "marzban_account_not_found":
+            await message.answer(t(lang, "add_subscription_marzban_not_found"))
+        else:
+            await message.answer(t(lang, "add_subscription_fetch_failed"))
         return
-
-    # Validate existence on Marzban
-    user_info = await marzban_api.get_user_info(marzban_username)
-    if not user_info:
-        await message.answer(t(lang, "add_subscription_marzban_not_found"))
-        return
-
-    plan_name = 'custom'
-
-    # Insert subscription row as pending, then mark active immediately
-    new_sub = await crud.create_subscription(
-        db=session,
-        user_id=db_user.id,
-        marzban_username=marzban_username,
-        plan=plan_name,
-        receipt_message_id=None,
-        referrer_id=None,
-        renewal_paid=False,
-        price=0  # Custom admin-added subscriptions have no price
-    )
-    await crud.activate_subscription(session, new_sub.id)
 
     await state.clear()
     await message.answer(
-        t(lang, "add_subscription_success"),
+        t(lang, "add_subscription_existing_added") if result.linked else t(lang, "add_subscription_success"),
         reply_markup=get_main_keyboard(message.chat.id, lang=lang),
     )

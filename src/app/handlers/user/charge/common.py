@@ -54,6 +54,7 @@ class ChargeState(StatesGroup):
     booking_choice = State()
     buy_days_plan = State()
     confirmation = State()
+    ask_credit = State()
     receipt = State()
 
 

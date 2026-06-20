@@ -1,4 +1,4 @@
-@import url("./tokens.css");
+@import url("./tokens.css?v=5");
 
 *{ box-sizing:border-box; margin:0; padding:0; }
 ::selection{ background: rgba(var(--brandRgb),0.25); color: var(--text); }

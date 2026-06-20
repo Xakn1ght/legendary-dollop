@@ -1,5 +1,4 @@
 import base64
-import re
 from datetime import datetime
 
 from aiogram import F
@@ -53,13 +52,17 @@ async def handle_charge_button(callback: CallbackQuery, state: FSMContext, sessi
     lang = get_cached_lang(callback.from_user.id)
     token = callback.data.split("_", 1)[1]
     subscription: Subscription | None = None
-    # Prefer numeric id when provided; otherwise treat as marzban username
+    user = await crud.get_user(session, callback.from_user.id)
+    # Prefer numeric id when provided; otherwise treat as marzban username.
+    # Either way the subscription must belong to the caller (the numeric path
+    # previously skipped that check and leaked other users' traffic info).
     try:
         sub_id = int(token)
         subscription = await session.get(Subscription, sub_id)
+        if subscription and (not user or subscription.user_id != user.id):
+            subscription = None
     except ValueError:
         # Lookup by username for notifications keyboards like charge_{username}
-        user = await crud.get_user(session, callback.from_user.id)
         if user:
             subs = await crud.get_user_active_subscriptions(session, user.id)
             subscription = next((s for s in subs if s.marzban_username == token), None)
@@ -82,11 +85,28 @@ async def revoke_subscription(callback: CallbackQuery, session: AsyncSession, st
     if not sub:
         await callback.answer(t(lang, "service_not_found"), show_alert=True)
         return
+    # Ownership is enforced by the shared flow — this button previously revoked ANY
+    # subscription id, letting a non-owner rotate someone else's link.
+    from app.services.flows.errors import FlowError
+    from app.services.flows.subs import revoke_subscription as revoke_flow
+
+    db_user = await crud.get_user(session, callback.from_user.id)
+    if not db_user:
+        await callback.answer(t(lang, "service_not_found"), show_alert=True)
+        return
     try:
-        success = await marzban_api.revoke_user_subscription(sub.marzban_username)
+        try:
+            revoke_result = await revoke_flow(session, db_user, sub_id)
+            success = True
+        except FlowError as e:
+            if e.code in ("not_found", "unauthorized"):
+                await callback.answer(t(lang, "service_not_found"), show_alert=True)
+                return
+            success = False
+            revoke_result = None
         if success:
-            user_info = await marzban_api.get_user_info(sub.marzban_username)
-            new_link = user_info.get("subscription_url") if user_info else None
+            user_info = revoke_result.user_info
+            new_link = revoke_result.new_link
             plan = sub.plan_name or "-"
             status = user_info.get("status", "-") if user_info else "-"
             expire = user_info.get("expire", "-") if user_info else "-"
@@ -105,16 +125,7 @@ async def revoke_subscription(callback: CallbackQuery, session: AsyncSession, st
             except Exception:
                 expire_str = str(expire)
                 jalali_warning = "\n⚠️ خطا در تبدیل تاریخ به شمسی."
-            # Persist token for fast reads next time
-            try:
-                if new_link:
-                    token_match = re.search(r"/sub/([^/]+)/?", new_link)
-                    if token_match:
-                        sub.sub_token = token_match.group(1)
-                        await session.commit()
-            except Exception:
-                pass
-
+            # (new sub_token already persisted by the shared revoke flow)
             # Persist Base64 (optional) but avoid sending a new message; just update the existing card
             if new_link:
                 _ = base64.b64encode(new_link.encode()).decode()

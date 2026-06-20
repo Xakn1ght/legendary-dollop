@@ -3,91 +3,102 @@ from aiogram.fsm.context import FSMContext
 from aiogram.types import KeyboardButton, Message, ReplyKeyboardMarkup
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.coupons import coupon_discount_amount
 from app.core.settings import ADMIN_ID, PLANS
 from app.database import crud
-from app.handlers.admin.subscription import process_approved_subscription
 from app.keyboards.reply import KEYBOARD_MARKUP_BACK, get_main_keyboard
+from app.services.flows.errors import FlowError
+from app.services.flows.purchase import start_purchase_order
 from app.utils.bot_i18n import t
 
-from .common import PurchaseState, _lang_for, router
+from .common import PurchaseState, _lang_for, _name_keyboard, router
+from .summary import build_quote_from_state
 
 
 @router.message(PurchaseState.confirmation, lambda m: (m.text or "").strip() in {"تایید و پرداخت ✅", "Confirm & Pay ✅"})
 async def process_confirmation(message: Message, state: FSMContext, session: AsyncSession, bot: Bot):
     lang = await _lang_for(message, session)
     data = await state.get_data()
-    plan_info = PLANS[data['plan']]
-    renewal_template = data.get('renewal_template')
-    renewal_price = PLANS[renewal_template]['price'] if renewal_template else 0
-    initial_price = plan_info['price'] + (renewal_price or 0)
-    used_discount_percents = data.get('used_discount_percents', [])
-    total_discount_percent = sum(used_discount_percents)
-    price_after_discount = initial_price
-    if total_discount_percent > 0:
-        discount_amount = int(initial_price * (total_discount_percent / 100))
-        price_after_discount = initial_price - discount_amount
-    # Reward coupon (one per purchase): discount capped to a ~100GB plan; free_gb adds
-    # bonus GB at provisioning via subscription.applied_coupon_id (set in summary.py).
-    coupon_id = data.get('coupon_id')
-    coupon_amount = coupon_discount_amount(data.get('coupon_discount_percent', 0), initial_price)
-    if coupon_amount > 0:
-        price_after_discount = max(0, price_after_discount - coupon_amount)
-    credit_used = data.get('credit_used', 0)
-    final_price = price_after_discount - credit_used
-    if final_price <= 0:
-        # FULLY PAID BY CREDIT/DISCOUNT
-        sub_id = data.get('sub_id')
-        if not sub_id:
+    user = await crud.get_user(session, message.chat.id)
+    if not user:
+        await state.clear()
+        await message.answer(t(lang, "start_bot_first"), reply_markup=get_main_keyboard(message.chat.id, lang=lang))
+        return
+
+    try:
+        # Same quote the summary displayed; the order (and the consumption of
+        # credit/discounts/coupon) is created here in one shared-service call.
+        quote = await build_quote_from_state(session, user, data)
+        result = await start_purchase_order(
+            session,
+            user,
+            quote=quote,
+            service_name=data.get("marzban_username"),
+            referrer_id=data.get("referrer_id"),
+            auto_renewal=bool(data.get("auto_renewal")),
+            bot=bot,
+        )
+    except FlowError as e:
+        if e.code in ("invalid_service_name", "service_name_taken"):
+            await state.set_state(PurchaseState.name)
             await message.answer(
-                ("خطا: شماره سفارش یافت نشد. لطفاً دوباره تلاش کنید." if lang == "fa" else "Error: order id not found. Please try again."),
-                reply_markup=get_main_keyboard(message.chat.id, lang=lang),
+                ("⚠️ این نام دیگر در دسترس نیست. لطفاً نام دیگری انتخاب کنید:" if lang == "fa" else "⚠️ That name is no longer available. Please pick another:"),
+                reply_markup=_name_keyboard(lang),
             )
-            await state.clear()
             return
+        await state.clear()
+        await message.answer(
+            (
+                "متاسفانه در ثبت سفارش شما مشکلی پیش آمد. لطفاً دوباره تلاش کنید یا به پشتیبانی اطلاع دهید."
+                if lang == "fa"
+                else "We couldn't register your order. Please try again or contact support."
+            ),
+            reply_markup=get_main_keyboard(message.chat.id, lang=lang),
+        )
+        return
 
-        # Use the centralized processing function (reads sub.applied_coupon_id for free_gb)
-        success = await process_approved_subscription(sub_id, session, bot)
+    sub = result.subscription
+    await state.update_data(sub_id=sub.id, marzban_username=sub.marzban_username)
+    from app.services.flows.pricing import get_plan_info
+    plan_info = get_plan_info(quote.plan_name)
 
-        if success:
-            if coupon_id:
-                await crud.mark_coupon_used(session, coupon_id)
-            await message.answer(
-                ("✅ سفارش شما با موفقیت با اعتبار پرداخت و فعال شد." if lang == "fa" else "✅ Your order was paid with credit/discount and activated."),
-                reply_markup=get_main_keyboard(message.chat.id, lang=lang),
-            )
-            # Send admin notification
-            user = await crud.get_user(session, message.chat.id)
-            marzban_username = data.get('marzban_username', '-')
-            admin_msg = (
-                f"✅ سفارش جدید با پرداخت کامل توسط اعتبار/تخفیف (پردازش خودکار):\n"
-                f"کاربر: {user.full_name} ({user.chat_id})\n"
-                f"پلن: {data['plan']} ({plan_info['gb']} گیگابایت)\n"
-                f"نام سرویس: {marzban_username}\n"
-                f"مبلغ اولیه: {initial_price:,} تومان\n"
-            )
-            if total_discount_percent > 0:
-                admin_msg += f"تخفیف: {total_discount_percent}%\n"
-            if credit_used > 0:
-                admin_msg += f"اعتبار استفاده‌شده: {credit_used:,} تومان\n"
-            admin_msg += f"مبلغ نهایی: ۰ تومان (پرداخت کامل)\n"
-            admin_msg += f"شماره سفارش: {sub_id}"
-            from app.utils.admin_bot_helper import get_admin_bot
+    if result.auto_approved:
+        # FULLY PAID BY CREDIT/DISCOUNT/COUPON
+        await message.answer(
+            ("✅ سفارش شما با موفقیت با اعتبار پرداخت و فعال شد." if lang == "fa" else "✅ Your order was paid with credit/discount and activated."),
+            reply_markup=get_main_keyboard(message.chat.id, lang=lang),
+        )
+        admin_msg = (
+            f"✅ سفارش جدید با پرداخت کامل توسط اعتبار/تخفیف (پردازش خودکار):\n"
+            f"کاربر: {user.full_name} ({user.chat_id})\n"
+            f"پلن: {quote.plan_name} ({plan_info['gb']} گیگابایت)\n"
+            f"نام سرویس: {sub.marzban_username}\n"
+            f"مبلغ اولیه: {quote.base_total:,} تومان\n"
+        )
+        if quote.discount_percent > 0:
+            admin_msg += f"تخفیف: {quote.discount_percent}%\n"
+        if quote.credit_used > 0:
+            admin_msg += f"اعتبار استفاده‌شده: {quote.credit_used:,} تومان\n"
+        admin_msg += "مبلغ نهایی: ۰ تومان (پرداخت کامل)\n"
+        admin_msg += f"شماره سفارش: {sub.id}"
+        from app.utils.admin_bot_helper import get_admin_bot
 
-            _ab = get_admin_bot()
-            if _ab:
-                try:
-                    await _ab.send_message(ADMIN_ID, admin_msg)
-                except Exception:
-                    pass
-        else:
-            await message.answer(
-                ("متاسفانه در فعال‌سازی سرویس شما مشکلی پیش آمد. لطفاً به پشتیبانی اطلاع دهید." if lang == "fa" else "We couldn't activate your service. Please contact support."),
-                reply_markup=get_main_keyboard(message.chat.id, lang=lang),
-            )
+        _ab = get_admin_bot()
+        if _ab:
+            try:
+                await _ab.send_message(ADMIN_ID, admin_msg)
+            except Exception:
+                pass
 
         await state.clear()
         return
+
+    # Same admin-configured card the webapp shows (read at call time — the admin
+    # panel can change it at runtime).
+    from app.core.settings import payment_ui as _payment
+
+    card_line = f"<code>{_payment.PAYMENT_CARD_NUMBER}</code>"
+    if _payment.PAYMENT_CARD_HOLDER:
+        card_line += f"\n{_payment.PAYMENT_CARD_HOLDER}"
 
     await message.answer(
         (
@@ -99,7 +110,7 @@ async def process_confirmation(message: Message, state: FSMContext, session: Asy
                 "✅ Your order is confirmed.\n\n"
                 "Please transfer the amount to the card below, then send the receipt image:\n"
             )
-            + "<code>6037-xxxx-xxxx-xxxx</code>\n\n"
+            + card_line + "\n\n"
             + (
                 "پس از ارسال رسید، سرویس شما در اسرع وقت فعال خواهد شد."
                 if lang == "fa"
@@ -109,10 +120,6 @@ async def process_confirmation(message: Message, state: FSMContext, session: Asy
         reply_markup=ReplyKeyboardMarkup(keyboard=[[KeyboardButton(text=t(lang, "btn_back"))]], resize_keyboard=True, one_time_keyboard=True),
         parse_mode='HTML',
     )
-    # Consume the coupon now that the order is committed (awaiting receipt) — parity with
-    # how discounts are consumed at summary time.
-    if coupon_id:
-        await crud.mark_coupon_used(session, coupon_id)
     await state.set_state(PurchaseState.receipt)
 
 @router.callback_query(F.data == "enable_auto_renew")
@@ -129,9 +136,11 @@ async def enable_auto_renew_callback(callback, state: FSMContext):
 
 @router.callback_query(F.data == "confirm_payment")
 async def confirm_payment_callback(callback, state: FSMContext):
+    from app.core.settings import payment_ui as _payment
+
     await callback.message.answer(
         "لطفا هزینه را به شماره کارت زیر واریز کرده و سپس تصویر رسید را ارسال کنید:\n"
-        "<code>6037-xxxx-xxxx-xxxx</code>\n\n"
+        f"<code>{_payment.PAYMENT_CARD_NUMBER}</code>\n\n"
         "پس از ارسال رسید، سرویس شما در اسرع وقت فعال خواهد شد.",
         reply_markup=KEYBOARD_MARKUP_BACK,
         parse_mode='HTML',

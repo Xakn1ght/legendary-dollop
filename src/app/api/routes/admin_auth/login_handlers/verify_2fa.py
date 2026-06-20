@@ -19,6 +19,10 @@ from app.core.settings import (
 
 from .. import state as st
 
+import logging
+
+logger = logging.getLogger(__name__)
+
 
 async def handle_admin_verify_2fa(request: web.Request):
     """
@@ -102,7 +106,7 @@ async def handle_admin_verify_2fa(request: web.Request):
         del st._pending_2fa[chat_id]
         session = st._create_session(chat_id, ip, ua)
         
-        print(f"[ADMIN AUTH] 2FA verified, session created for admin {chat_id} from IP {ip}")
+        logger.info(f"[ADMIN AUTH] 2FA verified, session created for admin {chat_id} from IP {ip}")
         
         response = web.json_response({
             "ok": True,

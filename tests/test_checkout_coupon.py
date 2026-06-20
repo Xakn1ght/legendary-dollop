@@ -66,12 +66,29 @@ async def _run():
     Session = async_sessionmaker(eng, expire_on_commit=False)
 
     # Patch auth + the handler's session factory + plans + VIP/global discounts.
+    # Price math now lives in app.services.flows.pricing — patch it there too.
+    from app.services.flows import pricing as pricing_mod
+    from app.services.flows import purchase as purchase_mod
+
     hmod._verify_webapp_auth = lambda request: (CHAT, None)
     hmod.AsyncSessionLocal = Session
     hmod.PLANS = PLANS
-    hmod.GLOBAL_PURCHASE_DISCOUNTS = []
-    hmod.VIP_PURCHASE_DISCOUNT_ENABLED = False
-    hmod.VIP_PURCHASE_DISCOUNT_PERCENT = 0
+    pricing_mod.PLANS = PLANS
+    pricing_mod.GLOBAL_PURCHASE_DISCOUNTS = []
+    pricing_mod.VIP_PURCHASE_DISCOUNT_ENABLED = False
+    pricing_mod.VIP_PURCHASE_DISCOUNT_PERCENT = 0
+
+    # Service-name availability normally checks Marzban; keep it DB-only here.
+    async def _name_taken(db, username):
+        return bool(await crud.get_subscription_by_username(db, username))
+
+    purchase_mod.is_service_name_taken = _name_taken
+
+    # Force the botless auto-approve path (no Telegram DM in tests).
+    import app.utils.admin_bot_helper as abh
+
+    abh.get_user_bot = lambda: None
+    abh.get_admin_bot = lambda: None
 
     # Capture Marzban provisioning instead of hitting the network.
     captured = {}

@@ -85,7 +85,11 @@ async def process_approved_subscription(sub_id: int, session: AsyncSession, bot:
         logging.error(f"Could not find user for subscription {sub_id}")
         return False
 
-    plan_info = PLANS[subscription.plan_name]
+    from app.services.flows.pricing import get_plan_info
+    plan_info = get_plan_info(subscription.plan_name)
+    if not plan_info:
+        logging.error(f"Unknown plan {subscription.plan_name} for subscription {sub_id}")
+        return False
 
     # Apply a free_gb season coupon's bonus GB at provisioning so receipt/admin-approved
     # orders get the same bonus the webapp auto-approve path applies.
@@ -218,7 +222,7 @@ async def process_approved_subscription(sub_id: int, session: AsyncSession, bot:
                 total_price = plan_info["price"]
 
                 if subscription.renewal_paid and subscription.renewal_template:
-                    renewal_info = PLANS.get(subscription.renewal_template)
+                    renewal_info = get_plan_info(subscription.renewal_template)
                     if renewal_info:
                         total_gb += renewal_info["gb"]
                         total_price += renewal_info["price"]

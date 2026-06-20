@@ -114,10 +114,16 @@ async def process_language_selection(callback: CallbackQuery, state: FSMContext,
 		
 		keyboard = InlineKeyboardMarkup(
 			inline_keyboard=[
-				[InlineKeyboardButton(
-					text=("🎁 باز کردن منوی پاداش" if selected_lang == "fa" else "🎁 Open Rewards Menu"),
-					callback_data="open_enhanced_rewards"
-				)],
+				[
+					InlineKeyboardButton(
+						text=("🛒 خرید سرویس" if selected_lang == "fa" else "🛒 Buy a Plan"),
+						callback_data="welcome_buy"
+					),
+					InlineKeyboardButton(
+						text=("➕ افزودن اشتراک" if selected_lang == "fa" else "➕ Add Subscription"),
+						callback_data="welcome_addsub"
+					),
+				],
 				[_create_share_button(callback.message.bot, user.referral_code, selected_lang)]
 			]
 		)
@@ -196,16 +202,21 @@ async def process_language_selection(callback: CallbackQuery, state: FSMContext,
 
 			share_keyboard = InlineKeyboardMarkup(
 				inline_keyboard=[
+					[
+						InlineKeyboardButton(
+							text=("🛒 خرید سرویس" if selected_lang == "fa" else "🛒 Buy a Plan"),
+							callback_data="welcome_buy"
+						),
+						InlineKeyboardButton(
+							text=("➕ افزودن اشتراک" if selected_lang == "fa" else "➕ Add Subscription"),
+							callback_data="welcome_addsub"
+						),
+					],
 					[_create_share_button(callback.message.bot, user.referral_code, selected_lang)]
 				]
 			)
 
-			await callback.message.edit_text(welcome_message, parse_mode=ParseMode.HTML)
-			await callback.message.answer(
-				welcome_message,
-				reply_markup=share_keyboard,
-				parse_mode=ParseMode.HTML,
-			)
+			await callback.message.edit_text(welcome_message, reply_markup=share_keyboard, parse_mode=ParseMode.HTML)
 			await callback.message.answer(
 				("از منوی زیر استفاده کنید:" if selected_lang == "fa" else "Use the menu below:"),
 				reply_markup=get_main_keyboard(chat_id, is_admin=user.is_admin, lang=selected_lang),

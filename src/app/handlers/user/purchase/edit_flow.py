@@ -2,12 +2,10 @@ from aiogram.fsm.context import FSMContext
 from aiogram.types import KeyboardButton, Message, ReplyKeyboardMarkup
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.database import crud
 from app.utils.bot_i18n import t
 
 from .common import (
     PurchaseState,
-    _cleanup_pending_subscription,
     _confirm_keyboard,
     _get_plan_keyboard_for_user,
     _lang_for,
@@ -19,15 +17,8 @@ from .common import (
 @router.message(PurchaseState.confirmation, lambda m: (m.text or "").strip() in {"بازگشت🔙", "Back 🔙"})
 async def go_back_from_confirmation(message: Message, state: FSMContext, session: AsyncSession):
     lang = await _lang_for(message, session)
-    # Refund any deducted credit
-    data_state = await state.get_data()
-    credit_used = data_state.get('credit_used', 0)
-    if credit_used:
-        await crud.add_credit(session, message.chat.id, credit_used)
-        await state.update_data(credit_used=0)
-    # Delete pending subscription row as user goes back to name step
-    await _cleanup_pending_subscription(session, state)
-
+    # Nothing to refund/clean up: the order row (and any credit/coupon/discount
+    # consumption) is only created when the user taps Confirm & Pay.
     await state.set_state(PurchaseState.name)
     await message.answer(
         ("لطفا یک نام برای سرویس خود انتخاب کنید یا دکمه 'اتفاقی' را بزنید." if lang == "fa" else "Choose a service name, or tap 'Random'."),
@@ -37,13 +28,6 @@ async def go_back_from_confirmation(message: Message, state: FSMContext, session
 @router.message(PurchaseState.confirmation, lambda m: (m.text or "").strip() in {"ویرایش ✏️", "Edit ✏️"})
 async def edit_from_confirmation(message: Message, state: FSMContext, session: AsyncSession):
     """Ask the user what they want to edit (name or plan)."""
-    # Refund any deducted credit before editing so we recalculate later
-    data_state = await state.get_data()
-    credit_used = data_state.get('credit_used', 0)
-    if credit_used:
-        await crud.add_credit(session, message.chat.id, credit_used)
-        await state.update_data(credit_used=0)
-
     lang = await _lang_for(message, session)
     edit_markup = ReplyKeyboardMarkup(
         keyboard=[

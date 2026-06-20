@@ -1,15 +1,12 @@
 from __future__ import annotations
 
-from datetime import datetime
-
-from aiogram import F
 from aiogram.fsm.context import FSMContext
 from aiogram.types import Message
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.settings import PLANS
 from app.database import crud
-from app.keyboards.reply import get_main_keyboard
+from app.keyboards.reply import KEYBOARD_MARKUP_BACK, get_main_keyboard
 from app.utils.bot_i18n import normalize_lang, set_cached_lang, t, text_matches
 from app.utils.validation import InputValidator, sanitize_user_input
 
@@ -146,23 +143,33 @@ async def booking_pick_plan(message: Message, state: FSMContext, session: AsyncS
         return
     plan_name = message.text
     plan_info = PLANS[plan_name]
-    # Update subscription with renewal settings immediately (no payment now)
-    await crud.update_subscription_renewal(
-        session,
-        sub_id,
-        renewal_paid=True,
-        renewal_template=plan_name,
-        renewal_price=plan_info.get('price'),
-        renewal_requested_at=datetime.utcnow(),
-    )
-    await state.clear()
+    # A booking is paid like any other charge: create the order now and apply the
+    # renewal only when an admin approves the receipt (flows.charge.approve_charge).
+    from app.services.flows.charge import start_booking_order
+    from app.services.flows.errors import FlowError
+
+    user = await crud.get_user(session, message.chat.id)
+    try:
+        result = await start_booking_order(session, user, subscription_id=sub_id, plan_name=plan_name)
+    except FlowError:
+        await state.clear()
+        await message.answer(t(lang, "charge_error_no_sub"), reply_markup=get_main_keyboard(message.chat.id, lang=lang))
+        return
+
+    await state.update_data(charge_order_id=result.charge_request.id, package_label=plan_name)
+    await state.set_state(ChargeState.receipt)
     await message.answer(
         t(lang, "charge_booking_success").format(
             plan=plan_name,
             gb=plan_info.get("gb"),
             price=f'{plan_info.get("price"):,}'
+        )
+        + (
+            "\n\n💳 لطفاً مبلغ را واریز کرده و تصویر رسید را ارسال کنید تا رزرو پس از تایید ادمین فعال شود."
+            if lang == "fa"
+            else "\n\n💳 Please pay and send the receipt image; the booking activates after admin approval."
         ),
-        reply_markup=get_main_keyboard(message.chat.id, lang=lang),
+        reply_markup=KEYBOARD_MARKUP_BACK,
     )
 
 

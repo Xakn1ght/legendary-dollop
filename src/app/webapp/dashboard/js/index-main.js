@@ -71,10 +71,13 @@
     function getLocale(){ return currentLang==='fa' ? 'fa-IR' : 'en-US'; }
     function fmtNum(n, digits = 1){
       try{
-        const f = new Intl.NumberFormat(getLocale(), { minimumFractionDigits: digits, maximumFractionDigits: digits });
+        // Allow up to `digits` decimals but don't force trailing zeros
+        // (so 6 → "6", 6.4 → "6.4", not "6.0").
+        const f = new Intl.NumberFormat(getLocale(), { minimumFractionDigits: 0, maximumFractionDigits: digits });
         return f.format(n);
       }catch(_){
-        return (n!=null && isFinite(n)) ? Number(n).toFixed(digits) : '0';
+        if (n==null || !isFinite(n)) return '0';
+        return String(parseFloat(Number(n).toFixed(digits)));
       }
     }
     const fmtGB = (bytes) => { 
@@ -847,8 +850,36 @@
     // Session token (Bearer) fallback for platforms where cookies are flaky.
     // Stored in localStorage; used only for your domain (same-origin requests).
     const SESSION_STORAGE_KEY = 'tma_bearer_token';
+    const SESSION_UID_KEY = 'tma_bearer_uid';
+    let _forceRelogin = false;
     let bearerToken = '';
     try { bearerToken = localStorage.getItem(SESSION_STORAGE_KEY) || ''; } catch(_){ bearerToken = ''; }
+
+    // Account-switch guard: a stored bearer/session is minted for one Telegram user.
+    // If the client is now a DIFFERENT user (multi-account testing, shared device),
+    // the stale token would auth the dashboard as the OLD account — showing their
+    // (empty) data while the bot is the new account. Drop it when the uid differs.
+    try {
+      const curUid = (tg && tg.initDataUnsafe && tg.initDataUnsafe.user && tg.initDataUnsafe.user.id)
+        ? String(tg.initDataUnsafe.user.id) : '';
+      const storedUid = localStorage.getItem(SESSION_UID_KEY) || '';
+      const mismatch = curUid && storedUid && curUid !== storedUid;
+      // A bearer with no companion uid is a legacy/untrusted token (minted before
+      // this guard existed) — drop it once so it can't auth as a stale account.
+      const untrusted = bearerToken && !storedUid;
+      if (mismatch || untrusted) {
+        bearerToken = '';
+        try { localStorage.removeItem(SESSION_STORAGE_KEY); } catch(_){}
+        try { localStorage.removeItem(SESSION_UID_KEY); } catch(_){}
+        // tma_session is httponly (JS can't delete it), but clearing the bearer
+        // forces a fresh loginWithInitData on the next call, which re-mints the
+        // cookie for the CURRENT account — overwriting the stale one server-side.
+        try { document.cookie = 'auth_token=; Max-Age=0; path=/'; } catch(_){}
+        _forceRelogin = true;
+      }
+      if (curUid) { try { localStorage.setItem(SESSION_UID_KEY, curUid); } catch(_){} }
+    } catch(_){}
+
     let _loginInFlight = null;
 
     async function loginWithInitData(initData){
@@ -867,6 +898,11 @@
           if (r.ok && j && j.ok && j.token) {
             bearerToken = String(j.token);
             try { localStorage.setItem(SESSION_STORAGE_KEY, bearerToken); } catch(_){}
+            // Tag the bearer with the user it was minted for (account-switch guard).
+            try {
+              const uid = getUserIdUnsafe();
+              if (uid) localStorage.setItem(SESSION_UID_KEY, uid);
+            } catch(_){}
             return bearerToken;
           }
           // Check if user is not registered (needs referral code)
@@ -932,13 +968,21 @@
         }
       } catch (_) {}
 
-      // If we have a stored bearer token, use it.
-      if (bearerToken) {
+      // Auth priority: when fresh initData is present, the X-Telegram-Init header
+      // above is authoritative (server checks it first) and always reflects the
+      // CURRENT Telegram account. Do NOT also send a stored bearer then — a stale
+      // one from a previous account would otherwise be a confusing fallback.
+      // Only fall back to the stored bearer when initData is unavailable.
+      if (initData) {
+        if (!bearerToken || _forceRelogin) {
+          // Re-mint for the current account (also overwrites a stale tma_session
+          // cookie server-side, healing an account switch).
+          _forceRelogin = false;
+          const t = await loginWithInitData(initData);
+          if (t) headers['Authorization'] = 'Bearer ' + t;
+        }
+      } else if (bearerToken) {
         headers['Authorization'] = 'Bearer ' + bearerToken;
-      } else if (initData) {
-        // If no token yet, try a one-time login to get one (prevents "stuck loading" on some platforms).
-        const t = await loginWithInitData(initData);
-        if (t) headers['Authorization'] = 'Bearer ' + t;
       }
       
       // Legacy URL auth fallback:
@@ -1746,7 +1790,7 @@
     }
 
     function beginDataLoading(){ try{ const c=document.querySelector('.content'); if(c) c.classList.add('loading'); }catch(_){ } }
-    function endDataLoading(){ try{ const c=document.querySelector('.content'); if(c) c.classList.remove('loading'); }catch(_){ } }
+    function endDataLoading(){ try{ const c=document.querySelector('.content'); if(c) c.classList.remove('loading'); }catch(_){ } try{ if(window.AstroSkeleton) window.AstroSkeleton.ready(); }catch(_){ } }
     
     let overviewAbort = null;
 
@@ -3269,7 +3313,6 @@
       // Read theme after prefs sync to avoid a dark→light flash.
       const savedTheme = localStorage.getItem('theme') || document.documentElement.getAttribute('data-theme') || 'dark';
       function runThemeTransition(apply){
-        // Freeze all CSS transitions for 2 frames so color vars snap instantly
         document.documentElement.setAttribute('data-no-trans', '1');
         apply();
         requestAnimationFrame(() => requestAnimationFrame(() => {
@@ -3283,33 +3326,36 @@
           const tg = (window.Telegram && window.Telegram.WebApp) ? window.Telegram.WebApp : null;
           if (!tg) return;
           const isLight = (themeName === 'light');
-          const bg       = isLight ? '#d4dff0' : '#0a141b';
-          const headerBg = isLight ? '#d4dff0' : '#10202a';
+          const bg       = isLight ? '#f1ede5' : '#0a141b';
+          const headerBg = isLight ? '#f1ede5' : '#10202a';
           try { if (typeof tg.setBackgroundColor === 'function') tg.setBackgroundColor(bg); } catch(_) {}
           try { if (typeof tg.setHeaderColor    === 'function') tg.setHeaderColor(headerBg); } catch(_) {}
           try { if (typeof tg.setBottomBarColor === 'function') tg.setBottomBarColor(bg); } catch(_) {}
         } catch(_) {}
       }
+      // Coalesce rapid toggles into one restyle on the next frame
+      let _themeRaf = 0;
+      let _themeDesired = null;
       function setTheme(theme) {
         const next = (theme === 'light') ? 'light' : 'dark';
-        const prev = document.documentElement.getAttribute('data-theme') || '';
-        const prevChecked = !!(themeToggle && themeToggle.checked);
-        const nextChecked = (next === 'light');
-        if (prev === next && prevChecked === nextChecked) {
-          try { localStorage.setItem('theme', next); } catch(_) {}
-          syncTelegramChromeToTheme(next);
-          return;
-        }
-        const apply = () => {
-          document.documentElement.setAttribute('data-theme', next);
-          try { localStorage.setItem('theme', next); } catch(_) {}
-          if(themeToggle) themeToggle.checked = nextChecked;
-          schedulePrefsSave({ theme: next });
-          // Sync Telegram chrome AFTER the attr is set so we read the right CSS vars.
-          requestAnimationFrame(() => syncTelegramChromeToTheme(next));
-        };
-        if (prev && prev !== next) runThemeTransition(apply);
-        else apply();
+        _themeDesired = next;
+        try { localStorage.setItem('theme', next); } catch(_) {}
+        if (_themeRaf) return;
+        _themeRaf = requestAnimationFrame(() => {
+          _themeRaf = 0;
+          const target = _themeDesired;
+          const prev = document.documentElement.getAttribute('data-theme') || '';
+          if (themeToggle) themeToggle.checked = (target === 'light');
+          if (prev === target) { syncTelegramChromeToTheme(target); return; }
+          const apply = () => {
+            document.documentElement.setAttribute('data-theme', target);
+            schedulePrefsSave({ theme: target });
+            // read the right CSS vars after the attr lands
+            requestAnimationFrame(() => syncTelegramChromeToTheme(target));
+          };
+          if (prev) runThemeTransition(apply);
+          else apply();
+        });
       }
       window.syncTelegramChromeToTheme = syncTelegramChromeToTheme;
       setTheme(savedTheme);
@@ -3327,6 +3373,7 @@
         const prev = document.documentElement.getAttribute('data-accent') || 'red';
         if (prev === next) {
           try { localStorage.setItem('accent', next); } catch(_) {}
+          if (!opts.silent) schedulePrefsSave({ accent: next });
           return;
         }
         document.documentElement.setAttribute('data-accent', next);
@@ -3702,17 +3749,25 @@
       const notificationBell = document.getElementById('notificationBell');
       const notificationBadge = document.getElementById('notificationBadge');
       
-      // Sticky header on scroll
+      // Sticky header on scroll (rAF-gated, passive)
       let lastScroll = 0;
+      let _scrollTicking = false;
+      let _headerScrolled = false;
       window.addEventListener('scroll', () => {
-        const currentScroll = window.pageYOffset || document.documentElement.scrollTop;
-        if (currentScroll > 50) {
-          header.classList.add('scrolled');
-        } else {
-          header.classList.remove('scrolled');
+        if (!_scrollTicking) {
+          _scrollTicking = true;
+          requestAnimationFrame(() => {
+            const currentScroll = window.pageYOffset || document.documentElement.scrollTop;
+            const shouldBeScrolled = currentScroll > 50;
+            if (shouldBeScrolled !== _headerScrolled) {
+              _headerScrolled = shouldBeScrolled;
+              if (header) header.classList.toggle('scrolled', shouldBeScrolled);
+            }
+            lastScroll = currentScroll;
+            _scrollTicking = false;
+          });
         }
-        lastScroll = currentScroll;
-      });
+      }, { passive: true });
       
       // Notification system
       let notificationCount = 0;
@@ -3866,16 +3921,15 @@
         setTimeout(() => {
           if (container.scrollHeight > container.clientHeight) {
             container.classList.add('has-more');
-            
-            // Update fade indicator on scroll
-            container.addEventListener('scroll', function checkScroll() {
-              const isNearBottom = container.scrollHeight - container.scrollTop - container.clientHeight < 20;
-              if (isNearBottom) {
-                container.classList.remove('has-more');
-              } else {
-                container.classList.add('has-more');
-              }
-            });
+
+            // bind the fade-indicator listener once, not per render
+            if (!container._notifScrollBound) {
+              container._notifScrollBound = true;
+              container.addEventListener('scroll', function checkScroll() {
+                const isNearBottom = container.scrollHeight - container.scrollTop - container.clientHeight < 20;
+                container.classList.toggle('has-more', !isNearBottom);
+              }, { passive: true });
+            }
           } else {
             container.classList.remove('has-more');
           }

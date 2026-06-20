@@ -1,4 +1,4 @@
-@import url("./tokens.css");
+@import url("./tokens.css?v=5");
 
 /* Challenge Type Tabs */
 .challenge-tabs {
@@ -1403,3 +1403,312 @@ html[dir="rtl"] .referral-code {
     font-size: 16px;
   }
 }
+
+/* ============================================================
+   Rewards page redesign (season / coupons / referrals)
+   ============================================================ */
+
+/* Card accent rails */
+#seasonCard{ --accent: rgba(255,202,40,0.95); }
+#couponsCard{ --accent: rgba(236,72,153,0.95); }
+#seasonCard::before{
+  background: radial-gradient(ellipse at 15% 0%, rgba(255,202,40,0.22) 0%, rgba(255,202,40,0.10) 35%, transparent 65%);
+}
+#couponsCard::before{
+  background: radial-gradient(ellipse at 15% 0%, rgba(236,72,153,0.20) 0%, rgba(236,72,153,0.10) 35%, transparent 65%);
+}
+
+/* ---- Season hero ---- */
+.season-top{
+  display: grid;
+  grid-template-columns: auto minmax(0,1fr);
+  gap: 18px;
+  align-items: center;
+}
+.season-orb{
+  width: 92px;
+  height: 92px;
+  border-radius: 50%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  background:
+    radial-gradient(circle at 30% 25%, rgba(255,255,255,0.22), transparent 60%),
+    linear-gradient(150deg, rgba(255,202,40,0.95), rgba(245,158,11,0.85));
+  box-shadow: 0 8px 26px rgba(245,158,11,0.40), 0 0 0 1px rgba(255,255,255,0.18) inset;
+  flex-shrink: 0;
+}
+.season-stars-big{
+  font-size: 34px;
+  font-weight: 900;
+  line-height: 1;
+  color: #1a1206;
+  text-shadow: 0 1px 0 rgba(255,255,255,0.25);
+}
+.season-stars-unit{
+  font-size: 10px;
+  font-weight: 700;
+  margin-top: 3px;
+  color: rgba(26,18,6,0.72);
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+}
+.season-meta{ min-width: 0; }
+.season-next-row{
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+.season-next-label{
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+}
+.season-days-chip{
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--text);
+  background: rgba(255,255,255,0.08);
+  border: 1px solid rgba(255,255,255,0.14);
+  border-radius: 999px;
+  padding: 4px 10px;
+  white-space: nowrap;
+}
+.season-progress{
+  height: 12px;
+  border-radius: 999px;
+  background: rgba(255,255,255,0.10);
+  overflow: hidden;
+  box-shadow: 0 1px 2px rgba(0,0,0,0.25) inset;
+}
+.season-progress-fill{
+  height: 100%;
+  width: 0%;
+  border-radius: 999px;
+  background: linear-gradient(90deg, rgba(255,202,40,0.95), rgba(245,158,11,0.95));
+  box-shadow: 0 0 12px rgba(245,158,11,0.55);
+  transition: width 0.7s cubic-bezier(0.4,0,0.2,1);
+}
+.season-next-reward{
+  margin-top: 10px;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text);
+}
+
+/* ---- Season ladder ---- */
+.season-ladder{ margin-top: 18px; }
+.season-rung{
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 12px;
+  border-radius: 14px;
+  margin-bottom: 8px;
+  background: rgba(255,255,255,0.04);
+  border: 1px solid rgba(255,255,255,0.07);
+  transition: all 0.25s ease;
+}
+.season-rung.reached{
+  background: rgba(255,202,40,0.10);
+  border-color: rgba(255,202,40,0.28);
+}
+.season-rung.next{
+  background: rgba(255,255,255,0.07);
+  border-color: rgba(255,202,40,0.45);
+  box-shadow: 0 0 0 1px rgba(255,202,40,0.18);
+}
+.season-rung-node{
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 13px;
+  font-weight: 800;
+  color: var(--muted);
+  background: rgba(255,255,255,0.06);
+  border: 1px solid rgba(255,255,255,0.12);
+  flex-shrink: 0;
+}
+.season-rung.reached .season-rung-node{
+  color: #1a1206;
+  background: linear-gradient(150deg, rgba(255,202,40,0.98), rgba(245,158,11,0.92));
+  border-color: transparent;
+  box-shadow: 0 3px 10px rgba(245,158,11,0.40);
+}
+.season-rung-body{ flex: 1; min-width: 0; }
+.season-rung-reward{
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--text);
+}
+.season-rung-stars{
+  font-size: 11px;
+  color: var(--muted);
+  margin-top: 2px;
+}
+.season-rung-state{ font-size: 15px; flex-shrink: 0; }
+
+/* ---- Coupon tickets ---- */
+.coupon-list{ display: flex; flex-direction: column; gap: 10px; }
+.coupon-ticket{
+  display: flex;
+  align-items: stretch;
+  border-radius: 14px;
+  overflow: hidden;
+  background: rgba(236,72,153,0.08);
+  border: 1px solid rgba(236,72,153,0.24);
+}
+.coupon-ticket-stub{
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 64px;
+  padding: 0 12px;
+  font-size: 14px;
+  font-weight: 900;
+  color: #fff;
+  background: linear-gradient(150deg, rgba(236,72,153,0.95), rgba(190,24,93,0.92));
+  border-right: 2px dashed rgba(255,255,255,0.35);
+}
+html[dir="rtl"] .coupon-ticket-stub{
+  border-right: none;
+  border-left: 2px dashed rgba(255,255,255,0.35);
+}
+.coupon-ticket-body{ flex: 1; padding: 12px 14px; min-width: 0; }
+.coupon-ticket-label{
+  font-size: 14px;
+  font-weight: 800;
+  color: var(--text);
+}
+.coupon-ticket-exp{
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--muted);
+  margin-top: 4px;
+}
+.coupon-ticket-exp.soon{ color: rgba(248,113,113,0.95); }
+.coupon-empty{
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  padding: 22px 12px;
+  gap: 8px;
+}
+.coupon-empty-icon{ font-size: 28px; opacity: 0.8; }
+.coupon-empty-text{ font-size: 13px; color: var(--muted); line-height: 1.5; max-width: 280px; }
+
+html[data-theme="light"] .season-days-chip{ background: rgba(0,0,0,0.05); border-color: rgba(0,0,0,0.10); }
+html[data-theme="light"] .season-progress{ background: rgba(0,0,0,0.08); }
+html[data-theme="light"] .season-rung{ background: rgba(0,0,0,0.03); border-color: rgba(0,0,0,0.07); }
+html[data-theme="light"] .season-rung-node{ background: rgba(0,0,0,0.05); border-color: rgba(0,0,0,0.10); }
+
+/* ---- Season: simple stack layout (redesign2) ---- */
+.season-count{
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  margin-bottom: 18px;
+}
+.season-count-num{
+  font-size: 40px;
+  font-weight: 900;
+  line-height: 1;
+  color: var(--text);
+}
+.season-count-num::after{ content: " ★"; color: rgba(255,202,40,0.95); font-size: 28px; }
+.season-count-label{
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+}
+.season-next-block{ margin-bottom: 16px; }
+.season-togo{
+  font-size: 12px;
+  font-weight: 800;
+  color: rgba(255,202,40,0.95);
+}
+.season-progress-nums{
+  margin-top: 6px;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--muted);
+  text-align: right;
+}
+html[dir="rtl"] .season-progress-nums{ text-align: left; }
+.season-ends{
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--muted);
+  margin-bottom: 16px;
+}
+.season-ends:empty{ display: none; }
+.season-ladder-toggle{
+  appearance: none;
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 12px 14px;
+  border-radius: 14px;
+  border: 1px solid rgba(255,255,255,0.10);
+  background: rgba(255,255,255,0.05);
+  color: var(--text);
+  font-size: 14px;
+  font-weight: 800;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  transition: all 0.25s ease;
+}
+.season-ladder-toggle:hover{ background: rgba(255,255,255,0.08); border-color: rgba(255,202,40,0.30); }
+.season-ladder-toggle:active{ transform: scale(0.99); }
+.season-ladder-toggle svg{ width: 20px; height: 20px; transition: transform 0.3s ease; flex-shrink: 0; }
+.season-ladder-toggle.open svg{ transform: rotate(180deg); }
+.season-ladder{ margin-top: 12px; }
+html[data-theme="light"] .season-ladder-toggle{ background: rgba(0,0,0,0.04); border-color: rgba(0,0,0,0.08); }
+
+/* ── Referral voucher card: tinted pill chips + calm hover ───────── */
+.voucher-item { align-items: center; }
+.voucher-item:hover {
+  /* No horizontal jitter; a calm lift + soft glow that matches the gold accent. */
+  transform: translateY(-1px);
+  background: rgba(255, 255, 255, 0.06);
+  border-color: rgba(251, 191, 36, 0.30);
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.18);
+}
+.voucher-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.voucher-chip {
+  display: inline-flex;
+  align-items: center;
+  padding: 3px 9px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 800;
+  line-height: 1.6;
+  border: 1px solid transparent;
+  white-space: nowrap;
+}
+.vc-gb     { color:#7cc0ff; background:rgba(96,165,250,0.14); border-color:rgba(96,165,250,0.30); }
+.vc-days   { color:#c0a9ff; background:rgba(167,139,250,0.14); border-color:rgba(167,139,250,0.30); }
+.vc-credit { color:#5fd6a8; background:rgba(52,211,153,0.14); border-color:rgba(52,211,153,0.30); }
+.vc-star   { color:#fcd34d; background:rgba(251,191,36,0.16); border-color:rgba(251,191,36,0.34); }
+[data-theme="light"] .vc-gb     { color:#1d4ed8; background:rgba(96,165,250,0.16); }
+[data-theme="light"] .vc-days   { color:#6d28d9; background:rgba(167,139,250,0.16); }
+[data-theme="light"] .vc-credit { color:#047857; background:rgba(52,211,153,0.18); }
+[data-theme="light"] .vc-star   { color:#b45309; background:rgba(251,191,36,0.20); }
+.voucher-item .ref-btn.primary { flex-shrink: 0; font-size: 13px; padding: 8px 18px; }

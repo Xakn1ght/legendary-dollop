@@ -1,12 +1,10 @@
 from aiogram import Router
-from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
 from aiogram.types import KeyboardButton, Message, ReplyKeyboardMarkup
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.future import select
 
 from app.core.settings import PLANS, PLANS_BUTTON_COLUMNS
-from app.database import crud, models
+from app.database import crud
 from app.shared.plan_ordering import get_ordered_plans
 from app.utils.bot_i18n import normalize_lang, set_cached_lang, t
 
@@ -16,6 +14,7 @@ router = Router()
 class PurchaseState(StatesGroup):
     referral_code = State()
     plan = State()
+    custom_gb = State()
     auto_renew_choice = State()
     renewal_template = State()
     name = State()
@@ -25,6 +24,10 @@ class PurchaseState(StatesGroup):
     confirmation = State()
     receipt = State()
     edit_choice = State()
+
+
+CUSTOM_PLAN_BTN_FA = "📦 پلن دلخواه"
+CUSTOM_PLAN_BTN_EN = "📦 Custom Plan"
 
 
 def _build_plan_keyboard(lang: str = "fa", is_vip: bool = False):
@@ -41,6 +44,7 @@ def _build_plan_keyboard(lang: str = "fa", is_vip: bool = False):
     for i in range(0, len(available_keys), PLANS_BUTTON_COLUMNS):
         row = [KeyboardButton(text=available_keys[j]) for j in range(i, min(i + PLANS_BUTTON_COLUMNS, len(available_keys)))]
         rows.append(row)
+    rows.append([KeyboardButton(text=CUSTOM_PLAN_BTN_FA if lang == "fa" else CUSTOM_PLAN_BTN_EN)])
     rows.append([KeyboardButton(text=t(lang, "btn_back"))])
     return ReplyKeyboardMarkup(keyboard=rows, resize_keyboard=True)
 
@@ -96,15 +100,6 @@ def _confirm_keyboard(lang: str) -> ReplyKeyboardMarkup:
     )
 
 
-async def _cleanup_pending_subscription(session: AsyncSession, state: FSMContext):
-    """Delete the pending subscription row (no receipt) and clear sub_id from state."""
-    data = await state.get_data()
-    sub_id = data.get('sub_id')
-    if not sub_id:
-        return
-    result = await session.execute(select(models.Subscription).filter(models.Subscription.id == sub_id))
-    sub = result.scalars().first()
-    if sub and sub.status == 'pending' and sub.receipt_message_id is None:
-        await crud.delete_subscription(session, sub_id)
-    # remove id from state
-    await state.update_data(sub_id=None)
+# NOTE: orders are now created only at Confirm & Pay via
+# app.services.flows.purchase.start_purchase_order; cancellation/refunds go through
+# cancel_purchase_order. The old _cleanup_pending_subscription helper is gone.

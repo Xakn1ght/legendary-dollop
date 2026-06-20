@@ -6,6 +6,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import crud, notifications_crud
 from app.handlers.admin.common import _send_pending_requests
+from app.services.flows.charge import deny_charge as deny_charge_flow
+from app.services.flows.errors import FlowError
 from app.utils.admin_bot_helper import get_user_bot
 from app.utils.bot_i18n import t
 
@@ -16,30 +18,29 @@ from .common import _admin_lang, router
 async def deny_charge(callback: CallbackQuery, session: AsyncSession, bot: Bot):
     lang = await _admin_lang(session, callback.from_user)
     charge_id = int(callback.data.split("_")[2])
-    charge_req = await crud.get_charge_request(session, charge_id)
-    if not charge_req or charge_req.status != "pending":
+
+    try:
+        result = await deny_charge_flow(session, charge_id)
+    except FlowError:
         await callback.answer(t(lang, "admin_charge_not_found_or_handled"), show_alert=True)
         return
 
-    await session.refresh(charge_req, attribute_names=["subscription", "user"])
-
-    await crud.update_charge_request_status(session, charge_id, "denied")
+    user = await crud.get_user_by_id(session, result.user_id)
 
     user_bot = get_user_bot()
-    if user_bot:
-        await user_bot.send_message(
-            charge_req.user.chat_id,
-            "❌ درخواست شارژ شما توسط ادمین رد شد. در صورت نیاز دوباره تلاش کنید.",
-        )
+    if user_bot and user:
+        msg = "❌ درخواست شارژ شما توسط ادمین رد شد. در صورت نیاز دوباره تلاش کنید."
+        if result.credit_refunded > 0:
+            msg += f"\n💰 بازگشت اعتبار: {result.credit_refunded:,} تومان"
+        await user_bot.send_message(user.chat_id, msg)
 
     try:
-        service_name = charge_req.subscription.marzban_username if charge_req.subscription else "your service"
         await notifications_crud.create_notification(
             session,
-            user_id=charge_req.user_id,
+            user_id=result.user_id,
             type="charge_denied",
             title="Charge denied",
-            message=f"❌ Your charge request for {service_name} was denied.",
+            message=f"❌ Your charge request for {result.service_name or 'your service'} was denied.",
             sent_to_webapp=True,
             sent_to_bot=False,
         )

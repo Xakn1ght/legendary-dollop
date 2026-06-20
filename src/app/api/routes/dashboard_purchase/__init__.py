@@ -3,6 +3,7 @@
 from app.api.routes.dashboard_purchase.orders import (
     handle_cancel_order,
     handle_check_service_name,
+    handle_custom_plan_quote,
     handle_get_pending_orders,
     handle_validate_referral,
 )
@@ -16,6 +17,7 @@ from app.api.routes.dashboard_purchase.submit_receipt import handle_submit_recei
 __all__ = [
     "handle_cancel_order",
     "handle_check_service_name",
+    "handle_custom_plan_quote",
     "handle_get_pending_orders",
     "handle_get_plans",
     "handle_get_user_purchase_info",

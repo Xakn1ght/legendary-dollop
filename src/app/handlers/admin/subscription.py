@@ -162,57 +162,28 @@ async def deny_subscription(callback: CallbackQuery, session: AsyncSession, bot:
     sub_id = int(callback.data.split("_")[2])
     user_bot = get_user_bot()
 
-    # Idempotency / stale button protection
-    from app.database.models import Subscription as _Subscription
-    existing_sub = await session.get(_Subscription, sub_id)
-    if not existing_sub:
-        await callback.answer(t(lang, "admin_sub_not_found"), show_alert=True)
+    from app.services.flows.errors import FlowError
+    from app.services.flows.purchase import deny_purchase_order
+
+    try:
+        result = await deny_purchase_order(session, sub_id)
+    except FlowError as e:
+        if e.code == "not_found":
+            await callback.answer(t(lang, "admin_sub_not_found"), show_alert=True)
+        else:
+            await callback.answer(t(lang, "admin_sub_already_processed"), show_alert=True)
+            try:
+                await callback.message.edit_text("✅ این درخواست قبلاً پردازش شده است.")
+            except Exception:
+                pass
         return
-    if existing_sub.status != 'pending':
-        await callback.answer(t(lang, "admin_sub_already_processed"), show_alert=True)
-        try:
-            await callback.message.edit_text("✅ این درخواست قبلاً پردازش شده است.")
-        except Exception:
-            pass
-        return
 
-    # Fetch subscription and user info for refund/notify
-    from app.database.models import Subscription, User
-    sub: Subscription | None = await session.get(Subscription, sub_id)
-    user_chat_id = None
-    credit_refunded = 0
-    discounts_restored = False
-    if sub:
-        result_chat = await session.execute(select(User.chat_id).filter(User.id == sub.user_id))
-        user_chat_id = result_chat.scalar_one_or_none()
-        # Refund any deducted credit
-        try:
-            credit_used = int(getattr(sub, 'credit_used', 0) or 0)
-            if credit_used > 0:
-                await crud.add_credit(session, sub.user_id, credit_used)
-                credit_refunded = credit_used
-        except Exception:
-            pass
-        # Restore any consumed discounts
-        try:
-            ids_str = getattr(sub, 'applied_discount_ids', None)
-            if ids_str:
-                from sqlalchemy import select as _select
+    credit_refunded = result.credit_refunded
+    discounts_restored = result.discounts_restored
 
-                from app.database.models import UserDiscount
-                id_list = [int(x) for x in ids_str.split(',') if x.strip().isdigit()]
-                if id_list:
-                    res = await session.execute(_select(UserDiscount).filter(UserDiscount.id.in_(id_list)))
-                    discounts = res.scalars().all()
-                    for d in discounts:
-                        d.used = False
-                    await session.commit()
-                    discounts_restored = True
-        except Exception:
-            pass
-
-    # Now, delete the subscription row
-    await crud.delete_subscription(session, sub_id)
+    from app.database.models import User
+    result_chat = await session.execute(select(User.chat_id).filter(User.id == result.user_id))
+    user_chat_id = result_chat.scalar_one_or_none()
 
     # Try to notify the user if we found their chat_id
     if user_chat_id and user_bot:
@@ -223,6 +194,8 @@ async def deny_subscription(callback: CallbackQuery, session: AsyncSession, bot:
                 details.append(f"بازگشت اعتبار: {credit_refunded:,} تومان")
             if discounts_restored:
                 details.append("تخفیف‌های استفاده‌شده به حساب شما بازگردانده شد.")
+            if result.coupon_restored:
+                details.append("کوپن استفاده‌شده به حساب شما بازگردانده شد.")
             if details:
                 msg += "\n" + "\n".join(details)
             await user_bot.send_message(user_chat_id, msg)
@@ -230,11 +203,11 @@ async def deny_subscription(callback: CallbackQuery, session: AsyncSession, bot:
             logging.warning(f"Failed to notify user {user_chat_id} about denied subscription {sub_id}: {e}")
 
     # Create dashboard notification
-    if sub and sub.user_id:
+    if result.user_id:
         try:
             from app.database.notifications_crud import create_notification
-            service_name = sub.marzban_username
-            plan_name = sub.plan_name
+            service_name = result.service_name
+            plan_name = result.plan_name
             notif_msg = f'درخواست سرویس "{service_name}" ({plan_name}) رد شد.' if service_name else "درخواست خرید سرویس شما رد شد."
             if credit_refunded > 0:
                 notif_msg += f" اعتبار {credit_refunded:,} تومان به حساب شما برگشت."
@@ -242,7 +215,7 @@ async def deny_subscription(callback: CallbackQuery, session: AsyncSession, bot:
                 notif_msg += " تخفیف‌های استفاده‌شده بازگردانده شد."
             await create_notification(
                 db=session,
-                user_id=sub.user_id,
+                user_id=result.user_id,
                 type='purchase_denied',
                 title='❌ درخواست رد شد',
                 message=notif_msg,

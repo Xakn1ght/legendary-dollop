@@ -37,6 +37,7 @@ from app.api.routes.dashboard_charge import (
 from app.api.routes.dashboard_purchase import (
     handle_cancel_order,
     handle_check_service_name,
+    handle_custom_plan_quote,
     handle_get_pending_orders,
     handle_get_plans,
     handle_get_user_purchase_info,

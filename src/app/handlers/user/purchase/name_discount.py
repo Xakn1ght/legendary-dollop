@@ -1,20 +1,14 @@
-from datetime import datetime
-
-from aiogram import F
 from aiogram.fsm.context import FSMContext
 from aiogram.types import KeyboardButton, Message, ReplyKeyboardMarkup
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.future import select
 
-from app.core.settings import PLANS
-from app.database import crud, models
+from app.database import crud
 from app.database.crud import get_active_user_discounts
 from app.utils.bot_i18n import normalize_lang, set_cached_lang, t
 from app.utils.validation import InputValidator, sanitize_user_input
 
-from .common import PurchaseState, _get_plan_keyboard_for_user, _lang_for, _name_keyboard, router
+from .common import PurchaseState, _get_plan_keyboard_for_user, _lang_for, router
 from .coupon import prompt_coupon_or_next
-from .summary import show_order_summary
 from .username import generate_unique_username, generate_username_suggestions, is_username_taken
 
 
@@ -107,68 +101,16 @@ async def process_name(message: Message, state: FSMContext, session: AsyncSessio
             )
             return  # Stay in the same state until user picks a new name
 
-    # At this point sub_name is available (or random)
+    # At this point sub_name is available (or random). The order row itself is only
+    # created at confirmation (services/flows/purchase.start_purchase_order) — until
+    # then everything lives in FSM state.
     await state.update_data(name=sub_name)
-    data = await state.get_data()
-    plan_info = PLANS[data['plan']]
+    user = await crud.get_user(session, message.chat.id)
+    if not user:
+        await message.answer(t(lang, "start_bot_first"))
+        return
     # Ensure marzban_username is unique; random names still go through uniqueness check
     marzban_username = sub_name if message.text != 'اتفاقی' else await generate_unique_username(session, sub_name)
-    renewal_paid = data.get('auto_renewal', False)
-    renewal_template = data.get('renewal_template')
-    renewal_price = PLANS[renewal_template]['price'] if renewal_template else None
-    renewal_requested_at = datetime.utcnow() if renewal_paid else None
-    # Calculate initial price and auto-apply wallet credit
-    initial_price = plan_info['price'] + (renewal_price or 0)
-    user = await crud.get_user(session, message.chat.id)
-    if not user:
-        await message.answer(t(lang, "start_bot_first"))
-        return
-    # Remove immediate credit deduction logic:
-    # user_credit = user.credit or 0
-    # credit_used = min(user_credit, initial_price)
-    # final_price = initial_price - credit_used
-    # if credit_used:
-    #     await crud.deduct_credit(session, user.id, credit_used)
-    #     await state.update_data(credit_used=credit_used)
-    # Create or update subscription row
-    # Ensure we have the user row
-    user = await crud.get_user(session, message.chat.id)
-    if not user:
-        await message.answer(t(lang, "start_bot_first"))
-        return
-
-    existing_sub_id = data.get('sub_id')
-    if existing_sub_id:
-        # Update existing subscription instead of creating a duplicate
-        result = await session.execute(select(models.Subscription).filter(models.Subscription.id == existing_sub_id))
-        sub = result.scalars().first()
-        if sub:
-            sub.marzban_username = marzban_username
-            sub.plan_name = data['plan']
-            sub.renewal_paid = renewal_paid
-            sub.renewal_template = renewal_template
-            sub.renewal_price = renewal_price
-            sub.renewal_requested_at = renewal_requested_at
-            await session.commit()
-            await session.refresh(sub)
-    else:
-        sub = await crud.create_subscription(
-            db=session,
-            user_id=user.id,
-            referrer_id=data.get('referrer_id'),
-            marzban_username=marzban_username,
-            plan=data['plan'],
-            receipt_message_id=None,
-            renewal_paid=renewal_paid,
-            renewal_template=renewal_template,
-            renewal_price=renewal_price,
-            renewal_requested_at=renewal_requested_at,
-            renewal_applied=False,
-            price=plan_info['price'],
-        )
-        await state.update_data(sub_id=sub.id)
-
-    # Always keep the latest chosen marzban_username in state
     await state.update_data(marzban_username=marzban_username)
 
     # NEW: Check for and ask about applying discounts

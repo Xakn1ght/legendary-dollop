@@ -1,0 +1,130 @@
+/* ═══════════════════════════════════════════════════════════════
+   ASTROBYTE — Shared Skeleton Loading System
+   Liquid-glass skeletons, content-shaped, both themes.
+   Load AFTER glass.css. Driven by a body-level state class:
+     <body> (default)        → skeleton visible, real content hidden
+     <body class="app-ready"> → skeleton fades out, content shown
+   skeleton.js manages the class (+ a safety timeout so it never sticks).
+   ═══════════════════════════════════════════════════════════════ */
+
+/* ── shimmer keyframe ─────────────────────────────────────────── */
+@keyframes skShimmer {
+  0%   { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
+
+/* ── skeleton screen container ────────────────────────────────── */
+.skel-screen {
+  position: relative;
+  z-index: 1;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  animation: skFadeIn 0.25s ease both;
+}
+@keyframes skFadeIn { from { opacity: 0; } to { opacity: 1; } }
+
+/* No DOM wrapping: the skeleton is a plain sibling of .content, gated by
+   a body.skel-on marker so unwired pages are never affected, and .content
+   keeps its ORIGINAL parent (so its layout/spacing rules still match).   */
+body.skel-on:not(.app-ready) .content { display: none !important; }
+body.skel-on.app-ready .skel-screen  { display: none !important; }
+
+/* ── primitive: the shimmering surface ───────────────────────── */
+.sk {
+  position: relative;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.07);
+  background-image: linear-gradient(
+    100deg,
+    transparent 20%,
+    rgba(255, 255, 255, 0.12) 42%,
+    rgba(255, 255, 255, 0.18) 50%,
+    rgba(255, 255, 255, 0.12) 58%,
+    transparent 80%
+  );
+  background-size: 200% 100%;
+  background-repeat: no-repeat;
+  animation: skShimmer 1.5s ease-in-out infinite;
+  overflow: hidden;
+}
+[data-theme="light"] .sk {
+  background: rgba(28, 24, 19, 0.07);
+  background-image: linear-gradient(
+    100deg,
+    transparent 20%,
+    rgba(255, 255, 255, 0.45) 42%,
+    rgba(255, 255, 255, 0.75) 50%,
+    rgba(255, 255, 255, 0.45) 58%,
+    transparent 80%
+  );
+  background-size: 200% 100%;
+  background-repeat: no-repeat;
+}
+
+/* ── shapes ───────────────────────────────────────────────────── */
+.sk-line   { height: 12px; border-radius: 7px; }
+.sk-line.h-8   { height: 8px; }
+.sk-line.h-16  { height: 16px; }
+.sk-line.h-22  { height: 22px; }
+.sk-line.h-40  { height: 40px; }
+.sk-line.w-30  { width: 30%; }
+.sk-line.w-40  { width: 40%; }
+.sk-line.w-50  { width: 50%; }
+.sk-line.w-60  { width: 60%; }
+.sk-line.w-70  { width: 70%; }
+.sk-line.w-85  { width: 85%; }
+.sk-line.w-100 { width: 100%; }
+.sk-circle { border-radius: 50%; width: 44px; height: 44px; flex: 0 0 auto; }
+.sk-pill   { height: 26px; width: 84px; border-radius: 99px; }
+.sk-btn    { height: 40px; width: 40px; border-radius: 12px; flex: 0 0 auto; }
+
+/* ── glass card shell that the skeleton shapes sit inside ─────── */
+.sk-card {
+  position: relative;
+  border-radius: 18px;
+  padding: 18px;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.07);
+  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.28);
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+[data-theme="light"] .sk-card {
+  background: rgba(255, 255, 255, 0.55);
+  backdrop-filter: blur(20px) saturate(170%);
+  -webkit-backdrop-filter: blur(20px) saturate(170%);
+  border: 1px solid rgba(255, 255, 255, 0.7);
+  box-shadow: 0 6px 24px rgba(60, 48, 32, 0.08);
+}
+
+/* tall hero shell (VPN card stand-in) */
+.sk-card.sk-hero { min-height: 210px; justify-content: space-between; border-top: 2px solid rgba(var(--brandRgb), 0.55); }
+
+/* layout helpers */
+.sk-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.sk-row.start { justify-content: flex-start; }
+.sk-grid-4 { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; }
+.sk-grid-3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
+.sk-grid-2 { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; }
+.sk-tile {
+  border-radius: 14px; padding: 14px 8px;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.07);
+  display: flex; flex-direction: column; align-items: center; gap: 8px;
+}
+[data-theme="light"] .sk-tile {
+  background: rgba(255, 255, 255, 0.5);
+  border: 1px solid rgba(255, 255, 255, 0.65);
+}
+.sk-col { display: flex; flex-direction: column; gap: 8px; }
+.sk-col.gap-12 { gap: 12px; }
+.sk-spacer { flex: 1; }
+
+/* ── reduced motion: keep shapes, drop the sweep ─────────────── */
+@media (prefers-reduced-motion: reduce) {
+  .sk { animation: none; background-image: none; }
+  .skel-screen { animation: none; }
+}

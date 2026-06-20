@@ -35,6 +35,7 @@ from app.api.schemas.dashboard import (
     DashboardPreferencesPatchRequest,
 )
 from app.api.schemas.game import ArcadeSubmitRequest, LeaderboardRequest
+from app.api.schemas.charge import StartChargeRequest
 from app.api.schemas.purchase import (
     CancelOrderRequest,
     CheckServiceNameRequest,
@@ -88,6 +89,7 @@ __all__ = [
     "PurchaseOrderResponse",
     "ReferralCodeValidator",
     "ServiceNameValidator",
+    "StartChargeRequest",
     "StartPurchaseRequest",
     "StartPurchaseResponse",
     "SubmitReceiptRequest",

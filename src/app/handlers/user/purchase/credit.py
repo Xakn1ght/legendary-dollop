@@ -2,8 +2,6 @@ from aiogram.fsm.context import FSMContext
 from aiogram.types import Message
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.coupons import coupon_discount_amount
-from app.core.settings import PLANS
 from app.database import crud
 from app.utils.bot_i18n import normalize_lang, set_cached_lang
 
@@ -21,28 +19,10 @@ async def process_credit_choice(message: Message, state: FSMContext, session: As
     user = await crud.get_user(session, message.chat.id)
     lang = normalize_lang(getattr(user, "language", None)) if user else normalize_lang(getattr(message.from_user, "language_code", None))
     set_cached_lang(message.chat.id, lang)
-    data = await state.get_data()
-    plan_info = PLANS[data['plan']]
-    renewal_price = PLANS[data['renewal_template']]['price'] if data.get('renewal_template') else 0
-    initial_price = plan_info['price'] + (renewal_price or 0)
-    # Calculate discount if any
-    used_discount_percents = data.get('used_discount_percents', [])
-    total_discount_percent = sum(used_discount_percents)
-    price_after_discount = initial_price
-    if total_discount_percent > 0:
-        discount_amount = int(initial_price * (total_discount_percent / 100))
-        price_after_discount = initial_price - discount_amount
-    # Reward coupon discount (so credit never over-covers the real amount due).
-    coupon_amount = coupon_discount_amount(data.get('coupon_discount_percent', 0), initial_price)
-    if coupon_amount > 0:
-        price_after_discount = max(0, price_after_discount - coupon_amount)
-    user_credit = user.credit or 0
-    credit_used = 0
-    if (message.text or "").startswith("✅ بله") or (message.text or "").startswith("✅ Yes"):
-        credit_used = min(user_credit, price_after_discount)
-        if credit_used > 0:
-            await crud.deduct_credit(session, user.id, credit_used)
-        await state.update_data(apply_credit=True, credit_used=credit_used)
-    else:
-        await state.update_data(apply_credit=False, credit_used=0)
+
+    # Only record the choice — the actual deduction happens when the order is
+    # created at confirmation (services/flows/purchase.start_purchase_order), and is
+    # refunded automatically on cancel/deny.
+    apply_credit = (message.text or "").startswith("✅ بله") or (message.text or "").startswith("✅ Yes")
+    await state.update_data(apply_credit=apply_credit)
     await show_order_summary(message, state, session)

@@ -11,7 +11,17 @@ from app.keyboards.reply import get_main_keyboard
 from app.utils.bot_i18n import normalize_lang, set_cached_lang, t, text_matches
 from app.utils.validation import InputValidator, sanitize_user_input
 
+from app.services.flows.pricing import (
+    CUSTOM_MAX_GB,
+    CUSTOM_MIN_GB,
+    custom_plan_price,
+    get_plan_info,
+    plan_display_name,
+)
+
 from .common import (
+    CUSTOM_PLAN_BTN_EN,
+    CUSTOM_PLAN_BTN_FA,
     PurchaseState,
     _auto_renew_keyboard,
     _get_plan_keyboard_for_user,
@@ -118,10 +128,9 @@ async def process_referral_code(message: Message, state: FSMContext, session: As
         reply_markup=plan_kb,
     )
 
-@router.message(PurchaseState.plan, F.text.in_(PLANS.keys()))
-async def process_plan(message: Message, state: FSMContext, session: AsyncSession):
+async def _continue_with_plan(message: Message, state: FSMContext, session: AsyncSession, plan_name: str):
     lang = await _lang_for(message, session)
-    await state.update_data(plan=message.text)
+    await state.update_data(plan=plan_name)
     data_prev = await state.get_data()
     if not data_prev.get('editing_plan_only'):
         # Clear previous name only in normal flow
@@ -131,6 +140,85 @@ async def process_plan(message: Message, state: FSMContext, session: AsyncSessio
         ("آیا می‌خواهید تمدید خودکار فعال باشد؟" if lang == "fa" else "Do you want to enable auto-renew?"),
         reply_markup=_auto_renew_keyboard(lang),
     )
+
+
+@router.message(PurchaseState.plan, F.text.in_(PLANS.keys()))
+async def process_plan(message: Message, state: FSMContext, session: AsyncSession):
+    await _continue_with_plan(message, state, session, message.text)
+
+
+_CUSTOM_BTNS = {CUSTOM_PLAN_BTN_FA, CUSTOM_PLAN_BTN_EN}
+_FA_DIGITS = str.maketrans("۰۱۲۳۴۵۶۷۸۹", "0123456789")
+
+
+def _custom_gb_prompt(lang: str) -> str:
+    return (
+        f"📦 پلن دلخواه\n\nچند گیگابایت می‌خواهید؟ یک عدد بین {CUSTOM_MIN_GB} تا {CUSTOM_MAX_GB} بفرستید:"
+        if lang == "fa"
+        else f"📦 Custom plan\n\nHow many GB? Send a number between {CUSTOM_MIN_GB} and {CUSTOM_MAX_GB}:"
+    )
+
+
+@router.message(PurchaseState.plan, F.text.in_(_CUSTOM_BTNS))
+async def ask_custom_gb(message: Message, state: FSMContext, session: AsyncSession):
+    lang = await _lang_for(message, session)
+    await state.update_data(custom_for_renewal=False)
+    await state.set_state(PurchaseState.custom_gb)
+    await message.answer(
+        _custom_gb_prompt(lang),
+        reply_markup=ReplyKeyboardMarkup(keyboard=[[KeyboardButton(text=t(lang, "btn_back"))]], resize_keyboard=True),
+    )
+
+
+@router.message(PurchaseState.renewal_template, F.text.in_(_CUSTOM_BTNS))
+async def ask_custom_gb_renewal(message: Message, state: FSMContext, session: AsyncSession):
+    lang = await _lang_for(message, session)
+    await state.update_data(custom_for_renewal=True)
+    await state.set_state(PurchaseState.custom_gb)
+    await message.answer(
+        _custom_gb_prompt(lang),
+        reply_markup=ReplyKeyboardMarkup(keyboard=[[KeyboardButton(text=t(lang, "btn_back"))]], resize_keyboard=True),
+    )
+
+
+@router.message(PurchaseState.custom_gb, text_matches("btn_back"))
+async def back_from_custom_gb(message: Message, state: FSMContext, session: AsyncSession):
+    lang = await _lang_for(message, session)
+    data = await state.get_data()
+    target = PurchaseState.renewal_template if data.get("custom_for_renewal") else PurchaseState.plan
+    await state.set_state(target)
+    plan_kb = await _get_plan_keyboard_for_user(session, message.chat.id, lang)
+    await message.answer(
+        ("لطفا یکی از پلن های زیر را انتخاب کنید:" if lang == "fa" else "Please choose a plan:"),
+        reply_markup=plan_kb,
+    )
+
+
+@router.message(PurchaseState.custom_gb)
+async def process_custom_gb(message: Message, state: FSMContext, session: AsyncSession):
+    lang = await _lang_for(message, session)
+    raw = (message.text or "").strip().translate(_FA_DIGITS)
+    try:
+        gb = int(raw)
+    except ValueError:
+        gb = -1
+    if not (CUSTOM_MIN_GB <= gb <= CUSTOM_MAX_GB):
+        await message.answer(
+            (f"❌ عدد نامعتبر. یک عدد بین {CUSTOM_MIN_GB} تا {CUSTOM_MAX_GB} بفرستید (فقط رقم انگلیسی یا فارسی)." if lang == "fa"
+             else f"❌ Invalid number. Send a number between {CUSTOM_MIN_GB} and {CUSTOM_MAX_GB}.")
+        )
+        return
+    plan_name = f"custom:{gb}"
+    price = custom_plan_price(gb)
+    data = await state.get_data()
+    await message.answer(
+        (f"📦 {plan_display_name(plan_name, lang)}\n💵 قیمت: {price:,} تومان" if lang == "fa"
+         else f"📦 {plan_display_name(plan_name, lang)}\n💵 Price: {price:,} Toman")
+    )
+    if data.get("custom_for_renewal"):
+        await _continue_with_renewal(message, state, session, plan_name)
+    else:
+        await _continue_with_plan(message, state, session, plan_name)
 
 @router.message(PurchaseState.auto_renew_choice, lambda m: (m.text or "").strip() in {"بدون تمدید خودکار", "No auto-renew"})
 async def process_no_auto_renew(message: Message, state: FSMContext, session: AsyncSession):
@@ -161,10 +249,14 @@ async def process_yes_auto_renew(message: Message, state: FSMContext, session: A
 
 @router.message(PurchaseState.renewal_template, F.text.in_(PLANS.keys()))
 async def process_renewal_template(message: Message, state: FSMContext, session: AsyncSession):
-    await state.update_data(renewal_template=message.text)
+    await _continue_with_renewal(message, state, session, message.text)
+
+
+async def _continue_with_renewal(message: Message, state: FSMContext, session: AsyncSession, template_name: str):
+    await state.update_data(renewal_template=template_name)
     data = await state.get_data()
-    plan_info = PLANS[data['plan']]
-    renewal_info = PLANS[message.text]
+    plan_info = get_plan_info(data['plan'])
+    renewal_info = get_plan_info(template_name)
     total_price = plan_info['price'] + renewal_info['price']
     if data.get('editing_plan_only') and data.get('marzban_username'):
         await state.update_data(editing_plan_only=False)

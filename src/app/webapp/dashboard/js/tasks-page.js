@@ -348,46 +348,12 @@
     function prefersReducedMotion(){
       try{ return !!(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches); }catch(_){ return false; }
     }
-    function ensureThemeTransitionStyles(){
-      if (document.getElementById('astro-theme-transition-styles')) return;
-      const style = document.createElement('style');
-      style.id = 'astro-theme-transition-styles';
-      style.textContent = `
-        html::before{
-          content:"";
-          position:fixed; inset:0;
-          background: rgba(0,0,0,0.22);
-          pointer-events:none;
-          z-index: 999999;
-          opacity: 0;
-          transition: opacity 160ms ease;
-          will-change: opacity;
-        }
-        html[data-theme="light"]::before{
-          background: rgba(15, 23, 42, 0.12);
-        }
-        html[data-astro-theme-switching="1"]::before{ opacity: 1; }
-        @media (prefers-reduced-motion: reduce){
-          html::before{ transition:none; }
-        }
-      `;
-      document.head.appendChild(style);
-    }
     function runThemeTransition(apply){
-      if (prefersReducedMotion()) return apply();
-      ensureThemeTransitionStyles();
-      const root = document.documentElement;
-      let done = false;
-      const cleanup = () => {
-        if (done) return;
-        done = true;
-        try{ root.removeAttribute('data-astro-theme-switching'); }catch(_){}
-      };
-      try{ root.setAttribute('data-astro-theme-switching', '1'); }catch(_){}
-      requestAnimationFrame(() => {
-        apply();
-        setTimeout(cleanup, 170);
-      });
+      document.documentElement.setAttribute('data-no-trans', '1');
+      apply();
+      requestAnimationFrame(() => requestAnimationFrame(() => {
+        document.documentElement.removeAttribute('data-no-trans');
+      }));
     }
 
     themeToggle.addEventListener('change', () => {
@@ -410,9 +376,16 @@
 
 		    function translatePage() {
 		      const t = i18n[currentLang];
-		      document.getElementById('tabAll').textContent = t.all;
-		      document.getElementById('tabDaily').textContent = t.daily;
-		      document.getElementById('tabWeekly').textContent = t.weekly;
+		      const tabAllEl = document.getElementById('tabAll');
+		      const tabDailyEl = document.getElementById('tabDaily');
+		      const tabWeeklyEl = document.getElementById('tabWeekly');
+		      if (tabAllEl) tabAllEl.textContent = t.all;
+		      if (tabDailyEl) tabDailyEl.textContent = t.daily;
+		      if (tabWeeklyEl) tabWeeklyEl.textContent = t.weekly;
+		      const statStarsLabel = document.getElementById('statStarsLabel');
+		      const statCreditsLabel2 = document.getElementById('statCreditsLabel');
+		      if (statStarsLabel) statStarsLabel.textContent = t.stars || 'Stars';
+		      if (statCreditsLabel2) statCreditsLabel2.textContent = t.creditLabel || 'Credit';
 		      const statXpLabel = document.getElementById('statXpLabel');
 		      const statPointsLabel = document.getElementById('statPointsLabel');
 		      const statCreditsLabel = document.getElementById('statCreditsLabel');
@@ -1071,36 +1044,81 @@
 	      if (couponsCard) couponsCard.style.display = 'block';
 	      applyRewardsPageTranslations(t);
 
+	      // Belt-and-suspenders: set the static season labels here too, so the card
+	      // always shows the right language even if the shared translator missed it.
+	      try {
+	        const setTxt = (id, val) => { const e = document.getElementById(id); if (e && val != null) e.textContent = val; };
+	        setTxt('seasonTitle', t.seasonTitle);
+	        setTxt('seasonSubtitle', t.seasonSubtitle);
+	        setTxt('seasonStarsLabel', t.seasonStarsLabel);
+	        setTxt('seasonNextLabel', t.seasonNextLabel);
+	        setTxt('seasonLadderLabel', t.seasonLadderLabel);
+	        setTxt('couponsTitle', t.couponsTitle);
+	        setTxt('couponsSubtitle', t.couponsSubtitle);
+	      } catch (_) {}
+
 	      const stars = Number(seasonData?.season_stars ?? 0);
 	      const next = seasonData?.next_milestone || null;
 	      const daysLeft = seasonData?.season?.days_left;
+	      const ladder = Array.isArray(seasonData?.ladder) ? seasonData.ladder : [];
+
+	      // Progress within the current segment (last reached -> next).
+	      let prevStars = 0;
+	      ladder.forEach((m) => { if (m.reached && Number(m.stars) > prevStars) prevStars = Number(m.stars); });
+	      const nextStars = next ? Number(next.stars) : prevStars;
+	      const need = next ? Math.max(0, nextStars - stars) : 0;
+	      let pct = 100;
+	      if (next && nextStars > prevStars) {
+	        pct = Math.max(0, Math.min(100, Math.round(((stars - prevStars) / (nextStars - prevStars)) * 100)));
+	      }
 
 	      try {
 	        const starsEl = document.getElementById('seasonStars');
-	        const nextEl = document.getElementById('seasonNext');
-	        const daysEl = document.getElementById('seasonDaysLeft');
 	        const statStarsEl = document.getElementById('statStars');
-	        const walletStarsEl = document.getElementById('walletStars');
+	        const fillEl = document.getElementById('seasonProgressFill');
+	        const toGoEl = document.getElementById('seasonToGo');
+	        const numsEl = document.getElementById('seasonProgressNums');
+	        const nextRewardEl = document.getElementById('seasonNextReward');
+	        const endsEl = document.getElementById('seasonEnds');
 	        if (starsEl) starsEl.textContent = stars.toLocaleString();
 	        if (statStarsEl) statStarsEl.textContent = stars.toLocaleString();
-	        if (walletStarsEl) walletStarsEl.textContent = stars.toLocaleString();
-	        if (nextEl) nextEl.textContent = next ? (next.stars + '⭐') : (t.seasonNextNone || 'Maxed');
-	        if (daysEl) daysEl.textContent = (daysLeft == null) ? '—' : String(daysLeft);
+	        if (fillEl) fillEl.style.width = pct + '%';
+
+	        const allUnlocked = t.seasonAllUnlocked || 'All unlocked';
+	        if (next) {
+	          const nextRung = ladder.find((m) => Number(m.stars) === nextStars) || next;
+	          const reward = couponLabel(nextRung, t, lang);
+	          if (toGoEl) toGoEl.textContent = lang === 'fa' ? `${need}⭐ مانده` : `${need}⭐ to go`;
+	          if (numsEl) numsEl.textContent = `${stars} / ${nextStars} ⭐`;
+	          if (nextRewardEl) nextRewardEl.textContent = `🎁 ${reward}`;
+	        } else {
+	          if (toGoEl) toGoEl.textContent = '';
+	          if (numsEl) numsEl.textContent = allUnlocked;
+	          if (nextRewardEl) nextRewardEl.textContent = '🎉 ' + allUnlocked;
+	        }
+
+	        if (endsEl) {
+	          if (daysLeft == null) endsEl.textContent = '';
+	          else endsEl.textContent = lang === 'fa' ? `پایان فصل تا ${daysLeft} روز` : `Season ends in ${daysLeft} days`;
+	        }
 	      } catch (_) {}
 
 	      try {
 	        const list = document.getElementById('seasonLadderList');
-	        const ladder = Array.isArray(seasonData?.ladder) ? seasonData.ladder : [];
 	        if (list) {
 	          list.innerHTML = ladder.map((m) => {
 	            const reached = !!m.reached;
+	            const isNext = next && Number(m.stars) === nextStars;
 	            const reward = couponLabel(m, t, lang);
+	            const cls = 'season-rung' + (reached ? ' reached' : '') + (isNext ? ' next' : '');
 	            return `
-	              <div class="referral-item" style="align-items:center;">
-	                <div style="flex:1;">
-	                  <div class="referral-item-name">${reached ? '✅ ' : '🔒 '}${m.stars}⭐ — ${reward}</div>
+	              <div class="${cls}">
+	                <div class="season-rung-node">${reached ? '★' : m.stars}</div>
+	                <div class="season-rung-body">
+	                  <div class="season-rung-reward">${reward}</div>
+	                  <div class="season-rung-stars">${m.stars}⭐</div>
 	                </div>
-	                <div class="referral-item-meta">${m.name || ''}</div>
+	                <div class="season-rung-state">${reached ? '✅' : (isNext ? '⏳' : '🔒')}</div>
 	              </div>
 	            `;
 	          }).join('');
@@ -1113,9 +1131,9 @@
 	        if (list) {
 	          if (!coupons.length) {
 	            list.innerHTML = `
-	              <div class="referral-item">
-	                <div class="referral-item-name">${t.couponsEmpty || ''}</div>
-	                <div class="referral-item-meta">🎁</div>
+	              <div class="coupon-empty">
+	                <div class="coupon-empty-icon">🎁</div>
+	                <div class="coupon-empty-text">${t.couponsEmpty || ''}</div>
 	              </div>
 	            `;
 	          } else {
@@ -1124,11 +1142,13 @@
 	              const star = Number(c.milestone_stars || 0);
 	              const dleft = c.days_left;
 	              const exp = (dleft == null) ? '' : `${t.couponExpires || 'exp'} ${dleft}d`;
+	              const soon = (dleft != null && dleft <= 7) ? ' soon' : '';
 	              return `
-	                <div class="referral-item" style="align-items:center;">
-	                  <div style="flex:1;">
-	                    <div class="referral-item-name">🎁 ${label}</div>
-	                    <div class="referral-item-meta" style="margin-top:6px;">⭐${star}${exp ? ' · ' + exp : ''}</div>
+	                <div class="coupon-ticket">
+	                  <div class="coupon-ticket-stub">${star}⭐</div>
+	                  <div class="coupon-ticket-body">
+	                    <div class="coupon-ticket-label">${label}</div>
+	                    ${exp ? `<div class="coupon-ticket-exp${soon}">${exp}</div>` : ''}
 	                  </div>
 	                </div>
 	              `;
@@ -1369,8 +1389,9 @@
     // Render Challenges
     function renderChallenges() {
       const container = document.getElementById('challengesContainer');
+      if (!container) return;
       const t = i18n[currentLang];
-      
+
       let filtered = allChallenges;
       if (currentFilter !== 'all') {
         filtered = allChallenges.filter(c => c.type === currentFilter);
@@ -1523,7 +1544,7 @@
     function showError(message) {
       console.error('[TASKS] Showing error:', message);
       const container = document.getElementById('challengesContainer');
-      container.innerHTML = `
+      if (container) container.innerHTML = `
         <div class="empty-state">
           <div class="empty-state-icon">❌</div>
           <div class="empty-state-title">Error</div>
@@ -1586,6 +1607,18 @@
 		      if (redeemConfirmBtn) redeemConfirmBtn.onclick = confirmRedeem;
 		      if (redeemAddBtn) redeemAddBtn.onclick = addSubscriptionTokenFromSheet;
 		      if (redeemBuyBtn) redeemBuyBtn.onclick = () => { window.location.href = '/webapp/dashboard/purchase.html'; };
+
+		      const seasonLadderToggle = document.getElementById('seasonLadderToggle');
+		      const seasonLadderWrap = document.getElementById('seasonLadderWrap');
+		      if (seasonLadderToggle && seasonLadderWrap) {
+		        seasonLadderToggle.onclick = () => {
+		          const open = seasonLadderWrap.style.display !== 'none';
+		          seasonLadderWrap.style.display = open ? 'none' : 'block';
+		          seasonLadderToggle.setAttribute('aria-expanded', open ? 'false' : 'true');
+		          seasonLadderToggle.classList.toggle('open', !open);
+		          if (tg?.HapticFeedback) tg.HapticFeedback.impactOccurred('light');
+		        };
+		      }
 
 		      const playBtn = document.getElementById('dailyGamePlayBtn');
 		      if (playBtn) {
