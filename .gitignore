@@ -49,9 +49,28 @@ misc/other/network-tab.txt
 # Large archives (keep these out of git history)
 *.zip
 
+# Local editor tooling
+.impeccable/
+skills-lock.json
+
 # Local binaries
 bin/
 
 
-# Session/handoff notes
+# Database dumps (real customer data — never commit)
+*.sql
+
+# Internal notes / planning docs / scratch (kept on the server, not in the repo)
 handoff.md
+HANDOFF.md
+FLOWS_HANDOFF.md
+REWARDS_HANDOFF.md
+PASHA_CONTEXT.md
+PUBLISH_CHECKLIST.md
+REFACTOR_PLAN.md
+DESIGN.md
+PRODUCT.md
+asstroo_*.md
+pics/
+previews/
+rewards.html
