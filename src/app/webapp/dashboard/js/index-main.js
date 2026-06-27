@@ -3366,7 +3366,9 @@
       }
 
       // Accent (highlight color) ---------------------------------------------
-      const ACCENT_ALLOWED = ['red','cyan','emerald','violet','amber'];
+      // champion/legend are unlocked via Star Season packs; the profile picker hides
+      // them until unlocked, but they must be applyable once chosen/saved.
+      const ACCENT_ALLOWED = ['red','cyan','emerald','violet','amber','champion','legend'];
       function setAccent(accent, opts) {
         opts = opts || {};
         const next = (ACCENT_ALLOWED.indexOf(accent) >= 0) ? accent : 'red';

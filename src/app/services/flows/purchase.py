@@ -183,6 +183,13 @@ async def _auto_approve(session: AsyncSession, sub: Subscription, bot) -> None:
                     await session.commit()
                 except Exception:
                     pass
+                # Mirror process_approved_subscription: apply vip/legend pack grants.
+                try:
+                    from app.services.subscription_processing import apply_coupon_pack_grants
+                    grant_user = await crud.get_user_by_id(session, sub.user_id)
+                    await apply_coupon_pack_grants(session, grant_user, getattr(sub, "applied_coupon_id", None))
+                except Exception as e:
+                    logger.error(f"Failed to apply pack grants (botless) for order {sub.id}: {e}")
                 ok = True
         except Exception as e:
             logger.error(f"Auto-approve (botless) failed for order {sub.id}: {e}")

@@ -1,4 +1,4 @@
-    @import url("./tokens.css?v=5");
+    @import url("./tokens.css?v=6");
     html[data-no-trans] *{ transition-duration:0s !important; }
     /* Keep the gooey toggle's own animation alive during theme transitions */
     html[data-no-trans] .toggle-background { transition-duration: .4s !important; }

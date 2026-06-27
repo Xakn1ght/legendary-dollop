@@ -38,7 +38,7 @@ class DashboardPreferencesPatchRequest(BaseModel):
     default_sub_id: Optional[str] = Field(default=None, max_length=32, description="Favorite/default subscription id")
     auto_claim: Optional[bool] = Field(default=None, description="Auto-claim completed challenges (VIP feature)")
     voucher_auto_sub_id: Optional[str] = Field(default=None, max_length=32, description="Default subscription id for auto-redeeming vouchers (VIP feature)")
-    accent: Optional[Literal["red", "cyan", "emerald", "violet", "amber"]] = Field(default=None, description="Dashboard accent/highlight color")
+    accent: Optional[Literal["red", "cyan", "emerald", "violet", "amber", "champion", "legend"]] = Field(default=None, description="Dashboard accent/highlight color")
     welcome_shown: Optional[bool] = Field(default=None, description="Whether the welcome screen has been shown")
 
 

@@ -9,15 +9,26 @@ from __future__ import annotations
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
 
+from app.core.rewards_config import PROMOTER_REFERRAL_CUT
 from app.database import crud
 from app.database.models import CashoutRequest, Referral, User
 from app.services.flows.errors import FlowError
 
 # Cash payout is a VIP-Promoter-only perk (final reward map §6): normal users stay
 # inside the VPN reward economy. "Active referral" = a referred user with a live
-# subscription. TODO(phase-d): move to rewards_config + apply 5% rate, caps, holds,
-# >=20GB rule.
+# subscription. Payout is intentionally 1:1 (no 5% haircut): credit is referral-only
+# here, so it's already earned reach — discounting it punishes the best promoters.
 CASHOUT_MIN_ACTIVE_REFERRALS = 20
+
+
+def promoter_credit_percent(active_referrals: int) -> float:
+    """Store-credit % a referrer earns per referral, by active-referral tier
+    (PROMOTER_REFERRAL_CUT). 0→10%, 20→12%, 50→15%. Returns a percent (e.g. 12.0)."""
+    pct = PROMOTER_REFERRAL_CUT[min(PROMOTER_REFERRAL_CUT)]
+    for thr in sorted(PROMOTER_REFERRAL_CUT):
+        if active_referrals >= thr:
+            pct = PROMOTER_REFERRAL_CUT[thr]
+    return pct * 100
 
 
 async def count_active_referrals(session: AsyncSession, user_id: int) -> int:

@@ -44,6 +44,11 @@ async def _prompt_credit_or_summary(message: Message, state: FSMContext, session
 async def prompt_coupon_or_next(message: Message, state: FSMContext, session: AsyncSession, user, lang: str):
     """If the user holds spendable coupons, offer to apply one; otherwise continue."""
     coupons = await _supported_coupons(session, user.id)
+    # free_autorenew only discounts a renewal plan — hide it when this order has none,
+    # so the user can't pick a coupon that would fail to price at summary.
+    data = await state.get_data()
+    if not (data.get("auto_renewal") and data.get("renewal_template")):
+        coupons = [c for c in coupons if c.coupon_type != "free_autorenew"]
     if not coupons:
         await state.update_data(coupon_id=None)
         await _prompt_credit_or_summary(message, state, session, user, lang)

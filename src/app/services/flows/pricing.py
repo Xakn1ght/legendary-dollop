@@ -42,6 +42,7 @@ from app.core.pricing import (  # noqa: E402
     CUSTOM_MIN_GB,
     PLAN_DURATION_DAYS,
     custom_gb_price,
+    custom_price,
 )
 
 CUSTOM_PLAN_PREFIX = "custom:"
@@ -98,9 +99,13 @@ def plan_display_name(plan_name: str, lang: str = "fa") -> str:
         return f"{gb} گیگ | سفارشی".translate(_FA_DIGITS)
     return f"{gb} GB | Custom"
 
-# Coupon types spendable at checkout today (Phase 1). Other types must be rejected,
-# never silently consumed.
-SUPPORTED_COUPON_TYPES = ("discount_percent", "free_gb")
+# Coupon types spendable at checkout. Other types must be rejected, never silently
+# consumed. free_plan/free_autorenew are valued via the pricing curve and applied as a
+# money discount (free_plan zeroes the plan up to its granted value; free_autorenew
+# zeroes the selected renewal plan up to its granted value).
+SUPPORTED_COUPON_TYPES = (
+    "discount_percent", "free_gb", "free_plan", "free_autorenew", "vip_pack", "legend_pack",
+)
 
 
 class QuoteError(FlowError):
@@ -185,7 +190,10 @@ async def quote_purchase(
 
     coupon_effect = None
     if coupon_id:
-        coupon_effect = await _validate_coupon(session, user, coupon_id, base_total)
+        coupon_effect = await _validate_coupon(
+            session, user, coupon_id, base_total,
+            plan_price=plan_price, renewal_price=renewal_price,
+        )
 
     if coupon_effect:
         discount_amount += coupon_effect.discount_amount
@@ -213,7 +221,18 @@ async def quote_purchase(
     )
 
 
-async def _validate_coupon(session: AsyncSession, user, coupon_id: int, base_total: int) -> CouponEffect:
+def _plan_value(gb: int, days: int) -> int:
+    """Toman value of a (gb, days) plan via the pricing curve; 0 if out of range."""
+    try:
+        return int(custom_price(int(gb), int(days or PLAN_DURATION_DAYS)))
+    except Exception:
+        return 0
+
+
+async def _validate_coupon(
+    session: AsyncSession, user, coupon_id: int, base_total: int,
+    *, plan_price: int = 0, renewal_price: int = 0,
+) -> CouponEffect:
     """Ownership / active / expiry / supported-type checks for a checkout coupon."""
     coupon = await crud.get_coupon_by_id(session, coupon_id)
     now = datetime.utcnow()
@@ -243,6 +262,38 @@ async def _validate_coupon(session: AsyncSession, user, coupon_id: int, base_tot
             coupon_type=coupon.coupon_type,
             free_gb=int(payload.get("gb") or 0),
         )
-    # free_plan / free_autorenew / vip_pack / legend_pack are deferred-tier coupons —
-    # reject so they're never silently consumed at checkout.
+    if coupon.coupon_type == "free_plan":
+        # Zero the plan up to the granted plan's value. On a bigger plan it's a partial
+        # discount worth the granted plan; on the exact plan it's fully free.
+        value = _plan_value(payload.get("plan_gb") or 0, payload.get("duration_days") or 0)
+        discount = min(value, int(plan_price or 0))
+        if discount <= 0:
+            raise QuoteError("invalid_coupon", "Coupon not available")
+        return CouponEffect(id=coupon.id, coupon_type=coupon.coupon_type, discount_amount=discount)
+    if coupon.coupon_type == "free_autorenew":
+        # Zero the selected renewal plan up to the granted value. Needs a renewal plan —
+        # reject (un-consumed) if none chosen so the user can re-pick one.
+        if int(renewal_price or 0) <= 0:
+            raise QuoteError("coupon_needs_renewal", "Pick a renewal plan to use this coupon.")
+        value = _plan_value(payload.get("max_plan_gb") or 0, payload.get("duration_days") or 0)
+        discount = min(value, int(renewal_price or 0))
+        if discount <= 0:
+            raise QuoteError("invalid_coupon", "Coupon not available")
+        return CouponEffect(id=coupon.id, coupon_type=coupon.coupon_type, discount_amount=discount)
+    if coupon.coupon_type in ("vip_pack", "legend_pack"):
+        # Bundle: money part = free renewal (if a renewal is selected) + bonus GB
+        # (legend). The non-money grants (VIP window → priority support, badge, theme)
+        # apply at provision via apply_coupon_pack_grants. Unlike free_autorenew the pack
+        # still has value without a renewal, so it's never rejected for lacking one.
+        ar = payload.get("free_autorenew") or {}
+        discount = 0
+        if int(renewal_price or 0) > 0 and ar:
+            value = _plan_value(ar.get("max_plan_gb") or 0, ar.get("duration_days") or 0)
+            discount = min(value, int(renewal_price or 0))
+        return CouponEffect(
+            id=coupon.id,
+            coupon_type=coupon.coupon_type,
+            discount_amount=discount,
+            free_gb=int(payload.get("bonus_gb") or 0),
+        )
     raise QuoteError("coupon_not_supported_yet", "This coupon type is not yet redeemable at checkout.")

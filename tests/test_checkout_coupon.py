@@ -159,15 +159,102 @@ async def _run():
     async with Session() as db:
         assert (await crud.get_coupon_by_id(db, cid)).status == "active"
 
-    # 5) unsupported type (free_plan) → rejected, not consumed.
+    # 5) unknown/unsupported type → rejected, not consumed.
     async with Session() as db:
-        c = await _mk_coupon(db, "free_plan", {"plan_gb": 20, "duration_days": 35})
+        c = await _mk_coupon(db, "mystery_pack", {"foo": 1})
         cid = c.id
     resp = await _call(Session, {"plan": "plan20", "use_credit": False, "coupon_id": cid})
     data = json.loads(resp.body.decode())
     assert resp.status == 400 and data["error"] == "coupon_not_supported_yet", data
     async with Session() as db:
         assert (await crud.get_coupon_by_id(db, cid)).status == "active"
+
+    # 5a) free_plan on the exact plan → plan fully free (90k off 90k), consumed.
+    async with Session() as db:
+        c = await _mk_coupon(db, "free_plan", {"plan_gb": 20, "duration_days": 35})
+        cid = c.id
+    resp = await _call(Session, {"plan": "plan20", "use_credit": False, "coupon_id": cid})
+    data = json.loads(resp.body.decode())
+    assert resp.status == 200 and data["ok"] is True, data
+    assert data["order"]["discount_amount"] == 90000 and data["order"]["final_price"] == 0, data["order"]
+    async with Session() as db:
+        assert (await crud.get_coupon_by_id(db, cid)).status == "used"
+
+    # 5b) free_plan on a bigger plan → partial (worth the 20GB plan), capped at plan price.
+    async with Session() as db:
+        c = await _mk_coupon(db, "free_plan", {"plan_gb": 20, "duration_days": 35})
+        cid = c.id
+    resp = await _call(Session, {"plan": "plan100", "use_credit": False, "coupon_id": cid})
+    data = json.loads(resp.body.decode())
+    assert data["order"]["discount_amount"] == 90000 and data["order"]["final_price"] == 310000, data["order"]
+
+    # 5c) free_autorenew with no renewal selected → rejected (un-consumed).
+    async with Session() as db:
+        c = await _mk_coupon(db, "free_autorenew", {"max_plan_gb": 100, "duration_days": 35})
+        cid = c.id
+    resp = await _call(Session, {"plan": "plan20", "use_credit": False, "coupon_id": cid})
+    data = json.loads(resp.body.decode())
+    assert resp.status == 400 and data["error"] == "coupon_needs_renewal", data
+    async with Session() as db:
+        assert (await crud.get_coupon_by_id(db, cid)).status == "active"
+
+    # 5d) free_autorenew with a renewal plan → renewal zeroed (90k off the 180k total).
+    async with Session() as db:
+        c = await _mk_coupon(db, "free_autorenew", {"max_plan_gb": 100, "duration_days": 35})
+        cid = c.id
+    resp = await _call(Session, {
+        "plan": "plan20", "use_credit": False, "coupon_id": cid,
+        "auto_renewal": True, "renewal_plan": "plan20",
+    })
+    data = json.loads(resp.body.decode())
+    assert resp.status == 200 and data["ok"] is True, data
+    assert data["order"]["discount_amount"] == 90000 and data["order"]["final_price"] == 90000, data["order"]
+    async with Session() as db:
+        assert (await crud.get_coupon_by_id(db, cid)).status == "used"
+
+    # 5e) vip_pack with a renewal → renewal zeroed (money part), consumed.
+    async with Session() as db:
+        c = await _mk_coupon(db, "vip_pack", {
+            "free_autorenew": {"max_plan_gb": 100, "duration_days": 35},
+            "priority_support_days": 30, "badge": "Champion", "theme": "champion",
+        })
+        cid = c.id
+    resp = await _call(Session, {
+        "plan": "plan20", "use_credit": False, "coupon_id": cid,
+        "auto_renewal": True, "renewal_plan": "plan20",
+    })
+    data = json.loads(resp.body.decode())
+    assert resp.status == 200 and data["order"]["discount_amount"] == 90000, data["order"]
+    async with Session() as db:
+        assert (await crud.get_coupon_by_id(db, cid)).status == "used"
+
+    # 5f) legend_pack auto-approved → +100GB provisioned AND grants applied (VIP, badge, theme).
+    async with Session() as db:
+        u = await crud.get_user(db, CHAT)
+        u.credit = 90000
+        await db.commit()
+        c = await _mk_coupon(db, "legend_pack", {
+            "free_autorenew": {"max_plan_gb": 100, "duration_days": 35},
+            "bonus_gb": 100, "priority_support_days": 60, "badge": "Legend", "theme": "legend",
+        })
+        cid = c.id
+    captured.clear()
+    resp = await _call(Session, {"plan": "plan20", "use_credit": True, "coupon_id": cid})
+    data = json.loads(resp.body.decode())
+    assert data.get("auto_approved") is True, data
+    assert captured["plan_info"]["gb"] == 120, captured  # 20 + 100 bonus
+    async with Session() as db:
+        assert (await crud.get_coupon_by_id(db, cid)).status == "used"
+        u = await crud.get_user(db, CHAT)
+        assert u.is_vip is True and u.vip_until is not None, "VIP grant missing"
+        prefs = json.loads(u.dashboard_prefs or "{}")
+        assert prefs.get("badge") == "Legend", prefs
+        assert "legend" in (prefs.get("unlocked_themes") or []), prefs
+        u.credit = 0
+        u.is_vip = False
+        u.vip_until = None
+        u.dashboard_prefs = "{}"
+        await db.commit()
 
     # 6) coupon owned by another user → rejected.
     async with Session() as db:

@@ -967,8 +967,8 @@
       updateSummary();
     }
 
-    // ── Reward coupons (Phase 1: discount_percent + free_gb) ──────────────────
-    const COUPON_SUPPORTED = ['discount_percent', 'free_gb'];
+    // ── Reward coupons (discount_percent, free_gb, free_plan, free_autorenew) ──
+    const COUPON_SUPPORTED = ['discount_percent', 'free_gb', 'free_plan', 'free_autorenew', 'vip_pack', 'legend_pack'];
     const COUPON_DISCOUNT_MAX_PLAN_GB = 100;
 
     function couponPriceCap() {
@@ -977,6 +977,13 @@
         .filter(p => Number(p.gb || 0) <= COUPON_DISCOUNT_MAX_PLAN_GB)
         .map(p => Number(p.price || 0));
       return caps.length ? Math.max(...caps) : 0;
+    }
+
+    // Preview value of a granted plan (gb) from the fixed-plan list; server prices it
+    // on the curve, this is just the summary estimate. 0 if no matching plan.
+    function couponPlanValue(gb) {
+      const m = (plans || []).find(p => Number(p.gb || 0) === Number(gb || 0));
+      return m ? Number(m.price || 0) : 0;
     }
 
     function couponLabel(c) {
@@ -988,6 +995,19 @@
       if (c.coupon_type === 'free_gb') {
         const n = Number(p.gb || 0);
         return currentLang === 'fa' ? (n + ' گیگ رایگان') : (n + 'GB free');
+      }
+      if (c.coupon_type === 'free_plan') {
+        const n = Number(p.plan_gb || 0);
+        return currentLang === 'fa' ? ('پلن ' + n + ' گیگ رایگان') : ('Free ' + n + 'GB plan');
+      }
+      if (c.coupon_type === 'free_autorenew') {
+        return currentLang === 'fa' ? 'تمدید خودکار رایگان' : 'Free auto-renewal';
+      }
+      if (c.coupon_type === 'vip_pack') {
+        return currentLang === 'fa' ? 'پک VIP قهرمان' : 'VIP Champion pack';
+      }
+      if (c.coupon_type === 'legend_pack') {
+        return currentLang === 'fa' ? 'پک افسانه‌ای' : 'Legend pack';
       }
       return c.coupon_type;
     }
@@ -1007,7 +1027,11 @@
       const wrap = document.getElementById('couponInfo');
       const list = document.getElementById('couponList');
       if (!wrap || !list) return;
-      if (!activeCoupons.length) {
+      // free_autorenew only discounts a renewal plan — hide it when none is chosen.
+      const hasRenewal = document.getElementById('autoRenewal')?.checked && selectedRenewalPlan;
+      const shown = activeCoupons.filter(c => c.coupon_type !== 'free_autorenew' || hasRenewal);
+      if (selectedCouponId && !shown.some(c => c.id === selectedCouponId)) selectedCouponId = null;
+      if (!shown.length) {
         wrap.style.display = 'none';
         list.innerHTML = '';
         selectedCouponId = null;
@@ -1020,7 +1044,7 @@
           <span class="coupon-radio"></span>
           <span class="coupon-text">${t('couponNone')}</span>
         </label>`];
-      activeCoupons.forEach(c => {
+      shown.forEach(c => {
         rows.push(`
           <label class="coupon-option ${selectedCouponId === c.id ? 'selected' : ''}">
             <input type="radio" name="couponPick" value="${c.id}" ${selectedCouponId === c.id ? 'checked' : ''} onchange="selectCoupon(${c.id})">
@@ -1216,6 +1240,22 @@
           discountAmount += Math.floor(base * (pct / 100));
         } else if (coupon.coupon_type === 'free_gb') {
           couponBonusGb = Number(coupon.payload?.gb || 0);
+        } else if (coupon.coupon_type === 'free_plan') {
+          // Zeroes the plan up to the granted plan's value (capped at this plan's price).
+          discountAmount += Math.min(couponPlanValue(coupon.payload?.plan_gb), selectedPlan.price);
+        } else if (coupon.coupon_type === 'free_autorenew') {
+          // Zeroes the selected renewal plan; only valid when a renewal is chosen.
+          if (autoRenewal && selectedRenewalPlan) {
+            discountAmount += Math.min(couponPlanValue(coupon.payload?.max_plan_gb) || selectedRenewalPlan.price, selectedRenewalPlan.price);
+          }
+        } else if (coupon.coupon_type === 'vip_pack' || coupon.coupon_type === 'legend_pack') {
+          // Bundle: free renewal (if chosen) + bonus GB (legend). VIP/badge/theme apply
+          // after purchase, server-side.
+          const ar = coupon.payload?.free_autorenew || {};
+          if (autoRenewal && selectedRenewalPlan) {
+            discountAmount += Math.min(couponPlanValue(ar.max_plan_gb) || selectedRenewalPlan.price, selectedRenewalPlan.price);
+          }
+          couponBonusGb = Number(coupon.payload?.bonus_gb || 0);
         }
       }
       if (discountAmount > totalPrice) discountAmount = totalPrice;
@@ -1284,6 +1324,7 @@
       
       // Update summary on payment step
       if (step === 3) {
+        renderCoupons();
         updateSummary();
       }
       

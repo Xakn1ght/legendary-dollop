@@ -42,5 +42,5 @@ STAR_SEASON_MILESTONES = {
 
 # ── VIP Promoter cashout (Phase D) ──────────────────────────────────────────
 CASHOUT_MIN_ACTIVE_REFERRALS = 20
-CASHOUT_RATE = 0.05               # 5% cash (vs 10% store credit)
+# Cash-out is 1:1 by decision — credit is referral-only, so no haircut. (Was 5%.)
 PROMOTER_REFERRAL_CUT = {0: 0.10, 20: 0.12, 50: 0.15}  # store-credit % by active-referral tier

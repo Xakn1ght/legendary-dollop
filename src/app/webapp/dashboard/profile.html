@@ -49,6 +49,12 @@
               </span>
               <span id="userCategoryText">Free</span>
             </span>
+            <span class="profile-badge" id="userPackBadge" hidden style="background:rgba(var(--brandRgb),0.18);">
+              <span class="svg-icon" aria-hidden="true">
+                <svg viewBox="0 0 24 24"><path d="M12 2l2.2 7.2L22 12l-7.8 2.8L12 22l-2.2-7.2L2 12l7.8-2.8L12 2z"/></svg>
+              </span>
+              <span id="userPackBadgeText"></span>
+            </span>
           </div>
         </div>
       </div>
@@ -339,6 +345,8 @@
               <button type="button" class="accent-swatch" data-accent-key="emerald" role="radio" aria-label="Emerald" style="--swatch:#34d399;"></button>
               <button type="button" class="accent-swatch" data-accent-key="violet"  role="radio" aria-label="Violet"  style="--swatch:#a78bfa;"></button>
               <button type="button" class="accent-swatch" data-accent-key="amber"   role="radio" aria-label="Amber"   style="--swatch:#fbbf24;"></button>
+              <button type="button" class="accent-swatch" data-accent-key="champion" role="radio" aria-label="Champion" style="--swatch:#e0b341;" hidden></button>
+              <button type="button" class="accent-swatch" data-accent-key="legend"   role="radio" aria-label="Legend"   style="--swatch:#b574f5;" hidden></button>
             </div>
           </div>
         </div>
@@ -554,7 +562,27 @@
     <script>
       // Accent color picker wiring
       (function(){
-        const ALLOWED = ['red','cyan','emerald','violet','amber'];
+        const ALLOWED = ['red','cyan','emerald','violet','amber','champion','legend'];
+
+        // Reveal pack-unlocked accents (champion/legend) and the earned badge chip from
+        // the user's stored prefs. champion/legend swatches stay hidden until unlocked.
+        async function applyUnlocks(){
+          try {
+            const r = await fetch('/api/dashboard/preferences', { headers: { 'Accept': 'application/json' }, credentials: 'same-origin' });
+            const d = await r.json();
+            const prefs = (d && d.ok && d.prefs) ? d.prefs : {};
+            const unlocked = Array.isArray(prefs.unlocked_themes) ? prefs.unlocked_themes : [];
+            unlocked.forEach(function(k){
+              const sw = document.querySelector('.accent-swatch[data-accent-key="' + k + '"]');
+              if (sw) sw.hidden = false;
+            });
+            if (prefs.badge) {
+              const chip = document.getElementById('userPackBadge');
+              const txt = document.getElementById('userPackBadgeText');
+              if (chip && txt) { txt.textContent = prefs.badge; chip.hidden = false; }
+            }
+          } catch(_){}
+        }
         function currentAccent(){
           try {
             const a = document.documentElement.getAttribute('data-accent') || localStorage.getItem('accent') || 'red';
@@ -593,6 +621,7 @@
         }
         function init(){
           paint(currentAccent());
+          applyUnlocks();
           document.querySelectorAll('.accent-swatch').forEach(function(btn){
             btn.addEventListener('click', function(){ apply(btn.getAttribute('data-accent-key')); });
             btn.addEventListener('keydown', function(e){

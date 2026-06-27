@@ -194,16 +194,21 @@ class _SeasonMixin:
 
     @staticmethod
     async def free_gb_bonus_for_coupon(db, coupon_id: int) -> int:
-        """Bonus GB granted by a free_gb coupon (0 for any other type/missing). Used at
-        provisioning time so both the webapp auto-approve and admin-approval paths add the
-        same bonus to the new subscription."""
+        """Bonus GB granted by a coupon at provisioning (free_gb's gb, or a legend/vip
+        pack's bonus_gb). 0 for any other type/missing. Used by both the webapp
+        auto-approve and admin-approval paths so they add the same bonus."""
         coupon = await _SeasonMixin.get_coupon_by_id(db, coupon_id)
-        if not coupon or coupon.coupon_type != "free_gb":
+        if not coupon:
             return 0
         try:
-            return int(json.loads(coupon.payload or "{}").get("gb", 0) or 0)
+            payload = json.loads(coupon.payload or "{}")
         except Exception:
             return 0
+        if coupon.coupon_type == "free_gb":
+            return int(payload.get("gb", 0) or 0)
+        if coupon.coupon_type in ("vip_pack", "legend_pack"):
+            return int(payload.get("bonus_gb", 0) or 0)
+        return 0
 
     @staticmethod
     async def end_active_season(db):

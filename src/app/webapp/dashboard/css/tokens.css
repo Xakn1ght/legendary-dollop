@@ -158,6 +158,21 @@
   --brand-soft: rgba(251, 191, 36, 0.14);
   --brand-glow: rgba(251, 191, 36, 0.32);
 }
+/* Unlocked-only accents (Star Season vip_pack / legend_pack). */
+[data-accent="champion"] {
+  --brand:      #e0b341;
+  --brandDark:  #b8860b;
+  --brandRgb:   224, 179, 65;
+  --brand-soft: rgba(224, 179, 65, 0.14);
+  --brand-glow: rgba(224, 179, 65, 0.34);
+}
+[data-accent="legend"] {
+  --brand:      #b574f5;
+  --brandDark:  #7c3aed;
+  --brandRgb:   181, 116, 245;
+  --brand-soft: rgba(181, 116, 245, 0.14);
+  --brand-glow: rgba(181, 116, 245, 0.36);
+}
 
 /* ============================================================
    GLOBAL BASE — lets the lava layer show through both themes
