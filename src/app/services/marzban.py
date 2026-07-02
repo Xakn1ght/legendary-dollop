@@ -1,13 +1,31 @@
 import asyncio
 import json
 from datetime import datetime, timedelta
-from typing import Any, Dict, Optional
+from typing import Optional
 
 import aiohttp
 
 from app.core.paths import core_path
+from app.core.redis_config import cache
 from app.core.settings import MARZBAN_BASE_URL, MARZBAN_PASSWORD, MARZBAN_USERNAME
-from app.utils.logger import MarzbanError, log_api_call, log_error
+from app.utils.logger import log_api_call, log_error
+
+# Panel-load shield. Every read surface (dashboard list/overview, bot menus, the
+# notify + renewal jobs) funnels through get_fast_user_info, so one short-TTL Redis
+# cache here caps panel traffic at ~1 request per user per TTL no matter how many
+# places poll. Mutations invalidate their user's entry immediately, so post-payment
+# screens still show fresh numbers. Redis down → cache no-ops and we fall through
+# to the panel exactly as before.
+USER_INFO_CACHE_TTL = 90       # seconds; live usage % may lag at most this much
+USAGE_CHART_CACHE_TTL = 600    # 7-day usage chart changes slowly
+
+
+def _info_key(username: str) -> str:
+    return f"mz:info:{username}"
+
+
+def _usage_key(username: str, days: int) -> str:
+    return f"mz:usage:{days}d:{username}"
 
 
 class MarzbanAPI:
@@ -115,6 +133,7 @@ class MarzbanAPI:
     async def add_user(self, username: str, data_limit_gb: int, expire_days: int):
         import time
         start_time = time.time()
+        await self.invalidate_user_info(username)
         try:
             inbounds_config = await self._inbounds_for_new_user()
 
@@ -238,6 +257,7 @@ class MarzbanAPI:
         return None
 
     async def delete_user(self, username: str):
+        await self.invalidate_user_info(username)
         session = await self._get_session()
         url = f"{self.base_url}/api/user/{username}"
         headers = await self._get_headers()
@@ -298,11 +318,29 @@ class MarzbanAPI:
             return None
         return None
 
+    async def invalidate_user_info(self, username: str):
+        """Drop the cached info/usage for a user after any panel mutation."""
+        try:
+            await cache.delete(_info_key(username))
+            await cache.delete(_usage_key(username, 7))
+        except Exception:
+            pass
+
     async def get_fast_user_info(self, username: str, sub_token: Optional[str] = None):
         """Prefer share-link /sub/{token}/info when token present; fallback to admin API.
 
         Returns a dict compatible with get_user_info keys: used_traffic, data_limit, expire, status, links, subscription_url.
+        Results are served from a short-TTL Redis cache (USER_INFO_CACHE_TTL) to
+        protect the panel; mutations call invalidate_user_info().
         """
+        try:
+            cached = await cache.get(_info_key(username))
+            if isinstance(cached, dict) and cached:
+                return cached
+        except Exception:
+            pass
+
+        result = None
         if sub_token:
             try:
                 data = await self.get_subscription_info(sub_token)
@@ -310,7 +348,7 @@ class MarzbanAPI:
                     # Normalize to admin API-like keys
                     from app.utils.logger import bot_logger
                     bot_logger.debug("[USER_INFO] source=share_link", username=username)
-                    return {
+                    result = {
                         'used_traffic': data.get('used_traffic'),
                         'data_limit': data.get('data_limit'),
                         'expire': data.get('expire'),
@@ -320,13 +358,27 @@ class MarzbanAPI:
                     }
             except asyncio.CancelledError:
                 return None
-        # Fallback
-        from app.utils.logger import bot_logger
-        bot_logger.debug("[USER_INFO] source=admin", username=username)
-        return await self.get_user_info(username)
+        if result is None:
+            # Fallback
+            from app.utils.logger import bot_logger
+            bot_logger.debug("[USER_INFO] source=admin", username=username)
+            result = await self.get_user_info(username)
+
+        if isinstance(result, dict) and result:
+            try:
+                await cache.set(_info_key(username), result, ttl=USER_INFO_CACHE_TTL)
+            except Exception:
+                pass
+        return result
 
     async def get_user_usage(self, username: str, days: int = 7):
         """Return usage stats for last `days` days list of dicts with date & used_traffic."""
+        try:
+            cached = await cache.get(_usage_key(username, days))
+            if isinstance(cached, list):
+                return cached
+        except Exception:
+            pass
         from datetime import datetime, timedelta
         end = datetime.utcnow()
         start = end - timedelta(days=days)
@@ -340,7 +392,12 @@ class MarzbanAPI:
         async with session.get(url, headers=headers, params=params) as resp:
             if resp.status == 200:
                 data = await resp.json()
-                return data.get("usages", [])
+                usages = data.get("usages", [])
+                try:
+                    await cache.set(_usage_key(username, days), usages, ttl=USAGE_CHART_CACHE_TTL)
+                except Exception:
+                    pass
+                return usages
             return None
 
     async def reset_user_traffic_bytes(self, username: str, new_data_limit_bytes: int, new_expire_ts: int):
@@ -350,6 +407,7 @@ class MarzbanAPI:
         Marzban does not reliably accept `used_traffic` updates via `PUT /api/user/{username}`.
         The canonical way to reset usage is `POST /api/user/{username}/reset`.
         """
+        await self.invalidate_user_info(username)
         session = await self._get_session()
         headers = await self._get_headers()
 
@@ -418,6 +476,7 @@ class MarzbanAPI:
 
     async def toggle_user_status(self, username: str, status: str):
         """Set user status (active|disabled). Returns bool."""
+        await self.invalidate_user_info(username)
         session = await self._get_session()
         headers = await self._get_headers()
         url = f"{self.base_url}/api/user/{username}"
@@ -425,6 +484,7 @@ class MarzbanAPI:
             return resp.status in (200, 204)
 
     async def revoke_user_subscription(self, username: str) -> bool:
+        await self.invalidate_user_info(username)
         session = await self._get_session()
         headers = await self._get_headers()
         url = f"{self.base_url}/api/user/{username}/revoke_sub"

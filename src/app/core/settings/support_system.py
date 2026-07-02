@@ -1,7 +1,6 @@
 """Support UX, jobs, renewal thresholds, plans ordering; loads optional JSON from ``app/core/``."""
 
 import json
-import sys
 
 from app.core.settings.bootstrap import CORE_DIR
 
@@ -48,9 +47,13 @@ MAX_TICKET_IMAGES = 3
 
 # Job Schedules (overrideable)
 JOB_SCHEDULES = {
-    "check_low_data_job": {"type": "interval", "seconds": 15},  # Check every 15 seconds
-    # Auto-renew should feel "instant". Default to a short interval; override via /app/core/job_schedules.json.
-    "renewal_job": {"type": "interval", "seconds": 15, "max_instances": 1, "coalesce": True},
+    # Low-data warnings are throttled to once/day per sub anyway — sweeping every 15s
+    # only hammered the Marzban panel (one API call per active sub per tick). 10 min
+    # is still far more responsive than a daily notification needs.
+    "check_low_data_job": {"type": "interval", "minutes": 10},
+    # Auto-renew should feel "instant"; 60s + the 90s marzban info cache keeps worst-case
+    # renewal lag ~2-3 min while cutting panel sweeps 4x. Override via job_schedules.json.
+    "renewal_job": {"type": "interval", "seconds": 60, "max_instances": 1, "coalesce": True},
     "update_user_analytics_job": {"type": "interval", "hours": 1},
     "expire_claims_job": {"type": "interval", "minutes": 15},
     "reminder_unclaimed_star_rewards_job": {"type": "interval", "hours": 12},
