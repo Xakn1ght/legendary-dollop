@@ -75,7 +75,7 @@ def main():
         ("plans", "/api/dashboard/purchase/plans"),
         ("custom-quote 52GB", "/api/dashboard/purchase/custom-quote?gb=52"),
         ("referrals", "/api/dashboard/referrals"),
-        ("rewards summary", "/api/dashboard/rewards"),
+        ("rewards summary", "/api/dashboard/rewards/summary"),
     ]:
         status, data = call(chat_id, path)
         brief = json.dumps(data, ensure_ascii=False)
