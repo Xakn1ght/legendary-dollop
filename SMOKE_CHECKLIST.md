@@ -1,94 +1,161 @@
-# ASTROBYTE — Pre-Publish Smoke Checklist
+# ASTROBYTE — Fresh-DB Smoke Script
 
-_One place to verify everything, back + front. Ordered so each section builds on the
-previous one. Test accounts: **Paşanim `8148909121`** (admin + referrer), **Rakai
-`8120318706`** (buyer/referee). Run everything from the repo root._
+_Written for a JUST-RESET database: no users, no VIP, no coupons, no referral links.
+Phases are ordered so each one CREATES the state the next one needs — follow top to
+bottom and every feature gets tested with real state, no assumptions._
 
-Legend: `[A]` automated — one command, `[M]` manual — needs your phone(s).
+Test accounts: **Paşanim `8148909121`** (admin + referrer), **Rakai `8120318706`**
+(buyer/referee). Run all commands from the repo root.
+Legend: `[A]` automated command · `[M]` manual on phone.
 
 ---
 
-## 1. Automated backend checks `[A]`
+## Phase 0 — Accounts & referral link `[M]`
+
+- [x] 0.1 Paşanim: `/start` → language → main keyboard (was 2.1)
+- [ ] 0.2 Paşanim: **Invite** button → copy invite code/link
+- [ ] 0.3 Rakai: `/start` **via Paşanim's invite link** → registers; Paşanim gets "new user joined" DM
+- [ ] 0.4 Both: menu button opens webapp dashboard, no "Login problem"; first-run tour shows once, Skip works
+
+## Phase 1 — Automated baseline `[A]` (needs Phase 0 done)
 
 | # | What | Command | Expect |
 |---|---|---|---|
-| 1.1 | Unit suite (pricing, coupons, season, cashout, flows) | `for t in tests/test_*.py; do PYTHONPATH=src .venv/bin/python $t; done` | every file prints PASS / "tests passed" |
-| 1.2 | Dashboard API probes (auth, plans, quote, referrals, rewards, prefs) | `PYTHONPATH=src .venv/bin/python scripts/smoke_dashboard.py 8148909121` | all rows 200 |
-| 1.3 | Season config live | `PYTHONPATH=src .venv/bin/python scripts/smoke_dashboard.py 8148909121 /api/dashboard/season` | ladder starts at 1★ "First Spark"; autorenew payloads say `max_plan_gb: 60` |
-| 1.4 | **Full money loop** — purchase → receipt → admin-approve → Marzban provision → referral voucher → star redeem → 1★ coupon → coupon spend+restore → charge top-up → cashout gate | `PYTHONPATH=src:. .venv/bin/python scripts/smoke_full_loop.py` | `8/8 passed`; buyer + referrer Telegram accounts each get real DMs |
-| 1.5 | Loop cleanup (after phone inspection) | `PYTHONPATH=src:. .venv/bin/python scripts/smoke_full_loop.py --cleanup <marzban_username>` (username printed by 1.4) | marzban_deleted=True |
+| 1.1 | Unit suite | `for t in tests/test_*.py; do PYTHONPATH=src .venv/bin/python $t; done` | every file PASS |
+| 1.2 | API probes | `PYTHONPATH=src .venv/bin/python scripts/smoke_dashboard.py 8148909121` | all 200 |
+| 1.3 | Season config | `PYTHONPATH=src .venv/bin/python scripts/smoke_dashboard.py 8148909121 /api/dashboard/season` | ladder starts 1★ First Spark; `max_plan_gb: 60` on 30/40/50★; creates Season row on first call |
+| 1.4 | Full money loop (purchase→approve→voucher→star→coupon→charge→cashout-gate) | `PYTHONPATH=src:. .venv/bin/python scripts/smoke_full_loop.py` | 8/8 PASS; both phones get DMs |
 
-> 1.4 mutates the real DB + Marzban and DMs the two test accounts — that's the point.
+> 1.4 already exercises the whole backend loop headlessly. Phases 2–4 re-walk the same
+> loop through the REAL UI so you see what users see. If 1.4 ran, Paşanim already has
+> 1★ + the First Spark coupon — fine, the phases below just add more state.
 
+## Phase 2 — First real purchase, bot UI `[M]` (Rakai buys, Paşanim approves)
 
-- [ ] 1.1 &nbsp; - [ ] 1.2 &nbsp; - [ ] 1.3 &nbsp; - [ ] 1.4 &nbsp; - [ ] 1.5
+- [ ] 2.1 Rakai bot: **Buy** → 20GB plan → summary shows 90,000 (no VIP yet, no coupons yet — picker should NOT appear) → card number = your REAL card
+- [x] 2.2 Send receipt photo → "registered" (was 2.3)
+- [ ] 2.3 Paşanim admin bot: receipt lands with photo + Approve/Deny
+- [ ] 2.4 **Approve** → Rakai gets sub link DM; user visible in Marzban panel; dashboard home shows the sub with usage ring
+- [ ] 2.5 Paşanim: voucher DM arrives with 4 choices → pick **⭐ star**
+- [ ] 2.6 Paşanim rewards page (bot menu + webapp): season stars = 1, **First Spark 5% coupon** in wallet with 45d expiry, next milestone 3★
+- [ ] 2.7 Paşanim invite screen now shows: 4-choice payoff line, tier 10%, cash-out-at-20 line, active invites = 1
 
----
+## Phase 3 — Spend & edge paths `[M]` (state from Phase 2 exists now)
 
-## 2. User bot — manual on phone (Rakai account) `[M]`
+- [ ] 3.1 Paşanim buys (bot or webapp): **coupon step appears**, picking First Spark cuts 5% in summary/live preview
+- [ ] 3.2 Submit that order → admin **Deny** → Paşanim notified; coupon back to `active` in wallet; any credit refunded
+- [ ] 3.3 Custom plan: 52GB quote follows curve (~178k); days <15 rejected
+- [ ] 3.4 **Charge** on Rakai's sub: all 6 presets (10→38k … 100→300k); fresh sub has >5GB so the "charge anyway (5GB carry)" warning path shows → receipt → admin approve → Marzban limit/expire bump + DM
+- [ ] 3.5 Rakai redeems a second referral voucher choice on Paşanim's next approved buy? — reverse roles once: Paşanim buys via Rakai's code fails (already registered, no self-code) — instead just have Rakai buy AGAIN and Paşanim pick **credit** this time → wallet credit = 10% of price
+- [ ] 3.6 Support: Rakai opens ticket → Paşanim replies from admin side → live round-trip
+- [ ] 3.7 Language fa↔en toggle re-renders (bot menus + webapp)
 
-- [ ] 2.1 `/start` → language pick → main keyboard appears (no crash, fa default)
-- [ ] 2.2 **Buy**: pick 20GB plan → summary shows price (VIP −20% if VIP) → card number shown is the REAL card (from admin payment settings, not a placeholder)
-- [ ] 2.3 Send an actual receipt **photo** → "registered" message → order pending
-- [ ] 2.4 **Coupon step** appears after discount step when a spendable coupon exists; picking one changes the payable amount in the summary
-- [ ] 2.5 **Custom plan** (`custom:<gb>`): 52GB quote ≈ curve price, min-days guard (no <15d)
-- [ ] 2.6 **Charge**: pick service → all 6 presets show (10→38k … 100→300k) → over-5GB warning path (`charge anyway` = 5GB carry) → receipt photo
-- [ ] 2.7 **Invite** button: message shows the 4-choice payoff, your % tier, 20-invite cash-out line, season stars, active-invite count
-- [ ] 2.8 **Rewards menu**: season stars + next milestone + "My coupons" wallet with expiry dates
-- [ ] 2.9 Voucher DM (after 1.4 or a real referred buy): 4 buttons → pick each type once across tests (⭐ / credit / GB / days) → confirmation + balances change
-- [ ] 2.10 **Support**: open ticket → send message → reply arrives from admin side (2.14)
-- [ ] 2.11 Language toggle fa↔en re-renders menus in place
+## Phase 4 — VIP `[M]` (real VIP flow, creates the −20% state)
 
-## 3. Admin bot — manual (Paşanim account) `[M]`
+- [ ] 4.1 Rakai webapp: buy **VIP 1-month (99k)** → receipt → admin approve → `is_vip` on
+- [ ] 4.2 Rakai purchase page now shows **−20%** badges; bot summary shows VIP price; VIP-only 150/200GB plans visible
+- [ ] 4.3 VIP ticket priority: Rakai's new support ticket lands as high priority
 
-- [ ] 3.1 New purchase receipt lands with photo + Approve/Deny buttons
-- [ ] 3.2 **Approve** → buyer gets sub link DM; Marzban panel shows the user; dashboard lists it
-- [ ] 3.3 **Deny** a second test order → buyer notified; credit/coupon/discount all restored (check wallet + coupon wallet)
-- [ ] 3.4 Charge receipt → Approve → traffic/days bump visible in Marzban + user DM
-- [ ] 3.5 Cashout request visible → **Deny** → credit returned to user; **Approve** path marks paid
-- [ ] 3.6 Plan editor: change a price → `src/app/core/plans.json` updates → bot + webapp show new price without restart
-- [ ] 3.7 Broadcast/announcement sends to test users only (careful before launch)
+## Phase 5 — Webapp sweep `[M]` (any time after Phase 2)
 
-## 4. Webapp dashboard — manual, inside Telegram `[M]`
+- [ ] 5.1 Home: usage %, copy link + QR, sub actions menu
+- [ ] 5.2 Rewards page stat tiles Persian; season card "⭐ ۱ از ۳"; ladder 1→50 with ✅/⏳/🔒
+- [ ] 5.3 Wallet: cash-out → gate message "needs 20 active invites" (you have 1)
+- [ ] 5.4 Shop/support: bottom-nav labels Persian; navigation works
+- [ ] 5.5 Notifications bell: unread badge from the purchase events, mark-read works
+- [ ] 5.6 Theme light/dark; accent picker persists
+- [ ] 5.7 Arcade: play once → XP moves, stars/credit do NOT
+- [ ] 5.8 iPhone heat after 2–3 min OK; Android nav clear of system bar
+- [ ] 5.9 Rewards page opened from BOT deep-link button (standalone page): logo small, nav Persian
 
-- [ ] 4.1 Menu button opens dashboard over HTTPS; auth works (no "Login problem")
-- [ ] 4.2 First run: welcome tour (14 steps) → Skip works → never re-appears
-- [ ] 4.3 Home: VPN card shows real usage %, copy sub-link + QR work
-- [ ] 4.4 **Purchase page**: plan grid → coupon picker (single-select, live price preview) → receipt upload → lands in admin bot (3.1)
-- [ ] 4.5 **Charge page**: 4-step stepper, presets correct, custom GB/days quotes
-- [ ] 4.6 **Rewards page** (also via bot deep-link button — standalone page): stat tiles Persian, season card "⭐ ۰ از ۳" style, ladder 1→50, coupon wallet, redeem voucher sheet works
-- [ ] 4.7 Wallet: cash-out button → below 20 active invites shows the gate message; min amount 200k message when eligible
-- [ ] 4.8 Profile: Legend/Champion badge chip + unlocked accent swatches (after owning a pack coupon); accent picks persist
-- [ ] 4.9 Shop/support pages: bottom-nav labels in Persian, nav navigation works
-- [ ] 4.10 Notifications bell: unread badge, mark-read, polling stops when app minimized
-- [ ] 4.11 Theme light/dark toggle; one accent hue per screen (no rainbow)
-- [ ] 4.12 Arcade opens, plays, XP-only (no stars/credit from score) — check rewards summary before/after a run
-- [ ] 4.13 iPhone: heat/lag acceptable after 2–3 min (glass v47); Android: bottom nav clears system buttons
-- [ ] 4.14 EN language end-to-end (switch in profile): no stray Persian/English mixing
+## Phase 6 — Cheat-seeds `[A]` (states that need 20–40 referrals — fabricate, test UI, wipe)
 
-## 5. Background jobs `[A]`/`[M]`
+**6.1 Grant Paşanim 40★** → auto-unlocks every ladder coupon incl. **Champion pack** (badge + gold accent appear in profile immediately; free-renewal coupons in wallet):
 
-- [ ] 5.1 Scheduler registered: `journalctl -u astrobyte-userbot.service --since '10 min ago' | grep -i -E 'scheduler|job'`
-- [ ] 5.2 Renewal job: reserved-renewal sub near expiry renews + carries ≤5GB (or force with a short test sub)
-- [ ] 5.3 Expiry notifications DM at the configured thresholds
-- [ ] 5.4 Season reset: runs every 12h; on season end → stars reset to 0, new season row, coupons expire per their own dates (unit-tested; spot-check journal)
+```bash
+PYTHONPATH=src .venv/bin/python - <<'EOF'
+from dotenv import load_dotenv; load_dotenv('config/.env')
+import asyncio
+from app.database.models import AsyncSessionLocal
+from app.database import crud
+from app.database.repos.reward import RewardRepository as RR
+async def m():
+    async with AsyncSessionLocal() as db:
+        u = await crud.get_user(db, 8148909121)
+        total, unlocked = await RR.add_season_stars(db, u.id, 40)
+        print("stars:", total, "unlocked:", [x["milestone"] for x in unlocked])
+asyncio.run(m())
+EOF
+```
+- [ ] Profile shows **Champion** badge chip + gold swatch; coupon wallet lists free-plan/autorenew/pack coupons; a free_plan coupon zeroes a 20GB purchase at checkout
 
-## 6. Ops / launch gate (from PUBLISH_CHECKLIST.md)
+**6.2 Fake 20 active referrals** → cash-out gate opens (test the 200k-minimum message + admin approve/deny refund):
 
-- [ ] 6.1 `config/.env` prod values (tokens, Marzban, DB, Redis, ADMIN_2FA_ENABLED=true)
-- [ ] 6.2 HTTPS reverse proxy → :8585; `DASHBOARD_PUBLIC_BASE_URL` = real domain; BotFather menu-button URL set
-- [ ] 6.3 `PYTHONPATH=src alembic -c config/alembic.ini current` = head
-- [ ] 6.4 systemd: `systemctl is-enabled astrobyte-userbot astrobyte-adminbot` = enabled; restart drill: `systemctl restart ...` then `ss -ltnp | grep 8585`, journal free of `TelegramConflictError`
-- [ ] 6.5 Backups scheduled (`scripts/backup_db.py` cron) + one restore rehearsal
-- [ ] 6.6 Decide git-history scrub (customer receipts still in remote history)
-- [ ] 6.7 Reset test data before real users: stop bots → `scripts/reset_db.py --confirm` → alembic stamp head → Redis FLUSHDB → start bots (see memory of exact steps in GUIDE/handoff)
-- [ ] 6.8 Error monitoring decision (Sentry or journalctl retention)
+```bash
+PYTHONPATH=src .venv/bin/python - <<'EOF'
+from dotenv import load_dotenv; load_dotenv('config/.env')
+import asyncio
+from app.database.models import AsyncSessionLocal, Referral, Subscription, User
+from app.database import crud
+async def m():
+    async with AsyncSessionLocal() as db:
+        ref = await crud.get_user(db, 8148909121)
+        for i in range(20):
+            u = User(chat_id=990000 + i, referral_code=f"seedref{i}")
+            db.add(u)
+            await db.flush()
+            db.add(Referral(referrer_id=ref.id, referee_id=u.id))
+            db.add(Subscription(user_id=u.id, marzban_username=f"seedref{i}", status="active", price=90000))
+        ref.credit = 500000
+        await db.commit()
+        print("seeded 20 active referrals + 500k credit")
+asyncio.run(m())
+EOF
+```
+- [ ] Cash-out 100k → "minimum 200k" message · cash-out 250k → request created, credit reserved → admin **Deny** → credit back → cash-out 250k again → **Approve** → marked paid
+
+**6.3 Wipe the seeds** (before continuing real tests):
+
+```bash
+PYTHONPATH=src .venv/bin/python - <<'EOF'
+from dotenv import load_dotenv; load_dotenv('config/.env')
+import asyncio, os, asyncpg
+async def m():
+    c = await asyncpg.connect(os.environ['DATABASE_URL'].replace('postgresql+asyncpg://','postgresql://'))
+    await c.execute("delete from subscriptions where marzban_username like 'seedref%'")
+    await c.execute("delete from referrals where referee_id in (select id from users where chat_id between 990000 and 990019)")
+    await c.execute("delete from users where chat_id between 990000 and 990019")
+    print("seed referrals wiped (Paşanim's stars/coupons/credit left as-is — reset DB again before launch anyway)")
+    await c.close()
+asyncio.run(m())
+EOF
+```
+- [ ] After wipe: invite screen shows active invites back to real count
+
+## Phase 7 — Jobs `[A]`
+
+- [ ] 7.1 `journalctl -u astrobyte-userbot.service --since '15 min ago' | grep -iE 'scheduler|job'` — jobs registered; renewal every 60s, low-data every 10 min (not 15s)
+- [ ] 7.2 Panel-load shield: `journalctl -u astrobyte-userbot.service -f | grep USER_INFO` — sparse cache-miss lines, not a constant stream
+- [ ] 7.3 Auto-renew: buy with reserved renewal → burn traffic (or shrink limit in panel) → renews within ~2–3 min, carries ≤5GB
+- [ ] 7.4 Season reset job logged every 12h (`grep -i season_reset`)
+
+## Phase 8 — Launch gate (unchanged, from PUBLISH_CHECKLIST.md)
+
+- [ ] 8.1 `config/.env` prod values; `ADMIN_2FA_ENABLED=true`
+- [ ] 8.2 HTTPS proxy → :8585; `DASHBOARD_PUBLIC_BASE_URL` real domain; BotFather menu URL
+- [ ] 8.3 `PYTHONPATH=src .venv/bin/alembic -c config/alembic.ini current` = head
+- [ ] 8.4 systemd enabled + restart drill clean
+- [ ] 8.5 Backups cron + one restore rehearsal
+- [ ] 8.6 Git-history scrub decision (old receipts in remote history)
+- [ ] 8.7 **Final DB reset** (same procedure as this test reset) so real users start at zero
+- [ ] 8.8 Error monitoring decision
 
 ---
 
 ## Known-good state when everything passes
 
-Purchase money flows only through: plan price → optional credit/discount/one coupon →
-receipt → admin approval → Marzban provision. Rewards mint money only from referred
-purchases (10/12/15% credit tier, or GB/days/stars). Cash leaves only via cashout:
-≥20 active referrals AND ≥200k toman. Play/levels mint nothing.
+Money enters only via: plan price → optional credit/discount/one coupon → receipt →
+admin approval → Marzban provision. Rewards mint money only from referred purchases
+(10/12/15% credit tier, or GB/days/stars). Cash leaves only via cashout: ≥20 active
+referrals AND ≥200k toman. Play/levels mint nothing. Panel sees ≤1 info request per
+user per 90s.
