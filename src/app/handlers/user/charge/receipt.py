@@ -72,16 +72,8 @@ async def process_receipt(message: Message, state: FSMContext, session: AsyncSes
         )
         return
 
-    # Forward photo receipt to admin bot (not user bot)
-    from app.utils.admin_bot_helper import get_admin_bot
+    from app.utils.admin_bot_helper import get_admin_bot, relay_user_receipt_photo_to_admin
     admin_bot = get_admin_bot()
-    if admin_bot:
-        try:
-            from app.utils.admin_bot_helper import relay_user_receipt_photo_to_admin
-
-            await relay_user_receipt_photo_to_admin(message.bot, admin_bot, ADMIN_ID, message)
-        except Exception:
-            pass
 
     from aiogram.utils.keyboard import InlineKeyboardBuilder
     kb = InlineKeyboardBuilder()
@@ -109,12 +101,22 @@ async def process_receipt(message: Message, state: FSMContext, session: AsyncSes
     except Exception:
         pass
 
-    # Send to admin bot (not user bot)
+    # ONE admin message: photo + details caption + buttons (photo relay first,
+    # plain text only as fallback so the buttons never get lost).
     if admin_bot:
+        sent = None
         try:
-            await admin_bot.send_message(ADMIN_ID, charge_msg, reply_markup=kb.as_markup())
+            sent = await relay_user_receipt_photo_to_admin(
+                message.bot, admin_bot, ADMIN_ID, message,
+                caption=charge_msg, reply_markup=kb.as_markup(),
+            )
         except Exception:
-            pass
+            sent = None
+        if sent is None:
+            try:
+                await admin_bot.send_message(ADMIN_ID, charge_msg, reply_markup=kb.as_markup())
+            except Exception:
+                pass
 
     await state.clear()
     await message.answer(t(lang, "charge_receipt_sent"), reply_markup=get_main_keyboard(message.chat.id, lang=lang))

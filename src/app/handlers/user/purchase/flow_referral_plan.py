@@ -43,31 +43,19 @@ async def start_purchase(message: Message, state: FSMContext, session: AsyncSess
     lang = normalize_lang(getattr(user, "language", None)) if user else normalize_lang(getattr(message.from_user, "language_code", None))
     set_cached_lang(message.chat.id, lang)
 
+    # Referral attribution comes from signup only (Referral row). Never interrupt
+    # a purchase to ask for an invite code — existing users found it confusing.
     if user:
         result_ref = await session.execute(select(Referral).filter(Referral.referee_id == user.id))
         ref_row = result_ref.scalars().first()
         if ref_row:
             await state.update_data(referrer_id=ref_row.referrer_id)
-            await state.set_state(PurchaseState.plan)
-            plan_kb = await _get_plan_keyboard_for_user(session, message.chat.id, lang)
-            await message.answer(
-                ("لطفا یکی از پلن های زیر را انتخاب کنید:" if lang == "fa" else "Please choose a plan:"),
-                reply_markup=plan_kb,
-            )
-            return
 
-    # Otherwise ask for referral code as before
-    await state.set_state(PurchaseState.referral_code)
+    await state.set_state(PurchaseState.plan)
+    plan_kb = await _get_plan_keyboard_for_user(session, message.chat.id, lang)
     await message.answer(
-        ("اگر کد دعوت دارید، آن را وارد کنید. در غیر این صورت، دکمه 'رد شدن' را بزنید." if lang == "fa" else "If you have an invite code, send it now. Otherwise tap 'Skip'."),
-        reply_markup=ReplyKeyboardMarkup(
-            keyboard=[
-                [KeyboardButton(text=("رد شدن" if lang == "fa" else "Skip"))],
-                [KeyboardButton(text=t(lang, "btn_back"))],
-            ],
-            resize_keyboard=True,
-            one_time_keyboard=True,
-        ),
+        ("لطفا یکی از پلن های زیر را انتخاب کنید:" if lang == "fa" else "Please choose a plan:"),
+        reply_markup=plan_kb,
     )
 
 @router.message(PurchaseState.referral_code)

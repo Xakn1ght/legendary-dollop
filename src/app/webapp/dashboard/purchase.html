@@ -1070,6 +1070,8 @@
       const input = document.getElementById('serviceName');
       const hint = document.getElementById('serviceNameHint');
       const continueBtn = document.querySelector('#section-details .btn-primary');
+      // Spaces can't be part of a service name — drop them as the user types.
+      if (/\s/.test(input.value)) input.value = input.value.replace(/\s+/g, '');
       const name = input.value.trim();
       
       if (!name) {

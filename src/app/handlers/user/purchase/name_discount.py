@@ -46,7 +46,9 @@ async def process_name(message: Message, state: FSMContext, session: AsyncSessio
         )
         return
 
-    sub_name = message.text
+    # Be forgiving about stray spaces: "my name 12" -> "myname12" instead of a
+    # rejection (the regex below still guards everything else).
+    sub_name = (message.text or '').replace(' ', '')
     if message.text in ('اتفاقی', 'Random'):
         import random
         import string

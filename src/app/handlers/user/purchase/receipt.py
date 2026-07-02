@@ -42,22 +42,6 @@ async def process_receipt(message: Message, state: FSMContext, session: AsyncSes
     except Exception:
         pass
 
-    # Forward the receipt to admin bot (not user bot)
-    from app.utils.admin_bot_helper import get_admin_bot
-
-    admin_bot = get_admin_bot()
-    if admin_bot:
-        try:
-            from app.utils.admin_bot_helper import relay_user_receipt_photo_to_admin
-
-            forwarded = await relay_user_receipt_photo_to_admin(message.bot, admin_bot, ADMIN_ID, message)
-            if sub and forwarded:
-                sub.admin_receipt_forward_message_id = forwarded.message_id
-                await session.commit()
-                await session.refresh(sub)
-        except Exception:
-            pass
-
     builder = InlineKeyboardBuilder()
     builder.button(text="✅ تایید", callback_data=f"approve_sub_{sub_id}")
     builder.button(text="❌ رد", callback_data=f"deny_sub_{sub_id}")
@@ -69,15 +53,29 @@ async def process_receipt(message: Message, state: FSMContext, session: AsyncSes
 
     admin_msg = purchase_receipt_caption(sub, user, source="bot", plans=PLANS)
 
-    # Send the actionable admin message to admin bot (not user bot)
+    # ONE admin message: receipt photo + order details caption + approve/deny
+    # buttons (previously the photo and the actionable text arrived separately).
+    from app.utils.admin_bot_helper import get_admin_bot, relay_user_receipt_photo_to_admin
+
+    admin_bot = get_admin_bot()
     admin_action_msg = None
     if admin_bot:
         try:
-            admin_action_msg = await admin_bot.send_message(ADMIN_ID, admin_msg, reply_markup=builder.as_markup())
+            admin_action_msg = await relay_user_receipt_photo_to_admin(
+                message.bot, admin_bot, ADMIN_ID, message,
+                caption=admin_msg, reply_markup=builder.as_markup(),
+            )
         except Exception:
-            pass
+            admin_action_msg = None
+        if admin_action_msg is None:
+            # Photo relay failed — at least deliver the actionable text.
+            try:
+                admin_action_msg = await admin_bot.send_message(ADMIN_ID, admin_msg, reply_markup=builder.as_markup())
+            except Exception:
+                pass
     try:
         if sub and admin_action_msg is not None:
+            sub.admin_receipt_forward_message_id = admin_action_msg.message_id
             sub.admin_request_message_id = admin_action_msg.message_id
             await session.commit()
     except Exception:

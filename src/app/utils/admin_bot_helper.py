@@ -53,34 +53,40 @@ async def relay_user_receipt_photo_to_admin(
     admin_bot: Bot,
     admin_chat_id: int,
     message: Message,
+    caption: str | None = None,
+    reply_markup=None,
 ):
     """Deliver a user-sent receipt photo to the admin Telegram chat.
 
-    Tries ``forward_message`` first (works in shared/group contexts). For private user↔user-bot
-    chats, falls back to download-via-user-bot + ``send_photo`` via admin bot.
+    With ``caption``/``reply_markup`` the photo, order details and action buttons
+    arrive as ONE message (a plain forward can't carry custom buttons, so that
+    path is only used when neither is requested). Falls back to
+    download-via-user-bot + ``send_photo`` via admin bot.
     """
     if not message.photo:
         return None
 
-    try:
-        return await admin_bot.forward_message(
-            chat_id=admin_chat_id,
-            from_chat_id=message.chat.id,
-            message_id=message.message_id,
-        )
-    except Exception:
-        pass
+    if caption is None and reply_markup is None:
+        try:
+            return await admin_bot.forward_message(
+                chat_id=admin_chat_id,
+                from_chat_id=message.chat.id,
+                message_id=message.message_id,
+            )
+        except Exception:
+            pass
 
     try:
         buf = BytesIO()
         await user_bot.download(message.photo[-1], destination=buf)
         buf.seek(0)
         raw = buf.getvalue()
-        cap = message.caption or None
+        cap = caption if caption is not None else (message.caption or None)
         return await admin_bot.send_photo(
             admin_chat_id,
             photo=BufferedInputFile(raw, filename="receipt.jpg"),
             caption=cap,
+            reply_markup=reply_markup,
         )
     except Exception:
         return None
