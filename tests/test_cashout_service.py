@@ -13,9 +13,9 @@ import sys
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "src"))
 
+from app.core.rewards_config import CASHOUT_MIN_AMOUNT_TOMAN  # noqa: E402
 from app.database import crud  # noqa: E402
 from app.database.models import Base, Referral, Subscription, User  # noqa: E402
-from app.core.rewards_config import CASHOUT_MIN_AMOUNT_TOMAN  # noqa: E402
 from app.services.flows.cashout import CASHOUT_MIN_ACTIVE_REFERRALS, create_cashout  # noqa: E402
 from app.services.flows.errors import FlowError  # noqa: E402
 from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine  # noqa: E402
