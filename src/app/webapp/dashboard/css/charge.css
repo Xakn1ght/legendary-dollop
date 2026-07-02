@@ -57,7 +57,7 @@ html[lang="fa"], html[lang="fa"] body {
   flex-direction: column;
   overflow-x: hidden;
   position: relative;
-  padding-bottom: env(safe-area-inset-bottom, 0px);
+  padding-bottom: calc(env(safe-area-inset-bottom, 0px) + var(--astro-safe-bottom-extra, 0px));
 }
 
 .container::before {
@@ -527,7 +527,7 @@ input:checked + .toggle-slider:before { transform: translateX(20px); }
   bottom: 0;
   z-index: 40;
   padding-top: 16px;
-  padding-bottom: calc(env(safe-area-inset-bottom, 0px) + 16px);
+  padding-bottom: calc(env(safe-area-inset-bottom, 0px) + 16px + var(--astro-safe-bottom-extra, 0px));
 }
 
 /* Step 1: Auto-fit subscription list height */

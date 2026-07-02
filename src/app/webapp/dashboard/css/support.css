@@ -173,7 +173,7 @@ body.platform-ios .header { padding-top: calc(env(safe-area-inset-top) + 50px) !
 .empty-icon { width: 80px; height: 80px; border-radius: 50%; background: var(--bg-glass); display: flex; align-items: center; justify-content: center; margin-bottom: 20px; border: 1px solid var(--border-subtle); }
 .empty-icon svg { width: 32px; height: 32px; color: var(--text-dim); }
 
-.fab { position: fixed; bottom: max(24px, env(safe-area-inset-bottom)); right: 24px; width: 56px; height: 56px; border-radius: 50%; background: linear-gradient(135deg, var(--primary), var(--brandDark)); box-shadow: 0 4px 20px rgba(var(--brandRgb), 0.4); border: none; color: white; display: flex; align-items: center; justify-content: center; cursor: pointer; z-index: 100; }
+.fab { position: fixed; bottom: calc(max(24px, env(safe-area-inset-bottom)) + var(--astro-safe-bottom-extra, 0px)); right: 24px; width: 56px; height: 56px; border-radius: 50%; background: linear-gradient(135deg, var(--primary), var(--brandDark)); box-shadow: 0 4px 20px rgba(var(--brandRgb), 0.4); border: none; color: white; display: flex; align-items: center; justify-content: center; cursor: pointer; z-index: 100; }
 .fab:active { transform: scale(0.9); }
 .fab svg { width: 24px; height: 24px; stroke-width: 2.5; }
 
@@ -197,7 +197,7 @@ html[dir="rtl"] .message.admin { align-self: flex-end; flex-direction: row-rever
 .message-time { font-size: 10px; color: var(--text-dim); margin-top: 4px; padding: 0 4px; }
 .message.user .message-time { text-align: right; }
 
-.reply-area { padding: 16px 20px; padding-bottom: calc(env(safe-area-inset-bottom) + 20px); background: var(--bg-panel); border-top: 1px solid var(--border-subtle); display: flex; gap: 12px; align-items: flex-end; flex-shrink: 0; }
+.reply-area { padding: 16px 20px; padding-bottom: calc(env(safe-area-inset-bottom) + 20px + var(--astro-safe-bottom-extra, 0px)); background: var(--bg-panel); border-top: 1px solid var(--border-subtle); display: flex; gap: 12px; align-items: flex-end; flex-shrink: 0; }
 .keyboard-dismiss-btn { width: 36px; height: 36px; background: transparent; border: 1px solid var(--border-subtle); border-radius: var(--radius-sm); color: var(--text-muted); display: none; align-items: center; justify-content: center; cursor: pointer; flex-shrink: 0; opacity: 0.6; }
 .keyboard-dismiss-btn:active { opacity: 1; background: var(--bg-glass); }
 .keyboard-dismiss-btn svg { width: 18px; height: 18px; }

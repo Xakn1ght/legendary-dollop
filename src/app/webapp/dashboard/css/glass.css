@@ -1302,10 +1302,11 @@ html[data-theme="light"] .vpn-card,
 header {
   backdrop-filter: blur(14px) saturate(160%) !important;
   -webkit-backdrop-filter: blur(14px) saturate(160%) !important;
-  background: rgba(10,18,28, 0.78) !important;
+  /* Near-opaque: content scrolling under a see-through header read as "broken". */
+  background: rgba(10,18,28, 0.94) !important;
 }
 [data-theme="light"] header {
-  background: rgba(244,245,248, 0.82) !important;
+  background: rgba(244,245,248, 0.92) !important;
 }
 
 .bottom-nav {
@@ -2100,7 +2101,7 @@ html[data-theme="light"] body::before {
 
 /* ── 9. HEADER — frosted glass bar ───────────────────────────── */
 [data-theme="light"] header {
-  background: rgba(255, 255, 255, 0.68) !important;
+  background: rgba(255, 255, 255, 0.90) !important;
   backdrop-filter: blur(36px) saturate(220%) brightness(1.02) !important;
   -webkit-backdrop-filter: blur(36px) saturate(220%) brightness(1.02) !important;
   border-bottom: 1px solid rgba(255, 255, 255, 0.88) !important;
@@ -2109,7 +2110,7 @@ html[data-theme="light"] body::before {
     0 4px 24px rgba(20, 40, 100, 0.08) !important;
 }
 [data-theme="light"] header.scrolled {
-  background: rgba(255, 255, 255, 0.82) !important;
+  background: rgba(255, 255, 255, 0.95) !important;
   box-shadow:
     0 1px 0 rgba(255, 255, 255, 0.98),
     0 8px 30px rgba(20, 40, 100, 0.12) !important;
@@ -2374,6 +2375,14 @@ html[data-theme="light"] .vpn-usage-track {
   backdrop-filter: blur(16px) !important;
   -webkit-backdrop-filter: blur(16px) !important;
   border: 1px solid rgba(255, 255, 255, 0.82) !important;
+  color: #1e2130 !important;
+}
+/* Active lang chip keeps its brand fill — the white override above was leaving
+   the chip's white text on a white pill (invisible "FA"). */
+[data-theme="light"] .lang-switch.active {
+  background: var(--brand) !important;
+  border-color: var(--brand) !important;
+  color: #fff !important;
 }
 
 /* ── 19. BOOT SPLASH ─────────────────────────────────────────── */
@@ -4413,4 +4422,12 @@ html.astro-idle .nav-item-notch::after,
 html.astro-idle .welcome-orb-ring,
 html.astro-idle .vpn-card .status-badge.active::before {
   animation-play-state: paused !important;
+}
+
+/* ── v48: KEYBOARD/INPUT SAFETY ──────────────────────────────────
+   16px floor stops iOS Safari/Telegram auto-zoom on focus; the head-boot
+   focus helper scrolls the field above the keyboard. */
+input[type="text"], input[type="number"], input[type="tel"], input[type="email"],
+input[type="search"], input[type="password"], input:not([type]), textarea, select {
+  font-size: max(16px, 1em) !important;
 }

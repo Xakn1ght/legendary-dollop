@@ -36,6 +36,8 @@ html[data-boot="1"] #loadingOverlay { display: flex; }
   display: flex;
   flex-direction: column;
   overflow-x: hidden;
+  /* Clear Android 3-button nav in Telegram fullscreen (env() reports 0 there). */
+  padding-bottom: calc(env(safe-area-inset-bottom, 0px) + var(--astro-safe-bottom-extra, 0px));
 }
 
 /* Header - responsive padding */

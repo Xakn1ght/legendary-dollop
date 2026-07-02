@@ -1098,7 +1098,7 @@
       align-items: flex-end;
       justify-content: center;
       padding: 16px;
-      padding-bottom: calc(16px + env(safe-area-inset-bottom));
+      padding-bottom: calc(16px + env(safe-area-inset-bottom) + var(--astro-safe-bottom-extra, 0px));
       isolation: isolate;
     }
     #autoClaimModalOverlay.visible{ display:flex; }
@@ -1241,7 +1241,7 @@
       align-items: flex-end;
       justify-content: center;
       padding: 14px;
-      padding-bottom: calc(14px + env(safe-area-inset-bottom));
+      padding-bottom: calc(14px + env(safe-area-inset-bottom) + var(--astro-safe-bottom-extra, 0px));
       background: rgba(0,0,0,0.55);
       z-index: 200010;
     }
@@ -1464,7 +1464,7 @@
     /* Copy Toast Notification */
     .profile-copy-toast {
       position: fixed;
-      bottom: calc(100px + env(safe-area-inset-bottom));
+      bottom: calc(100px + env(safe-area-inset-bottom) + var(--astro-safe-bottom-extra, 0px));
       left: 50%;
       transform: translateX(-50%) translateY(100px);
       background: var(--panel);

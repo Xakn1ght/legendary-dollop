@@ -638,12 +638,20 @@
 
           // ---- Star Season (referral-only seasonal stars + coupon wallet) ----
           let seasonData = null;
+          // fa gets Persian-Indic digits everywhere numbers render (item: farsi numbers).
+          function faNum(v) {
+            return currentLang === 'fa' ? String(v).replace(/\d/g, (d) => '۰۱۲۳۴۵۶۷۸۹'[d]) : String(v);
+          }
+          function fmtNum(n) {
+            try { return Number(n || 0).toLocaleString(currentLang === 'fa' ? 'fa-IR' : 'en-US'); }
+            catch (_) { return String(n); }
+          }
           function couponLabel(c, t, lang) {
             const p = (c && c.payload) || {};
             switch (c && c.coupon_type) {
-              case 'discount_percent': { const n = Number(p.discount_percent || 0); return lang === 'fa' ? ('٪' + n + ' تخفیف') : (n + '% discount'); }
-              case 'free_gb': { const n = Number(p.gb || 0); return lang === 'fa' ? (n + ' گیگ رایگان') : (n + 'GB free'); }
-              case 'free_plan': { const n = Number(p.plan_gb || 0); return lang === 'fa' ? ('پلن ' + n + ' گیگ رایگان') : ('Free ' + n + 'GB plan'); }
+              case 'discount_percent': { const n = Number(p.discount_percent || 0); return lang === 'fa' ? ('٪' + faNum(n) + ' تخفیف') : (n + '% discount'); }
+              case 'free_gb': { const n = Number(p.gb || 0); return lang === 'fa' ? (faNum(n) + ' گیگ رایگان') : (n + 'GB free'); }
+              case 'free_plan': { const n = Number(p.plan_gb || 0); return lang === 'fa' ? ('پلن ' + faNum(n) + ' گیگ رایگان') : ('Free ' + n + 'GB plan'); }
               case 'free_autorenew': return t.couponFreeAutorenew || 'Free auto-renewal';
               case 'vip_pack': return t.couponVipPack || 'Season VIP Pack';
               case 'legend_pack': return t.couponLegendPack || 'Season Legend Pack';
@@ -688,22 +696,22 @@
               const numsEl = document.getElementById('seasonProgressNums');
               const nextRewardEl = document.getElementById('seasonNextReward');
               const endsEl = document.getElementById('seasonEnds');
-              if (starsEl) starsEl.textContent = stars.toLocaleString();
-              if (statStarsEl) statStarsEl.textContent = stars.toLocaleString();
+              if (starsEl) starsEl.textContent = fmtNum(stars);
+              if (statStarsEl) statStarsEl.textContent = fmtNum(stars);
               if (fillEl) fillEl.style.width = pct + '%';
               const allUnlocked = t.seasonAllUnlocked || 'All unlocked';
               if (next) {
                 const nextRung = ladder.find((m) => Number(m.stars) === nextStars) || next;
                 const reward = couponLabel(nextRung, t, lang);
-                if (toGoEl) toGoEl.textContent = lang === 'fa' ? `${need}⭐ مانده` : `${need}⭐ to go`;
-                if (numsEl) numsEl.textContent = lang === 'fa' ? `⭐ ${stars} از ${nextStars}` : `${stars} / ${nextStars} ⭐`;
+                if (toGoEl) toGoEl.textContent = lang === 'fa' ? `${faNum(need)}⭐ مانده` : `${need}⭐ to go`;
+                if (numsEl) numsEl.textContent = lang === 'fa' ? `⭐ ${faNum(stars)} از ${faNum(nextStars)}` : `${stars} / ${nextStars} ⭐`;
                 if (nextRewardEl) nextRewardEl.textContent = `🎁 ${reward}`;
               } else {
                 if (toGoEl) toGoEl.textContent = '';
                 if (numsEl) numsEl.textContent = allUnlocked;
                 if (nextRewardEl) nextRewardEl.textContent = '🎉 ' + allUnlocked;
               }
-              if (endsEl) endsEl.textContent = (daysLeft == null) ? '' : (lang === 'fa' ? `پایان فصل تا ${daysLeft} روز` : `Season ends in ${daysLeft} days`);
+              if (endsEl) endsEl.textContent = (daysLeft == null) ? '' : (lang === 'fa' ? `پایان فصل تا ${faNum(daysLeft)} روز` : `Season ends in ${daysLeft} days`);
             } catch (_) {}
             try {
               const list = document.getElementById('seasonLadderList');
@@ -713,7 +721,7 @@
                   const isNext = next && Number(m.stars) === nextStars;
                   const reward = couponLabel(m, t, lang);
                   const cls = 'season-rung' + (reached ? ' reached' : '') + (isNext ? ' next' : '');
-                  return `<div class="${cls}"><div class="season-rung-node">${reached ? '★' : m.stars}</div><div class="season-rung-body"><div class="season-rung-reward">${reward}</div><div class="season-rung-stars">${m.stars}⭐</div></div><div class="season-rung-state">${reached ? '✅' : (isNext ? '⏳' : '🔒')}</div></div>`;
+                  return `<div class="${cls}"><div class="season-rung-node">${reached ? '★' : faNum(m.stars)}</div><div class="season-rung-body"><div class="season-rung-reward">${reward}</div><div class="season-rung-stars">${faNum(m.stars)}⭐</div></div><div class="season-rung-state">${reached ? '✅' : (isNext ? '⏳' : '🔒')}</div></div>`;
                 }).join('');
               }
             } catch (_) {}
@@ -728,9 +736,9 @@
                     const label = couponLabel(c, t, lang);
                     const star = Number(c.milestone_stars || 0);
                     const dleft = c.days_left;
-                    const exp = (dleft == null) ? '' : `${t.couponExpires || 'exp'} ${dleft}d`;
+                    const exp = (dleft == null) ? '' : (currentLang === 'fa' ? `${t.couponExpires} ${faNum(dleft)} روز` : `${t.couponExpires || 'exp'} ${dleft}d`);
                     const soon = (dleft != null && dleft <= 7) ? ' soon' : '';
-                    return `<div class="coupon-ticket"><div class="coupon-ticket-stub">${star}⭐</div><div class="coupon-ticket-body"><div class="coupon-ticket-label">${label}</div>${exp ? `<div class="coupon-ticket-exp${soon}">${exp}</div>` : ''}</div></div>`;
+                    return `<div class="coupon-ticket"><div class="coupon-ticket-stub">${faNum(star)}⭐</div><div class="coupon-ticket-body"><div class="coupon-ticket-label">${label}</div>${exp ? `<div class="coupon-ticket-exp${soon}">${exp}</div>` : ''}</div></div>`;
                   }).join('');
                 }
               }
@@ -1132,9 +1140,9 @@
 		        const subCredit = rewardsSummary?.user?.subscription_credit ?? 0;
 		        const points = 0;
 		        const stars = rewardsSummary?.user?.stars ?? 0;
-		        if (creditEl) creditEl.textContent = Number(credit).toLocaleString();
-		        if (subCreditEl) subCreditEl.textContent = Number(subCredit).toLocaleString();
-		        if (pointsEl) pointsEl.textContent = Number(points).toLocaleString();
+		        if (creditEl) creditEl.textContent = fmtNum(credit);
+		        if (subCreditEl) subCreditEl.textContent = fmtNum(subCredit);
+		        if (pointsEl) pointsEl.textContent = fmtNum(points);
 		        if (starsEl) starsEl.textContent = Number(stars).toLocaleString();
             if (statCreditsEl) statCreditsEl.textContent = Number(credit).toLocaleString();
             if (statStarsEl) statStarsEl.textContent = Number(stars).toLocaleString();

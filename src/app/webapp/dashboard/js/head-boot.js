@@ -282,6 +282,38 @@
       }catch(_){}
     })();
 
+// Keyboard helper: keep the focused input visible above the on-screen keyboard.
+// Telegram resizes the viewport when the keyboard opens; scroll the focused field
+// to the middle of what's left. Re-run on viewportChanged so rotating/keyboard
+// size changes keep it in view. (No zoom: inputs are >=16px via glass.css.)
+(function () {
+  'use strict';
+  function reveal(el) {
+    try { el.scrollIntoView({ block: 'center', behavior: 'smooth' }); } catch (_) {
+      try { el.scrollIntoView(); } catch (_) {}
+    }
+  }
+  function focusedField() {
+    const el = document.activeElement;
+    return (el && el.matches && el.matches('input, textarea, select, [contenteditable="true"]')) ? el : null;
+  }
+  document.addEventListener('focusin', (e) => {
+    const el = e.target;
+    if (!el || !el.matches || !el.matches('input, textarea, select, [contenteditable="true"]')) return;
+    // Wait for the keyboard/viewport animation before measuring.
+    setTimeout(() => { if (focusedField() === el) reveal(el); }, 350);
+  }, true);
+  try {
+    const tg = window.Telegram && window.Telegram.WebApp;
+    if (tg && typeof tg.onEvent === 'function') {
+      tg.onEvent('viewportChanged', () => {
+        const el = focusedField();
+        if (el) setTimeout(() => reveal(el), 60);
+      });
+    }
+  } catch (_) {}
+})();
+
 // Idle freeze: pause the decorative drift after 45s without interaction
 // (html.astro-idle, see glass.css). Any touch/scroll resumes instantly —
 // the animation only stops while nobody is looking at it moving. Cuts
