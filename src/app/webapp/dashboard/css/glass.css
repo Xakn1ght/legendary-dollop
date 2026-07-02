@@ -4439,3 +4439,34 @@ html[data-perf="lite"] .toggle g { filter: none !important; }
 html[data-perf="lite"] .toggle-circle,
 html[data-perf="lite"] .toggle-circle-center,
 html[data-perf="lite"] .toggle-background { transition-duration: .15s !important; }
+
+/* ── v49: KEYBOARD LIFT ──────────────────────────────────────────
+   head-boot.js publishes the on-screen-keyboard height as --kb and sets
+   html.kb-open while an input is focused. Android doesn't resize the
+   webview — the keyboard just covers it — so fixed containers shrink
+   their usable area with bottom padding and flex re-centers the content
+   in the visible strip above the keyboard. */
+html.kb-open .modal-overlay.active {
+  padding-bottom: var(--kb, 0px) !important;
+}
+html.kb-open .chat-view.active {
+  padding-bottom: var(--kb, 0px) !important;
+}
+/* Keyboard replaces the nav bar — drop the reply bar's safe-area padding
+   so it hugs the keyboard instead of floating above it. */
+html.kb-open .chat-view.active .reply-area {
+  padding-bottom: 12px !important;
+}
+/* Self-centered sheets (translate(-50%,-50%)) move their anchor up instead. */
+html.kb-open .picker-panel.active {
+  top: calc(50% - var(--kb, 0px) / 2) !important;
+}
+/* Modals never exceed the visible strip; scroll inside instead of clipping.
+   Base overlay padding also keeps tall modals off the Android nav bar. */
+.modal-overlay {
+  padding: 16px 0 calc(16px + var(--astro-safe-bottom-extra, 0px));
+}
+.modal-overlay .modal {
+  max-height: calc(100vh - var(--kb, 0px) - 48px);
+  overflow-y: auto;
+}

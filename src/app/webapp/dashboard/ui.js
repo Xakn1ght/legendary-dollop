@@ -25,7 +25,11 @@
 
       // Telegram on Android doesn't consistently expose safe-area insets; add a small extra
       // padding so fixed bottom nav/actions don't sit on top of the system buttons.
-      root.style.setProperty('--astro-safe-bottom-extra', isAndroid ? '16px' : '0px');
+      // head-boot.js owns this value when present (it tracks safeAreaChanged /
+      // fullscreen) — only seed a default when nothing set it yet.
+      if (!root.style.getPropertyValue('--astro-safe-bottom-extra')) {
+        root.style.setProperty('--astro-safe-bottom-extra', isAndroid ? '16px' : '0px');
+      }
     } catch (_) {}
   })();
 

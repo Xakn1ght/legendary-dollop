@@ -1,13 +1,10 @@
-import re
-from datetime import datetime
-from typing import Any, List, Literal, Optional
+from typing import List, Literal, Optional
 
 from pydantic import (
     BaseModel,
     ConfigDict,
     Field,
     field_validator,
-    model_validator,
 )
 
 # =============================================================================
@@ -25,11 +22,13 @@ class TicketCreateRequest(BaseModel):
     """Schema for creating a new support ticket"""
     model_config = ConfigDict(str_strip_whitespace=True)
     
-    subject: str = Field(
-        ...,
-        min_length=3,
+    # The dashboard form has no subject input and the create handler never stores
+    # one (admin views show the category as the subject) — optional so legacy
+    # clients that still send it don't break.
+    subject: Optional[str] = Field(
+        default=None,
         max_length=60,
-        description="Short subject/title for the ticket",
+        description="Short subject/title for the ticket (unused, legacy)",
     )
     category: Literal["connection", "money", "other"] = Field(
         ..., 

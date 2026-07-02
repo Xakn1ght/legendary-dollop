@@ -91,6 +91,14 @@ async def telegram_only_middleware(app: web.Application, handler):
         is_exception = any(path.startswith(e) for e in exceptions)
         
         if is_protected and not is_exception:
+            # WebSocket upgrades can't carry custom headers, and Telegram Desktop's
+            # webview User-Agent is plain Chrome — let WS requests that present
+            # initData/auth in the query through to the handler's HMAC verification.
+            if (
+                request.headers.get("Upgrade", "").lower() == "websocket"
+                and (request.query.get("init_data") or request.query.get("auth"))
+            ):
+                return await handler(request)
             # For API endpoints: enforce Telegram origin check.
             # HTML pages stay open so the mini-app shell can load in the browser frame.
             # The real auth (HMAC-signed initData + session token) happens inside each handler.

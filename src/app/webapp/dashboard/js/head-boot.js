@@ -265,10 +265,13 @@
           const applySafeArea = () => {
             try {
               const sa = tg.safeAreaInset;
-              // Trust a reported value (0 = gesture nav, fine). If the client
-              // can't report at all while fullscreen, assume a 3-button bar.
+              // Trust a reported non-zero value. Zero/missing is unreliable on
+              // Android (clients often report 0 even over a 3-button nav bar),
+              // so floor it: assume a nav bar in fullscreen, breathing room
+              // otherwise. Overshoot is a little air; undershoot is buttons
+              // under the system bar.
               let px = sa ? Math.max(0, Math.round(sa.bottom || 0)) : 0;
-              if (!sa && tg.isFullscreen) px = 48;
+              if (px <= 0) px = tg.isFullscreen ? 48 : 16;
               document.documentElement.style.setProperty('--astro-safe-bottom-extra', px + 'px');
             } catch(_) {}
           };
@@ -283,34 +286,69 @@
     })();
 
 // Keyboard helper: keep the focused input visible above the on-screen keyboard.
-// Telegram resizes the viewport when the keyboard opens; scroll the focused field
-// to the middle of what's left. Re-run on viewportChanged so rotating/keyboard
-// size changes keep it in view. (No zoom: inputs are >=16px via glass.css.)
+// On Android the webview is NOT resized when the keyboard opens — it just covers
+// the bottom of the page, so scrollIntoView alone can't help short pages or
+// fixed-position modals. Measure the covered height (visualViewport primary,
+// Telegram viewportHeight as backup), publish it as --kb + html.kb-open, give
+// in-flow pages scroll room via body padding, then scroll the field into view.
+// Fixed containers (modals/sheets/chat) reposition themselves via CSS rules
+// keyed off html.kb-open. (No zoom: inputs are >=16px via glass.css.)
 (function () {
   'use strict';
-  function reveal(el) {
-    try { el.scrollIntoView({ block: 'center', behavior: 'smooth' }); } catch (_) {
-      try { el.scrollIntoView(); } catch (_) {}
-    }
-  }
+  var root = document.documentElement;
+  var vv = window.visualViewport || null;
   function focusedField() {
-    const el = document.activeElement;
+    var el = document.activeElement;
     return (el && el.matches && el.matches('input, textarea, select, [contenteditable="true"]')) ? el : null;
   }
-  document.addEventListener('focusin', (e) => {
-    const el = e.target;
-    if (!el || !el.matches || !el.matches('input, textarea, select, [contenteditable="true"]')) return;
-    // Wait for the keyboard/viewport animation before measuring.
-    setTimeout(() => { if (focusedField() === el) reveal(el); }, 350);
-  }, true);
-  try {
-    const tg = window.Telegram && window.Telegram.WebApp;
-    if (tg && typeof tg.onEvent === 'function') {
-      tg.onEvent('viewportChanged', () => {
-        const el = focusedField();
-        if (el) setTimeout(() => reveal(el), 60);
-      });
+  function kbHeight() {
+    var h = 0;
+    try { if (vv) h = Math.max(h, Math.round(window.innerHeight - vv.height - (vv.offsetTop || 0))); } catch (_) {}
+    try {
+      var tg = window.Telegram && window.Telegram.WebApp;
+      if (tg && tg.viewportHeight) h = Math.max(h, Math.round(window.innerHeight - tg.viewportHeight));
+    } catch (_) {}
+    return h > 80 ? h : 0; // below that it's nav-bar/viewport noise, not a keyboard
+  }
+  function inFixed(el) {
+    for (var n = el; n && n !== document.body; n = n.parentElement) {
+      try { if (getComputedStyle(n).position === 'fixed') return true; } catch (_) { return false; }
     }
+    return false;
+  }
+  function apply() {
+    var el = focusedField();
+    var kb = el ? kbHeight() : 0;
+    try {
+      root.style.setProperty('--kb', kb + 'px');
+      root.classList.toggle('kb-open', kb > 0);
+    } catch (_) {}
+    if (!el || !kb) {
+      if (document.body) document.body.style.paddingBottom = '';
+      return;
+    }
+    if (!inFixed(el) && document.body) document.body.style.paddingBottom = kb + 'px';
+    var r = el.getBoundingClientRect();
+    var visibleBottom = window.innerHeight - kb;
+    if (r.bottom > visibleBottom - 12 || r.top < 0) {
+      try { el.scrollIntoView({ block: 'center', behavior: 'smooth' }); } catch (_) {
+        try { el.scrollIntoView(); } catch (_) {}
+      }
+    }
+  }
+  var timer = null;
+  function queue(delay) {
+    if (timer) clearTimeout(timer);
+    timer = setTimeout(function () { timer = null; apply(); }, delay || 80);
+  }
+  document.addEventListener('focusin', function () { queue(320); }, true);
+  document.addEventListener('focusout', function () { queue(120); }, true);
+  if (vv) {
+    try { vv.addEventListener('resize', function () { queue(60); }); } catch (_) {}
+  }
+  try {
+    var tg = window.Telegram && window.Telegram.WebApp;
+    if (tg && typeof tg.onEvent === 'function') tg.onEvent('viewportChanged', function () { queue(60); });
   } catch (_) {}
 })();
 
