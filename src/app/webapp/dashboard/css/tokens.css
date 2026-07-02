@@ -158,20 +158,21 @@
   --brand-soft: rgba(251, 191, 36, 0.14);
   --brand-glow: rgba(251, 191, 36, 0.32);
 }
-/* Unlocked-only accents (Star Season vip_pack / legend_pack). */
-[data-accent="champion"] {
-  --brand:      #e0b341;
-  --brandDark:  #b8860b;
-  --brandRgb:   224, 179, 65;
-  --brand-soft: rgba(224, 179, 65, 0.14);
-  --brand-glow: rgba(224, 179, 65, 0.34);
+/* Unlocked-only accents (Star Season vip_pack / legend_pack) — kept clearly
+   distinct from amber (yellow) and violet (soft purple). */
+[data-accent="champion"] {            /* deep metallic gold */
+  --brand:      #e8a300;
+  --brandDark:  #a87400;
+  --brandRgb:   232, 163, 0;
+  --brand-soft: rgba(232, 163, 0, 0.14);
+  --brand-glow: rgba(232, 163, 0, 0.34);
 }
-[data-accent="legend"] {
-  --brand:      #b574f5;
-  --brandDark:  #7c3aed;
-  --brandRgb:   181, 116, 245;
-  --brand-soft: rgba(181, 116, 245, 0.14);
-  --brand-glow: rgba(181, 116, 245, 0.36);
+[data-accent="legend"] {              /* electric royal magenta */
+  --brand:      #c026d3;
+  --brandDark:  #8a0fae;
+  --brandRgb:   192, 38, 211;
+  --brand-soft: rgba(192, 38, 211, 0.14);
+  --brand-glow: rgba(192, 38, 211, 0.38);
 }
 
 /* ============================================================

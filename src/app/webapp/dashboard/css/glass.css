@@ -1311,11 +1311,12 @@ header {
 .bottom-nav {
   backdrop-filter: blur(16px) saturate(160%) !important;
   -webkit-backdrop-filter: blur(16px) saturate(160%) !important;
-  background: rgba(10,18,28, 0.85) !important;
+  /* Near-opaque: stays solid where backdrop-filter is weak (Telegram Desktop). */
+  background: rgba(10,18,28, 0.985) !important;
   border-top: 1px solid rgba(255,255,255,0.06) !important;
 }
 [data-theme="light"] .bottom-nav {
-  background: rgba(255,255,255, 0.88) !important;
+  background: rgba(255,255,255, 0.97) !important;
   border-top-color: rgba(15,23,42, 0.08) !important;
 }
 
@@ -2934,7 +2935,7 @@ html[data-theme="light"] body::before {
 
 /* ── 8. BOTTOM NAV — heavy frost ─────────────────────────────── */
 [data-theme="light"] .bottom-nav {
-  background: rgba(250, 248, 245, 0.66) !important;
+  background: rgba(250, 248, 245, 0.97) !important;
   backdrop-filter: var(--lg-blur-heavy) !important;
   -webkit-backdrop-filter: var(--lg-blur-heavy) !important;
   border-top: 1px solid rgba(255, 255, 255, 0.88) !important;

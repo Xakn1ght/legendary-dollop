@@ -16,8 +16,8 @@
   <div id="astro-lava" aria-hidden="true"><div class="lava-blob lava-blob-1"></div><div class="lava-blob lava-blob-2"></div><div class="lava-blob lava-blob-3"></div><div class="lava-blob lava-blob-4"></div><div class="lava-blob lava-blob-5"></div></div>
   <div class="content">
     <!-- ALL STYLES MUST BE INSIDE .content FOR DASHBOARD INJECTION -->
-    <link rel="stylesheet" href="/webapp/dashboard/css/profile.css?v=bump">
-    <link rel="stylesheet" href="/webapp/dashboard/css/glass.css?v=46">
+    <link rel="stylesheet" href="/webapp/dashboard/css/profile.css?v=bump3">
+    <link rel="stylesheet" href="/webapp/dashboard/css/glass.css?v=47">
     
     <!-- Profile Hero Card -->
     <section class="profile-hero">
@@ -345,8 +345,8 @@
               <button type="button" class="accent-swatch" data-accent-key="emerald" role="radio" aria-label="Emerald" style="--swatch:#34d399;"></button>
               <button type="button" class="accent-swatch" data-accent-key="violet"  role="radio" aria-label="Violet"  style="--swatch:#a78bfa;"></button>
               <button type="button" class="accent-swatch" data-accent-key="amber"   role="radio" aria-label="Amber"   style="--swatch:#fbbf24;"></button>
-              <button type="button" class="accent-swatch" data-accent-key="champion" role="radio" aria-label="Champion" style="--swatch:#e0b341;" hidden></button>
-              <button type="button" class="accent-swatch" data-accent-key="legend"   role="radio" aria-label="Legend"   style="--swatch:#b574f5;" hidden></button>
+              <button type="button" class="accent-swatch" data-accent-key="champion" role="radio" aria-label="Champion" style="--swatch:#e8a300;" hidden></button>
+              <button type="button" class="accent-swatch" data-accent-key="legend"   role="radio" aria-label="Legend"   style="--swatch:#c026d3;" hidden></button>
             </div>
           </div>
         </div>
@@ -566,22 +566,49 @@
 
         // Reveal pack-unlocked accents (champion/legend) and the earned badge chip from
         // the user's stored prefs. champion/legend swatches stay hidden until unlocked.
-        async function applyUnlocks(){
+        // Authenticated GET — the shell's window.api attaches the Telegram initData /
+        // bearer headers (raw fetch 401s on Telegram Desktop). Falls back to a plain
+        // fetch only for a standalone page load outside the shell.
+        async function unlockGet(path){
+          try { if (typeof window.api === 'function') return await window.api(path); } catch(_){}
           try {
-            const r = await fetch('/api/dashboard/preferences', { headers: { 'Accept': 'application/json' }, credentials: 'same-origin' });
-            const d = await r.json();
+            const r = await fetch(path, { headers: { 'Accept': 'application/json' }, credentials: 'same-origin' });
+            return await r.json();
+          } catch(_) { return null; }
+        }
+        async function applyUnlocks(){
+          const themes = new Set();
+          let badge = '';
+          // 1) Permanent unlocks (written into prefs when a pack was spent).
+          try {
+            const d = await unlockGet('/api/dashboard/preferences');
             const prefs = (d && d.ok && d.prefs) ? d.prefs : {};
-            const unlocked = Array.isArray(prefs.unlocked_themes) ? prefs.unlocked_themes : [];
-            unlocked.forEach(function(k){
-              const sw = document.querySelector('.accent-swatch[data-accent-key="' + k + '"]');
-              if (sw) sw.hidden = false;
-            });
-            if (prefs.badge) {
-              const chip = document.getElementById('userPackBadge');
-              const txt = document.getElementById('userPackBadgeText');
-              if (chip && txt) { txt.textContent = prefs.badge; chip.hidden = false; }
-            }
+            (Array.isArray(prefs.unlocked_themes) ? prefs.unlocked_themes : []).forEach(function(t){ themes.add(t); });
+            if (prefs.badge) badge = prefs.badge;
           } catch(_){}
+          // 2) Owned pack coupons unlock their look NOW — the theme/badge is a status
+          //    reward, earned the moment you reach the milestone, not something you must
+          //    spend first. The coupon's money perk is still spent at checkout.
+          try {
+            const d = await unlockGet('/api/dashboard/season');
+            const coupons = (d && d.ok && Array.isArray(d.coupons)) ? d.coupons : [];
+            coupons.forEach(function(c){
+              if (c.coupon_type !== 'vip_pack' && c.coupon_type !== 'legend_pack') return;
+              const p = c.payload || {};
+              if (p.theme) themes.add(p.theme);
+              if (p.badge && (c.coupon_type === 'legend_pack' || !badge)) badge = p.badge; // legend outranks
+            });
+          } catch(_){}
+          // Reveal the unlocked swatches + the badge chip.
+          themes.forEach(function(k){
+            const sw = document.querySelector('.accent-swatch[data-accent-key="' + k + '"]');
+            if (sw) sw.hidden = false;
+          });
+          if (badge) {
+            const chip = document.getElementById('userPackBadge');
+            const txt = document.getElementById('userPackBadgeText');
+            if (chip && txt) { txt.textContent = badge; chip.hidden = false; }
+          }
         }
         function currentAccent(){
           try {
