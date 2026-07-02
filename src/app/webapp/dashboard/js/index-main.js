@@ -481,6 +481,7 @@
         hide: 'Hide',
         autoOff: 'Auto: Off',
         auto: 'Auto',
+        refreshNow: 'Refresh',
         secondsShort: 's',
         minutesShort: 'm',
         actions: 'Actions',
@@ -588,6 +589,7 @@
         hide: 'بستن',
         autoOff: 'خودکار: خاموش',
         auto: 'خودکار',
+        refreshNow: 'بروزرسانی',
         secondsShort: 'ث',
         minutesShort: 'د',
         actions: 'اقدامات',
@@ -734,12 +736,11 @@
       setText('markAllReadBtn','markAllAsRead');
       setText('clearHistoryBtn','clearHistory');
       // Quick action buttons
-      setText('quickActionsTitle','quickActions');
       setText('btnBuyService','buyService');
       setText('btnChargeService','chargeService');
       setText('btnSupport','support');
       // Speed + auto-refresh controls
-      const autoBtn = document.getElementById('autoRefreshBtn'); if (autoBtn) autoBtn.textContent = autoRefreshLabel(autoRefreshSeconds);
+      try { _paintRefreshBtn(); } catch(_) {}
       const speedToggleBtn = document.getElementById('speedToggleBtn'); if (speedToggleBtn) speedToggleBtn.textContent = speedPanelOpen ? t('hide') : t('show');
     }
 	    function applyLanguageLight(lang){
@@ -1804,46 +1805,50 @@
       }catch(_){}
     }
 
-    const autoRefreshStorageKey = 'astro_auto_refresh_s';
-    const autoRefreshOptions = [0, 30, 60, 120];
-    let autoRefreshTimer = null;
-    let autoRefreshSeconds = 0;
-
-    function autoRefreshLabel(seconds){
-      if (!seconds) return t('autoOff');
-      if (seconds < 60) return t('auto') + ': ' + seconds + t('secondsShort');
-      const m = Math.round(seconds / 60);
-      return t('auto') + ': ' + m + t('minutesShort');
+    // Manual refresh with a 5-minute cooldown. Replaced the 30/60/120s auto-poll:
+    // background polling burned battery and panel for data that rarely changes
+    // mid-session, and the backend Marzban cache made sub-90s polls pointless.
+    const REFRESH_COOLDOWN_S = 300;
+    const refreshTsKey = 'astro_last_manual_refresh';
+    let refreshCooldownTimer = null;
+    function _faDigits(str){
+      return currentLang === 'fa' ? String(str).replace(/\d/g, d => '۰۱۲۳۴۵۶۷۸۹'[d]) : String(str);
     }
-    function applyAutoRefresh(seconds){
-      autoRefreshSeconds = Math.max(0, Number(seconds) || 0);
-      try{ localStorage.setItem(autoRefreshStorageKey, String(autoRefreshSeconds)); }catch(_){}
+    function _refreshCooldownLeft(){
+      let last = 0; try{ last = Number(localStorage.getItem(refreshTsKey) || 0); }catch(_){}
+      return Math.max(0, REFRESH_COOLDOWN_S - Math.floor((Date.now() - last) / 1000));
+    }
+    function _paintRefreshBtn(){
       const btn = document.getElementById('autoRefreshBtn');
-      if (btn) btn.textContent = autoRefreshLabel(autoRefreshSeconds);
-      if (autoRefreshTimer) { try{ clearInterval(autoRefreshTimer); }catch(_){} autoRefreshTimer = null; }
-      if (!autoRefreshSeconds) return;
-      autoRefreshTimer = setInterval(() => {
-        try{
-          if (document.hidden || !appIsActive) return;
-          if (currentSubId) fetchOverviewById(currentSubId, { instant: true, skipLoading: true });
-          else fetchOverview({ instant: true, skipLoading: true });
-        }catch(_){}
-      }, autoRefreshSeconds * 1000);
+      if (!btn) return;
+      const left = _refreshCooldownLeft();
+      if (left > 0) {
+        const m = Math.floor(left / 60), sec = left % 60;
+        btn.textContent = _faDigits(m + ':' + String(sec).padStart(2, '0'));
+        btn.disabled = true;
+        btn.classList.add('cooldown');
+        if (!refreshCooldownTimer) refreshCooldownTimer = setInterval(_paintRefreshBtn, 1000);
+      } else {
+        btn.textContent = t('refreshNow');
+        btn.disabled = false;
+        btn.classList.remove('cooldown');
+        if (refreshCooldownTimer) { clearInterval(refreshCooldownTimer); refreshCooldownTimer = null; }
+      }
     }
     function initAutoRefresh(){
-      let saved = 0;
-      try{ saved = Number(localStorage.getItem(autoRefreshStorageKey) || 0); }catch(_){ saved = 0; }
-      if (!autoRefreshOptions.includes(saved)) saved = 0;
-      applyAutoRefresh(saved);
       const btn = document.getElementById('autoRefreshBtn');
-      if (btn) {
-        btn.addEventListener('click', () => {
-          const idx = Math.max(0, autoRefreshOptions.indexOf(autoRefreshSeconds));
-          const next = autoRefreshOptions[(idx + 1) % autoRefreshOptions.length];
-          if (tg && tg.HapticFeedback) tg.HapticFeedback.impactOccurred('light');
-          applyAutoRefresh(next);
-        });
-      }
+      if (!btn) return;
+      _paintRefreshBtn();
+      btn.addEventListener('click', () => {
+        if (_refreshCooldownLeft() > 0) return;
+        try{ localStorage.setItem(refreshTsKey, String(Date.now())); }catch(_){}
+        if (tg && tg.HapticFeedback) tg.HapticFeedback.impactOccurred('light');
+        try{
+          if (currentSubId) fetchOverviewById(currentSubId, { skipCache: true, forceUpdate: true });
+          else fetchOverview({ skipCache: true, forceUpdate: true });
+        }catch(_){}
+        _paintRefreshBtn();
+      });
     }
 
     const speedPanelStorageKey = 'astro_speed_open';
@@ -2341,9 +2346,9 @@
                   fa: '\u0627\u06CC\u0646 \u062F\u06A9\u0645\u0647 \u0631\u0627 \u0628\u0632\u0646\u06CC\u062F \u062A\u0627 \u0644\u06CC\u0646\u06A9 \u0627\u062A\u0635\u0627\u0644 VPN \u06A9\u067E\u06CC \u0634\u0648\u062F.\n\u0622\u0646 \u0631\u0627 \u062F\u0631 \u0628\u0631\u0646\u0627\u0645\u0647 VPN \u062E\u0648\u062F \u067E\u06CC\u0633\u062A \u06A9\u0646\u06CC\u062F!' },
         placement: 'top',
       },
-      // ── Step 6: Quick Actions ──
+      // ── Step 6: Quick Actions (moved into the + actions menu) ──
       {
-        target: '#quickActionsCard',
+        target: '#addSubBtn',
         title:  { en: 'Quick Actions', fa: '\u062F\u0633\u062A\u0631\u0633\u06CC \u0633\u0631\u06CC\u0639' },
         desc:   { en: 'Buy new services, charge your subscription, or contact support \u2014 all in one tap.',
                   fa: '\u062E\u0631\u06CC\u062F \u0633\u0631\u0648\u06CC\u0633 \u062C\u062F\u06CC\u062F\u060C \u0634\u0627\u0631\u0698 \u0627\u0634\u062A\u0631\u0627\u06A9 \u06CC\u0627 \u062A\u0645\u0627\u0633 \u0628\u0627 \u067E\u0634\u062A\u06CC\u0628\u0627\u0646\u06CC \u2014 \u0647\u0645\u0647 \u062F\u0631 \u06CC\u06A9 \u0644\u0645\u0633.' },
@@ -2893,8 +2898,34 @@
         }
       }
     }
+			    // The home page's listeners are bound once at boot by THIS file. Refetching
+			    // home HTML on back-navigation produced fresh nodes with no listeners
+			    // (dead buttons until a hard refresh). Instead: stash the live home element
+			    // when leaving, and put the SAME element (listeners intact) back on return.
+			    let _homeContentEl = null;
 			    async function loadPageIntoShell(url, page){
 		      const content = document.querySelector('.content');
+		      const leavingHome = (document.body.getAttribute('data-page') || 'home') === 'home';
+		      const goingHome = (page || '') === 'home';
+		      if (goingHome && leavingHome) return; // already there
+		      if (leavingHome && content) _homeContentEl = content;
+		      if (goingHome && _homeContentEl) {
+		        try {
+		          content.replaceWith(_homeContentEl);
+		          document.body.setAttribute('data-page', 'home');
+		          persistLastDashboard(DASHBOARD_PAGE_URLS.home);
+		          document.querySelectorAll('.nav-item[data-page]').forEach(function(ni){
+		            ni.classList.toggle('active', ni.getAttribute('data-page') === 'home');
+		          });
+		          try { const tg = window.Telegram?.WebApp; if (tg && tg.BackButton) tg.BackButton.hide(); } catch(_) {}
+		          try { fetchOverview({ instant: true, skipLoading: true }); } catch(_) {}
+		          try { loadSubscriptions(); } catch(_) {}
+		          try { window.scrollTo(0, 0); } catch(_) {}
+		          return;
+		        } catch (restoreErr) {
+		          console.warn('[DASHBOARD] home restore failed, falling back to fetch:', restoreErr);
+		        }
+		      }
 		      if (content) content.classList.add('loading');
 		      try{
 		        // Do NOT propagate auth tokens into navigation/fetch URLs.
@@ -2922,6 +2953,24 @@
         const styles = Array.from(newContent.querySelectorAll('style'));
         scripts.forEach(s => s.remove());
         // Don't remove styles, they'll be re-injected for better reliability
+
+        // Preload the page's stylesheets BEFORE swapping the DOM. The injected
+        // <link> tags only started loading after the swap, so the new page
+        // painted as bare HTML for a few frames. The old page stays fully
+        // styled while these fetch (cached after first visit -> instant).
+        try {
+          const cssLinks = Array.from(newContent.querySelectorAll('link[rel="stylesheet"]'));
+          await Promise.all(cssLinks.map((l) => new Promise((res) => {
+            const href = l.getAttribute('href') || '';
+            if (!href || document.head.querySelector('link[rel="stylesheet"][href="' + href + '"]')) return res();
+            const pre = document.createElement('link');
+            pre.rel = 'stylesheet';
+            pre.href = href;
+            pre.onload = pre.onerror = () => res();
+            document.head.appendChild(pre);
+            setTimeout(res, 1200); // never block navigation on one slow sheet
+          })));
+        } catch(_) {}
 
         // Hide until scripts run (prevents a visible "double render" during navigation)
         try { newContent.style.visibility = 'hidden'; } catch(_) {}

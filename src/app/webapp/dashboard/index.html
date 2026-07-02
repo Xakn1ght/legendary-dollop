@@ -13,11 +13,11 @@
   <link href="https://fonts.googleapis.com/css2?family=Urbanist:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/rastikerdar/vazirmatn@v33.003/Vazirmatn-font-face.css">
   <link rel="stylesheet" href="/webapp/dashboard/scrollbar-hide.css">
-  <link rel="stylesheet" href="/webapp/dashboard/css/index.css?v=17">
+  <link rel="stylesheet" href="/webapp/dashboard/css/index.css?v=18">
   <link rel="stylesheet" href="/webapp/dashboard/css/glass.css?v=48">
   <link rel="stylesheet" href="/webapp/dashboard/css/skeleton.css?v=2">
   <script src="/webapp/dashboard/js/skeleton.js?v=1"></script>
-  <script src="/webapp/dashboard/js/index-main.js?v=103"></script>
+  <script src="/webapp/dashboard/js/index-main.js?v=104"></script>
 </head>
 <body data-page="home" class="skel-on">
   <script>/* skeleton fail-safe: never leave content hidden */setTimeout(function(){try{document.body.classList.add('app-ready');}catch(e){}},8000);</script>
@@ -377,38 +377,6 @@
         </div>
       </div>
 
-      <!-- Quick Actions -->
-      <div class="card quick-actions-card" id="quickActionsCard">
-        <div class="quick-actions-head">
-          <div class="quick-actions-title" id="quickActionsTitle">Quick actions</div>
-        </div>
-        <div class="action-grid">
-          <button class="action-tile" type="button" onclick="openPurchasePage()">
-            <div class="action-ic" aria-hidden="true">
-              <svg viewBox="0 0 24 24" fill="currentColor">
-                <path d="M20 4H4c-1.11 0-1.99.89-1.99 2L2 18c0 1.11.89 2 2 2h16c1.11 0 2-.89 2-2V6c0-1.11-.89-2-2-2zm0 14H4v-6h16v6zm0-10H4V6h16v2z"/>
-              </svg>
-            </div>
-            <div class="action-label" id="btnBuyService">Buy Service</div>
-          </button>
-          <button class="action-tile" type="button" onclick="openChargePage()">
-            <div class="action-ic green" aria-hidden="true">
-              <svg viewBox="0 0 24 24" fill="currentColor">
-                <path d="M11 9h2V6h3V4h-3V1h-2v3H8v2h3v3zm-4 9c-1.1 0-1.99.9-1.99 2S5.9 22 7 22s2-.9 2-2-.9-2-2-2zm10 0c-1.1 0-1.99.9-1.99 2s.89 2 1.99 2 2-.9 2-2-.9-2-2-2zm-9.83-3.25l.03-.12.9-1.63h7.45c.75 0 1.41-.41 1.75-1.03l3.86-7.01L19.42 4h-.01l-1.1 2-2.76 5H8.53l-.13-.27L6.16 6l-.95-2-.94-2H1v2h2l3.6 7.59-1.35 2.45c-.16.28-.25.61-.25.96 0 1.1.9 2 2 2h12v-2H7.42c-.13 0-.25-.11-.25-.25z"/>
-              </svg>
-            </div>
-            <div class="action-label" id="btnChargeService">Charge Service</div>
-          </button>
-          <button class="action-tile" type="button" onclick="openSupportPage()">
-            <div class="action-ic blue" aria-hidden="true">
-              <svg viewBox="0 0 24 24" fill="currentColor">
-                <path d="M20 2H4c-1.1 0-2 .9-2 2v18l4-4h14c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2zm0 14H6l-2 2V4h16v12z"/>
-              </svg>
-            </div>
-            <div class="action-label" id="btnSupport">Support</div>
-          </button>
-        </div>
-      </div>
 
       <!-- Connection -->
       <div class="card center" id="connectionCard">
@@ -436,7 +404,7 @@
         </div>
         <div class="usage-meta">
           <div class="updated"><span id="overviewUpdatedLabel">Updated</span> <strong id="overviewUpdated">—</strong></div>
-          <button id="autoRefreshBtn" class="mini-btn" type="button">Auto: Off</button>
+          <button id="autoRefreshBtn" class="mini-btn" type="button">Refresh</button>
         </div>
 
         <div class="stats-grid" style="width:100%;margin-top:12px;">

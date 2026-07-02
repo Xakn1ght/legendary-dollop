@@ -4431,3 +4431,11 @@ input[type="text"], input[type="number"], input[type="tel"], input[type="email"]
 input[type="search"], input[type="password"], input:not([type]), textarea, select {
   font-size: max(16px, 1em) !important;
 }
+
+/* ── v48: PERF-LITE THEME SWITCH ─────────────────────────────────
+   Old Androids choke on the gooey toggle's feGaussianBlur while the whole
+   page restyles. On lite devices: drop the goo filter and snap the knob. */
+html[data-perf="lite"] .toggle g { filter: none !important; }
+html[data-perf="lite"] .toggle-circle,
+html[data-perf="lite"] .toggle-circle-center,
+html[data-perf="lite"] .toggle-background { transition-duration: .15s !important; }
