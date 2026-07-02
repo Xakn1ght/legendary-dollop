@@ -32,7 +32,6 @@ from sqlalchemy.orm import sessionmaker
 
 from app.core.settings import DATABASE_URL
 from app.database.models import Base, init_db
-from app.database.tier_seeder import seed_star_reward_tiers
 from app.database.indexes import create_all_indexes
 
 
@@ -94,15 +93,13 @@ async def create_tables():
 
 
 async def seed_initial_data(session: AsyncSession):
-    """Seed initial data like star reward tiers."""
-    print("\n🌱 Seeding initial data...")
-    try:
-        await seed_star_reward_tiers(session)
-        await session.commit()
-        print("   ✓ Star reward tiers seeded")
-    except Exception as e:
-        print(f"   ⚠ Seeding error (may be OK if already exists): {e}")
-        await session.rollback()
+    """No-op: the legacy star-tier system is retired (2026-06, rewards rework).
+
+    Re-seeding it with is_active tiers would re-open the closed play->stars->credit
+    money route. The Star Season engine needs no seed rows — it creates its own
+    season on first use.
+    """
+    print("\n🌱 Seeding initial data... (nothing to seed — legacy tiers retired)")
 
 
 async def create_indexes(session: AsyncSession):
