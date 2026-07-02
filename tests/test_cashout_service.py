@@ -15,6 +15,7 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "src"))
 
 from app.database import crud  # noqa: E402
 from app.database.models import Base, Referral, Subscription, User  # noqa: E402
+from app.core.rewards_config import CASHOUT_MIN_AMOUNT_TOMAN  # noqa: E402
 from app.services.flows.cashout import CASHOUT_MIN_ACTIVE_REFERRALS, create_cashout  # noqa: E402
 from app.services.flows.errors import FlowError  # noqa: E402
 from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine  # noqa: E402
@@ -29,7 +30,7 @@ async def _setup(active_referrals: int):
     Session = async_sessionmaker(eng, expire_on_commit=False)
 
     async with Session() as db:
-        db.add(User(id=1, chat_id=CHAT, referral_code="me", credit=100000))
+        db.add(User(id=1, chat_id=CHAT, referral_code="me", credit=500000))
         db.add(Subscription(id=1, user_id=1, marzban_username="own", status="active", price=90000))
         for i in range(active_referrals):
             uid = 100 + i
@@ -45,7 +46,7 @@ async def test_gate_enforced():
     async with Session() as db:
         user = await crud.get_user(db, CHAT)
         try:
-            await create_cashout(db, user, amount=50000)
+            await create_cashout(db, user, amount=250000)
             raise AssertionError("expected requires_vip_promoter")
         except FlowError as e:
             assert e.code == "requires_vip_promoter"
@@ -58,29 +59,36 @@ async def test_reserve_and_rejections():
     async with Session() as db:
         user = await crud.get_user(db, CHAT)
 
-        for amount, code in [(0, "invalid_amount"), (-5, "invalid_amount"), (999999, "insufficient_credit")]:
+        for amount, code in [
+            (0, "invalid_amount"),
+            (-5, "invalid_amount"),
+            (CASHOUT_MIN_AMOUNT_TOMAN - 1, "amount_below_minimum"),
+            (999999, "insufficient_credit"),
+        ]:
             try:
                 await create_cashout(db, user, amount=amount)
                 raise AssertionError(f"expected {code}")
             except FlowError as e:
                 assert e.code == code, (e.code, code)
+                if code == "amount_below_minimum":
+                    assert e.min_amount == CASHOUT_MIN_AMOUNT_TOMAN
 
         try:
-            await create_cashout(db, user, amount=50000, destination="short")
+            await create_cashout(db, user, amount=250000, destination="short")
             raise AssertionError("expected invalid_destination")
         except FlowError as e:
             assert e.code == "invalid_destination"
 
-        req = await create_cashout(db, user, amount=60000, destination="IR12345678901234")
-        assert req.status == "pending" and req.amount == 60000
+        req = await create_cashout(db, user, amount=CASHOUT_MIN_AMOUNT_TOMAN, destination="IR12345678901234")
+        assert req.status == "pending" and req.amount == CASHOUT_MIN_AMOUNT_TOMAN
         await db.refresh(user)
-        assert user.credit == 40000  # reserved immediately
+        assert user.credit == 500000 - CASHOUT_MIN_AMOUNT_TOMAN  # reserved immediately
 
         # Denial returns the funds (repo behavior the admin panel relies on).
         back = await crud.deny_cashout_request(db, req.id)
         assert back is not None and back.status == "denied"
         await db.refresh(user)
-        assert user.credit == 100000
+        assert user.credit == 500000
     print("PASS test_reserve_and_rejections")
 
 

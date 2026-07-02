@@ -25,7 +25,7 @@ async def _run():
         await db.commit()
 
         total, unlocked = await RR.add_season_stars(db, 1, 3)
-        assert total == 3 and [u["milestone"] for u in unlocked] == [3]
+        assert total == 3 and [u["milestone"] for u in unlocked] == [1, 3]
 
         total, unlocked = await RR.add_season_stars(db, 1, 2)  # → 5
         assert total == 5 and [u["milestone"] for u in unlocked] == [5]
@@ -38,7 +38,7 @@ async def _run():
         assert unlocked == []
 
         coupons = await RR.get_active_coupons(db, 1)
-        assert sorted(c.milestone_stars for c in coupons) == [3, 5, 10, 15, 20, 25, 30, 40, 50]
+        assert sorted(c.milestone_stars for c in coupons) == [1, 3, 5, 10, 15, 20, 25, 30, 40, 50]
 
         # season reset → fresh season starts at 0
         await RR.end_active_season(db)

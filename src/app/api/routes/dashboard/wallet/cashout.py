@@ -49,6 +49,8 @@ async def handle_dashboard_wallet_cashout(request: web.Request):
                 if e.code == "requires_vip_promoter":
                     body["min_active_referrals"] = getattr(e, "min_active_referrals", None)
                     body["active_referrals"] = getattr(e, "active_referrals", None)
+                elif e.code == "amount_below_minimum":
+                    body["min_amount"] = getattr(e, "min_amount", None)
                 return web.json_response(body, status=_ERROR_STATUS.get(e.code, 400))
 
             await session.refresh(user)

@@ -120,6 +120,7 @@
               cashoutOk: 'Cashout request submitted.',
               cashoutNeedSub: 'You need an active paid subscription to cash out.',
               cashoutNoBalance: 'Insufficient credit.',
+              cashoutMin: 'Minimum cashout is {min} Toman — smaller balances can be spent in-app.',
               stars: 'Stars',
               creditLabel: 'Credit',
               subCreditLabel: 'Sub credit',
@@ -240,6 +241,7 @@
               cashoutOk: 'درخواست برداشت ثبت شد.',
               cashoutNeedSub: 'برای برداشت باید اشتراک فعالِ پرداخت‌شده داشته باشید.',
               cashoutNoBalance: 'موجودی کافی نیست.',
+              cashoutMin: 'حداقل برداشت {min} تومان است — مبالغ کمتر را می‌توانید داخل اپ خرج کنید.',
               stars: 'ستاره',
               creditLabel: 'اعتبار',
               subCreditLabel: 'اعتبار اشتراک',
@@ -1822,6 +1824,7 @@
                       const t = i18n[currentLang] || i18n.en;
                       if (msg.includes('requires_active_paid_subscription') && t.cashoutNeedSub) msg = t.cashoutNeedSub;
                       if (msg.includes('insufficient_credit') && t.cashoutNoBalance) msg = t.cashoutNoBalance;
+                      if (msg.includes('amount_below_minimum') && t.cashoutMin) msg = t.cashoutMin.replace('{min}', (200000).toLocaleString(currentLang === 'fa' ? 'fa-IR' : 'en-US'));
                     } catch (_) {}
                     if (window.AstroUI && window.AstroUI.toast) window.AstroUI.toast(msg, 'error', 2600);
                     else alert(msg);

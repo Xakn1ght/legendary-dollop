@@ -25,22 +25,26 @@ DISCOUNT_COUPON_MAX_PLAN_GB = 100         # cap discount value on very large cus
 # ── Star milestone ladder (auto-unlocks a coupon once per season) ───────────
 # coupon_type ∈ discount_percent | free_gb | free_plan | free_autorenew | vip_pack | legend_pack
 STAR_SEASON_MILESTONES = {
+    1:  {"name": "First Spark",       "coupon_type": "discount_percent", "payload": {"discount_percent": 5}},
     3:  {"name": "Starter Discount",  "coupon_type": "discount_percent", "payload": {"discount_percent": 10}},
     5:  {"name": "Better Discount",   "coupon_type": "discount_percent", "payload": {"discount_percent": 20}},
     10: {"name": "Free Traffic Boost","coupon_type": "free_gb",          "payload": {"gb": 10}},
     15: {"name": "Half Price",        "coupon_type": "discount_percent", "payload": {"discount_percent": 50}},
     20: {"name": "Free 20GB Plan",    "coupon_type": "free_plan",        "payload": {"plan_gb": 20, "duration_days": 35}},
     25: {"name": "Free 40GB Plan",    "coupon_type": "free_plan",        "payload": {"plan_gb": 40, "duration_days": 35}},
-    30: {"name": "Free Auto-Renewal", "coupon_type": "free_autorenew",   "payload": {"max_plan_gb": 100, "duration_days": 35}},
+    # Free-renewal value capped at the 60GB plan (250k) — the single biggest giveaway;
+    # 100GB (400k) was ~60% more exposure for no extra motivational pull.
+    30: {"name": "Free Auto-Renewal", "coupon_type": "free_autorenew",   "payload": {"max_plan_gb": 60, "duration_days": 35}},
     40: {"name": "Season Champion",   "coupon_type": "vip_pack",         "payload": {
-        "free_autorenew": {"max_plan_gb": 100, "duration_days": 35},
+        "free_autorenew": {"max_plan_gb": 60, "duration_days": 35},
         "priority_support_days": 30, "badge": "Champion", "theme": "champion"}},
     50: {"name": "Season Legend",     "coupon_type": "legend_pack",      "payload": {
-        "free_autorenew": {"max_plan_gb": 100, "duration_days": 35},
+        "free_autorenew": {"max_plan_gb": 60, "duration_days": 35},
         "bonus_gb": 100, "priority_support_days": 60, "badge": "Legend", "theme": "legend"}},
 }
 
 # ── VIP Promoter cashout (Phase D) ──────────────────────────────────────────
 CASHOUT_MIN_ACTIVE_REFERRALS = 20
+CASHOUT_MIN_AMOUNT_TOMAN = 200_000   # below this, credit stays spendable in-app
 # Cash-out is 1:1 by decision — credit is referral-only, so no haircut. (Was 5%.)
 PROMOTER_REFERRAL_CUT = {0: 0.10, 20: 0.12, 50: 0.15}  # store-credit % by active-referral tier

@@ -47,8 +47,9 @@ async def _run():
 
     ladder = {m["stars"]: m for m in data["ladder"]}
     # full ladder present
-    assert sorted(ladder) == [3, 5, 10, 15, 20, 25, 30, 40, 50]
+    assert sorted(ladder) == [1, 3, 5, 10, 15, 20, 25, 30, 40, 50]
     # reached flags reflect 7 stars
+    assert ladder[1]["reached"] is True
     assert ladder[3]["reached"] is True
     assert ladder[5]["reached"] is True
     assert ladder[10]["reached"] is False
@@ -56,11 +57,11 @@ async def _run():
     assert ladder[3]["coupon_type"] == "discount_percent"
     assert ladder[3]["payload"]["discount_percent"] == 10
 
-    # coupon wallet has exactly the two unlocked coupons
+    # coupon wallet has exactly the unlocked coupons (1★, 3★, 5★ at 7 stars)
     coup = sorted(data["coupons"], key=lambda c: c["milestone_stars"])
-    assert [c["milestone_stars"] for c in coup] == [3, 5]
+    assert [c["milestone_stars"] for c in coup] == [1, 3, 5]
     assert coup[0]["coupon_type"] == "discount_percent"
-    assert coup[0]["payload"]["discount_percent"] == 10
+    assert coup[0]["payload"]["discount_percent"] == 5
     assert coup[0]["id"] > 0
     assert coup[0]["days_left"] is not None and coup[0]["days_left"] >= 0
     assert coup[0]["expires_at"]

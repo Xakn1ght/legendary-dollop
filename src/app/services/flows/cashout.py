@@ -9,7 +9,7 @@ from __future__ import annotations
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
 
-from app.core.rewards_config import PROMOTER_REFERRAL_CUT
+from app.core.rewards_config import CASHOUT_MIN_AMOUNT_TOMAN, PROMOTER_REFERRAL_CUT
 from app.database import crud
 from app.database.models import CashoutRequest, Referral, User
 from app.services.flows.errors import FlowError
@@ -62,6 +62,12 @@ async def create_cashout(
     """
     if amount <= 0:
         raise FlowError("invalid_amount")
+    if amount < CASHOUT_MIN_AMOUNT_TOMAN:
+        # Small balances stay in-app as spendable credit — card transfers under this
+        # threshold aren't worth the manual admin round-trip.
+        err = FlowError("amount_below_minimum")
+        err.min_amount = CASHOUT_MIN_AMOUNT_TOMAN
+        raise err
     if destination and len(destination) < 8:
         raise FlowError("invalid_destination")
 
