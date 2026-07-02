@@ -302,6 +302,11 @@
           }
 	          function applyShopTranslations(){
 	            const set=(id, key)=>{ const el=document.getElementById(id); if(el) el.textContent=tShop(key); };
+	            // Standalone bottom nav (the shell translates its own copy, not this one).
+	            const navMap = getLang()==='fa'
+	              ? { navHomeLabel:'خانه', navTasksLabel:'پاداش', navArcadeLabel:'بازی', navShopLabel:'فروشگاه', navProfileLabel:'پروفایل' }
+	              : { navHomeLabel:'Home', navTasksLabel:'Rewards', navArcadeLabel:'Game', navShopLabel:'Shop', navProfileLabel:'Profile' };
+	            Object.keys(navMap).forEach(function(id){ const el=document.getElementById(id); if(el) el.textContent=navMap[id]; });
 	            set('pageTitle','pageTitle');
 	            set('shopBadge','badge');
 	            set('shopMini','mini');

@@ -440,6 +440,7 @@
             const statXpLabel = document.getElementById('statXpLabel');
             const statPointsLabel = document.getElementById('statPointsLabel');
             const statCreditsLabel = document.getElementById('statCreditsLabel');
+            const statStarsLabel = document.getElementById('statStarsLabel');
             const loadingStatus = document.getElementById('loadingStatus');
             const autoClaimTitle = document.getElementById('autoClaimTitle');
             const autoClaimSub = document.getElementById('autoClaimSub');
@@ -489,6 +490,14 @@
             if (statXpLabel) statXpLabel.textContent = t.xp || 'XP';
             if (statPointsLabel) statPointsLabel.textContent = t.loyalty_points || 'Points';
             if (statCreditsLabel) statCreditsLabel.textContent = t.credit || 'Credits';
+            if (statStarsLabel) statStarsLabel.textContent = t.stars || 'Stars';
+            try {
+              // Standalone bottom nav (the shell translates its own copy, not this one).
+              const navMap = currentLang === 'fa'
+                ? { navHomeLabel:'خانه', navTasksLabel:'پاداش', navArcadeLabel:'بازی', navShopLabel:'فروشگاه', navProfileLabel:'پروفایل' }
+                : { navHomeLabel:'Home', navTasksLabel:'Rewards', navArcadeLabel:'Game', navShopLabel:'Shop', navProfileLabel:'Profile' };
+              Object.keys(navMap).forEach((id) => { const el = document.getElementById(id); if (el) el.textContent = navMap[id]; });
+            } catch (_) {}
             if (loadingStatus) loadingStatus.textContent = t.loading || 'Loading...';
             try {
               document.querySelectorAll('.retry-btn').forEach((b) => (b.textContent = t.retry || 'Retry'));
@@ -687,7 +696,7 @@
                 const nextRung = ladder.find((m) => Number(m.stars) === nextStars) || next;
                 const reward = couponLabel(nextRung, t, lang);
                 if (toGoEl) toGoEl.textContent = lang === 'fa' ? `${need}⭐ مانده` : `${need}⭐ to go`;
-                if (numsEl) numsEl.textContent = `${stars} / ${nextStars} ⭐`;
+                if (numsEl) numsEl.textContent = lang === 'fa' ? `⭐ ${stars} از ${nextStars}` : `${stars} / ${nextStars} ⭐`;
                 if (nextRewardEl) nextRewardEl.textContent = `🎁 ${reward}`;
               } else {
                 if (toGoEl) toGoEl.textContent = '';

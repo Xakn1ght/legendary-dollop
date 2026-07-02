@@ -3461,10 +3461,12 @@
           var shouldShow = false;
           if (!oldSeen && !tourDone) shouldShow = true;
           if (!deviceKnown && !tourDone) shouldShow = true;
+          // Never stack the tour on top of the login-problem overlay.
+          if (authHelpShown) shouldShow = false;
 
           if (shouldShow) {
             try { localStorage.setItem('hasSeenWelcome', 'true'); } catch(_) {}
-            setTimeout(function () { startInteractiveTour(); }, 600);
+            setTimeout(function () { if (!authHelpShown) startInteractiveTour(); }, 600);
           }
         } catch(_) {}
       }

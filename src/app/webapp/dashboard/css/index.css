@@ -1275,8 +1275,10 @@
       filter:drop-shadow(0 1px 4px rgba(var(--brandRgb), 0.3));
     }
     
-    /* Content spacing for bottom nav — must include safe-area so footer clears the fixed nav on notched phones */
-    .wrap{padding-bottom: calc(90px + env(safe-area-inset-bottom, 0px) + var(--astro-safe-bottom-extra, 0px))}
+    /* Content spacing for bottom nav — must include safe-area so footer clears the fixed nav on notched
+       phones. 112px (not 90) because the arcade notch bulges ~26px above the nav bar and its glow was
+       sitting on the last card row. */
+    .wrap{padding-bottom: calc(112px + env(safe-area-inset-bottom, 0px) + var(--astro-safe-bottom-extra, 0px))}
     
     /* Desktop tweaks (Telegram Desktop) */
     [data-platform="desktop"] .wrap{max-width:560px; padding-bottom:calc(140px + var(--astro-safe-bottom-extra, 0px))}
@@ -1302,7 +1304,7 @@
       .nav-item-notch .nav-item-icon{width:32px !important; height:32px !important}
       .btn-icon{width:46px; height:46px}
       .location .flag{width:32px; height:24px}
-      .wrap{padding-bottom:calc(70px + env(safe-area-inset-bottom, 0px) + var(--astro-safe-bottom-extra, 0px))}
+      .wrap{padding-bottom:calc(96px + env(safe-area-inset-bottom, 0px) + var(--astro-safe-bottom-extra, 0px))}
       footer{padding:8px 16px; font-size:10px}
     }
     @media (prefers-reduced-motion: reduce){

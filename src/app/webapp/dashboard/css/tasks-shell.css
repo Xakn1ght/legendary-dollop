@@ -242,6 +242,9 @@ header {
 }
 
 .brand-icon {
+  /* inline-flex so width/height actually apply to the span — as a plain inline
+     element the 30px is ignored and the SVG blows up to the full header width. */
+  display: inline-flex;
   width: 30px;
   height: 30px;
   color: var(--brand);
