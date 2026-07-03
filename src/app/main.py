@@ -15,6 +15,7 @@ from app.handlers.user import (
     add_subscription,
     charge,
     common,
+    flow_inline,
     my_services,
     purchase,
     referral,
@@ -215,6 +216,7 @@ async def main():
     # User bot only — admin approvals and admin Telegram UI run in admin_main (separate token).
     routers = [
         start.router,
+        flow_inline.router,
         purchase.router,
         referral.router,
         rewards_router,

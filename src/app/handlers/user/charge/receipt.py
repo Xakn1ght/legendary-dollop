@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from aiogram import F
 from aiogram.fsm.context import FSMContext
-from aiogram.types import KeyboardButton, Message, ReplyKeyboardMarkup
+from aiogram.types import Message
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.settings import ADMIN_ID, CHARGE_PRESET_PACKAGES
@@ -17,7 +17,7 @@ from app.services.flows.charge import (
 from app.services.flows.errors import FlowError
 from app.utils.bot_i18n import t, text_matches
 
-from .common import ChargeState, _get_lang, router
+from .common import ChargeState, _back_keyboard, _get_lang, router
 
 
 @router.message(ChargeState.receipt, F.photo)
@@ -152,5 +152,5 @@ async def receipt_catch_all(message: Message, state: FSMContext, session: AsyncS
     # Any other text/non-photo - remind user to send receipt or go back
     await message.answer(
         ("لطفاً تصویر رسید را ارسال کنید یا بازگشت را بزنید." if lang == "fa" else "Please send the receipt image or press back."),
-        reply_markup=ReplyKeyboardMarkup(keyboard=[[KeyboardButton(text=t(lang, "btn_back"))]], resize_keyboard=True)
+        reply_markup=await _back_keyboard(state, lang)
     )

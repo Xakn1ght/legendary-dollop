@@ -1,10 +1,12 @@
 from aiogram import Router
+from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
-from aiogram.types import KeyboardButton, Message, ReplyKeyboardMarkup
+from aiogram.types import InlineKeyboardMarkup, Message
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.settings import PLANS, PLANS_BUTTON_COLUMNS
 from app.database import crud
+from app.handlers.user.flow_inline import ikb
 from app.shared.plan_ordering import get_ordered_plans
 from app.utils.bot_i18n import normalize_lang, set_cached_lang, t
 
@@ -30,7 +32,7 @@ CUSTOM_PLAN_BTN_FA = "📦 پلن دلخواه"
 CUSTOM_PLAN_BTN_EN = "📦 Custom Plan"
 
 
-def _build_plan_keyboard(lang: str = "fa", is_vip: bool = False):
+async def _build_plan_keyboard(state: FSMContext, lang: str = "fa", is_vip: bool = False) -> InlineKeyboardMarkup:
     rows = []
     keys = get_ordered_plans()
     # Filter VIP-only plans based on user's VIP status
@@ -42,18 +44,17 @@ def _build_plan_keyboard(lang: str = "fa", is_vip: bool = False):
         available_keys.append(k)
 
     for i in range(0, len(available_keys), PLANS_BUTTON_COLUMNS):
-        row = [KeyboardButton(text=available_keys[j]) for j in range(i, min(i + PLANS_BUTTON_COLUMNS, len(available_keys)))]
-        rows.append(row)
-    rows.append([KeyboardButton(text=CUSTOM_PLAN_BTN_FA if lang == "fa" else CUSTOM_PLAN_BTN_EN)])
-    rows.append([KeyboardButton(text=t(lang, "btn_back"))])
-    return ReplyKeyboardMarkup(keyboard=rows, resize_keyboard=True)
+        rows.append(available_keys[i:i + PLANS_BUTTON_COLUMNS])
+    rows.append([CUSTOM_PLAN_BTN_FA if lang == "fa" else CUSTOM_PLAN_BTN_EN])
+    rows.append([t(lang, "btn_back")])
+    return await ikb(state, rows)
 
 
-async def _get_plan_keyboard_for_user(session, chat_id: int, lang: str = "fa"):
+async def _get_plan_keyboard_for_user(session, chat_id: int, state: FSMContext, lang: str = "fa") -> InlineKeyboardMarkup:
     """Get plan keyboard with VIP status check"""
     user = await crud.get_user(session, chat_id)
     is_vip = await crud.is_user_vip(session, user.id) if user else False
-    return _build_plan_keyboard(lang, is_vip)
+    return await _build_plan_keyboard(state, lang, is_vip)
 
 
 async def _lang_for(message: Message, session: AsyncSession) -> str:
@@ -67,37 +68,30 @@ async def _lang_for(message: Message, session: AsyncSession) -> str:
         return normalize_lang(getattr(message.from_user, "language_code", None))
 
 
-def _auto_renew_keyboard(lang: str) -> ReplyKeyboardMarkup:
-    return ReplyKeyboardMarkup(
-        keyboard=[
-            [KeyboardButton(text=("فعال‌سازی تمدید خودکار" if lang == "fa" else "Enable auto-renew"))],
-            [KeyboardButton(text=("بدون تمدید خودکار" if lang == "fa" else "No auto-renew"))],
-            [KeyboardButton(text=t(lang, "btn_back"))],
-        ],
-        resize_keyboard=True,
-        one_time_keyboard=True,
-    )
+async def _auto_renew_keyboard(state: FSMContext, lang: str) -> InlineKeyboardMarkup:
+    return await ikb(state, [
+        [("فعال‌سازی تمدید خودکار" if lang == "fa" else "Enable auto-renew")],
+        [("بدون تمدید خودکار" if lang == "fa" else "No auto-renew")],
+        [t(lang, "btn_back")],
+    ])
 
 
-def _name_keyboard(lang: str) -> ReplyKeyboardMarkup:
-    return ReplyKeyboardMarkup(
-        keyboard=[
-            [KeyboardButton(text=("اتفاقی" if lang == "fa" else "Random"))],
-            [KeyboardButton(text=t(lang, "btn_back"))],
-        ],
-        resize_keyboard=True,
-        one_time_keyboard=True,
-    )
+async def _name_keyboard(state: FSMContext, lang: str) -> InlineKeyboardMarkup:
+    return await ikb(state, [
+        [("اتفاقی" if lang == "fa" else "Random")],
+        [t(lang, "btn_back")],
+    ])
 
 
-def _confirm_keyboard(lang: str) -> ReplyKeyboardMarkup:
-    return ReplyKeyboardMarkup(
-        keyboard=[
-            [KeyboardButton(text=("تایید و پرداخت ✅" if lang == "fa" else "Confirm & Pay ✅"))],
-            [KeyboardButton(text=("ویرایش ✏️" if lang == "fa" else "Edit ✏️")), KeyboardButton(text=t(lang, "btn_back"))],
-        ],
-        resize_keyboard=True,
-    )
+async def _back_keyboard(state: FSMContext, lang: str) -> InlineKeyboardMarkup:
+    return await ikb(state, [[t(lang, "btn_back")]])
+
+
+async def _confirm_keyboard(state: FSMContext, lang: str) -> InlineKeyboardMarkup:
+    return await ikb(state, [
+        [("تایید و پرداخت ✅" if lang == "fa" else "Confirm & Pay ✅")],
+        [("ویرایش ✏️" if lang == "fa" else "Edit ✏️"), t(lang, "btn_back")],
+    ])
 
 
 # NOTE: orders are now created only at Confirm & Pay via

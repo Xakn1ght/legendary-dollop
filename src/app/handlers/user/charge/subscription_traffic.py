@@ -6,12 +6,13 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.settings import PLANS
 from app.database import crud
-from app.keyboards.reply import KEYBOARD_MARKUP_BACK, get_main_keyboard
+from app.keyboards.reply import get_main_keyboard
 from app.utils.bot_i18n import normalize_lang, set_cached_lang, t, text_matches
 from app.utils.validation import InputValidator, sanitize_user_input
 
 from .common import (
     ChargeState,
+    _back_keyboard,
     _build_main_plan_keyboard,
     _build_package_keyboard,
     _build_subscription_keyboard,
@@ -49,7 +50,7 @@ async def start_charge(message: Message, state: FSMContext, session: AsyncSessio
         await state.set_state(ChargeState.subscription)
         await message.answer(
             t(lang, "charge_which_service"),
-            reply_markup=_build_subscription_keyboard(subs),
+            reply_markup=await _build_subscription_keyboard(state, subs, lang),
         )
 
 
@@ -103,7 +104,7 @@ async def proceed_with_5gb_limit(message: Message, state: FSMContext, session: A
     await state.set_state(ChargeState.package)
     await message.answer(
         t(lang, "charge_immediate_title"),
-        reply_markup=_build_package_keyboard(lang)
+        reply_markup=await _build_package_keyboard(state, lang)
     )
 
 
@@ -115,7 +116,7 @@ async def choose_booking(message: Message, state: FSMContext, session: AsyncSess
     await state.set_state(ChargeState.booking_plan)
     await message.answer(
         t(lang, "charge_booking_title"),
-        reply_markup=_build_main_plan_keyboard(lang)
+        reply_markup=await _build_main_plan_keyboard(state, lang)
     )
 
 
@@ -130,10 +131,10 @@ async def booking_pick_plan(message: Message, state: FSMContext, session: AsyncS
     
     if message.text in (t("fa", "btn_back"), t("en", "btn_back")):
         await state.set_state(ChargeState.traffic_check)
-        await message.answer(t(lang, "charge_back_step"), reply_markup=_build_traffic_options_keyboard(lang))
+        await message.answer(t(lang, "charge_back_step"), reply_markup=await _build_traffic_options_keyboard(state, lang))
         return
     if message.text not in PLANS:
-        await message.answer(t(lang, "charge_choose_plan"), reply_markup=_build_main_plan_keyboard(lang))
+        await message.answer(t(lang, "charge_choose_plan"), reply_markup=await _build_main_plan_keyboard(state, lang))
         return
     data = await state.get_data()
     sub_id = data.get('subscription_id')
@@ -169,7 +170,7 @@ async def booking_pick_plan(message: Message, state: FSMContext, session: AsyncS
             if lang == "fa"
             else "\n\n💳 Please pay and send the receipt image; the booking activates after admin approval."
         ),
-        reply_markup=KEYBOARD_MARKUP_BACK,
+        reply_markup=await _back_keyboard(state, lang),
     )
 
 

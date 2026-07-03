@@ -11,6 +11,7 @@ from app.database import crud
 from app.keyboards.reply import get_main_keyboard
 from app.services.flows.errors import FlowError
 from app.services.flows.purchase import cancel_purchase_order, submit_purchase_receipt
+from app.utils.bot_i18n import text_matches
 
 from .common import PurchaseState, router
 
@@ -87,7 +88,7 @@ async def process_receipt(message: Message, state: FSMContext, session: AsyncSes
         reply_markup=get_main_keyboard(message.chat.id),
     )
 
-@router.message(PurchaseState.receipt, F.text == 'بازگشت🔙')
+@router.message(PurchaseState.receipt, text_matches("btn_back"))
 async def cancel_purchase_receipt(message: Message, state: FSMContext, session: AsyncSession):
     # Cancel the draft order: refunds credit and restores the coupon/discounts that
     # were consumed at order creation (all inside the shared cancel service).

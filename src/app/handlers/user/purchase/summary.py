@@ -103,4 +103,4 @@ async def show_order_summary(message: Message, state: FSMContext, session: Async
     )
 
     await state.set_state(PurchaseState.confirmation)
-    await message.answer("\n".join(summary_lines), reply_markup=_confirm_keyboard(lang), parse_mode='HTML')
+    await message.answer("\n".join(summary_lines), reply_markup=await _confirm_keyboard(state, lang), parse_mode='HTML')

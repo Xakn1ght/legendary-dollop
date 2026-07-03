@@ -2,16 +2,18 @@ from __future__ import annotations
 
 from aiogram import F
 from aiogram.fsm.context import FSMContext
-from aiogram.types import CallbackQuery, KeyboardButton, Message, ReplyKeyboardMarkup
+from aiogram.types import CallbackQuery, Message
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.settings import CHARGE_RATE_PER_DAY, DAY_PLANS
 from app.database import crud
+from app.handlers.user.flow_inline import ikb
 from app.keyboards.reply import get_main_keyboard
 from app.utils.bot_i18n import t
 
 from .common import (
     ChargeState,
+    _back_keyboard,
     _build_main_plan_keyboard,
     _get_lang,
     check_subscription_traffic,
@@ -58,13 +60,10 @@ async def cb_buy_days(cb: CallbackQuery, state: FSMContext, session: AsyncSessio
         return
     # Ask user to choose a day plan (admin-configurable)
     await state.update_data(subscription_id=target.id)
-    from aiogram.types import KeyboardButton, ReplyKeyboardMarkup
-    rows = []
-    for title in DAY_PLANS.keys():
-        rows.append([KeyboardButton(text=title)])
-    rows.append([KeyboardButton(text=t(lang, "btn_back"))])
+    rows = [[title] for title in DAY_PLANS.keys()]
+    rows.append([t(lang, "btn_back")])
     await state.set_state(ChargeState.buy_days_plan)
-    await cb.message.answer(t(lang, "charge_buy_days_title"), reply_markup=ReplyKeyboardMarkup(keyboard=rows, resize_keyboard=True))
+    await cb.message.answer(t(lang, "charge_buy_days_title"), reply_markup=await ikb(state, rows))
     await cb.answer()
 
 
@@ -90,7 +89,7 @@ async def handle_buy_days_plan(message: Message, state: FSMContext, session: Asy
     await state.update_data(custom_extra_days=extra_days, custom_price=price)
     await message.answer(
         t(lang, "charge_buy_days_summary").format(days=extra_days, price=f"{price:,}"),
-        reply_markup=ReplyKeyboardMarkup(keyboard=[[KeyboardButton(text=t(lang, "btn_back"))]], resize_keyboard=True)
+        reply_markup=await _back_keyboard(state, lang)
     )
     await state.set_state(ChargeState.receipt)
 
@@ -113,6 +112,6 @@ async def cb_renew(cb: CallbackQuery, state: FSMContext, session: AsyncSession):
     await state.set_state(ChargeState.booking_plan)
     await cb.message.answer(
         t(lang, "charge_renew_title"),
-        reply_markup=_build_main_plan_keyboard(lang)
+        reply_markup=await _build_main_plan_keyboard(state, lang)
     )
     await cb.answer()

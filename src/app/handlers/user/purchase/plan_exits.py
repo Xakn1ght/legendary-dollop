@@ -29,11 +29,11 @@ async def cancel_from_plan(message: Message, state: FSMContext, session: AsyncSe
 async def back_from_auto_renew_choice(message: Message, state: FSMContext, session: AsyncSession):
     lang = await _lang_for(message, session)
     await state.set_state(PurchaseState.plan)
-    plan_kb = await _get_plan_keyboard_for_user(session, message.chat.id, lang)
+    plan_kb = await _get_plan_keyboard_for_user(session, message.chat.id, state, lang)
     await message.answer(("لطفا یکی از پلن های زیر را انتخاب کنید:" if lang == "fa" else "Please choose a plan:"), reply_markup=plan_kb)
 
 @router.message(PurchaseState.renewal_template, lambda m: (m.text or "").strip() in {"بازگشت🔙", "Back 🔙"})
 async def back_from_renewal_template(message: Message, state: FSMContext, session: AsyncSession):
     lang = await _lang_for(message, session)
     await state.set_state(PurchaseState.auto_renew_choice)
-    await message.answer(("آیا می‌خواهید تمدید خودکار فعال باشد؟" if lang == "fa" else "Do you want to enable auto-renew?"), reply_markup=_auto_renew_keyboard(lang))
+    await message.answer(("آیا می‌خواهید تمدید خودکار فعال باشد؟" if lang == "fa" else "Do you want to enable auto-renew?"), reply_markup=await _auto_renew_keyboard(state, lang))

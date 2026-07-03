@@ -1,16 +1,16 @@
-from aiogram import Bot, F
+from aiogram import Bot
 from aiogram.fsm.context import FSMContext
-from aiogram.types import KeyboardButton, Message, ReplyKeyboardMarkup
+from aiogram.types import Message
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.settings import ADMIN_ID, PLANS
+from app.core.settings import ADMIN_ID
 from app.database import crud
-from app.keyboards.reply import KEYBOARD_MARKUP_BACK, get_main_keyboard
+from app.keyboards.reply import get_main_keyboard
 from app.services.flows.errors import FlowError
 from app.services.flows.purchase import start_purchase_order
 from app.utils.bot_i18n import t
 
-from .common import PurchaseState, _lang_for, _name_keyboard, router
+from .common import PurchaseState, _back_keyboard, _lang_for, _name_keyboard, router
 from .summary import build_quote_from_state
 
 
@@ -42,7 +42,7 @@ async def process_confirmation(message: Message, state: FSMContext, session: Asy
             await state.set_state(PurchaseState.name)
             await message.answer(
                 ("⚠️ این نام دیگر در دسترس نیست. لطفاً نام دیگری انتخاب کنید:" if lang == "fa" else "⚠️ That name is no longer available. Please pick another:"),
-                reply_markup=_name_keyboard(lang),
+                reply_markup=await _name_keyboard(state, lang),
             )
             return
         await state.clear()
@@ -117,32 +117,10 @@ async def process_confirmation(message: Message, state: FSMContext, session: Asy
                 else "After you send the receipt, your service will be activated as soon as possible."
             )
         ),
-        reply_markup=ReplyKeyboardMarkup(keyboard=[[KeyboardButton(text=t(lang, "btn_back"))]], resize_keyboard=True, one_time_keyboard=True),
+        reply_markup=await _back_keyboard(state, lang),
         parse_mode='HTML',
     )
     await state.set_state(PurchaseState.receipt)
 
-@router.callback_query(F.data == "enable_auto_renew")
-async def enable_auto_renew_callback(callback, state: FSMContext):
-    await state.update_data(auto_renew=True)
-    plan_buttons = [[KeyboardButton(text=plan)] for plan in PLANS.keys()]
-    markup = ReplyKeyboardMarkup(keyboard=plan_buttons, resize_keyboard=True, one_time_keyboard=True)
-    await callback.message.answer(
-        "برای تمدید خودکار، لطفا پلن مورد نظر برای دوره بعد را انتخاب کنید:",
-        reply_markup=markup,
-    )
-    await state.set_state(PurchaseState.renewal_template)
-    await callback.answer()
-
-@router.callback_query(F.data == "confirm_payment")
-async def confirm_payment_callback(callback, state: FSMContext):
-    from app.core.settings import payment_ui as _payment
-
-    await callback.message.answer(
-        "لطفا هزینه را به شماره کارت زیر واریز کرده و سپس تصویر رسید را ارسال کنید:\n"
-        f"<code>{_payment.PAYMENT_CARD_NUMBER}</code>\n\n"
-        "پس از ارسال رسید، سرویس شما در اسرع وقت فعال خواهد شد.",
-        reply_markup=KEYBOARD_MARKUP_BACK,
-        parse_mode='HTML',
-    )
-    await callback.answer()
+# Legacy "enable_auto_renew"/"confirm_payment" callback handlers removed — nothing
+# produced those callback_data values anymore.

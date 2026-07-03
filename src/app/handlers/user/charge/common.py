@@ -3,11 +3,12 @@ from __future__ import annotations
 from aiogram import Router
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
-from aiogram.types import KeyboardButton, Message, ReplyKeyboardMarkup
+from aiogram.types import InlineKeyboardMarkup, Message
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.settings import CHARGE_PLANS_BUTTON_COLUMNS, PLANS_BUTTON_COLUMNS
 from app.database import crud
+from app.handlers.user.flow_inline import ikb
 from app.keyboards.reply import get_main_keyboard
 from app.services.marzban import marzban_api
 from app.shared.plan_ordering import get_ordered_charge_plans, get_ordered_plans
@@ -71,49 +72,42 @@ async def _get_lang(chat_id: int, session: AsyncSession) -> str:
     return "fa"
 
 
-def _build_subscription_keyboard(subscriptions, lang: str = "fa"):
-    rows = []
-    for sub in subscriptions:
-        rows.append([KeyboardButton(text=sub.marzban_username)])
-    rows.append([KeyboardButton(text=t(lang, "btn_back"))])
-    return ReplyKeyboardMarkup(keyboard=rows, resize_keyboard=True)
+async def _build_subscription_keyboard(state: FSMContext, subscriptions, lang: str = "fa") -> InlineKeyboardMarkup:
+    rows = [[sub.marzban_username] for sub in subscriptions]
+    rows.append([t(lang, "btn_back")])
+    return await ikb(state, rows)
 
 
-def _build_package_keyboard(lang: str = "fa"):
-    rows = []
+async def _build_package_keyboard(state: FSMContext, lang: str = "fa") -> InlineKeyboardMarkup:
     keys = get_ordered_charge_plans()
-    
-    # Create a 2D list representing the button layout
     button_grid = []
     for i in range(0, len(keys), CHARGE_PLANS_BUTTON_COLUMNS):
-        row = [KeyboardButton(text=keys[j]) for j in range(i, min(i + CHARGE_PLANS_BUTTON_COLUMNS, len(keys)))]
-        button_grid.append(row)
-        
-    # Add back button
-    button_grid.append([KeyboardButton(text=t(lang, "btn_back"))])
-    
-    return ReplyKeyboardMarkup(keyboard=button_grid, resize_keyboard=True)
+        button_grid.append(keys[i:i + CHARGE_PLANS_BUTTON_COLUMNS])
+    button_grid.append([t(lang, "btn_back")])
+    return await ikb(state, button_grid)
 
 
-def _build_traffic_options_keyboard(lang: str = "fa"):
+async def _build_traffic_options_keyboard(state: FSMContext, lang: str = "fa") -> InlineKeyboardMarkup:
     """Build keyboard for >5GB traffic options"""
-    rows = [
-        [KeyboardButton(text=t(lang, "charge_now"))],
-        [KeyboardButton(text=t(lang, "book_plan"))],
-        [KeyboardButton(text=t(lang, "btn_back"))]
-    ]
-    return ReplyKeyboardMarkup(keyboard=rows, resize_keyboard=True)
+    return await ikb(state, [
+        [t(lang, "charge_now")],
+        [t(lang, "book_plan")],
+        [t(lang, "btn_back")],
+    ])
 
 
-def _build_main_plan_keyboard(lang: str = "fa"):
+async def _build_main_plan_keyboard(state: FSMContext, lang: str = "fa") -> InlineKeyboardMarkup:
     """Keyboard for selecting main subscription PLANS (for booking/renewal template)."""
     rows = []
     keys = get_ordered_plans()
     for i in range(0, len(keys), PLANS_BUTTON_COLUMNS):
-        row = [KeyboardButton(text=keys[j]) for j in range(i, min(i + PLANS_BUTTON_COLUMNS, len(keys)))]
-        rows.append(row)
-    rows.append([KeyboardButton(text=t(lang, "btn_back"))])
-    return ReplyKeyboardMarkup(keyboard=rows, resize_keyboard=True)
+        rows.append(keys[i:i + PLANS_BUTTON_COLUMNS])
+    rows.append([t(lang, "btn_back")])
+    return await ikb(state, rows)
+
+
+async def _back_keyboard(state: FSMContext, lang: str = "fa") -> InlineKeyboardMarkup:
+    return await ikb(state, [[t(lang, "btn_back")]])
 
 
 async def check_subscription_traffic(message: Message, state: FSMContext, session: AsyncSession, subscription):
@@ -145,12 +139,12 @@ async def check_subscription_traffic(message: Message, state: FSMContext, sessio
         await state.set_state(ChargeState.package)
         await message.answer(
             t(lang, "charge_remaining").format(gb=gb_str) + "\n\n" + t(lang, "charge_choose_package"),
-            reply_markup=_build_package_keyboard(lang)
+            reply_markup=await _build_package_keyboard(state, lang)
         )
     else:
         # Show options for >5GB
         await state.set_state(ChargeState.traffic_check)
         await message.answer(
             _build_persian_traffic_message(gb_str) if lang == "fa" else _build_english_traffic_message(gb_str),
-            reply_markup=_build_traffic_options_keyboard(lang)
+            reply_markup=await _build_traffic_options_keyboard(state, lang)
         )

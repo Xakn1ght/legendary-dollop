@@ -1,13 +1,14 @@
 from aiogram.fsm.context import FSMContext
-from aiogram.types import KeyboardButton, Message, ReplyKeyboardMarkup
+from aiogram.types import Message
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import crud
 from app.database.crud import get_active_user_discounts
+from app.handlers.user.flow_inline import ikb
 from app.utils.bot_i18n import normalize_lang, set_cached_lang, t
 from app.utils.validation import InputValidator, sanitize_user_input
 
-from .common import PurchaseState, _get_plan_keyboard_for_user, _lang_for, router
+from .common import PurchaseState, _back_keyboard, _get_plan_keyboard_for_user, _lang_for, router
 from .coupon import prompt_coupon_or_next
 from .username import generate_unique_username, generate_username_suggestions, is_username_taken
 
@@ -39,7 +40,7 @@ async def process_name(message: Message, state: FSMContext, session: AsyncSessio
     sanitized_name = sanitize_user_input(message.text)
     if message.text in ('بازگشت🔙', 'Back 🔙', t(lang, "btn_back")):
         await state.set_state(PurchaseState.plan)
-        plan_kb = await _get_plan_keyboard_for_user(session, message.chat.id, lang)
+        plan_kb = await _get_plan_keyboard_for_user(session, message.chat.id, state, lang)
         await message.answer(
             ("لطفا یکی از پلن های زیر را انتخاب کنید:" if lang == "fa" else "Please choose a plan:"),
             reply_markup=plan_kb,
@@ -82,21 +83,17 @@ async def process_name(message: Message, state: FSMContext, session: AsyncSessio
             )
             await message.answer(
                 error_msg,
-                reply_markup=ReplyKeyboardMarkup(
-                    keyboard=[[KeyboardButton(text=t(lang, "btn_back"))]],
-                    resize_keyboard=True,
-                    one_time_keyboard=True,
-                ),
+                reply_markup=await _back_keyboard(state, lang),
             )
             return
 
         # For custom names ensure availability first
         if await is_username_taken(session, sub_name):
             suggestions = await generate_username_suggestions(session, sub_name)
-            rows = [[KeyboardButton(text=s)] for s in suggestions]
-            rows.append([KeyboardButton(text=('اتفاقی' if lang == 'fa' else 'Random'))])
-            rows.append([KeyboardButton(text=t(lang, "btn_back"))])
-            markup = ReplyKeyboardMarkup(keyboard=rows, resize_keyboard=True, one_time_keyboard=True)
+            rows = [[s] for s in suggestions]
+            rows.append([('اتفاقی' if lang == 'fa' else 'Random')])
+            rows.append([t(lang, "btn_back")])
+            markup = await ikb(state, rows)
             await message.answer(
                 ("⚠️ این نام قبلاً گرفته شده است. لطفاً یکی از گزینه‌های پیشنهادی را انتخاب کنید یا نام دیگری وارد کنید:" if lang == "fa" else "⚠️ This name is already taken. Choose a suggestion or enter another name:"),
                 reply_markup=markup,
@@ -125,23 +122,15 @@ async def process_name(message: Message, state: FSMContext, session: AsyncSessio
         discount_buttons = []
         for d in discounts:
             discount_buttons.append(
-                [
-                    KeyboardButton(
-                        text=(f"✅ استفاده از {d.percent}% (از {d.source})" if lang == "fa" else f"✅ Use {d.percent}% ({d.source})"),
-                    )
-                ]
+                [(f"✅ استفاده از {d.percent}% (از {d.source})" if lang == "fa" else f"✅ Use {d.percent}% ({d.source})")]
             )
 
         if len(discounts) > 1:
-            discount_buttons.append([KeyboardButton(text=("✅ استفاده از همه تخفیف‌ها (جمع)" if lang == "fa" else "✅ Use all discounts"))])
+            discount_buttons.append([("✅ استفاده از همه تخفیف‌ها (جمع)" if lang == "fa" else "✅ Use all discounts")])
 
-        discount_buttons.append([KeyboardButton(text=("خیر، برای بعد ذخیره کن" if lang == "fa" else "No, save for later"))])
+        discount_buttons.append([("خیر، برای بعد ذخیره کن" if lang == "fa" else "No, save for later")])
 
-        discount_markup = ReplyKeyboardMarkup(
-            keyboard=discount_buttons,
-            resize_keyboard=True,
-            one_time_keyboard=True,
-        )
+        discount_markup = await ikb(state, discount_buttons)
 
         await message.answer(
             ("شما چند تخفیف فعال دارید! کدام را می‌خواهید روی این خرید اعمال کنید?" if lang == "fa" else "You have active discounts. Which one do you want to apply?"),
@@ -190,13 +179,9 @@ async def process_discount_choice(message: Message, state: FSMContext, session: 
 
 # Any non-text (media, voice, sticker, etc.) in the *name* step → politely reject
 @router.message(PurchaseState.name)
-async def reject_name_media(message: Message, session: AsyncSession):
+async def reject_name_media(message: Message, state: FSMContext, session: AsyncSession):
     lang = await _lang_for(message, session)
     await message.answer(
         t(lang, "purchase_text_name_only"),
-        reply_markup=ReplyKeyboardMarkup(
-            keyboard=[[KeyboardButton(text="اتفاقی"), KeyboardButton(text="Random")], [KeyboardButton(text="بازگشت🔙"), KeyboardButton(text="Back 🔙")]],
-            resize_keyboard=True,
-            one_time_keyboard=True,
-        ),
+        reply_markup=await ikb(state, [["اتفاقی", "Random"], ["بازگشت🔙", "Back 🔙"]]),
     )

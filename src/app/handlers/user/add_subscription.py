@@ -1,32 +1,18 @@
 from aiogram import Router
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
-from aiogram.types import KeyboardButton, Message, ReplyKeyboardMarkup
+from aiogram.types import Message
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.settings import PLANS
 from app.database import crud
-from app.keyboards.reply import KEYBOARD_MARKUP_BACK, get_main_keyboard
+from app.handlers.user.flow_inline import ikb
+from app.keyboards.reply import get_main_keyboard
 from app.utils.bot_i18n import normalize_lang, set_cached_lang, t, text_matches
 
 router = Router()
 
 class AddSubState(StatesGroup):
     link = State()
-
-
-def _build_plan_keyboard() -> ReplyKeyboardMarkup:
-    """Return a reply keyboard showing available plans plus a back button."""
-    plan_keys = [k for k, _ in sorted(PLANS.items(), key=lambda kv: kv[1].get('gb', 0))]
-    rows = []
-    # put two buttons per row
-    for i in range(0, len(plan_keys), 2):
-        row = [KeyboardButton(text=plan_keys[i])]
-        if i + 1 < len(plan_keys):
-            row.append(KeyboardButton(text=plan_keys[i + 1]))
-        rows.append(row)
-    rows.append([KeyboardButton(text='بازگشت🔙')])
-    return ReplyKeyboardMarkup(keyboard=rows, resize_keyboard=True)
 
 
 @router.message(text_matches("btn_add_service"))
@@ -66,7 +52,7 @@ async def start_add_subscription(message: Message, state: FSMContext, session: A
     await state.set_state(AddSubState.link)
     await message.answer(
         t(lang, "add_subscription_prompt"),
-        reply_markup=KEYBOARD_MARKUP_BACK,
+        reply_markup=await ikb(state, [[t(lang, "btn_back")]]),
     )
 
 

@@ -78,7 +78,7 @@ async def back_to_main(message: Message, state: FSMContext, session: AsyncSessio
             await state.set_state(PurchaseState.plan)
             await message.answer(
                 ("لطفا یکی از پلن های زیر را انتخاب کنید:" if lang == "fa" else "Please choose a plan:"),
-                reply_markup=_build_plan_keyboard(),
+                reply_markup=await _build_plan_keyboard(state, lang),
             )
             return
         if step == 'confirmation':

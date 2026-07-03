@@ -1,6 +1,6 @@
 from aiogram import F
 from aiogram.fsm.context import FSMContext
-from aiogram.types import KeyboardButton, Message, ReplyKeyboardMarkup
+from aiogram.types import Message
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
 
@@ -8,9 +8,6 @@ from app.core.settings import PLANS
 from app.database import crud
 from app.database.models import Referral
 from app.keyboards.reply import get_main_keyboard
-from app.utils.bot_i18n import normalize_lang, set_cached_lang, t, text_matches
-from app.utils.validation import InputValidator, sanitize_user_input
-
 from app.services.flows.pricing import (
     CUSTOM_MAX_GB,
     CUSTOM_MIN_GB,
@@ -18,12 +15,15 @@ from app.services.flows.pricing import (
     get_plan_info,
     plan_display_name,
 )
+from app.utils.bot_i18n import normalize_lang, set_cached_lang, t, text_matches
+from app.utils.validation import InputValidator, sanitize_user_input
 
 from .common import (
     CUSTOM_PLAN_BTN_EN,
     CUSTOM_PLAN_BTN_FA,
     PurchaseState,
     _auto_renew_keyboard,
+    _back_keyboard,
     _get_plan_keyboard_for_user,
     _lang_for,
     _name_keyboard,
@@ -52,7 +52,7 @@ async def start_purchase(message: Message, state: FSMContext, session: AsyncSess
             await state.update_data(referrer_id=ref_row.referrer_id)
 
     await state.set_state(PurchaseState.plan)
-    plan_kb = await _get_plan_keyboard_for_user(session, message.chat.id, lang)
+    plan_kb = await _get_plan_keyboard_for_user(session, message.chat.id, state, lang)
     await message.answer(
         ("لطفا یکی از پلن های زیر را انتخاب کنید:" if lang == "fa" else "Please choose a plan:"),
         reply_markup=plan_kb,
@@ -110,7 +110,7 @@ async def process_referral_code(message: Message, state: FSMContext, session: As
             await state.update_data(referrer_id=user.referral_entry.referrer_id)
 
     await state.set_state(PurchaseState.plan)
-    plan_kb = await _get_plan_keyboard_for_user(session, message.chat.id, lang)
+    plan_kb = await _get_plan_keyboard_for_user(session, message.chat.id, state, lang)
     await message.answer(
         ("لطفا یکی از پلن های زیر را انتخاب کنید:" if lang == "fa" else "Please choose a plan:"),
         reply_markup=plan_kb,
@@ -126,7 +126,7 @@ async def _continue_with_plan(message: Message, state: FSMContext, session: Asyn
     await state.set_state(PurchaseState.auto_renew_choice)
     await message.answer(
         ("آیا می‌خواهید تمدید خودکار فعال باشد؟" if lang == "fa" else "Do you want to enable auto-renew?"),
-        reply_markup=_auto_renew_keyboard(lang),
+        reply_markup=await _auto_renew_keyboard(state, lang),
     )
 
 
@@ -154,7 +154,7 @@ async def ask_custom_gb(message: Message, state: FSMContext, session: AsyncSessi
     await state.set_state(PurchaseState.custom_gb)
     await message.answer(
         _custom_gb_prompt(lang),
-        reply_markup=ReplyKeyboardMarkup(keyboard=[[KeyboardButton(text=t(lang, "btn_back"))]], resize_keyboard=True),
+        reply_markup=await _back_keyboard(state, lang),
     )
 
 
@@ -165,7 +165,7 @@ async def ask_custom_gb_renewal(message: Message, state: FSMContext, session: As
     await state.set_state(PurchaseState.custom_gb)
     await message.answer(
         _custom_gb_prompt(lang),
-        reply_markup=ReplyKeyboardMarkup(keyboard=[[KeyboardButton(text=t(lang, "btn_back"))]], resize_keyboard=True),
+        reply_markup=await _back_keyboard(state, lang),
     )
 
 
@@ -175,7 +175,7 @@ async def back_from_custom_gb(message: Message, state: FSMContext, session: Asyn
     data = await state.get_data()
     target = PurchaseState.renewal_template if data.get("custom_for_renewal") else PurchaseState.plan
     await state.set_state(target)
-    plan_kb = await _get_plan_keyboard_for_user(session, message.chat.id, lang)
+    plan_kb = await _get_plan_keyboard_for_user(session, message.chat.id, state, lang)
     await message.answer(
         ("لطفا یکی از پلن های زیر را انتخاب کنید:" if lang == "fa" else "Please choose a plan:"),
         reply_markup=plan_kb,
@@ -221,7 +221,7 @@ async def process_no_auto_renew(message: Message, state: FSMContext, session: As
         await state.set_state(PurchaseState.name)
         await message.answer(
             ("لطفا یک نام برای سرویس خود انتخاب کنید یا دکمه 'اتفاقی' را بزنید." if lang == "fa" else "Choose a service name, or tap 'Random'."),
-            reply_markup=_name_keyboard(lang),
+            reply_markup=await _name_keyboard(state, lang),
         )
 
 @router.message(PurchaseState.auto_renew_choice, lambda m: (m.text or "").strip() in {"فعال‌سازی تمدید خودکار", "Enable auto-renew"})
@@ -253,9 +253,5 @@ async def _continue_with_renewal(message: Message, state: FSMContext, session: A
         await state.set_state(PurchaseState.name)
         await message.answer(
             f"مجموع قیمت: {total_price:,} تومان\n\nلطفا یک نام برای سرویس خود انتخاب کنید یا دکمه 'اتفاقی' را بزنید.",
-            reply_markup=ReplyKeyboardMarkup(
-                keyboard=[[KeyboardButton(text="اتفاقی")], [KeyboardButton(text="بازگشت🔙")]],
-                resize_keyboard=True,
-                one_time_keyboard=True,
-            ),
+            reply_markup=await _name_keyboard(state, "fa"),
         )

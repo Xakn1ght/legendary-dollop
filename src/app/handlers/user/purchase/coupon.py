@@ -4,10 +4,11 @@ Only the coupon_id is held in FSM state; pricing/validation/consumption all happ
 in the shared services (flows.pricing quotes it, flows.purchase consumes/restores it).
 """
 from aiogram.fsm.context import FSMContext
-from aiogram.types import KeyboardButton, Message, ReplyKeyboardMarkup
+from aiogram.types import Message
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import crud
+from app.handlers.user.flow_inline import ikb
 from app.handlers.user.rewards.menu import _coupon_label
 from app.services.flows.pricing import SUPPORTED_COUPON_TYPES
 from app.utils.bot_i18n import normalize_lang, set_cached_lang
@@ -25,14 +26,10 @@ async def _prompt_credit_or_summary(message: Message, state: FSMContext, session
     """Shared next-step after discount/coupon: ask about credit if any, else summarize."""
     if user and (user.credit or 0) > 0:
         await state.set_state(PurchaseState.ask_credit)
-        credit_markup = ReplyKeyboardMarkup(
-            keyboard=[
-                [KeyboardButton(text=(f"✅ بله، {user.credit:,} تومان اعتبار را استفاده کن" if lang == "fa" else f"✅ Yes, use {user.credit:,} credit"))],
-                [KeyboardButton(text=("خیر، برای بعد ذخیره کن" if lang == "fa" else "No, save for later"))],
-            ],
-            resize_keyboard=True,
-            one_time_keyboard=True,
-        )
+        credit_markup = await ikb(state, [
+            [(f"✅ بله، {user.credit:,} تومان اعتبار را استفاده کن" if lang == "fa" else f"✅ Yes, use {user.credit:,} credit")],
+            [("خیر، برای بعد ذخیره کن" if lang == "fa" else "No, save for later")],
+        ])
         await message.answer(
             (f"شما **{user.credit:,} تومان اعتبار** دارید! آیا می‌خواهید آن را روی این خرید استفاده کنید؟" if lang == "fa" else f"You have **{user.credit:,}** credit. Do you want to use it for this purchase?"),
             reply_markup=credit_markup,
@@ -58,8 +55,8 @@ async def prompt_coupon_or_next(message: Message, state: FSMContext, session: As
     buttons = []
     for i, c in enumerate(coupons, start=1):
         choices.append(c.id)
-        buttons.append([KeyboardButton(text=f"{i}) {_coupon_label(c, lang)}")])
-    buttons.append([KeyboardButton(text=("بدون کوپن" if lang == "fa" else "No coupon"))])
+        buttons.append([f"{i}) {_coupon_label(c, lang)}"])
+    buttons.append([("بدون کوپن" if lang == "fa" else "No coupon")])
 
     await state.update_data(coupon_choices=choices)
     await state.set_state(PurchaseState.ask_coupon)
@@ -69,7 +66,7 @@ async def prompt_coupon_or_next(message: Message, state: FSMContext, session: As
             if lang == "fa"
             else "🎁 You have reward coupons! Pick one for this purchase (one coupon per purchase):"
         ),
-        reply_markup=ReplyKeyboardMarkup(keyboard=buttons, resize_keyboard=True, one_time_keyboard=True),
+        reply_markup=await ikb(state, buttons),
     )
 
 

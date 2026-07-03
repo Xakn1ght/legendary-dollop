@@ -1,17 +1,19 @@
 from __future__ import annotations
 
 from aiogram.fsm.context import FSMContext
-from aiogram.types import KeyboardButton, Message, ReplyKeyboardMarkup
+from aiogram.types import Message
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.settings import CHARGE_PRESET_PACKAGES
 from app.database import crud
+from app.handlers.user.flow_inline import ikb
 from app.keyboards.reply import get_main_keyboard
 from app.utils.bot_i18n import t, text_matches
 from app.utils.validation import InputValidator
 
 from .common import (
     ChargeState,
+    _back_keyboard,
     _build_package_keyboard,
     _build_subscription_keyboard,
     _build_traffic_options_keyboard,
@@ -116,8 +118,7 @@ async def choose_package(message: Message, state: FSMContext, session: AsyncSess
         
         summary_lines.append('\nTo continue and send receipt, tap Confirm.')
     
-    from aiogram.types import KeyboardButton, ReplyKeyboardMarkup
-    confirm_kb = ReplyKeyboardMarkup(keyboard=[[KeyboardButton(text=t(lang, "charge_confirm"))], [KeyboardButton(text=t(lang, "btn_back"))]], resize_keyboard=True)
+    confirm_kb = await ikb(state, [[t(lang, "charge_confirm")], [t(lang, "btn_back")]])
     await state.set_state(ChargeState.confirmation)
     await message.answer('\n'.join(summary_lines), reply_markup=confirm_kb)
 
@@ -130,7 +131,7 @@ async def back_from_package(message: Message, state: FSMContext, session: AsyncS
     # If user had to choose between traffic options, return there
     if data.get('charge_type') in {'booking', 'normal_5gb_limit'} or (data.get('remaining_gb') or 0) > 5:
         await state.set_state(ChargeState.traffic_check)
-        await message.answer(t(lang, "charge_back_step"), reply_markup=_build_traffic_options_keyboard(lang))
+        await message.answer(t(lang, "charge_back_step"), reply_markup=await _build_traffic_options_keyboard(state, lang))
         return
 
     # Otherwise, go back to subscription selection when multiple exist; cancel if none
@@ -142,7 +143,7 @@ async def back_from_package(message: Message, state: FSMContext, session: AsyncS
     subs = await crud.get_user_active_subscriptions(session, user.id)
     if len(subs) > 1:
         await state.set_state(ChargeState.subscription)
-        await message.answer(t(lang, "charge_back_to_services"), reply_markup=_build_subscription_keyboard(subs, lang))
+        await message.answer(t(lang, "charge_back_to_services"), reply_markup=await _build_subscription_keyboard(state, subs, lang))
     else:
         await state.clear()
         await message.answer(t(lang, "charge_cancelled"), reply_markup=get_main_keyboard(message.chat.id, lang=lang))
@@ -159,14 +160,10 @@ async def confirm_charge(message: Message, state: FSMContext, session: AsyncSess
     pkg_label = data.get('package_label')
     if user and (user.credit or 0) > 0 and pkg_label in CHARGE_PRESET_PACKAGES:
         await state.set_state(ChargeState.ask_credit)
-        credit_kb = ReplyKeyboardMarkup(
-            keyboard=[
-                [KeyboardButton(text=(f"✅ بله، {user.credit:,} تومان اعتبار را استفاده کن" if lang == "fa" else f"✅ Yes, use {user.credit:,} credit"))],
-                [KeyboardButton(text=("خیر، برای بعد ذخیره کن" if lang == "fa" else "No, save for later"))],
-            ],
-            resize_keyboard=True,
-            one_time_keyboard=True,
-        )
+        credit_kb = await ikb(state, [
+            [(f"✅ بله، {user.credit:,} تومان اعتبار را استفاده کن" if lang == "fa" else f"✅ Yes, use {user.credit:,} credit")],
+            [("خیر، برای بعد ذخیره کن" if lang == "fa" else "No, save for later")],
+        ])
         await message.answer(
             (f"شما **{user.credit:,} تومان اعتبار** دارید! آیا می‌خواهید آن را روی این شارژ استفاده کنید؟" if lang == "fa" else f"You have **{user.credit:,}** credit. Use it for this charge?"),
             reply_markup=credit_kb,
@@ -175,7 +172,7 @@ async def confirm_charge(message: Message, state: FSMContext, session: AsyncSess
 
     await message.answer(
         _registered_text(lang),
-        reply_markup=ReplyKeyboardMarkup(keyboard=[[KeyboardButton(text=t(lang, "btn_back"))]], resize_keyboard=True),
+        reply_markup=await _back_keyboard(state, lang),
         parse_mode="HTML"
     )
     await state.set_state(ChargeState.receipt)
@@ -196,7 +193,7 @@ async def charge_credit_choice(message: Message, state: FSMContext, session: Asy
     if not use_credit:
         await message.answer(
             _registered_text(lang),
-            reply_markup=ReplyKeyboardMarkup(keyboard=[[KeyboardButton(text=t(lang, "btn_back"))]], resize_keyboard=True),
+            reply_markup=await _back_keyboard(state, lang),
             parse_mode="HTML"
         )
         await state.set_state(ChargeState.receipt)
@@ -240,7 +237,7 @@ async def charge_credit_choice(message: Message, state: FSMContext, session: Asy
             else f"💰 {result.credit_used:,} Toman of your credit was used.\n"
             f"💵 Remaining to pay: {result.final_price:,} Toman\n\n" + _registered_text(lang)
         ),
-        reply_markup=ReplyKeyboardMarkup(keyboard=[[KeyboardButton(text=t(lang, "btn_back"))]], resize_keyboard=True),
+        reply_markup=await _back_keyboard(state, lang),
         parse_mode="HTML"
     )
     await state.set_state(ChargeState.receipt)
@@ -265,11 +262,7 @@ async def confirmation_catch_all(message: Message, state: FSMContext, session: A
         return  # Let start handler handle it
     
     # Any other text - remind user to confirm or go back
-    from aiogram.types import KeyboardButton, ReplyKeyboardMarkup
-    confirm_kb = ReplyKeyboardMarkup(
-        keyboard=[[KeyboardButton(text=t(lang, "charge_confirm"))], [KeyboardButton(text=t(lang, "btn_back"))]],
-        resize_keyboard=True
-    )
+    confirm_kb = await ikb(state, [[t(lang, "charge_confirm")], [t(lang, "btn_back")]])
     await message.answer(
         t(lang, "charge_confirm_or_back") if "charge_confirm_or_back" in dir(t) else 
         ("لطفاً تایید یا بازگشت را انتخاب کنید." if lang == "fa" else "Please choose confirm or back."),
