@@ -303,26 +303,10 @@
   }
   var IS_ANDROID = /android/i.test(navigator.userAgent || '');
   var baseHeight = window.innerHeight; // refreshed whenever no field is focused
-  // VirtualKeyboard API (Chromium 94+): the only exact signal on Android
-  // Telegram, whose webview neither resizes nor updates visualViewport /
-  // tg.viewportHeight when the keyboard opens. geometrychange also fires when
-  // the keyboard is BACK-dismissed while the input stays focused — the case
-  // the old focus-based 42% guess could not see (it kept the page lifted over
-  // a keyboard that was no longer there). Only trusted after it has reported
-  // at least once; until then the 42% guess stays as the fallback.
-  var vkReported = false;
-  var vkHeight = 0;
-  try {
-    var vk = navigator.virtualKeyboard;
-    if (IS_ANDROID && vk && typeof vk.addEventListener === 'function') {
-      vk.overlaysContent = true;
-      vk.addEventListener('geometrychange', function (e) {
-        try { vkHeight = Math.round(((e.target && e.target.boundingRect) || {}).height || 0); } catch (_) { vkHeight = 0; }
-        vkReported = true;
-        queue(30);
-      });
-    }
-  } catch (_) {}
+  // NOTE: the VirtualKeyboard API is a trap here — it exists in this webview
+  // but the keyboard isn't chromium-managed, so geometrychange reports height
+  // 0 while the keyboard is actually covering the page. Trusting it disabled
+  // the lift entirely. Don't reintroduce it.
   function kbHeight() {
     var h = 0;
     try { if (vv) h = Math.max(h, Math.round(window.innerHeight - vv.height - (vv.offsetTop || 0))); } catch (_) {}
@@ -333,11 +317,12 @@
     if (h > 80) return h; // below that it's nav-bar/viewport noise, not a keyboard
     // Webview shrank itself (adjustResize) — the keyboard is already handled natively.
     if (baseHeight - window.innerHeight > 80) return 0;
-    // Exact measurement from the VirtualKeyboard API (0 = keyboard really closed).
-    if (vkReported) return vkHeight > 80 ? vkHeight : 0;
-    // Last resort: while an input is focused assume ~42% of the screen.
-    // ponytail: over-lifts with external keyboards / after back-dismiss; blur resets it.
-    if (IS_ANDROID) return Math.round(window.innerHeight * 0.42);
+    // Last resort: while an input is focused assume half the screen. Samsung
+    // keyboards with number row + suggestion bar measure ~49% of the webview,
+    // so 42% left the composer clipped under the keyboard; slight over-lift
+    // (a gap above a short keyboard) is the cheaper failure.
+    // ponytail: over-lifts with external keyboards; the outside-tap blur below resets it.
+    if (IS_ANDROID) return Math.round(window.innerHeight * 0.50);
     return 0;
   }
   function inFixed(el) {
@@ -380,6 +365,22 @@
   }
   document.addEventListener('focusin', function () { queue(320); }, true);
   document.addEventListener('focusout', function () { queue(120); }, true);
+  // The webview gives NO signal when the keyboard is dismissed with the Android
+  // back button — focus stays in the field, so the guessed lift got stuck and
+  // left a dead gap. Recovery (and native chat feel): tapping anything that is
+  // not the field itself or another control blurs the field, which closes the
+  // keyboard if it is still up and always drops the lift. Buttons/links are
+  // exempt so tapping Send doesn't collapse the composer mid-action.
+  document.addEventListener('touchstart', function (ev) {
+    var el = focusedField();
+    if (!el || !root.classList.contains('kb-open')) return;
+    var t = ev.target;
+    if (t === el) return;
+    try {
+      if (t && t.closest && t.closest('input, textarea, select, [contenteditable="true"], button, a, label')) return;
+    } catch (_) {}
+    try { el.blur(); } catch (_) {}
+  }, { capture: true, passive: true });
   if (vv) {
     try { vv.addEventListener('resize', function () { queue(60); }); } catch (_) {}
   }
