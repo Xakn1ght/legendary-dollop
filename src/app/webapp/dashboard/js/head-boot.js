@@ -303,6 +303,26 @@
   }
   var IS_ANDROID = /android/i.test(navigator.userAgent || '');
   var baseHeight = window.innerHeight; // refreshed whenever no field is focused
+  // VirtualKeyboard API (Chromium 94+): the only exact signal on Android
+  // Telegram, whose webview neither resizes nor updates visualViewport /
+  // tg.viewportHeight when the keyboard opens. geometrychange also fires when
+  // the keyboard is BACK-dismissed while the input stays focused — the case
+  // the old focus-based 42% guess could not see (it kept the page lifted over
+  // a keyboard that was no longer there). Only trusted after it has reported
+  // at least once; until then the 42% guess stays as the fallback.
+  var vkReported = false;
+  var vkHeight = 0;
+  try {
+    var vk = navigator.virtualKeyboard;
+    if (IS_ANDROID && vk && typeof vk.addEventListener === 'function') {
+      vk.overlaysContent = true;
+      vk.addEventListener('geometrychange', function (e) {
+        try { vkHeight = Math.round(((e.target && e.target.boundingRect) || {}).height || 0); } catch (_) { vkHeight = 0; }
+        vkReported = true;
+        queue(30);
+      });
+    }
+  } catch (_) {}
   function kbHeight() {
     var h = 0;
     try { if (vv) h = Math.max(h, Math.round(window.innerHeight - vv.height - (vv.offsetTop || 0))); } catch (_) {}
@@ -313,9 +333,9 @@
     if (h > 80) return h; // below that it's nav-bar/viewport noise, not a keyboard
     // Webview shrank itself (adjustResize) — the keyboard is already handled natively.
     if (baseHeight - window.innerHeight > 80) return 0;
-    // Android Telegram often neither resizes the webview nor updates
-    // visualViewport/viewportHeight when the keyboard opens — while an input
-    // is focused, assume a typical keyboard covers ~42% of the screen.
+    // Exact measurement from the VirtualKeyboard API (0 = keyboard really closed).
+    if (vkReported) return vkHeight > 80 ? vkHeight : 0;
+    // Last resort: while an input is focused assume ~42% of the screen.
     // ponytail: over-lifts with external keyboards / after back-dismiss; blur resets it.
     if (IS_ANDROID) return Math.round(window.innerHeight * 0.42);
     return 0;

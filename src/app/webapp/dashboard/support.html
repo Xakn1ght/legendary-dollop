@@ -8,7 +8,7 @@
   <meta name="referrer" content="no-referrer" />
   <title>Support - AstroByte</title>
   <script src="https://telegram.org/js/telegram-web-app.js"></script>
-  <script src="/webapp/dashboard/js/head-boot.js?v=14"></script>
+  <script src="/webapp/dashboard/js/head-boot.js?v=15"></script>
   <script src="/webapp/dashboard/ui.js?v=3" defer></script>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -1038,14 +1038,46 @@
     // ---- ticket photo attachments ----
     const photoCache = {};   // file_name -> objectURL
 
+    // Self-contained: initData/bearerToken/loginWithInitDataOnce are locals of
+    // apiCall() and are NOT visible here — referencing them threw a
+    // ReferenceError and every photo fetch/upload failed before hitting the
+    // network. Resolve auth from scratch instead.
     async function authHeaders() {
       const h = {};
+      const tg = window.Telegram?.WebApp;
+      const initData = (tg && tg.initData && tg.initData.length > 10) ? tg.initData : '';
       if (initData) h['X-Telegram-Init'] = initData;
-      if (!bearerToken && initData) {
-        try { const tk = await loginWithInitDataOnce(); if (tk) bearerToken = tk; } catch (_) {}
+      let bearer = '';
+      try { bearer = localStorage.getItem('tma_bearer_token') || ''; } catch (_) {}
+      if (!bearer && initData) {
+        try {
+          const r = await fetch('/api/dashboard/login', {
+            method: 'POST',
+            credentials: 'include',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ init_data: initData }),
+          });
+          const j = await r.json().catch(() => ({}));
+          if (j && j.ok && j.token) {
+            bearer = String(j.token);
+            try { localStorage.setItem('tma_bearer_token', bearer); } catch (_) {}
+          }
+        } catch (_) {}
       }
-      if (bearerToken) h['Authorization'] = 'Bearer ' + bearerToken;
+      if (bearer) h['Authorization'] = 'Bearer ' + bearer;
       return h;
+    }
+
+    // Same fallback apiCall() uses for standalone ?auth= sessions (no initData):
+    // carry the url token as a query param so the photo endpoints can verify it.
+    function photoApiUrl(path) {
+      const tg = window.Telegram?.WebApp;
+      const initData = (tg && tg.initData && tg.initData.length > 10) ? tg.initData : '';
+      const authToken = getUrlAuthToken();
+      if (!initData && authToken) {
+        return path + (path.includes('?') ? '&' : '?') + 'auth=' + encodeURIComponent(authToken);
+      }
+      return path;
     }
 
     function photoBubbleHtml(fileName, localUrl) {
@@ -1064,7 +1096,7 @@
         try {
           let url = photoCache[fname];
           if (!url) {
-            const res = await fetch(`/api/dashboard/tickets/${selectedTicket.id}/photo/${fname}`, {
+            const res = await fetch(photoApiUrl(`/api/dashboard/tickets/${selectedTicket.id}/photo/${fname}`), {
               credentials: 'include', headers: await authHeaders(),
             });
             if (!res.ok) throw new Error('http ' + res.status);
@@ -1104,7 +1136,7 @@
       try {
         const fd = new FormData();
         fd.append('photo', file, file.name || 'photo.jpg');
-        const res = await fetch(`/api/dashboard/tickets/${selectedTicket.id}/photo`, {
+        const res = await fetch(photoApiUrl(`/api/dashboard/tickets/${selectedTicket.id}/photo`), {
           method: 'POST', credentials: 'include', headers: await authHeaders(), body: fd,
         });
         const data = await res.json().catch(() => ({}));
