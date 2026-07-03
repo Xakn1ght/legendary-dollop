@@ -43,6 +43,8 @@ from .handlers import (
     handle_dashboard_tickets_delete,
     handle_dashboard_tickets_detail,
     handle_dashboard_tickets_list,
+    handle_dashboard_ticket_photo_get,
+    handle_dashboard_ticket_photo_upload,
     handle_dashboard_tickets_reply,
     handle_dashboard_wallet_cashout,
     handle_dashboard_wallet_convert_loyalty,
@@ -126,6 +128,10 @@ def register_dashboard_api_routes(app: web.Application) -> None:
     app.router.add_post(DASHBOARD_API_BASE_PATH + "/tickets", handle_dashboard_tickets_create)
     app.router.add_get(DASHBOARD_API_BASE_PATH + "/tickets/{ticket_id}", handle_dashboard_tickets_detail)
     app.router.add_post(DASHBOARD_API_BASE_PATH + "/tickets/{ticket_id}/reply", handle_dashboard_tickets_reply)
+    app.router.add_post(DASHBOARD_API_BASE_PATH + "/tickets/{ticket_id}/photo", handle_dashboard_ticket_photo_upload)
+    app.router.add_get(
+        DASHBOARD_API_BASE_PATH + "/tickets/{ticket_id}/photo/{file_name}", handle_dashboard_ticket_photo_get
+    )
     app.router.add_delete(DASHBOARD_API_BASE_PATH + "/tickets/{ticket_id}", handle_dashboard_tickets_delete)
 
     app.router.add_get(DASHBOARD_API_BASE_PATH + "/ws/support", handle_user_support_ws)

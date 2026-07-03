@@ -59,6 +59,8 @@ async def handle_admin_ticket_detail(request: web.Request):
                         "from_admin": m.sender == 'admin',
                         "message": m.text,
                         "text": m.text,
+                        "content_type": m.content_type or "text",
+                        "file_name": m.file_name if m.content_type == "photo" else None,
                         "created_at": m.created_at.isoformat()
                     } for m in msgs]
                 }

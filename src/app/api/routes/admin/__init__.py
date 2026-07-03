@@ -46,6 +46,8 @@ from app.api.routes.admin.tickets import (
     handle_admin_ticket_delete,
     handle_admin_ticket_detail,
     handle_admin_ticket_reopen,
+    handle_admin_ticket_photo_get,
+    handle_admin_ticket_photo_upload,
     handle_admin_ticket_reply,
     handle_admin_tickets,
 )
@@ -94,6 +96,8 @@ __all__ = [
     "handle_admin_ticket_delete",
     "handle_admin_ticket_detail",
     "handle_admin_ticket_reopen",
+    "handle_admin_ticket_photo_get",
+    "handle_admin_ticket_photo_upload",
     "handle_admin_ticket_reply",
     "handle_admin_tickets",
     "handle_admin_toggle_user",

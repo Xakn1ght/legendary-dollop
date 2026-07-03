@@ -289,8 +289,8 @@
           const next = (data.tickets || []).slice();
           // Always keep newest activity first
           next.sort((a, b) => {
-            const ta = new Date(a.updated_at || a.created_at || 0).getTime();
-            const tb = new Date(b.updated_at || b.created_at || 0).getTime();
+            const ta = parseTs(a.updated_at || a.created_at).getTime() || 0;
+            const tb = parseTs(b.updated_at || b.created_at).getTime() || 0;
             return (tb || 0) - (ta || 0);
           });
           allTickets = next;
@@ -362,9 +362,42 @@
       return true;
       }
 
-    function appendAdminChatMessage({ isAdmin, text, created_at }) {
-      appendGroupedMessage({ isAdmin, text, created_at, isNew: true });
+    function appendAdminChatMessage({ isAdmin, text, created_at, content_type, file_name }) {
+      appendGroupedMessage({ isAdmin, text, created_at, isNew: true, content_type, file_name });
     }
+
+    async function sendAdminTicketPhoto(file) {
+      if (!selectedId || !file) return;
+      if (file.size > 8 * 1024 * 1024) { try { v3Alert('Too large', 'Image exceeds 8MB.'); } catch(_) {} return; }
+      const localUrl = URL.createObjectURL(file);
+      appendGroupedMessage({
+        isAdmin: true, text: '', created_at: new Date().toISOString(),
+        isNew: true, isPending: true, content_type: 'photo', local_url: localUrl,
+      });
+      try { scrollToLatestMessage(true); } catch(_) {}
+      try {
+        const fd = new FormData();
+        fd.append('photo', file, file.name || 'photo.jpg');
+        const resp = await fetch(`/api/admin/tickets/${selectedId}/photo`, {
+          method: 'POST', credentials: 'include', body: fd,
+        });
+        let data = null; try { data = await resp.json(); } catch(_) {}
+        if (!resp.ok || (data && data.ok === false)) throw new Error((data && data.error) || 'upload_failed');
+        const el = document.querySelector('#chatMessages .msg-bubble[data-upload-pending]');
+        if (el) {
+          const timeEl = el.querySelector('.msg-meta');
+          if (timeEl) timeEl.textContent = escHtml(formatTime(data.created_at || new Date().toISOString()));
+          el.classList.remove('pending');
+          // Keep data-upload-pending until the WS echo adopts it (prevents a duplicate bubble).
+        }
+        lastMessageCount = (lastMessageCount || 0) + 1;
+      } catch (e) {
+        const el = document.querySelector('#chatMessages .msg-bubble[data-upload-pending]');
+        if (el) el.remove();
+        try { v3Alert('Send failed', 'Could not send the image.'); } catch(_) {}
+      }
+    }
+    window.sendAdminTicketPhoto = sendAdminTicketPhoto;
 
     function getChatThread() {
       const container = document.getElementById('chatMessages');
@@ -382,9 +415,36 @@
       return thread;
     }
 
+    // Backend timestamps are naive UTC — pin to UTC so toLocale* shows the
+    // admin's local timezone instead of misreading them as local.
+    function parseTs(v) {
+      if (!v) return new Date(NaN);
+      if (typeof v === 'string' && !/(?:[zZ]|[+-]\d\d:?\d\d)$/.test(v)) v += 'Z';
+      return new Date(v);
+    }
+
+    function photoBubbleInner(ticketId, fileName, localUrl) {
+      const src = localUrl || `/api/admin/tickets/${ticketId}/photo/${encodeURIComponent(fileName || '')}`;
+      return `<div class="msg-photo" onclick="openAdminLightbox(this.querySelector('img').src)"><img src="${src}" alt="" loading="lazy" onerror="this.parentElement.innerHTML='🖼'"></div>`;
+    }
+
+    window.openAdminLightbox = function (src) {
+      let lb = document.getElementById('adminPhotoLightbox');
+      if (!lb) {
+        lb = document.createElement('div');
+        lb.id = 'adminPhotoLightbox';
+        lb.className = 'photo-lightbox';
+        lb.innerHTML = '<img alt="">';
+        lb.onclick = () => lb.classList.remove('active');
+        document.body.appendChild(lb);
+      }
+      lb.querySelector('img').src = src;
+      lb.classList.add('active');
+    };
+
     function formatDay(dateString) {
       try {
-        const d = new Date(dateString);
+        const d = parseTs(dateString);
         if (isNaN(d.getTime())) return 'Unknown day';
         return d.toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' });
       } catch (_) {
@@ -394,7 +454,7 @@
 
     function dayKey(dateString) {
       try {
-        const d = new Date(dateString);
+        const d = parseTs(dateString);
         if (isNaN(d.getTime())) return 'unknown';
         const y = d.getFullYear();
         const m = String(d.getMonth() + 1).padStart(2, '0');
@@ -437,7 +497,7 @@
       return group;
     }
 
-    function appendGroupedMessage({ isAdmin, text, created_at, isNew = false, isPending = false }) {
+    function appendGroupedMessage({ isAdmin, text, created_at, isNew = false, isPending = false, content_type, file_name, local_url }) {
       const thread = getChatThread();
       if (!thread) return;
 
@@ -455,10 +515,14 @@
 
       const bubble = document.createElement('div');
       bubble.className = `msg-bubble${isNew ? ' new' : ''}${isPending ? ' pending' : ''}`;
+      const inner = (content_type === 'photo')
+        ? photoBubbleInner(selectedId, file_name, local_url)
+        : `<div>${escHtml(text || '')}</div>`;
       bubble.innerHTML = `
-        <div>${escHtml(text || '')}</div>
+        ${inner}
         <div class="msg-meta">${escHtml(isPending ? '…' : formatTime(created_at))}</div>
       `;
+      if (content_type === 'photo' && local_url) bubble.setAttribute('data-upload-pending', '1');
       row.appendChild(bubble);
 
       // Ensure visibility updates after DOM changes
@@ -691,7 +755,7 @@
           const isAdmin = !!m.from_admin;
           const text = (m.message || m.text || '');
         const isNew = hasNewMessages && index >= oldCount;
-          appendGroupedMessage({ isAdmin, text, created_at: m.created_at, isNew });
+          appendGroupedMessage({ isAdmin, text, created_at: m.created_at, isNew, content_type: m.content_type, file_name: m.file_name });
         });
         try { positionScrollToBottomButton(); } catch(_) {}
         try { updateScrollToBottomVisibility(); } catch(_) {}
@@ -699,7 +763,7 @@
         // Incremental update: append only the new messages (no full innerHTML replace)
         const newOnes = messages.slice(oldCount);
         newOnes.forEach(m => {
-          appendGroupedMessage({ isAdmin: !!m.from_admin, text: (m.message || m.text || ''), created_at: m.created_at, isNew: true });
+          appendGroupedMessage({ isAdmin: !!m.from_admin, text: (m.message || m.text || ''), created_at: m.created_at, isNew: true, content_type: m.content_type, file_name: m.file_name });
         });
       }
 
@@ -1389,7 +1453,8 @@
               const ticketId = data.ticket_id;
               const payload = data.data || {};
               const sender = payload.sender; // 'user' | 'admin'
-              const text = payload.text || '';
+              const isPhotoMsg = payload.content_type === 'photo';
+              const text = isPhotoMsg ? '📷 Photo' : (payload.text || '');
               const createdAt = payload.created_at;
 
               // Update ticket list row (preview + time) without full reload
@@ -1427,7 +1492,16 @@
                 // If this is an echo of our optimistic message, upgrade it instead of appending (prevents duplicates)
                 let handled = false;
                 try {
-                  if (sender === 'admin') {
+                  if (sender === 'admin' && isPhotoMsg) {
+                    const mine = document.querySelector('#chatMessages .msg-bubble[data-upload-pending]');
+                    if (mine) {
+                      mine.removeAttribute('data-upload-pending');
+                      const timeEl = mine.querySelector('.msg-meta');
+                      if (timeEl) timeEl.textContent = escHtml(formatTime(createdAt));
+                      mine.classList.remove('pending');
+                      handled = true;
+                    }
+                  } else if (sender === 'admin') {
                     const key = _pendingAdminKey(ticketId, text);
                     const pending = pendingAdminMessages.get(key);
                     if (pending && pending.el && pending.expiresAt > Date.now()) {
@@ -1440,7 +1514,10 @@
                   }
                 } catch(_) {}
                 if (!handled) {
-                  appendAdminChatMessage({ isAdmin: sender === 'admin', text, created_at: createdAt });
+                  appendAdminChatMessage({
+                    isAdmin: sender === 'admin', text: isPhotoMsg ? '' : text, created_at: createdAt,
+                    content_type: payload.content_type, file_name: payload.file_name,
+                  });
                   lastMessageCount = (lastMessageCount || 0) + 1;
                 }
                 scrollToLatestMessage(true);
@@ -1561,7 +1638,7 @@
     function timeAgo(dateString) {
       if (!dateString) return 'Just now';
       try {
-        const date = new Date(dateString);
+        const date = parseTs(dateString);
         if (isNaN(date.getTime())) return 'Unknown';
         const now = new Date();
         const seconds = Math.floor((now - date) / 1000);
@@ -1579,7 +1656,7 @@
     function formatTime(dateString) {
       if (!dateString) return '';
       try {
-        return new Date(dateString).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'});
+        return parseTs(dateString).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'});
       } catch(e) {
         return '';
       }

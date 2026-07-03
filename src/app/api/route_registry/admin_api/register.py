@@ -50,6 +50,8 @@ from .handlers import (
     handle_admin_ticket_delete,
     handle_admin_ticket_detail,
     handle_admin_ticket_reopen,
+    handle_admin_ticket_photo_get,
+    handle_admin_ticket_photo_upload,
     handle_admin_ticket_reply,
     handle_admin_tickets,
     handle_admin_toggle_user,
@@ -90,6 +92,8 @@ def register_admin_api_routes(app: web.Application) -> None:
     app.router.add_get(ADMIN_API_BASE + "/tickets", handle_admin_tickets)
     app.router.add_get(ADMIN_API_BASE + "/tickets/{ticket_id}", handle_admin_ticket_detail)
     app.router.add_post(ADMIN_API_BASE + "/tickets/{ticket_id}/reply", handle_admin_ticket_reply)
+    app.router.add_post(ADMIN_API_BASE + "/tickets/{ticket_id}/photo", handle_admin_ticket_photo_upload)
+    app.router.add_get(ADMIN_API_BASE + "/tickets/{ticket_id}/photo/{file_name}", handle_admin_ticket_photo_get)
     app.router.add_post(ADMIN_API_BASE + "/tickets/{ticket_id}/close", handle_admin_ticket_close)
     app.router.add_post(ADMIN_API_BASE + "/tickets/{ticket_id}/archive", handle_admin_ticket_archive)
     app.router.add_post(ADMIN_API_BASE + "/tickets/{ticket_id}/reopen", handle_admin_ticket_reopen)

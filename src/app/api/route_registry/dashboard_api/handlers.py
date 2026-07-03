@@ -59,6 +59,8 @@ from app.api.routes.dashboard_subs import (
     handle_dashboard_speed_ul,
 )
 from app.api.routes.dashboard_tickets import (
+    handle_dashboard_ticket_photo_get,
+    handle_dashboard_ticket_photo_upload,
     handle_dashboard_tickets_create,
     handle_dashboard_tickets_delete,
     handle_dashboard_tickets_detail,

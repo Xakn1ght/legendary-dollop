@@ -53,7 +53,11 @@ async def handle_admin_tickets(request: web.Request):
                     "status": t.status,
                     "priority": t.priority,
                     "subscription_username": sub_username,
-                    "last_message": last_msg.text[:50] + "..." if last_msg and last_msg.text and len(last_msg.text) > 50 else (last_msg.text if last_msg else "No messages yet"),
+                    "last_message": (
+                        "\U0001f4f7 Photo" if last_msg is not None and last_msg.content_type == "photo"
+                        else last_msg.text[:50] + "..." if last_msg and last_msg.text and len(last_msg.text) > 50
+                        else (last_msg.text if last_msg else "No messages yet")
+                    ),
                     "unread_count": unread_count,
                     "created_at": t.created_at.isoformat(),
                     "updated_at": t.updated_at.isoformat()

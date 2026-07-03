@@ -8,7 +8,7 @@
   <meta name="referrer" content="no-referrer" />
   <title>Support - AstroByte</title>
   <script src="https://telegram.org/js/telegram-web-app.js"></script>
-  <script src="/webapp/dashboard/js/head-boot.js?v=13"></script>
+  <script src="/webapp/dashboard/js/head-boot.js?v=14"></script>
   <script src="/webapp/dashboard/ui.js?v=3" defer></script>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -19,7 +19,7 @@
 <body>
   <div id="astro-lava" aria-hidden="true"><div class="lava-blob lava-blob-1"></div><div class="lava-blob lava-blob-2"></div><div class="lava-blob lava-blob-3"></div><div class="lava-blob lava-blob-4"></div><div class="lava-blob lava-blob-5"></div></div>
   <div class="content">
-    <link rel="stylesheet" href="/webapp/dashboard/css/support.css?v=6">
+    <link rel="stylesheet" href="/webapp/dashboard/css/support.css?v=7">
     <link rel="stylesheet" href="/webapp/dashboard/css/glass.css?v=49">
     
     <div class="space-bg"></div>
@@ -73,11 +73,21 @@
               <path d="M4 6h16M4 10h16M4 14h16M8 18l4 3 4-3"/>
             </svg>
           </button>
+          <button class="attach-btn" id="attachBtn" type="button" title="Send photo">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <rect x="3" y="3" width="18" height="18" rx="3"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="M21 15l-5-5L5 21"/>
+            </svg>
+          </button>
+          <input type="file" id="photoInput" accept="image/jpeg,image/png,image/webp" style="display:none">
           <textarea class="reply-input" id="replyInput" rows="1" placeholder="Type a message..." oninput="autoResize(this)"></textarea>
           <button class="send-btn" id="sendBtn" type="button">
             <svg viewBox="0 0 24 24"><path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/></svg>
           </button>
         </div>
+      </div>
+
+      <div class="photo-lightbox" id="photoLightbox" onclick="closeLightbox()">
+        <img id="photoLightboxImg" alt="">
       </div>
     </div>
     
@@ -243,6 +253,9 @@
         messageLabel: 'Message',
         describeIssue: 'Describe your issue...',
         createTicketBtn: 'Create Ticket',
+        photoTooLarge: 'Image is too large (max 8MB)',
+        photoSendFailed: 'Failed to send image',
+        photoLabel: 'Photo',
         newTicket: 'New Ticket',
         noMessagesYet: 'No messages',
         loading: 'Loading...',
@@ -283,6 +296,9 @@
         messageLabel: 'پیام',
         describeIssue: 'مشکل خود را شرح دهید...',
         createTicketBtn: 'ایجاد تیکت',
+        photoTooLarge: 'حجم تصویر زیاد است (حداکثر ۸ مگابایت)',
+        photoSendFailed: 'ارسال تصویر ناموفق بود',
+        photoLabel: 'تصویر',
         newTicket: 'تیکت جدید',
         noMessagesYet: 'بدون پیام',
         loading: 'در حال بارگذاری...',
@@ -468,6 +484,17 @@
       const sendBtn = document.getElementById('sendBtn');
       const dismissBtn = document.getElementById('keyboardDismissBtn');
       const ticketsList = document.getElementById('ticketsList');
+
+      const attachBtn = document.getElementById('attachBtn');
+      const photoInput = document.getElementById('photoInput');
+      if (attachBtn && photoInput) {
+        attachBtn.addEventListener('click', () => photoInput.click());
+        photoInput.addEventListener('change', () => {
+          const f = photoInput.files && photoInput.files[0];
+          photoInput.value = '';
+          if (f) sendTicketPhoto(f);
+        });
+      }
       
       // Only show keyboard dismiss button on phone devices
       if (dismissBtn) {
@@ -988,8 +1015,8 @@
         allTickets = (data.tickets || []).slice();
         // Always keep newest activity first
         allTickets.sort((a, b) => {
-          const ta = new Date(a.updated_at || a.created_at || 0).getTime();
-          const tb = new Date(b.updated_at || b.created_at || 0).getTime();
+          const ta = parseTs(a.updated_at || a.created_at).getTime();
+          const tb = parseTs(b.updated_at || b.created_at).getTime();
           return (tb || 0) - (ta || 0);
         });
         renderTickets();
@@ -999,18 +1026,119 @@
       }
     }
 
+    // Backend timestamps are naive UTC ISO strings — pin them to UTC so
+    // toLocale* renders in the device's timezone (e.g. Tehran) instead of
+    // being misread as local time.
+    function parseTs(v) {
+      if (!v) return new Date(NaN);
+      if (typeof v === 'string' && !/(?:[zZ]|[+-]\d\d:?\d\d)$/.test(v)) v += 'Z';
+      return new Date(v);
+    }
+
+    // ---- ticket photo attachments ----
+    const photoCache = {};   // file_name -> objectURL
+
+    async function authHeaders() {
+      const h = {};
+      if (initData) h['X-Telegram-Init'] = initData;
+      if (!bearerToken && initData) {
+        try { const tk = await loginWithInitDataOnce(); if (tk) bearerToken = tk; } catch (_) {}
+      }
+      if (bearerToken) h['Authorization'] = 'Bearer ' + bearerToken;
+      return h;
+    }
+
+    function photoBubbleHtml(fileName, localUrl) {
+      if (localUrl) {
+        return `<div class="message-bubble msg-photo" data-upload-pending="1"><img src="${localUrl}" alt=""></div>`;
+      }
+      return `<div class="message-bubble msg-photo" data-pending="1" data-fname="${escapeHtml(fileName || '')}"><div class="msg-photo-spin"></div></div>`;
+    }
+
+    async function hydratePhotos(scope) {
+      const nodes = Array.from((scope || document).querySelectorAll('.msg-photo[data-pending]'));
+      for (const el of nodes) {
+        el.removeAttribute('data-pending');
+        const fname = el.getAttribute('data-fname');
+        if (!fname || !selectedTicket) continue;
+        try {
+          let url = photoCache[fname];
+          if (!url) {
+            const res = await fetch(`/api/dashboard/tickets/${selectedTicket.id}/photo/${fname}`, {
+              credentials: 'include', headers: await authHeaders(),
+            });
+            if (!res.ok) throw new Error('http ' + res.status);
+            url = URL.createObjectURL(await res.blob());
+            photoCache[fname] = url;
+          }
+          el.innerHTML = `<img src="${url}" alt="">`;
+          el.onclick = () => openLightbox(url);
+        } catch (_) {
+          el.innerHTML = '<div class="msg-photo-fail">🖼</div>';
+        }
+      }
+    }
+
+    function openLightbox(src) {
+      const lb = document.getElementById('photoLightbox');
+      const img = document.getElementById('photoLightboxImg');
+      if (!lb || !img) return;
+      img.src = src;
+      lb.classList.add('active');
+    }
+    function closeLightbox() {
+      const lb = document.getElementById('photoLightbox');
+      if (lb) lb.classList.remove('active');
+    }
+
+    async function sendTicketPhoto(file) {
+      if (!selectedTicket || !file) return;
+      if (file.size > 8 * 1024 * 1024) { showToast(t('photoTooLarge'), 'error'); return; }
+      const localUrl = URL.createObjectURL(file);
+      appendMessageToChat({
+        from_admin: false, message: '', created_at: new Date().toISOString(),
+        content_type: 'photo', local_url: localUrl,
+      });
+      const container = document.getElementById('messagesArea');
+      if (container) container.scrollTop = container.scrollHeight;
+      try {
+        const fd = new FormData();
+        fd.append('photo', file, file.name || 'photo.jpg');
+        const res = await fetch(`/api/dashboard/tickets/${selectedTicket.id}/photo`, {
+          method: 'POST', credentials: 'include', headers: await authHeaders(), body: fd,
+        });
+        const data = await res.json().catch(() => ({}));
+        if (!data.ok) throw new Error(data.error || 'upload_failed');
+        if (data.file_name) photoCache[data.file_name] = localUrl;
+        const el = container && container.querySelector('.msg-photo[data-upload-pending]');
+        if (el) {
+          el.removeAttribute('data-upload-pending');
+          el.setAttribute('data-fname', data.file_name || '');
+          el.onclick = () => openLightbox(localUrl);
+        }
+        updateTicketPreviewInDOM(selectedTicket.id, { last_message: '📷 ' + t('photoLabel'), updated_at: data.created_at });
+      } catch (_) {
+        showToast(t('photoSendFailed'), 'error');
+        const el = container && container.querySelector('.msg-photo[data-upload-pending]');
+        if (el) { const row = el.closest('.message'); if (row) row.remove(); }
+      }
+    }
+
     function isChatNearBottom() {
       const container = document.getElementById('messagesArea');
       if (!container) return true;
       return (container.scrollHeight - container.scrollTop - container.clientHeight) < 120;
     }
 
-    function appendMessageToChat({ from_admin, message, created_at }) {
+    function appendMessageToChat({ from_admin, message, created_at, content_type, file_name, local_url }) {
       const container = document.getElementById('messagesArea');
       if (!container) return;
 
       const getLocale = () => currentLang === 'fa' ? 'fa-IR' : 'en-US';
-      const time = created_at ? new Date(created_at).toLocaleTimeString(getLocale(), {hour: '2-digit', minute:'2-digit'}) : '';
+      const time = created_at ? parseTs(created_at).toLocaleTimeString(getLocale(), {hour: '2-digit', minute:'2-digit'}) : '';
+      const bubble = (content_type === 'photo')
+        ? photoBubbleHtml(file_name, local_url)
+        : `<div class="message-bubble">${escapeHtml(message || '')}</div>`;
 
       const wrap = document.createElement('div');
       wrap.innerHTML = `
@@ -1021,12 +1149,13 @@
             </svg>
           </div>
           <div style="display:flex; flex-direction:column; max-width:100%;">
-            <div class="message-bubble">${escapeHtml(message || '')}</div>
+            ${bubble}
             <div class="message-time">${escapeHtml(time)}</div>
           </div>
         </div>
       `;
       container.appendChild(wrap.firstElementChild);
+      if (content_type === 'photo' && !local_url) hydratePhotos(container);
     }
 
     function updateTicketPreviewInDOM(ticketId, patch) {
@@ -1039,7 +1168,7 @@
       if (previewEl && patch.last_message != null) previewEl.textContent = patch.last_message;
       if (dateEl && (patch.updated_at || patch.created_at)) {
         const getLocale = () => currentLang === 'fa' ? 'fa-IR' : 'en-US';
-        const d = new Date(patch.updated_at || patch.created_at);
+        const d = parseTs(patch.updated_at || patch.created_at);
         dateEl.textContent = isNaN(d.getTime()) ? '' : d.toLocaleDateString(getLocale());
       }
       if (statusEl && patch.status) {
@@ -1093,7 +1222,7 @@
       
       const getLocale = () => currentLang === 'fa' ? 'fa-IR' : 'en-US';
       list.innerHTML = filtered.map(tk => {
-        const date = new Date(tk.updated_at || tk.created_at).toLocaleDateString(getLocale());
+        const date = parseTs(tk.updated_at || tk.created_at).toLocaleDateString(getLocale());
         const icon = tk.category === 'money' ? '<path d="M12 2v20m-5-5h10M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/>' : 
                      tk.category === 'connection' ? '<path d="M5 12.55a11 11 0 0 1 14.08 0M1.64 9.5a15 15 0 0 1 20.72 0M12 18a3 3 0 1 1 0-6 3 3 0 0 1 0 6z"/>' :
                      '<circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/>';
@@ -1176,7 +1305,7 @@
       const getLocale = () => currentLang === 'fa' ? 'fa-IR' : 'en-US';
       
       container.innerHTML = messages.map(m => {
-        const time = new Date(m.created_at).toLocaleTimeString(getLocale(), {hour: '2-digit', minute:'2-digit'});
+        const time = parseTs(m.created_at).toLocaleTimeString(getLocale(), {hour: '2-digit', minute:'2-digit'});
         return `
           <div class="message ${m.from_admin ? 'admin' : 'user'}">
             <div class="message-avatar">
@@ -1185,7 +1314,7 @@
               </svg>
             </div>
             <div style="display:flex; flex-direction:column; max-width:100%;">
-              <div class="message-bubble">${escapeHtml(m.message)}</div>
+              ${m.content_type === 'photo' ? photoBubbleHtml(m.file_name) : `<div class="message-bubble">${escapeHtml(m.message)}</div>`}
               <div class="message-time">${time}</div>
             </div>
           </div>
@@ -1193,6 +1322,7 @@
       }).join('');
       
       container.scrollTop = container.scrollHeight;
+      hydratePhotos(container);
     }
     
     async function sendReply() {
@@ -1467,7 +1597,10 @@
           if (msgs.length > currentCount) {
             const shouldScroll = isChatNearBottom();
             msgs.slice(currentCount).forEach(m => {
-              appendMessageToChat({ from_admin: !!m.from_admin, message: m.message, created_at: m.created_at });
+              appendMessageToChat({
+                from_admin: !!m.from_admin, message: m.message, created_at: m.created_at,
+                content_type: m.content_type, file_name: m.file_name,
+              });
             });
             if (shouldScroll && container) container.scrollTop = container.scrollHeight;
             
@@ -1566,7 +1699,8 @@
 	              const ticketId = data.ticket_id;
 	              const payload = data.data || {};
 	              const sender = payload.sender;
-	              const text = payload.text || '';
+	              const isPhotoMsg = payload.content_type === 'photo';
+	              const text = isPhotoMsg ? ('📷 ' + t('photoLabel')) : (payload.text || '');
 	              const createdAt = payload.created_at;
 
 	              // Update tickets list preview/date without re-render
@@ -1602,14 +1736,22 @@
                 // If this is an echo of our optimistic message, upgrade it instead of appending (prevents duplicates)
                 let handled = false;
                 try {
-                  if (sender === 'user') {
+                  if (sender === 'user' && isPhotoMsg) {
+                    // Echo of our own upload: adopt the optimistic bubble.
+                    const mine = document.querySelector('#messagesArea .message.user .msg-photo[data-upload-pending]');
+                    if (mine) {
+                      mine.removeAttribute('data-upload-pending');
+                      mine.setAttribute('data-fname', payload.file_name || '');
+                      handled = true;
+                    }
+                  } else if (sender === 'user') {
                     const key = _pendingKey(ticketId, text);
                     const pending = pendingLocalMessages.get(key);
                     if (pending && pending.el && pending.expiresAt > Date.now()) {
                       const timeEl = pending.el.querySelector('.message-time');
                       if (timeEl) {
                         const getLocale = () => currentLang === 'fa' ? 'fa-IR' : 'en-US';
-                        const time = createdAt ? new Date(createdAt).toLocaleTimeString(getLocale(), {hour: '2-digit', minute:'2-digit'}) : timeEl.textContent;
+                        const time = createdAt ? parseTs(createdAt).toLocaleTimeString(getLocale(), {hour: '2-digit', minute:'2-digit'}) : timeEl.textContent;
                         timeEl.textContent = time;
                       }
                       pending.el.style.opacity = '1';
@@ -1620,7 +1762,13 @@
                   }
                 } catch(_) {}
                 if (!handled) {
-                  appendMessageToChat({ from_admin: sender === 'admin', message: text, created_at: createdAt });
+                  appendMessageToChat({
+                    from_admin: sender === 'admin',
+                    message: isPhotoMsg ? '' : text,
+                    created_at: createdAt,
+                    content_type: payload.content_type,
+                    file_name: payload.file_name,
+                  });
                 }
                 if (shouldScroll) {
                   const container = document.getElementById('messagesArea');

@@ -71,7 +71,10 @@ async def handle_dashboard_tickets_list(request: web.Request):
                         "subscription_username": subscription_username,
                         "created_at": ticket.created_at.isoformat() if ticket.created_at else None,
                         "updated_at": ticket.updated_at.isoformat() if ticket.updated_at else None,
-                        "last_message": last_msg.text[:100] if last_msg and last_msg.text else "No messages",
+                        "last_message": (
+                            "\U0001f4f7" if last_msg is not None and last_msg.content_type == "photo"
+                            else (last_msg.text[:100] if last_msg and last_msg.text else "No messages")
+                        ),
                         "unread_count": unread_count,
                     }
                 )

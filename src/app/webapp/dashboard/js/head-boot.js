@@ -301,6 +301,8 @@
     var el = document.activeElement;
     return (el && el.matches && el.matches('input, textarea, select, [contenteditable="true"]')) ? el : null;
   }
+  var IS_ANDROID = /android/i.test(navigator.userAgent || '');
+  var baseHeight = window.innerHeight; // refreshed whenever no field is focused
   function kbHeight() {
     var h = 0;
     try { if (vv) h = Math.max(h, Math.round(window.innerHeight - vv.height - (vv.offsetTop || 0))); } catch (_) {}
@@ -308,7 +310,15 @@
       var tg = window.Telegram && window.Telegram.WebApp;
       if (tg && tg.viewportHeight) h = Math.max(h, Math.round(window.innerHeight - tg.viewportHeight));
     } catch (_) {}
-    return h > 80 ? h : 0; // below that it's nav-bar/viewport noise, not a keyboard
+    if (h > 80) return h; // below that it's nav-bar/viewport noise, not a keyboard
+    // Webview shrank itself (adjustResize) — the keyboard is already handled natively.
+    if (baseHeight - window.innerHeight > 80) return 0;
+    // Android Telegram often neither resizes the webview nor updates
+    // visualViewport/viewportHeight when the keyboard opens — while an input
+    // is focused, assume a typical keyboard covers ~42% of the screen.
+    // ponytail: over-lifts with external keyboards / after back-dismiss; blur resets it.
+    if (IS_ANDROID) return Math.round(window.innerHeight * 0.42);
+    return 0;
   }
   function inFixed(el) {
     for (var n = el; n && n !== document.body; n = n.parentElement) {
@@ -324,10 +334,17 @@
       root.classList.toggle('kb-open', kb > 0);
     } catch (_) {}
     if (!el || !kb) {
+      if (!el) baseHeight = window.innerHeight;
       if (document.body) document.body.style.paddingBottom = '';
       return;
     }
     if (!inFixed(el) && document.body) document.body.style.paddingBottom = kb + 'px';
+    // Chat view shrinks around the reply bar — keep the newest messages visible.
+    var chat = el.closest && el.closest('.chat-view');
+    if (chat) {
+      var msgs = chat.querySelector('.chat-messages');
+      if (msgs) msgs.scrollTop = msgs.scrollHeight;
+    }
     var r = el.getBoundingClientRect();
     var visibleBottom = window.innerHeight - kb;
     if (r.bottom > visibleBottom - 12 || r.top < 0) {

@@ -47,6 +47,8 @@ async def handle_dashboard_tickets_detail(request: web.Request):
                     "id": msg.id,
                     "message": msg.text or "",
                     "from_admin": msg.sender == "admin",
+                    "content_type": msg.content_type or "text",
+                    "file_name": msg.file_name if msg.content_type == "photo" else None,
                     "created_at": msg.created_at.isoformat() if msg.created_at else None,
                 }
                 for msg in messages
