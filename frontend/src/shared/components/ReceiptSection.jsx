@@ -8,8 +8,9 @@ function formatCardNumber(cardNum) {
   return formatted || '6037-xxxx-xxxx-xxxx';
 }
 
-export function ReceiptSection({ t, fmtPrice, paymentInfo, amount, previewSrc, hasFile, onCopyCard, onFileSelect, onCancel, onSubmit }) {
+export function ReceiptSection({ t, fmtPrice, paymentInfo, amount, previewSrc, hasFile, onCopyCard, onFileSelect, onCancel, onSubmit, uploadPct = null }) {
   const inputRef = useRef(null);
+  const uploading = uploadPct != null;
 
   const openPicker = () => {
     try {
@@ -71,12 +72,23 @@ export function ReceiptSection({ t, fmtPrice, paymentInfo, amount, previewSrc, h
         </div>
       </div>
 
+      {uploading && (
+        <div className="upload-progress" role="progressbar" aria-valuemin={0} aria-valuemax={100} aria-valuenow={uploadPct}>
+          <div className="upload-progress-track">
+            <div className="upload-progress-fill" style={{ width: `${uploadPct}%` }} />
+          </div>
+          <div className="upload-progress-label">
+            {uploadPct >= 100 ? (t('uploadProcessing') || '…') : `${t('uploading') || 'Uploading'} ${uploadPct}%`}
+          </div>
+        </div>
+      )}
+
       <div className="btn-container">
-        <button className="btn btn-secondary" onClick={onCancel}>
+        <button className="btn btn-secondary" onClick={onCancel} disabled={uploading}>
           <span>{t('cancel')}</span>
         </button>
-        <button className="btn btn-primary" id="btnSubmitReceipt" disabled={!hasFile} onClick={onSubmit}>
-          <span>{t('submitReceipt')}</span>
+        <button className="btn btn-primary" id="btnSubmitReceipt" disabled={!hasFile || uploading} onClick={onSubmit}>
+          <span>{uploading ? `${uploadPct}%` : t('submitReceipt')}</span>
         </button>
       </div>
     </div>

@@ -834,3 +834,28 @@ body[data-charge-step="1"] .bottom-actions .btn {
   font-size: 13px;
   text-align: center;
 }
+
+/* Receipt upload progress (XHR-tracked; shown while the image is in flight) */
+.upload-progress { margin: 4px 2px 0; }
+.upload-progress-track {
+  height: 8px;
+  border-radius: 999px;
+  background: var(--chip, rgba(255,255,255,0.08));
+  border: 1px solid var(--line, rgba(255,255,255,0.10));
+  overflow: hidden;
+}
+.upload-progress-fill {
+  height: 100%;
+  border-radius: 999px;
+  background: linear-gradient(90deg, var(--brand), var(--brandDark));
+  transition: width 180ms ease-out;
+  min-width: 6px;
+}
+.upload-progress-label {
+  margin-top: 6px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--muted);
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+}

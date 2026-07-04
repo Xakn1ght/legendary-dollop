@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import { api, getAuthToken, setNotRegisteredHandler } from '../shared/auth.js';
+import { postWithProgress } from '../shared/upload.js';
 import { ReceiptSection } from '../shared/components/ReceiptSection.jsx';
 import { StepsBar } from '../shared/components/StepsBar.jsx';
 import { SuccessSection } from '../shared/components/SuccessSection.jsx';
@@ -57,6 +58,7 @@ export function PurchaseApp() {
   const [nameValid, setNameValid] = useState(true);
   const [orderFinalPrice, setOrderFinalPrice] = useState(null);
   const [showNotRegistered, setShowNotRegistered] = useState(false);
+  const [uploadPct, setUploadPct] = useState(null); // null = not uploading
 
   const t = useMemo(() => makeT(lang), [lang]);
   const fmt = useCallback((n) => formatNumberExt(n, lang), [lang]);
@@ -228,12 +230,14 @@ export function PurchaseApp() {
     if (!orderIdRef.current) return;
     const base64 = await receipt.getBase64ForSubmit();
     if (!base64) return;
+    setUploadPct(0);
     await busy(async () => {
       try {
-        const data = await api('/api/dashboard/purchase/receipt', {
-          method: 'POST',
-          body: JSON.stringify({ order_id: orderIdRef.current, receipt_image: base64 }),
-        });
+        const data = await postWithProgress(
+          '/api/dashboard/purchase/receipt',
+          { order_id: orderIdRef.current, receipt_image: base64 },
+          setUploadPct,
+        );
         if (data && data.ok) {
           goToStep(5);
           hapticNotify('success');
@@ -255,6 +259,8 @@ export function PurchaseApp() {
         console.error('Failed to submit receipt (exception):', e);
         astroToast(e?.message ? String(e.message) : tt('errorOccurred'));
         hapticNotify('error');
+      } finally {
+        setUploadPct(null);
       }
     });
   }, [receipt, busy, goToStep]);
@@ -521,6 +527,7 @@ export function PurchaseApp() {
             onFileSelect={receipt.handleSelect}
             onCancel={cancelOrder}
             onSubmit={submitReceipt}
+            uploadPct={uploadPct}
           />
         )}
 

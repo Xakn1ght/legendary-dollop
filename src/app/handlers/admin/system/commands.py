@@ -1,4 +1,7 @@
+import html
+import json
 from datetime import datetime as _dt
+from pathlib import Path
 
 from aiogram import F
 from aiogram.types import Message
@@ -15,6 +18,55 @@ from app.utils.bot_i18n import t
 from app.utils.health_check import get_health_summary, get_system_health
 
 from .common import _lang_for_tg_user, router
+
+
+_CLIENT_ERRORS_FILE = Path(__file__).resolve().parents[3] / "data" / "client_errors.jsonl"
+
+
+@router.message(F.text.startswith("/errors"))
+async def show_client_errors(message: Message):
+    """Show the latest client-side JS errors reported by the Mini App.
+
+    Usage: /errors [N]   (default 10, max 25)
+    """
+    if message.from_user.id not in ADMIN_IDS:
+        return
+    try:
+        parts = (message.text or "").split()
+        count = min(25, max(1, int(parts[1]))) if len(parts) > 1 else 10
+    except Exception:
+        count = 10
+
+    try:
+        lines = _CLIENT_ERRORS_FILE.read_text(encoding="utf-8").strip().splitlines()
+    except FileNotFoundError:
+        await message.answer("هیچ خطای کلاینتی ثبت نشده است.")
+        return
+    except Exception as e:
+        await message.answer(f"خواندن فایل خطاها ممکن نشد: {e}")
+        return
+
+    if not lines:
+        await message.answer("هیچ خطای کلاینتی ثبت نشده است.")
+        return
+
+    rows = []
+    for line in lines[-count:]:
+        try:
+            ev = json.loads(line)
+        except Exception:
+            continue
+        ts = _dt.fromtimestamp(int(ev.get("at", 0))).strftime("%m-%d %H:%M")
+        kind = str(ev.get("kind", "?"))[:10]
+        platform = str(ev.get("platform", "?"))[:8]
+        page = html.escape(str(ev.get("page", ""))[:40])
+        msg = html.escape(str(ev.get("msg", ""))[:160])
+        rows.append(f"<b>{ts}</b> [{kind}/{platform}] {page}\n{msg}")
+
+    total = len(lines)
+    text = f"🧾 آخرین خطاهای کلاینت ({len(rows)} از {total}):\n\n" + "\n\n".join(rows)
+    # Telegram message cap is 4096 chars.
+    await message.answer(text[:4000])
 
 
 @router.message(F.text == "/run_renewal")

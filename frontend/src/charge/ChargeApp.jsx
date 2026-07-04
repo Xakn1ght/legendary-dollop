@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import { api, getAuthToken } from '../shared/auth.js';
+import { postWithProgress } from '../shared/upload.js';
 import { ReceiptSection } from '../shared/components/ReceiptSection.jsx';
 import { StepsBar } from '../shared/components/StepsBar.jsx';
 import { SuccessSection } from '../shared/components/SuccessSection.jsx';
@@ -47,6 +48,7 @@ export function ChargeApp() {
   const [step, setStep] = useState(1);
   const [subscriptions, setSubscriptions] = useState([]);
   const [subsLoaded, setSubsLoaded] = useState(false);
+  const [uploadPct, setUploadPct] = useState(null); // null = not uploading
   const [packages, setPackages] = useState([]);
   const [packagesStatus, setPackagesStatus] = useState('loading'); // loading | ready | empty | error
   const [plans, setPlans] = useState([]);
@@ -240,12 +242,14 @@ export function ChargeApp() {
     if (!orderIdRef.current) return;
     const base64 = await receipt.getBase64ForSubmit();
     if (!base64) return;
+    setUploadPct(0);
     await busy(async () => {
       try {
-        const data = await api('/api/dashboard/charge/receipt', {
-          method: 'POST',
-          body: JSON.stringify({ order_id: orderIdRef.current, receipt_image: base64 }),
-        });
+        const data = await postWithProgress(
+          '/api/dashboard/charge/receipt',
+          { order_id: orderIdRef.current, receipt_image: base64 },
+          setUploadPct,
+        );
         if (data && data.ok) {
           goToStep(5);
           hapticNotify('success');
@@ -256,6 +260,8 @@ export function ChargeApp() {
       } catch (e) {
         console.error('Failed to submit receipt:', e);
         showToast(tt('errorOccurred'));
+      } finally {
+        setUploadPct(null);
       }
     });
   }, [receipt, busy, goToStep]);
@@ -499,6 +505,7 @@ export function ChargeApp() {
             onFileSelect={receipt.handleSelect}
             onCancel={cancelOrder}
             onSubmit={submitReceipt}
+            uploadPct={uploadPct}
           />
         )}
 

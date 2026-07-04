@@ -160,6 +160,15 @@ async def main() -> None:
 
     dp.shutdown.register(shutdown)
 
+    # Watchdog: alert admins when the user bot / web server stops answering.
+    watchdog_task = None
+    try:
+        from app.utils.service_watchdog import service_watchdog
+
+        watchdog_task = asyncio.create_task(service_watchdog(bot))
+    except Exception as e:
+        bot_logger.warning(f"Failed to start service watchdog: {e}")
+
     try:
         await bot.delete_webhook(drop_pending_updates=True)
         bot_logger.info("Admin bot ready, starting polling...")
@@ -167,6 +176,9 @@ async def main() -> None:
     except Exception as e:
         log_error(e, {"operation": "admin_bot_startup"})
         bot_logger.critical(f"Failed to start admin bot polling: {e}. Exiting.")
+    finally:
+        if watchdog_task is not None:
+            watchdog_task.cancel()
 
 
 if __name__ == "__main__":
