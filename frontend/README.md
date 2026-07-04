@@ -22,6 +22,9 @@ cd frontend
 npm install        # once
 npm run build      # emits src/app/webapp/dashboard/react/ (COMMIT this output)
 npm run dev        # dev server; proxies /api and /webapp to localhost:8585
+
+# Browser-test the built app without DB/Redis/Telegram (mock API on :8686):
+python3 ../scripts/dev_fixture_server.py
 ```
 
 ## How serving works

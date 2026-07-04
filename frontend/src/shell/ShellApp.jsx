@@ -508,6 +508,35 @@ export function ShellApp() {
     setExportState({ link, showQRFirst });
   }, []);
 
+  // ── Update detection ──────────────────────────────────────────────
+  // Deploys change the hashed bundle name inside the (no-store) shell HTML.
+  // Compare it against the script this session is running; offer a reload
+  // instead of letting users ride a stale bundle until the next cold open.
+  const [updateReady, setUpdateReady] = useState(false);
+  useEffect(() => {
+    let stop = false;
+    const runningSrc = (() => {
+      try {
+        const s = document.querySelector('script[src*="/react/assets/index-"]');
+        return s ? s.src.split('/').pop() : '';
+      } catch (_) { return ''; }
+    })();
+    if (!runningSrc) return undefined;
+    const check = async () => {
+      try {
+        const r = await fetch('/webapp/dashboard/', { cache: 'no-store', credentials: 'include' });
+        if (!r.ok) return;
+        const html = await r.text();
+        const m = html.match(/\/react\/assets\/(index-[^"']+\.js)/);
+        if (!stop && m && m[1] && m[1] !== runningSrc) setUpdateReady(true);
+      } catch (_) { /* offline — the net banner handles that story */ }
+    };
+    const iv = setInterval(check, 5 * 60 * 1000);
+    const onVis = () => { if (document.visibilityState === 'visible') check(); };
+    document.addEventListener('visibilitychange', onVis);
+    return () => { stop = true; clearInterval(iv); document.removeEventListener('visibilitychange', onVis); };
+  }, []);
+
   // ── Offline banner + auto-retry ───────────────────────────────────
   const netDownRef = useRef(false);
   const netRetryRef = useRef(null);
@@ -780,6 +809,18 @@ export function ShellApp() {
             hasUsedRef={welcome.hasUsedRef}
             onDismiss={() => setWelcome(null)}
           />
+        )}
+
+        {updateReady && !netDown && (
+          <div className="net-banner update-banner" role="status">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" width="14" height="14" aria-hidden="true">
+              <path d="M21 12a9 9 0 1 1-2.64-6.36" /><path d="M21 3v6h-6" />
+            </svg>
+            <span>{t('updateReady')}</span>
+            <button type="button" onClick={() => { try { window.location.reload(); } catch (_) { /* ignore */ } }}>
+              {t('updateReload')}
+            </button>
+          </div>
         )}
 
         {netDown && (

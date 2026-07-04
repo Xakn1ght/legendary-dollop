@@ -10,6 +10,7 @@ send a recovery message with total downtime when it comes back.
 
 import asyncio
 import logging
+import shutil
 import time
 
 import aiohttp
@@ -23,6 +24,13 @@ _HEALTH_URL = f"http://127.0.0.1:{GAME_WEBAPP_PORT}/health"
 _PROBE_EVERY = 60
 _FAILS_TO_ALERT = 2
 _REALERT_EVERY = 30 * 60
+
+# Disk watch: the classic silent killer — logs/backups fill the disk and
+# Postgres stops writing. Alert at 90%, all-clear below 85%.
+_DISK_PATH = "/"
+_DISK_ALERT_PCT = 90
+_DISK_CLEAR_PCT = 85
+_DISK_REALERT_EVERY = 12 * 3600
 
 
 async def _probe(session: aiohttp.ClientSession) -> str | None:
@@ -44,10 +52,20 @@ async def _notify(bot, text: str) -> None:
             logger.warning("watchdog notify to %s failed: %s", admin_id, e)
 
 
+def _disk_used_pct() -> int | None:
+    try:
+        usage = shutil.disk_usage(_DISK_PATH)
+        return int(round(usage.used / usage.total * 100))
+    except Exception:
+        return None
+
+
 async def service_watchdog(bot) -> None:
     fails = 0
     down_since: float | None = None
     last_alert = 0.0
+    disk_high = False
+    last_disk_alert = 0.0
 
     async with aiohttp.ClientSession() as session:
         while True:
@@ -76,6 +94,24 @@ async def service_watchdog(bot) -> None:
                                 "بررسی: systemctl status astrobyte-userbot",
                             )
                             logger.error("watchdog: service DOWN (%s)", error)
+
+                # Disk watch (hysteresis: alert ≥90%, clear <85%)
+                pct = _disk_used_pct()
+                if pct is not None:
+                    if pct >= _DISK_ALERT_PCT:
+                        if now - last_disk_alert >= _DISK_REALERT_EVERY:
+                            last_disk_alert = now
+                            disk_high = True
+                            await _notify(
+                                bot,
+                                f"🟠 هشدار فضای دیسک: {pct}٪ پر است!\n"
+                                "بررسی: du -sh /root/5a06b8e65bdb/ASTROBYTE/{backups,logs}",
+                            )
+                            logger.error("watchdog: disk usage %s%%", pct)
+                    elif disk_high and pct < _DISK_CLEAR_PCT:
+                        disk_high = False
+                        last_disk_alert = 0.0
+                        await _notify(bot, f"🟢 فضای دیسک به حالت عادی برگشت ({pct}٪)")
             except Exception as e:
                 logger.warning("watchdog loop error: %s", e)
 

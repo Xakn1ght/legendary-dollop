@@ -1686,6 +1686,17 @@
       from{opacity:0; transform:translateY(-6px)}
       to{opacity:1; transform:none}
     }
+    /* Update prompt reuses the banner shell in the brand hue */
+    .net-banner.update-banner{
+      background:rgba(var(--brandRgb), 0.10);
+      border-color:rgba(var(--brandRgb), 0.30);
+      color:var(--brand);
+    }
+    .net-banner.update-banner button{
+      border-color:rgba(var(--brandRgb), 0.4);
+      background:rgba(var(--brandRgb), 0.14);
+      color:var(--brand);
+    }
 
     /* Inline dot at the title's reading start (flex gap handles spacing;
        dir=rtl puts it on the right automatically). */
