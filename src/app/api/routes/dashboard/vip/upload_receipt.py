@@ -16,7 +16,7 @@ from app.core.settings import ADMIN_ID, VIP_PLANS
 from app.database import crud
 from app.database.models import AsyncSessionLocal, VipOrder
 from app.utils.admin_bot_helper import get_admin_bot
-from app.utils.validation import detect_image_type, validate_image_bytes
+from app.utils.image_security import ImageRejected, sanitize_image
 
 logger = logging.getLogger(__name__)
 
@@ -55,22 +55,6 @@ async def handle_vip_upload_receipt(request: web.Request):
             if order.status not in ("draft", "pending"):
                 return web.json_response({"ok": False, "error": "order_already_processed"}, status=400)
 
-            receipt_ext = "jpg"
-            try:
-                if isinstance(receipt_image_b64, str) and receipt_image_b64.startswith("data:image/"):
-                    mime = receipt_image_b64.split(";")[0].split(":")[1].strip().lower()
-                    if "png" in mime:
-                        receipt_ext = "png"
-                    elif "jpeg" in mime or "jpg" in mime:
-                        receipt_ext = "jpg"
-                    else:
-                        return web.json_response(
-                            {"ok": False, "error": "invalid_format", "message": "Only JPG and PNG allowed"},
-                            status=400,
-                        )
-            except Exception:
-                pass
-
             try:
                 if "," in receipt_image_b64:
                     receipt_image_b64 = receipt_image_b64.split(",")[1]
@@ -79,13 +63,10 @@ async def handle_vip_upload_receipt(request: web.Request):
                 logger.error(f"Failed to decode receipt image: {e}")
                 return web.json_response({"ok": False, "error": "invalid_image"}, status=400)
 
-            ok, err = validate_image_bytes(image_data, MAX_RECEIPT_BYTES)
-            if not ok:
-                return web.json_response({"ok": False, "error": "invalid_image", "detail": err}, status=400)
-
-            detected = detect_image_type(image_data)
-            if receipt_ext and detected and receipt_ext != detected:
-                return web.json_response({"ok": False, "error": "invalid_image", "detail": "type_mismatch"}, status=400)
+            try:
+                image_data, receipt_ext, _mime = sanitize_image(image_data, MAX_RECEIPT_BYTES)
+            except ImageRejected as e:
+                return web.json_response({"ok": False, "error": "invalid_image", "detail": e.code}, status=400)
 
             uploads_dir = os.path.abspath(webapp_path("admin", "uploads", "receipts"))
             os.makedirs(uploads_dir, exist_ok=True)

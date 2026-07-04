@@ -17,20 +17,21 @@ from sqlalchemy.future import select
 from app.api.deps import _verify_webapp_auth, set_tma_session_cookie
 from app.api.routes.dashboard_tickets.common import broadcast_ticket_update
 from app.database.models import AsyncSessionLocal, Ticket, TicketMessage, User
+from app.utils.image_security import ImageRejected, sanitize_image
 
 UPLOAD_ROOT = Path(__file__).resolve().parents[4] / "data" / "ticket_uploads"
 MAX_PHOTO_BYTES = 8 * 1024 * 1024  # nginx caps the request at 12M
+# Uploads are always re-encoded to jpg/png by sanitize_image; webp stays valid
+# for any file written before that hardening landed.
 _SAFE_NAME = re.compile(r"^[a-f0-9]{32}\.(jpg|png|webp)\Z")  # \Z: '$' would accept a trailing newline (%0A)
 
-# magic bytes -> extension/mime
-def sniff_image(head: bytes):
-    if head.startswith(b"\xff\xd8\xff"):
-        return "jpg", "image/jpeg"
-    if head.startswith(b"\x89PNG\r\n\x1a\n"):
-        return "png", "image/png"
-    if head[:4] == b"RIFF" and head[8:12] == b"WEBP":
-        return "webp", "image/webp"
-    return None, None
+# Serve user-supplied files defused: never let the browser sniff them into an
+# active type, and neutralise anything scriptable with a locked-down CSP.
+_UPLOAD_SERVE_HEADERS = {
+    "Cache-Control": "private, max-age=86400",
+    "X-Content-Type-Options": "nosniff",
+    "Content-Security-Policy": "default-src 'none'; sandbox; frame-ancestors 'none'",
+}
 
 
 async def _load_owned_ticket(session, user_chat_id: int, ticket_id: int):
@@ -73,8 +74,9 @@ async def handle_dashboard_ticket_photo_upload(request: web.Request):
     except Exception:
         return web.json_response({"ok": False, "error": "invalid_upload"}, status=400)
 
-    ext, mime = sniff_image(bytes(data[:16]))
-    if not ext or len(data) < 100:
+    try:
+        clean, ext, mime = sanitize_image(bytes(data), MAX_PHOTO_BYTES)
+    except ImageRejected:
         return web.json_response({"ok": False, "error": "unsupported_image"}, status=400)
 
     try:
@@ -88,7 +90,7 @@ async def handle_dashboard_ticket_photo_upload(request: web.Request):
             fname = f"{secrets.token_hex(16)}.{ext}"
             dest_dir = UPLOAD_ROOT / str(ticket_id)
             dest_dir.mkdir(parents=True, exist_ok=True)
-            (dest_dir / fname).write_bytes(bytes(data))
+            (dest_dir / fname).write_bytes(clean)
 
             new_msg = TicketMessage(
                 ticket_id=ticket_id,
@@ -96,7 +98,7 @@ async def handle_dashboard_ticket_photo_upload(request: web.Request):
                 content_type="photo",
                 text=None,
                 file_name=fname,
-                file_size=len(data),
+                file_size=len(clean),
                 file_mime_type=mime,
                 read_by_user=True,
                 created_at=datetime.utcnow(),
@@ -156,4 +158,4 @@ async def handle_dashboard_ticket_photo_get(request: web.Request):
     path = UPLOAD_ROOT / str(ticket_id) / fname
     if not path.is_file():
         return web.json_response({"ok": False, "error": "not_found"}, status=404)
-    return web.FileResponse(path, headers={"Cache-Control": "private, max-age=86400"})
+    return web.FileResponse(path, headers=_UPLOAD_SERVE_HEADERS)

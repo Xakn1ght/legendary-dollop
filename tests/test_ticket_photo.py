@@ -1,17 +1,19 @@
-"""Validation core of ticket photo uploads: magic-byte sniffing + filename guard."""
+"""Ticket photo upload invariants: served-filename guard + content hardening.
+
+Byte-content validation for uploads is no longer a magic-byte sniff; it is a
+full decode + re-encode via app.utils.image_security.sanitize_image (covered
+in depth by tests/test_ticket_photo content is in test_upload_security.py).
+This test locks the two invariants that live in the photo route itself:
+the filename guard used when serving, and that the route routes bytes through
+the sanitizer rather than writing raw upload bytes.
+"""
 import sys
 
 sys.path.insert(0, "src")
 
-from app.api.routes.dashboard_tickets.detail_ops.photo import _SAFE_NAME, sniff_image
+from app.api.routes.dashboard_tickets.detail_ops import photo
 
-# magic bytes
-assert sniff_image(b"\xff\xd8\xff\xe0" + b"\x00" * 12) == ("jpg", "image/jpeg")
-assert sniff_image(b"\x89PNG\r\n\x1a\n" + b"\x00" * 8) == ("png", "image/png")
-assert sniff_image(b"RIFF\x00\x00\x00\x00WEBPVP8 ") == ("webp", "image/webp")
-assert sniff_image(b"GIF89a" + b"\x00" * 10) == (None, None)          # gif rejected
-assert sniff_image(b"<svg xmlns='http://www.w3'") == (None, None)     # svg/XSS rejected
-assert sniff_image(b"") == (None, None)
+_SAFE_NAME = photo._SAFE_NAME
 
 # filename guard (route serves only names we generated)
 assert _SAFE_NAME.match("a" * 32 + ".jpg")
@@ -21,5 +23,9 @@ assert not _SAFE_NAME.match("abc.jpg")
 assert not _SAFE_NAME.match("A" * 32 + ".jpg")   # uppercase hex not ours
 assert not _SAFE_NAME.match("a" * 32 + ".svg")
 assert not _SAFE_NAME.match("a" * 32 + ".jpg\n")
+
+# The route must sanitize (decode + re-encode), never trust/write raw bytes.
+assert hasattr(photo, "sanitize_image"), "photo route no longer sanitizes uploads!"
+assert not hasattr(photo, "sniff_image"), "raw magic-byte sniff should be gone"
 
 print("test_ticket_photo: OK")

@@ -5,7 +5,7 @@ aiosqlite
 asyncpg
 apscheduler
 aiohttp
-pillow
+pillow>=10.0.0  # SECURITY: re-encodes every uploaded image (app/utils/image_security.py); do not remove
 pyzbar
 qrcode
 matplotlib

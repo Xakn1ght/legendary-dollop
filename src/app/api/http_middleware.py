@@ -1,6 +1,7 @@
 """HTTP middleware shared by the aiohttp Application (security headers, admin auth, audit)."""
 
 import logging
+import posixpath
 import time
 import urllib.parse
 
@@ -64,6 +65,15 @@ async def security_headers_middleware(request: web.Request, handler):
     # so it can never go stale — cache it hard (big win on slow connections; the
     # no-store HTML entry points always reference the current hashes).
     path = request.path
+    # Any served upload (receipt/background images under /admin/uploads/) is
+    # user-supplied content. Even though sanitize_image re-encodes on intake,
+    # serve it defused: forbid content-type sniffing and lock the document down
+    # so nothing can execute if a byte pattern ever slips through.
+    norm_path = posixpath.normpath(urllib.parse.unquote(path))
+    if "/uploads/" in (path + "/") or "/uploads/" in (norm_path + "/"):
+        resp.headers["X-Content-Type-Options"] = "nosniff"
+        resp.headers["Content-Security-Policy"] = "default-src 'none'; sandbox; frame-ancestors 'none'"
+
     if path.startswith("/webapp/dashboard/react/assets/"):
         resp.headers["Cache-Control"] = "public, max-age=31536000, immutable"
     elif path.startswith("/webapp/static/fonts/"):
@@ -141,7 +151,10 @@ async def admin_auth_middleware(request: web.Request, handler):
 
         # Protect uploads (receipt images) - do NOT allow these anonymously.
         # (Everything else can be a public SPA shell; sensitive data stays behind /api/admin/*.)
-        if path.startswith("/admin/uploads/"):
+        # Normalise first so /admin//uploads, /admin/./uploads and percent-encoded
+        # variants can't reach the static file handler while dodging this check.
+        norm_admin_path = posixpath.normpath(urllib.parse.unquote(path))
+        if path.startswith("/admin/uploads/") or norm_admin_path.startswith("/admin/uploads/"):
             token = _get_token_from_request(request)
             session = verify_admin_token(token)
             if not session:

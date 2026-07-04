@@ -1,3 +1,5 @@
+from app.utils.image_security import ImageRejected, sanitize_image
+
 from .common import *  # noqa: F403
 from .common import _load_settings, _save_settings  # underscore names aren't star-exported
 
@@ -32,46 +34,37 @@ async def handle_admin_ui_upload_background(request: web.Request):
       - field: file
     Returns:
       - { ok: true, url: "/admin/uploads/<name>" }
+
+    The client-declared Content-Type is not trusted: bytes are buffered (with a
+    hard cap), decoded, and re-encoded through sanitize_image, so only a clean
+    raster with a server-chosen extension ever reaches disk.
     """
+    max_bytes = 5 * 1024 * 1024  # 5MB
     try:
         reader = await request.multipart()
         field = await reader.next()
         if not field or field.name != "file":
             return web.json_response({"ok": False, "error": "missing_file"}, status=400)
 
-        filename = (field.filename or "").strip()
-        content_type = (field.headers.get("Content-Type") or "").lower()
+        data = bytearray()
+        while True:
+            chunk = await field.read_chunk(size=64 * 1024)
+            if not chunk:
+                break
+            data.extend(chunk)
+            if len(data) > max_bytes:
+                return web.json_response({"ok": False, "error": "file_too_large"}, status=400)
 
-        # Basic validation
-        allowed_types = {"image/png", "image/jpeg", "image/webp"}
-        if content_type not in allowed_types:
-            return web.json_response({"ok": False, "error": "unsupported_type"}, status=400)
+        try:
+            clean, ext, _mime = sanitize_image(bytes(data), max_bytes)
+        except ImageRejected as e:
+            return web.json_response({"ok": False, "error": "unsupported_type", "detail": e.code}, status=400)
 
-        ext = ".png" if content_type == "image/png" else ".jpg" if content_type == "image/jpeg" else ".webp"
-        safe_name = "bg_" + secrets.token_hex(8) + ext
-
+        safe_name = f"bg_{secrets.token_hex(8)}.{ext}"
         os.makedirs(_UPLOAD_DIR, exist_ok=True)
         out_path = os.path.join(_UPLOAD_DIR, safe_name)
-
-        size = 0
-        max_bytes = 5 * 1024 * 1024  # 5MB
         with open(out_path, "wb") as f:
-            while True:
-                chunk = await field.read_chunk(size=64 * 1024)
-                if not chunk:
-                    break
-                size += len(chunk)
-                if size > max_bytes:
-                    try:
-                        f.close()
-                    except Exception:
-                        pass
-                    try:
-                        os.remove(out_path)
-                    except Exception:
-                        pass
-                    return web.json_response({"ok": False, "error": "file_too_large"}, status=400)
-                f.write(chunk)
+            f.write(clean)
 
         return web.json_response({"ok": True, "url": f"/admin/uploads/{safe_name}"})
     except Exception:
