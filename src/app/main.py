@@ -19,6 +19,7 @@ from app.handlers.user import (
     my_services,
     purchase,
     referral,
+    sms_receipts,
     start,
     support,
     tutorials,
@@ -34,6 +35,7 @@ from app.jobs.expire_claims import expire_star_reward_claims_job
 from app.jobs.notifications import check_low_data_job
 from app.jobs.renewal import renewal_job
 from app.jobs.season_reset import season_reset_job
+from app.jobs.sms_sweep import sms_sweep_job
 from app.services.marzban import marzban_api
 from app.utils.banned_user_middleware import BannedUserMiddleware
 from app.utils.error_middleware import (
@@ -216,6 +218,7 @@ async def main():
 
     # User bot only — admin approvals and admin Telegram UI run in admin_main (separate token).
     routers = [
+        sms_receipts.router,  # bank-SMS channel ingest (scoped to SMS_SOURCE_CHAT_ID; inert if unset)
         start.router,
         flow_inline.router,
         purchase.router,
@@ -305,6 +308,7 @@ async def main():
         (cleanup_draft_orders_job, 'cleanup_draft_orders_job'),
         (season_reset_job, 'season_reset_job'),
         (arcade_monthly_prizes_job, 'arcade_monthly_prizes_job'),
+        (sms_sweep_job, 'sms_sweep_job'),
     ]
     
     # Add jobs with error handling

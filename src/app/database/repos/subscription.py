@@ -322,6 +322,9 @@ class SubscriptionRepository:
             traffic_bytes=traffic_bytes,
             extra_days=extra_days,
             price=price,
+            # Net toman actually transferred (price minus reserved credit) — the
+            # figure a bank SMS carries, for SMS auto-approval matching.
+            paid_amount=max(int(price) - int(credit_used or 0), 0),
             credit_used=credit_used or 0,
             charge_type=charge_type,
             renewal_template=renewal_template,

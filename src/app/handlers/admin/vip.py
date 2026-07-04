@@ -42,6 +42,76 @@ async def _notify_user_via_main_bot(chat_id: int, text: str, parse_mode: str = "
         return
 
 
+async def activate_vip_order(session: AsyncSession, vip_order: VipOrder, *,
+                             approved_by: int | None = None,
+                             notify_user_bot=None) -> bool:
+    """Grant VIP for an order and notify the user. Shared by the admin Approve
+    button and the SMS auto-approver so both paths behave identically.
+
+    Only acts on a still-'pending' order (idempotent). ``notify_user_bot`` is an
+    optional live user-bot to DM through; falls back to a short-lived bot.
+    Returns True if it flipped the order to approved.
+    """
+    if vip_order.status != "pending":
+        return False
+    user: User | None = await session.get(User, vip_order.user_id)
+    if not user:
+        return False
+
+    user.is_vip = True
+    duration_text = "دائمی"
+    if vip_order.days and vip_order.days > 0:
+        now = datetime.utcnow()
+        if user.vip_until and user.vip_until > now:
+            user.vip_until = user.vip_until + timedelta(days=int(vip_order.days))
+        else:
+            user.vip_until = now + timedelta(days=int(vip_order.days))
+        duration_text = f"{int(vip_order.days)} روز"
+    else:
+        user.vip_until = None
+
+    vip_order.status = "approved"
+    try:
+        vip_order.approved_at = datetime.utcnow()
+    except Exception:
+        pass
+    if approved_by is not None:
+        try:
+            vip_order.approved_by = int(approved_by)
+        except Exception:
+            pass
+
+    try:
+        await notifications_crud.create_notification(
+            db=session,
+            user_id=user.id,
+            type="vip_granted",
+            title="تبریک! VIP فعال شد",
+            message=f"اشتراک VIP شما فعال شد ({duration_text}). از مزایای ویژه لذت ببرید!",
+            sent_to_webapp=True,
+            sent_to_bot=True,
+        )
+    except Exception as e:
+        logging.warning(f"[VIP] Failed to create notification: {e}")
+
+    await session.commit()
+
+    msg = (
+        f"*تبریک! VIP فعال شد*\n\n"
+        f"اشتراک VIP شما با موفقیت فعال شد.\n"
+        f"مدت: {duration_text}\n\n"
+        f"از مزایای ویژه VIP لذت ببرید!"
+    )
+    try:
+        if user.chat_id and notify_user_bot is not None:
+            await notify_user_bot.send_message(chat_id=int(user.chat_id), text=msg, parse_mode="Markdown")
+        elif user.chat_id:
+            await _notify_user_via_main_bot(int(user.chat_id), msg, parse_mode="Markdown")
+    except Exception:
+        pass
+    return True
+
+
 @router.callback_query(F.data.startswith("approve_vip_"))
 async def approve_vip_order(callback: CallbackQuery, session: AsyncSession, bot: Bot):
     lang = await _admin_lang(session, callback.from_user)
@@ -68,58 +138,10 @@ async def approve_vip_order(callback: CallbackQuery, session: AsyncSession, bot:
             pass
         return
 
-    user: User | None = await session.get(User, vip_order.user_id)
-    if not user:
+    activated = await activate_vip_order(session, vip_order, approved_by=callback.from_user.id)
+    if not activated:
         await callback.answer("User not found", show_alert=True)
         return
-
-    # Set VIP status
-    user.is_vip = True
-    duration_text = "دائمی"
-    if vip_order.days and vip_order.days > 0:
-        now = datetime.utcnow()
-        if user.vip_until and user.vip_until > now:
-            user.vip_until = user.vip_until + timedelta(days=int(vip_order.days))
-        else:
-            user.vip_until = now + timedelta(days=int(vip_order.days))
-        duration_text = f"{int(vip_order.days)} روز"
-    else:
-        # Lifetime VIP
-        user.vip_until = None
-
-    vip_order.status = "approved"
-    try:
-        vip_order.approved_at = datetime.utcnow()
-    except Exception:
-        pass
-
-    try:
-        await notifications_crud.create_notification(
-            db=session,
-            user_id=user.id,
-            type="vip_granted",
-            title="تبریک! VIP فعال شد",
-            message=f"اشتراک VIP شما فعال شد ({duration_text}). از مزایای ویژه لذت ببرید!",
-            sent_to_webapp=True,
-            sent_to_bot=True,
-        )
-    except Exception as e:
-        logging.warning(f"[VIP] Failed to create notification: {e}")
-
-    await session.commit()
-
-    # Notify user in the main (user-facing) bot (best-effort)
-    try:
-        if user.chat_id:
-            msg = (
-                f"*تبریک! VIP فعال شد*\n\n"
-                f"اشتراک VIP شما با موفقیت فعال شد.\n"
-                f"مدت: {duration_text}\n\n"
-                f"از مزایای ویژه VIP لذت ببرید!"
-            )
-            await _notify_user_via_main_bot(int(user.chat_id), msg, parse_mode="Markdown")
-    except Exception:
-        pass
 
     await callback.answer("✅ تایید شد")
     try:

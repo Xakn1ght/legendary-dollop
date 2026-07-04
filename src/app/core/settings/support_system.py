@@ -62,6 +62,9 @@ JOB_SCHEDULES = {
     # Idempotent: no-ops until a new month starts, then mints last month's
     # arcade leaderboard prize coupons exactly once.
     "arcade_monthly_prizes_job": {"type": "interval", "hours": 6},
+    # Re-check pooled bank-SMS deposits vs pending orders (SMS-before-receipt case).
+    # Inert unless SMS auto-approval is armed; cheap when there's nothing pooled.
+    "sms_sweep_job": {"type": "interval", "seconds": 60, "max_instances": 1, "coalesce": True},
 }
 
 _job_schedules_path = str(CORE_DIR / "job_schedules.json")

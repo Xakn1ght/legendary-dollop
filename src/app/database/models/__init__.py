@@ -152,6 +152,7 @@ def _migrate(connection):
             ("carry_over_bytes", "ALTER TABLE subscriptions ADD COLUMN carry_over_bytes BIGINT;"),
             ("carry_over_reset_at", f"ALTER TABLE subscriptions ADD COLUMN carry_over_reset_at {datetime_type};"),
             ("price", "ALTER TABLE subscriptions ADD COLUMN price INTEGER;"),
+            ("paid_amount", "ALTER TABLE subscriptions ADD COLUMN paid_amount INTEGER;"),
             ("plan_name", "ALTER TABLE subscriptions ADD COLUMN plan_name VARCHAR;"),
             ("credit_used", "ALTER TABLE subscriptions ADD COLUMN credit_used INTEGER NOT NULL DEFAULT 0;"),
             ("applied_discount_ids", "ALTER TABLE subscriptions ADD COLUMN applied_discount_ids VARCHAR;"),
@@ -204,6 +205,8 @@ def _migrate(connection):
             connection.exec_driver_sql("ALTER TABLE charge_requests ADD COLUMN receipt_image_url VARCHAR;")
         if "charge_type" not in charge_cols:
             connection.exec_driver_sql("ALTER TABLE charge_requests ADD COLUMN charge_type VARCHAR(32) DEFAULT 'normal';")
+        if "paid_amount" not in charge_cols:
+            connection.exec_driver_sql("ALTER TABLE charge_requests ADD COLUMN paid_amount INTEGER;")
 
 
 def _ensure_link_table(connection):

@@ -128,6 +128,9 @@ async def start_purchase_order(
         ",".join(str(i) for i in quote.applied_discount_ids) if quote.applied_discount_ids else None
     )
     sub.applied_coupon_id = quote.coupon.id if quote.coupon else None
+    # Net toman the buyer actually transfers (after credit/discount/coupon) —
+    # the figure a bank-deposit SMS carries, for SMS auto-approval matching.
+    sub.paid_amount = int(quote.final_price)
     await session.commit()
     await session.refresh(sub)
 

@@ -17,6 +17,9 @@ class Subscription(Base):
     sub_token = Column(String, nullable=True)
     plan_name = Column(String)
     price = Column(Integer)
+    # Net toman the buyer actually transfers (after credit/discount/coupon) —
+    # the exact figure a bank-deposit SMS carries, used for SMS auto-approval.
+    paid_amount = Column(Integer, nullable=True)
     status = Column(String, default="pending")
     receipt_message_id = Column(Integer)
     admin_receipt_forward_message_id = Column(BigInteger, nullable=True)
@@ -101,6 +104,8 @@ class ChargeRequest(Base):
     traffic_bytes = Column(BigInteger, nullable=False)
     extra_days = Column(Integer, nullable=True)
     price = Column(Integer, nullable=False)
+    # Net toman actually transferred (price minus reserved credit) — for SMS match.
+    paid_amount = Column(Integer, nullable=True)
     charge_type = Column(String(32), nullable=True, default="normal")
     receipt_message_id = Column(Integer, nullable=True)
     receipt_image_url = Column(String, nullable=True)
