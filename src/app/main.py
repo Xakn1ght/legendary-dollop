@@ -27,6 +27,7 @@ from app.handlers.user import game as game_router
 from app.handlers.user.rewards import challenges as challenges_router
 from app.handlers.user.rewards import router as rewards_router
 from app.handlers.user.rewards import star_levels as star_levels_router
+from app.jobs.arcade_prizes import arcade_monthly_prizes_job
 from app.jobs.cleanup_draft_orders import cleanup_draft_orders_job
 from app.jobs.enhanced_rewards import reminder_unclaimed_star_rewards_job, update_user_analytics_job
 from app.jobs.expire_claims import expire_star_reward_claims_job
@@ -134,7 +135,7 @@ async def notification_worker(queue: asyncio.Queue, bot: Bot):
 
 
 async def main():
-    # Setup comprehensive logging
+    # Logging setup
     setup_logging(log_level="INFO", log_file="logs/bot.log")
     bot_logger.info("Starting ASSTRO bot...")
 
@@ -303,6 +304,7 @@ async def main():
         (reminder_unclaimed_star_rewards_job, 'reminder_unclaimed_star_rewards_job'),
         (cleanup_draft_orders_job, 'cleanup_draft_orders_job'),
         (season_reset_job, 'season_reset_job'),
+        (arcade_monthly_prizes_job, 'arcade_monthly_prizes_job'),
     ]
     
     # Add jobs with error handling

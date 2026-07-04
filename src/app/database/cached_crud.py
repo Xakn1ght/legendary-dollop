@@ -453,7 +453,7 @@ async def get_cache_stats() -> Dict[str, Any]:
         return {}
 
 # ========================================
-# CACHE-ENHANCED UTILITY FUNCTIONS
+# CACHED UTILITY FUNCTIONS
 # ========================================
 
 async def get_user_with_cache(session: AsyncSession, chat_id: int) -> Optional[User]:

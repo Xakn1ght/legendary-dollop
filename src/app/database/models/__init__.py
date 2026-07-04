@@ -10,6 +10,7 @@ from ._season import (
 )
 from ._reward import (
     Achievement,
+    ArcadeFlag,
     Challenge,
     DailyGamePlay,
     DailyStarCap,
@@ -60,6 +61,7 @@ __all__ = [
     "Challenge",
     "UserChallenge",
     "RewardHistory",
+    "ArcadeFlag",
     "DailyGamePlay",
     "UserAnalytics",
     "RewardEffectiveness",
@@ -296,6 +298,6 @@ async def _create_database_indexes(conn):
         await conn.execute(sqlalchemy.text("CREATE INDEX IF NOT EXISTS idx_challenges_type_active ON challenges (challenge_type, active)"))
         await conn.execute(sqlalchemy.text("CREATE INDEX IF NOT EXISTS idx_user_gifts_sender ON user_gifts (sender_id)"))
         await conn.execute(sqlalchemy.text("CREATE INDEX IF NOT EXISTS idx_user_gifts_receiver ON user_gifts (receiver_id)"))
-        print("✅ Database indexes created successfully")
+        print("Database indexes created successfully")
     except Exception as e:
-        print(f"⚠️ Warning: Some indexes may already exist or failed to create: {e}")
+        print(f"Warning: some indexes may already exist or failed to create: {e}")

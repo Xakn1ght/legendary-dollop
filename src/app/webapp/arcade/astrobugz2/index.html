@@ -57,14 +57,37 @@
       box-shadow: 0 8px 24px rgba(129,140,248,0.4);
     }
 
-    /* ---- game-over result ---- */
-    #ah-result { position: fixed; inset: 0; z-index: 300; background: rgba(11,6,23,0.92); backdrop-filter: blur(6px); display: flex; align-items: center; justify-content: center; }
+    /* ---- game-over result + daily-lock screen ---- */
+    #ah-result, #ah-locked { position: fixed; inset: 0; z-index: 300; background: rgba(11,6,23,0.92); backdrop-filter: blur(6px); display: flex; align-items: center; justify-content: center; }
+    #ah-locked { z-index: 290; }  /* a fresh result card stays on top of the lock */
+    #ah-locked button {
+      padding: 14px 34px; border: none; border-radius: 99px; cursor: pointer;
+      font-weight: 700; font-size: 15px; color: #fff;
+      background: linear-gradient(135deg, #818cf8, #c04dff);
+      box-shadow: 0 8px 24px rgba(129,140,248,0.4);
+    }
     .ah-card { width: 86%; max-width: 340px; text-align: center; padding: 30px 24px; border-radius: 24px;
       background: rgba(30,27,75,0.7); border: 1px solid rgba(167,139,250,0.3); display: flex; flex-direction: column; gap: 12px; }
     .ah-go { font-size: 14px; letter-spacing: 3px; color: #ff7ec2; font-weight: 800; }
     .ah-final { font-size: 52px; font-weight: 900; font-family: monospace; color: #fff; text-shadow: 0 0 24px rgba(192,77,255,0.6); }
     .ah-msg { font-size: 13px; color: rgba(248,250,252,0.7); margin-bottom: 6px; }
-    .ah-reward { font-size: 12px; color: #39ff88; font-family: monospace; word-break: break-all; }
+    .ah-rewards { display: flex; gap: 8px; justify-content: center; margin-bottom: 2px; }
+    .ah-chip { flex: 1; padding: 12px 6px; border-radius: 14px; display: flex; flex-direction: column; gap: 3px; align-items: center; }
+    .ah-chip b { font-size: 20px; font-weight: 800; line-height: 1; }
+    .ah-chip span { font-size: 9px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; color: rgba(248,250,252,0.5); }
+    .ah-chip.credits { background: rgba(255,193,7,0.10);  border: 1px solid rgba(255,193,7,0.35); }
+    .ah-chip.credits b { color: #ffc107; }
+    .ah-chip.stars   { background: rgba(255,126,194,0.10); border: 1px solid rgba(255,126,194,0.35); }
+    .ah-chip.stars b { color: #ff7ec2; }
+    .ah-chip.xp      { background: rgba(57,255,136,0.08);  border: 1px solid rgba(57,255,136,0.30); }
+    .ah-chip.xp b    { color: #39ff88; }
+    .ah-pieces { font-size: 11px; color: rgba(248,250,252,0.5); }
+    .ah-race {
+      padding: 10px 12px; border-radius: 12px; font-size: 13px; color: #e2e8f0;
+      background: rgba(129,140,248,0.12); border: 1px solid rgba(129,140,248,0.3);
+    }
+    .ah-race b { color: #a5b4fc; }
+    .ah-race small { color: rgba(248,250,252,0.55); font-size: 11px; }
     #ah-result button.ghost { background: rgba(255,255,255,0.06); box-shadow: none; border: 1px solid rgba(255,255,255,0.15); }
   </style>
 </head>
@@ -73,8 +96,8 @@
 
   <!-- load order matters: config defines data, bridge defines AstroBridge, engine runs -->
   <!-- bump ?v= when you change a JS file so Telegram/browsers fetch the new one -->
-  <script src="config.js?v=7"></script>
-  <script src="bridge.js?v=7"></script>
-  <script src="engine.js?v=7"></script>
+  <script src="config.js?v=17"></script>
+  <script src="bridge.js?v=17"></script>
+  <script src="engine.js?v=17"></script>
 </body>
 </html>

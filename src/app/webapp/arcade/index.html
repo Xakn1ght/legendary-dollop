@@ -349,6 +349,28 @@
       cursor: default;
     }
 
+    /* --- Monthly Race prizes --- */
+    .race-prizes { display: flex; gap: 8px; margin-bottom: 12px; }
+    .race-prize {
+      flex: 1; text-align: center; padding: 10px 4px; border-radius: 12px;
+      background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08);
+      display: flex; flex-direction: column; gap: 2px;
+    }
+    .race-prize b { font-size: 13px; color: var(--text-muted); }
+    .race-prize span { font-size: 14px; font-weight: 800; color: #e2e8f0; }
+    .race-prize.gold   { background: rgba(251,191,36,0.10); border-color: rgba(251,191,36,0.35); }
+    .race-prize.gold span { color: #fbbf24; }
+    .race-prize.silver { background: rgba(148,163,184,0.10); border-color: rgba(148,163,184,0.35); }
+    .race-prize.silver span { color: #cbd5e1; }
+    .race-prize.bronze { background: rgba(180,83,9,0.12); border-color: rgba(180,83,9,0.45); }
+    .race-prize.bronze span { color: #f59e0b; }
+    .race-me {
+      margin-bottom: 10px; padding: 10px 12px; border-radius: 12px;
+      background: rgba(129,140,248,0.10); border: 1px solid rgba(129,140,248,0.30);
+      font-size: 13px; color: #e2e8f0;
+    }
+    .race-me b { color: #a5b4fc; }
+
     /* --- Hall of Fame (Leaderboard) --- */
     .lb-header {
       display: flex;
@@ -567,6 +589,35 @@
       </button>
     </div>
 
+    <!-- Monthly Race (prizes) -->
+    <div class="card" id="raceCard">
+      <div class="lb-header">
+        <span class="lb-icon">🏆</span>
+        <span class="lb-title">Monthly Race</span>
+        <span id="raceCountdown" style="font-size:11px; color:var(--text-muted);"></span>
+      </div>
+      <div class="race-prizes" id="racePrizes">
+        <div class="race-prize gold"><b>#1</b><span>50GB</span></div>
+        <div class="race-prize silver"><b>#2</b><span>25GB</span></div>
+        <div class="race-prize bronze"><b>#3</b><span>10GB</span></div>
+        <div class="race-prize"><b>#4</b><span>10% off</span></div>
+      </div>
+      <div id="raceMe" class="race-me" style="display:none;"></div>
+      <ul id="raceList" class="lb-list">
+        <li class="lb-empty">Loading race standings...</li>
+      </ul>
+    </div>
+
+    <!-- Hall of Fame (last month's winners) -->
+    <div class="card" id="hofCard" style="display:none;">
+      <div class="lb-header">
+        <span class="lb-icon">👑</span>
+        <span class="lb-title">Hall of Fame</span>
+        <span id="hofMonth" style="font-size:11px; color:var(--text-muted);"></span>
+      </div>
+      <ul id="hofList" class="lb-list"></ul>
+    </div>
+
     <!-- Leaderboard -->
     <div class="card">
       <div class="lb-header">
@@ -648,6 +699,8 @@
       setupNameInput();
       checkStatus();
       loadLeaderboard();
+      loadRace();
+      loadHallOfFame();
       
       // Re-check on focus (in case user played and came back)
       window.addEventListener('focus', checkStatus);
@@ -842,6 +895,76 @@
       if (auth) url += '?auth=' + encodeURIComponent(auth);
       window.location.href = url;
     });
+
+    function rankMedal(rank){
+      return rank === 1 ? '🥇' : rank === 2 ? '🥈' : rank === 3 ? '🥉' : rank;
+    }
+    function escapeHtml(t){
+      return String(t).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+    }
+
+    async function loadRace(){
+      const list = document.getElementById('raceList');
+      try {
+        const urlParams = new URLSearchParams(window.location.search);
+        const auth = urlParams.get('auth') || '';
+        let url = '/api/arcade/race?_t=' + Date.now();
+        if (auth) url += '&auth=' + encodeURIComponent(auth);
+        if (tg && tg.initData) url += '&init_data=' + encodeURIComponent(tg.initData);
+        const res = await fetch(url, { credentials: 'include' });
+        const data = await res.json();
+        if(!data.ok) return;
+
+        const cd = document.getElementById('raceCountdown');
+        if(cd) cd.textContent = data.days_left === 0 ? 'Last day!' : data.days_left + ' days left';
+
+        // my rank banner
+        const meEl = document.getElementById('raceMe');
+        if(meEl && data.me){
+          let txt = `You're <b>#${data.me.rank}</b> with <b>${data.me.score.toLocaleString()}</b> pts`;
+          if(data.me.rank > 1 && data.me.gap_to_next > 0){
+            txt += ` — ${data.me.gap_to_next.toLocaleString()} behind #${data.me.rank - 1}`;
+          } else if (data.me.rank === 1){
+            txt += ' — defend your crown! 👑';
+          }
+          meEl.innerHTML = txt;
+          meEl.style.display = 'block';
+        }
+
+        if(!data.top || data.top.length === 0){
+          list.innerHTML = '<li class="lb-empty">No scores this month yet.<br>The 50GB is up for grabs!</li>';
+          return;
+        }
+        list.innerHTML = data.top.map(item => `
+          <li class="lb-item">
+            <span class="lb-rank">${rankMedal(item.rank)}</span>
+            <span class="lb-name">${escapeHtml(item.name)}</span>
+            <span class="lb-score">${item.score.toLocaleString()}</span>
+          </li>
+        `).join('');
+      } catch(e){
+        console.error('[ARCADE] race load failed', e);
+      }
+    }
+
+    async function loadHallOfFame(){
+      try {
+        const res = await fetch('/api/arcade/hall-of-fame?_t=' + Date.now());
+        const data = await res.json();
+        if(!data.ok || !data.winners || data.winners.length === 0) return;  // card stays hidden
+        document.getElementById('hofMonth').textContent = data.month;
+        document.getElementById('hofList').innerHTML = data.winners.map(w => `
+          <li class="lb-item">
+            <span class="lb-rank">${rankMedal(w.rank)}</span>
+            <span class="lb-name">${escapeHtml(w.name)}<br><small style="color:var(--text-muted); font-size:10px;">${escapeHtml(w.prize)}</small></span>
+            <span class="lb-score">${w.score.toLocaleString()}</span>
+          </li>
+        `).join('');
+        document.getElementById('hofCard').style.display = 'block';
+      } catch(e){
+        console.error('[ARCADE] hall of fame load failed', e);
+      }
+    }
 
     async function loadLeaderboard(){
       const list = document.getElementById('leaderboardList');

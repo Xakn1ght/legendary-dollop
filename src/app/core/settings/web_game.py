@@ -59,4 +59,34 @@ GAME_REWARDS = {
     "min_session_seconds": 20,  # Minimum game duration to get rewards
     # Loyalty points from arcade
     "loyalty_points_per_1000_credits": 0,  # Disabled: no loyalty points from credits
+    # ── Anti-cheat (2026-07-03) ────────────────────────────────────────────
+    # The rewarded run requires a single-use round token issued by
+    # /api/arcade/round-start when the round actually begins. The server
+    # measures elapsed time itself (token age) — the client-claimed duration
+    # is only a sanity cross-check. Score is capped by a points-per-second
+    # ceiling derived from the game's actual scoring math (megaboss burst
+    # ~260/s is the hottest legit source; 500/s leaves generous headroom).
+    "round_token_ttl_seconds": 2 * 60 * 60,   # token lifetime (max round length)
+    "max_points_per_second": 500,             # score ≤ this × server-elapsed seconds
+    "max_score_absolute": 500_000,            # hard per-run ceiling
+    "duration_slack_seconds": 30,             # client duration may exceed server elapsed by this
 }
+
+# ===========================================
+# MONTHLY ARCADE LEADERBOARD PRIZES
+# ===========================================
+# Awarded once per calendar month for the PREVIOUS month, based on each
+# user's single validated daily-run score (best of the month). Prizes are
+# coupons (existing wallet/checkout flow); traffic is the cheapest asset we
+# have, so the pool costs ~nothing while feeling substantial.
+ARCADE_MONTHLY_PRIZES = [
+    {"min_rank": 1, "max_rank": 1, "coupon_type": "free_gb",
+     "payload": {"gb": 50}, "name": "Arcade Champion — 50GB Free"},
+    {"min_rank": 2, "max_rank": 2, "coupon_type": "free_gb",
+     "payload": {"gb": 25}, "name": "Arcade Runner-up — 25GB Free"},
+    {"min_rank": 3, "max_rank": 3, "coupon_type": "free_gb",
+     "payload": {"gb": 10}, "name": "Arcade 3rd Place — 10GB Free"},
+    {"min_rank": 4, "max_rank": 4, "coupon_type": "discount_percent",
+     "payload": {"discount_percent": 10}, "name": "Arcade 4th Place — 10% Off"},
+]
+ARCADE_PRIZE_COUPON_EXPIRY_DAYS = 45   # same shelf life as season coupons

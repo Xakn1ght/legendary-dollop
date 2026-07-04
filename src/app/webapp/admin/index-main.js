@@ -759,7 +759,7 @@
       else if (page === 'vip') loadVipUsers();
       else if (page === 'subscriptions') loadSubscriptions();
       else if (page === 'servers') loadServers();
-      else if (page === 'logs') loadLogs();
+      else if (page === 'logs') { loadLogs(); loadArcadeFlags(); }
       else if (page === 'settings') loadSettings();
       else if (page === 'database') dbReload();
     }
@@ -3055,7 +3055,33 @@
        } catch(e){}
        if(btn) btn.innerHTML = normalIcon;
     }
-    function refreshLogs() { loadLogs(); }
+    function refreshLogs() { loadLogs(); loadArcadeFlags(); }
+
+    // --- ARCADE CHEAT FLAGS ---
+    async function loadArcadeFlags() {
+       const body = document.getElementById('arcadeFlagsBody');
+       if (!body) return;
+       try {
+          const res = await fetch('/api/admin/arcade/flags?limit=100', { credentials: 'include' });
+          const data = await res.json();
+          if (!data.ok) return;
+          if (!data.flags || data.flags.length === 0) {
+             body.innerHTML = '<tr><td colspan="7" style="text-align:center; color: var(--text-muted); padding: 16px;">No flagged submissions — the scoreboard is clean ✅</td></tr>';
+             return;
+          }
+          body.innerHTML = data.flags.map(f => `
+             <tr>
+                <td style="white-space:nowrap;">${escHtml((f.created_at || '').replace('T', ' ').slice(0, 16))}</td>
+                <td>${escHtml(f.name)}<br><small style="color:var(--text-muted);">${escHtml(String(f.chat_id))}</small></td>
+                <td style="font-weight:700;">${Number(f.score).toLocaleString()}</td>
+                <td>${escHtml(String(f.claimed_duration))}s</td>
+                <td>${f.server_elapsed == null ? '—' : escHtml(String(f.server_elapsed)) + 's'}</td>
+                <td><span style="color:${f.reason === 'no_token' ? 'var(--danger)' : 'var(--warning, #f59e0b)'}; font-weight:600;">${escHtml(f.reason)}</span></td>
+                <td style="text-align:center; font-weight:700; ${f.total_flags > 2 ? 'color: var(--danger);' : ''}">${f.total_flags}</td>
+             </tr>
+          `).join('');
+       } catch (e) {}
+    }
     
     // --- SETTINGS ---
     function showSettingsTab(tab, opts = {}) {

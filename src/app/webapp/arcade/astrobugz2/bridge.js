@@ -95,6 +95,76 @@
     play: '<svg viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>',
   };
 
+  /* ---- daily lock: reloading the score card must not allow another run ----
+   * Optimistic: the localStorage flag (set right after the daily submit)
+   * blocks instantly. Authoritative: /api/arcade/status confirms — and
+   * UNLOCKS if an admin reset the player's daily limit. Practice mode
+   * (?practice=1, testing only) is never locked. The backend refuses
+   * rewards/leaderboard for repeat runs anyway; this is the UX gate. */
+  function showLocked() {
+    if (document.getElementById('ah-locked')) return;
+    var v = document.createElement('div');
+    v.id = 'ah-locked';
+    v.innerHTML =
+      '<div class="ah-card">' +
+      '<div class="ah-go">SEE YOU TOMORROW</div>' +
+      '<div style="font-size:46px;line-height:1">🌙</div>' +
+      '<div class="ah-msg">You already played today\u2019s run.<br>A new rewarded run unlocks tomorrow!</div>' +
+      '<button id="ah-locked-back">Back to Arcade</button>' +
+      '</div>';
+    document.body.appendChild(v);
+    document.getElementById('ah-locked-back').addEventListener('click', function () {
+      var auth = new URLSearchParams(location.search).get('auth');
+      location.href = '/webapp/arcade' + (auth ? ('?auth=' + encodeURIComponent(auth)) : '');
+    });
+  }
+  function hideLocked() {
+    var v = document.getElementById('ah-locked');
+    if (v) v.remove();
+  }
+  (function dailyLock() {
+    if (isPractice) return;
+    try {
+      if (localStorage.getItem('astro_last_played_date') === new Date().toDateString()) showLocked();
+    } catch (_) {}
+    var url = '/api/arcade/status?_t=' + Date.now();
+    var auth = new URLSearchParams(location.search).get('auth');
+    if (auth) url += '&auth=' + encodeURIComponent(auth);
+    if (tg && tg.initData) url += '&init_data=' + encodeURIComponent(tg.initData);
+    fetch(url, { credentials: 'include' })
+      .then(function (r) { return r.json(); })
+      .then(function (d) {
+        if (!d || !d.ok) return;                 // can't verify → keep optimistic state
+        if (d.played_today) {
+          try { localStorage.setItem('astro_last_played_date', new Date().toDateString()); } catch (_) {}
+          if (!submitted) showLocked();          // don't stack over a fresh result card
+        } else {
+          try { localStorage.removeItem('astro_last_played_date'); } catch (_) {}
+          hideLocked();                          // daily limit was reset → allow play
+        }
+      })
+      .catch(function () {});
+  })();
+
+  /* ---- round token (anti-cheat) ----
+   * The engine calls AstroBridge.roundStart() the moment a round begins.
+   * The server hands back a single-use token and measures the round length
+   * itself — a submit without a fresh token earns no rewards. */
+  var roundToken = '';
+  function roundStart() {
+    roundToken = '';
+    var url = '/api/arcade/round-start';
+    var auth = new URLSearchParams(location.search).get('auth');
+    if (auth) url += '?auth=' + encodeURIComponent(auth);
+    var headers = { 'Content-Type': 'application/json' };
+    if (tg && tg.initData) headers['X-Telegram-Init'] = tg.initData;
+    fetch(url, { method: 'POST', headers: headers, credentials: 'include' })
+      .then(function (r) { return r.json(); })
+      .then(function (d) { if (d && d.ok) roundToken = d.round_token || ''; })
+      .catch(function () {});
+    startMs = (performance && performance.now) ? performance.now() : Date.now();
+  }
+
   /* ---- submit run ---- */
   function submit() {
     if (submitted) return; submitted = true;
@@ -104,6 +174,7 @@
       score: (latestScore | 0),
       duration: Math.floor((nowMs - startMs) / 1000),
       practice: !!isPractice,
+      round_token: roundToken,
       display_name: (function () { try { return (localStorage.getItem('astro_display_name') || '').trim().slice(0, 40); } catch (_) { return ''; } })(),
     };
     var headers = { 'Content-Type': 'application/json' };
@@ -126,26 +197,81 @@
     } catch (e) { showResult(payload.score, null); }
   }
 
+  // pretty reward chips instead of a raw JSON dump
+  function rewardHtml(rewards) {
+    if (!rewards) return '';
+    var chips = [];
+    var credits = rewards.credits | 0;
+    var xp = rewards.xp | 0;
+    var stars = (rewards.stars_converted != null ? rewards.stars_converted : rewards.stars) | 0;
+    if (credits) chips.push('<div class="ah-chip credits"><b>+' + credits.toLocaleString() + '</b><span>Credits</span></div>');
+    if (stars) chips.push('<div class="ah-chip stars"><b>+' + stars + '</b><span>Stars</span></div>');
+    if (xp) chips.push('<div class="ah-chip xp"><b>+' + xp + '</b><span>XP</span></div>');
+    var html = chips.length ? '<div class="ah-rewards">' + chips.join('') + '</div>' : '';
+    var per = (rewards.pieces_per_star != null) ? rewards.pieces_per_star : 10;
+    var prog = (rewards.pieces_progress != null) ? rewards.pieces_progress
+             : (rewards.total_pieces || rewards.star_pieces || 0);
+    if (prog) html += '<div class="ah-pieces">' + prog + '/' + per + ' star pieces</div>';
+    return html;
+  }
+
   function showResult(score, data) {
+    // remember that today's rewarded run is used, so the lobby button locks
+    if (!isPractice) {
+      try { localStorage.setItem('astro_last_played_date', new Date().toDateString()); } catch (_) {}
+    }
     var v = document.createElement('div');
     v.id = 'ah-result';
     var msg = (data && data.message) ? data.message : (isPractice ? 'Practice run — not ranked.' : 'Score submitted!');
-    var rewards = (data && data.rewards) ? '<div class="ah-reward">' + escapeHtml(JSON.stringify(data.rewards)) + '</div>' : '';
+    var rewards = rewardHtml(data && data.rewards);
+    // The game is once per day — no replays of any kind after the run.
+    // (Practice mode still works if the page is opened with ?practice=1,
+    // e.g. for testing, and only then offers Play Again.)
     v.innerHTML =
       '<div class="ah-card">' +
       '<div class="ah-go">GAME OVER</div>' +
       '<div class="ah-final">' + score + '</div>' +
       '<div class="ah-msg">' + escapeHtml(msg) + '</div>' + rewards +
-      '<button id="ah-again">Play Again</button>' +
-      '<button id="ah-back" class="ghost">Back to Arcade</button>' +
+      (isPractice ? '<button id="ah-again">Play Again</button>' : '') +
+      '<button id="ah-back"' + (isPractice ? ' class="ghost"' : '') + '>Back to Arcade</button>' +
       '</div>';
     document.body.appendChild(v);
-    document.getElementById('ah-again').addEventListener('click', function () { location.reload(); });
+    var againEl = document.getElementById('ah-again');
+    if (againEl) againEl.addEventListener('click', function () { location.reload(); });
     document.getElementById('ah-back').addEventListener('click', function () {
       var base = '/webapp/arcade';
       var auth = new URLSearchParams(location.search).get('auth');
       location.href = base + (auth ? ('?auth=' + encodeURIComponent(auth)) : '');
     });
+    if (!isPractice) showRaceRank();
+  }
+
+  // "Monthly race: #N" line on the result card (prizes: 50/25/10GB + 10%)
+  function showRaceRank() {
+    var url = '/api/arcade/race?_t=' + Date.now();
+    var auth = new URLSearchParams(location.search).get('auth');
+    if (auth) url += '&auth=' + encodeURIComponent(auth);
+    if (tg && tg.initData) url += '&init_data=' + encodeURIComponent(tg.initData);
+    fetch(url, { credentials: 'include' })
+      .then(function (r) { return r.json(); })
+      .then(function (d) {
+        if (!d || !d.ok || !d.me) return;
+        var card = document.querySelector('#ah-result .ah-card');
+        if (!card) return;
+        var el = document.createElement('div');
+        el.className = 'ah-race';
+        var medal = d.me.rank === 1 ? '🥇' : d.me.rank === 2 ? '🥈' : d.me.rank === 3 ? '🥉' : '🏁';
+        var txt = medal + ' Monthly race: <b>#' + d.me.rank + '</b>';
+        if (d.me.rank > 1 && d.me.gap_to_next > 0) {
+          txt += ' · ' + d.me.gap_to_next.toLocaleString() + ' pts behind #' + (d.me.rank - 1);
+        }
+        txt += '<br><small>' + (d.days_left === 0 ? 'Last day' : d.days_left + ' days left') +
+               ' — top 3 win 50 / 25 / 10 GB!</small>';
+        el.innerHTML = txt;
+        var msg = card.querySelector('.ah-msg');
+        card.insertBefore(el, msg ? msg.nextSibling : card.children[2]);
+      })
+      .catch(function () {});
   }
 
   function escapeHtml(t) { return String(t).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;'); }
@@ -157,6 +283,7 @@
       var el = document.getElementById('ah-score-val');
       if (el) el.textContent = latestScore;
     },
+    roundStart: roundStart,
     gameOver: function () { submit(); },
   };
 

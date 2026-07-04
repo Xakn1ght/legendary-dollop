@@ -1,0 +1,548 @@
+
+##########################################################################################
+# SHEET: Main Game
+##########################################################################################
+INCLUDE Arcade
+INCLUDE Globals
+INCLUDE Mushrooms
+INCLUDE Player
+INCLUDE Centipede
+INCLUDE Spider, Scorpion and Flea
+INCLUDE State
+
+##########################################################################################
+# SHEET: Globals
+##########################################################################################
+# ==== GROUP: Constants ====
+WHEN System.IsGroupActive("Constants"):
+VAR CELLSIZE = 48
+VAR PLAYFIELD = 14
+VAR TOPMARGIN = 48
+VAR PLAYERAREA = 6
+VAR HCELLS = 0
+VAR VCELLS = 0
+# ==== GROUP: Globals ====
+WHEN System.IsGroupActive("Globals"):
+VAR isPlaying = 1
+VAR HIGHSCORE_KEY = 'HighScore'
+VAR HighScore = 0
+VAR score = 0
+VAR lives = 0
+VAR level = 1
+VAR fastSpeed = 0
+VAR Sound = 0
+VAR Pause = 0
+VAR VideoAvailable = 0
+# ==== GROUP: Initialisation ====
+WHEN System.IsGroupActive("Initialisation"):
+WHEN System.OnLayoutStart():
+    t29.Destroy()
+    t37.CheckItemExists("HighScore")
+    System.SetVar(gvar:HCELLS, floor((layoutwidth() / $CELLSIZE)))
+    System.SetVar(gvar:VCELLS, floor((layoutheight() / $CELLSIZE)))
+    System.SetVar(gvar:score, 0)
+    System.SetVar(gvar:lives, 1)
+    t5.CallFunction("RedrawLives", args())
+    t5.CallFunction("RedrawScore", args())
+    System.SetVar(gvar:level, 1)
+    t22.SetOpacity(0)
+    t20.Play(["centipede_beat", false], opt#0, 0, "")
+    System.SetLayerVisible(layer:"GameOver", opt#0)
+  WHEN System.Repeat(15):
+      System.CreateObject(OBJ:t29, layer:0, random(layoutwidth()), random(layoutheight()))
+      t29.Bullet.SetSpeed(random(10, 80))
+      t29.SetScale((t29.Bullet.Speed() / 220))
+      t29.SetOpacity(t29.Bullet.Speed())
+# ==== GROUP: Utility Functions ====
+WHEN System.IsGroupActive("Utility Functions"):
+WHEN t5.OnFunction("RedrawLives"):
+    t6.Destroy()
+  WHEN System.CompareVar(gvar:lives, op>, 0):
+WHEN t5.OnFunction("RedrawScore"):
+    t25.SetText(right(("00000" & $score), 6))
+WHEN t5.OnFunction("AddToScore"):
+    System.AddVar(gvar:score, t5.Param(0))
+    t5.CallFunction("RedrawScore", args())
+    t44.arcadeActionUpdateScore($score, opt#0)
+  WHEN System.Compare($score, op>, $HighScore):
+      System.SetVar(gvar:HighScore, $score)
+
+##########################################################################################
+# SHEET: Mushrooms
+##########################################################################################
+# ==== GROUP: Mushroom processing ====
+WHEN System.IsGroupActive("Mushroom processing"):
+WHEN System.OnLayoutStart():
+  WHEN System.For("", 1, 3):
+      System.CreateObject(OBJ:t0, layer:0, (floor((((loopindex() / 4) * $HCELLS) + choose(-1, 0, 1))) * $CELLSIZE), ($TOPMARGIN + $CELLSIZE))
+  WHEN System.For("", 1, floor(($PLAYFIELD * 1.3))):
+      System.CreateObject(OBJ:t0, layer:0, (floor(random(1, $HCELLS)) * $CELLSIZE), ((floor(random(1, $PLAYFIELD)) * $CELLSIZE) + $TOPMARGIN))
+    WHEN t0.IsOverlapping(OBJ:t0):
+        t0.Destroy()
+        System.CreateObject(OBJ:t0, layer:0, (floor(random(1, $HCELLS)) * $CELLSIZE), ((floor(random(1, $PLAYFIELD)) * $CELLSIZE) + $TOPMARGIN))
+WHEN t0.OnCollision(OBJ:t2):
+    t0.SubInstanceVar(ivar#0, 1)
+    t2.Destroy()
+  WHEN t0.CompareInstanceVar(ivar#0, op<=, 0):
+      t0.Destroy()
+      t5.CallFunction("AddToScore", args(1))
+WHEN t0.OnCreated():
+    t5.CallFunction("ColourObject", args(t0.UID()))
+
+##########################################################################################
+# SHEET: Player
+##########################################################################################
+# ==== GROUP: Player processing and Missile launching ====
+WHEN System.IsGroupActive("Player processing and Missile launching"):
+WHEN System.OnLayoutStart():
+    t1.SetX((layoutwidth() / 2))
+    t1.SetY((($TOPMARGIN + (($PLAYERAREA + $PLAYFIELD) * $CELLSIZE)) + 64))
+WHEN System.EveryTick():
+    t1.SetY((clamp(t1.Y(), ($TOPMARGIN + ($PLAYFIELD * $CELLSIZE)), ($TOPMARGIN + (($PLAYERAREA + $PLAYFIELD) * $CELLSIZE))) + 64))
+WHEN t26.IsInTouch()  AND  System.Compare(distance(t1.X(), 0, t26.X(), 0), op>=, (300 * dt())):
+    t1.MoveAtAngle(angle(t1.X(), 0, t26.X(), 0), (300 * dt()))
+  WHEN System.CompareVar(gvar:isPlaying, op!=, 0)  AND  System.Compare(time(), op>=, t1.var0):
+      t1.Spawn(OBJ:t2, layer:1, 0)
+      t2.Bullet.SetAngleOfMotion(-90)
+      t1.SetInstanceVar(ivar#0, (time() + t1.var1))
+      t20.Play(["shoot-04", false], opt#0, 0, "")
+WHEN t26.IsInTouch()  AND  System.CompareVar(gvar:isPlaying, op!=, 0)  AND  System.Compare(time(), op>=, t1.var0):
+    t1.Spawn(OBJ:t2, layer:1, 0)
+    t2.Bullet.SetAngleOfMotion(-90)
+    t1.SetInstanceVar(ivar#0, (time() + t1.var1))
+    t20.Play(["shoot-04", false], opt#0, 0, "")
+# ==== GROUP: Background ====
+WHEN System.IsGroupActive("Background"):
+  WHEN System.OnLayoutStart():
+      t23.SetSize((layoutwidth() + 384), (layoutheight() + 641))
+      t23.SetPos(-162, 641)
+  WHEN System.EveryTick():
+      t23.SetY((t23.Y() + (100 * dt())))
+  WHEN t23.CompareY(op>, 0):
+      t23.SetY((t23.Y() - 641))
+
+##########################################################################################
+# SHEET: Centipede
+##########################################################################################
+# ==== GROUP: Centipede management ====
+WHEN System.IsGroupActive("Centipede management"):
+WHEN t4.OnCollision(OBJ:t2):
+    t2.Destroy()
+    t20.Play(["centipede_kill", false], opt#0, 0, "")
+  VAR newHeadUID = 0
+  WHEN System.PickRandom(OBJ:t4):
+      System.SetVar(gvar:newHeadUID, t4.var2)
+    WHEN t4.IsBoolInstanceVarSet(ivar#0):
+        t5.CallFunction("AddToScore", args(100))
+        t4.Spawn(OBJ:t24, layer:1, 1)
+        t24.SetAngle(0)
+        t24.SetText(100)
+    WHEN System.Else():
+        t5.CallFunction("AddToScore", args(10))
+    WHEN System.EveryTick()  OR  t4.CompareY(op<, ($TOPMARGIN + (($PLAYFIELD - 1) * $CELLSIZE))):
+        System.CreateObject(OBJ:t0, layer:0, (round((t4.X() / $CELLSIZE)) * $CELLSIZE), (round((t4.Y() / $CELLSIZE)) * $CELLSIZE))
+    WHEN System.EveryTick():
+        t4.Destroy()
+  WHEN System.PickAll(OBJ:t4):
+    WHEN t4.PickByUID($newHeadUID):
+        t4.SetBoolInstanceVar(ivar#0, opt#1)
+        t4.SetAnim("Head", opt#1)
+# ==== GROUP: Create a centipede of a given size ====
+WHEN System.IsGroupActive("Create a centipede of a given size"):
+WHEN t5.OnFunction("CreateCentipede"):
+  VAR uid = 0
+  VAR y = 0
+  VAR x = 0
+  WHEN System.EveryTick():
+      System.SetVar(gvar:x, (floor(random(1, ($HCELLS - 1))) * $CELLSIZE))
+      System.SetVar(gvar:y, ($TOPMARGIN + $CELLSIZE))
+  WHEN System.Compare(t5.Param(0), op>, 1):
+    WHEN System.For("", 1, (t5.Param(0) - 1)):
+        System.CreateObject(OBJ:t4, layer:1, $x, $y)
+        t4.SetInstanceVar(ivar#2, $uid)
+        t4.SetBoolInstanceVar(ivar#0, opt#0)
+        System.SetVar(gvar:uid, t4.UID())
+        t4.SetAnim("Body", opt#1)
+        t4.SetInstanceVar(ivar#3, (($fastSpeed != 0) ? 400 : 300))
+  WHEN System.EveryTick():
+      System.CreateObject(OBJ:t4, layer:1, $x, $y)
+      t4.SetInstanceVar(ivar#2, $uid)
+      t4.SetAnim("Head", opt#1)
+      t4.SetInstanceVar(ivar#4, choose(-1, 1))
+      t4.SetInstanceVar(ivar#3, (($fastSpeed != 0) ? 400 : 300))
+WHEN t4.OnCreated():
+    t4.SetInstanceVar(ivar#6, t4.X())
+    t4.SetInstanceVar(ivar#7, t4.Y())
+# ==== GROUP: Segment Moving Code ====
+WHEN System.IsGroupActive("Segment Moving Code"):
+WHEN System.CompareVar(gvar:isPlaying, op!=, 0)  AND  System.ForEachOrdered(OBJ:t4, (t4.var0 ? 1 : 2), opt#0):
+  VAR isDownMove = 0
+  VAR pixDistance = 0
+  WHEN t4.CompareX(op=, t4.var6)  AND  t4.CompareY(op=, t4.var7)  AND  t4.IsBoolInstanceVarSet(ivar#0):
+      System.SetVar(gvar:isDownMove, 0)
+      t5.CallFunction("PassNewTargetDown", args(t4.var2, t4.X(), t4.Y()))
+      t4.MoveToTop()
+    WHEN t4.IsOverlappingOffset(OBJ:t0, 0, (t4.var4 * 4))  OR  t4.IsBoolInstanceVarSet(ivar#1):
+        System.SetVar(gvar:isDownMove, (-t4.var4))
+    WHEN t4.IsOverlapping(OBJ:t4):
+        System.SetVar(gvar:isDownMove, choose(-1, 1))
+    WHEN t4.CompareX(op=, (($HCELLS - 1) * $CELLSIZE))  AND  t4.CompareInstanceVar(ivar#4, op>, 0):
+        System.SetVar(gvar:isDownMove, -1)
+    WHEN t4.CompareX(op=, $CELLSIZE)  AND  t4.CompareInstanceVar(ivar#4, op<, 0):
+        System.SetVar(gvar:isDownMove, 1)
+    WHEN System.CompareVar(gvar:isDownMove, op=, 0):
+        t4.AddInstanceVar(ivar#6, ($CELLSIZE * t4.var4))
+    WHEN System.Else():
+        t4.AddInstanceVar(ivar#7, ($CELLSIZE * t4.var5))
+        t4.SetInstanceVar(ivar#4, $isDownMove)
+      WHEN t4.CompareInstanceVar(ivar#7, op=, ($TOPMARGIN + (($PLAYERAREA + $PLAYFIELD) * $CELLSIZE))):
+          t4.SetInstanceVar(ivar#5, -1)
+          t4.SetBoolInstanceVar(ivar#1, opt#0)
+      WHEN t4.CompareInstanceVar(ivar#7, op=, ($TOPMARGIN + ($PLAYFIELD * $CELLSIZE))):
+          t4.SetInstanceVar(ivar#5, 1)
+  WHEN System.EveryTick():
+      System.SetVar(gvar:pixDistance, (dt() * t4.var3))
+      t4.SetX(((min(abs((t4.X() - t4.var6)), $pixDistance) * ((t4.X() < t4.var6) ? 1 : -1)) + t4.X()))
+      t4.SetY(((min(abs((t4.Y() - t4.var7)), $pixDistance) * ((t4.Y() < t4.var7) ? 1 : -1)) + t4.Y()))
+WHEN System.Else():
+WHEN t5.OnFunction("PassNewTargetDown"):
+  WHEN t4.PickByUID(t5.Param(0)):
+      t4.SetInstanceVar(ivar#6, t5.Param(1))
+      t4.SetInstanceVar(ivar#7, t5.Param(2))
+      t5.CallFunction("PassNewTargetDown", args(t4.var2, t4.X(), t4.Y()))
+# ==== GROUP: Function to create all Centipedes for a level ====
+WHEN System.IsGroupActive("Function to create all Centipedes for a level"):
+WHEN t5.OnFunction("CreateLevel"):
+    System.SetVar(gvar:fastSpeed, 0)
+    System.CreateObject(OBJ:t52, layer:"Objects", (layoutwidth() / 2), (layoutheight() / 2))
+    t52.SetText(("LEVEL " & $level))
+    t20.Play(["collect-gem", false], opt#0, 0, "")
+  WHEN t5.CompareParam(0, op>, 1)  AND  System.Compare((t5.Param(0) % 2), op=, 1):
+      System.SetVar(gvar:fastSpeed, 1)
+  WHEN t5.CompareParam(0, op>, 1):
+    WHEN System.For("", 1, floor((t5.Param(0) / 2))):
+        t5.CallFunction("CreateCentipede", args(1))
+  WHEN t5.CompareParam(0, op<, 18):
+      t5.CallFunction("CreateCentipede", args((9 - floor((t5.Param(0) / 2)))))
+
+##########################################################################################
+# SHEET: State
+##########################################################################################
+VAR state = 0
+VAR STATE_NEWLEVEL = 1
+VAR STATE_PLAY = 2
+VAR STATE_LIFELOST = 3
+VAR STATE_GAMEOVER = 4
+# ==== GROUP: Initialisation and Tick ====
+WHEN System.IsGroupActive("Initialisation and Tick"):
+WHEN System.OnLayoutStart():
+    System.SetVar(gvar:state, $STATE_NEWLEVEL)
+WHEN System.EveryTick():
+    System.SetVar(gvar:isPlaying, ($state == $STATE_PLAY))
+# ==== GROUP: New Level State ====
+WHEN System.IsGroupActive("New Level State"):
+WHEN System.CompareVar(gvar:state, op=, $STATE_NEWLEVEL):
+    t5.CallFunction("CreateLevel", args(((($level - 1) % 19) + 1)))
+    System.SetVar(gvar:state, $STATE_PLAY)
+# ==== GROUP: Play State ====
+WHEN System.IsGroupActive("Play State"):
+WHEN System.CompareVar(gvar:state, op=, $STATE_PLAY):
+  WHEN t1.OnCollision(OBJ:t4)  OR  t1.OnCollision(OBJ:t67):
+      System.SetVar(gvar:state, $STATE_LIFELOST)
+      t1.Timer.StopTimer("beat")
+WHEN System.CompareVar(gvar:state, op=, $STATE_PLAY):
+  WHEN System.Compare(t4.Count(), op=, 0):
+      System.AddVar(gvar:level, 1)
+      System.SetVar(gvar:state, $STATE_NEWLEVEL)
+      t1.Timer.StopTimer("beat")
+WHEN System.TriggerOnce()  AND  System.CompareVar(gvar:state, op=, $STATE_PLAY):
+    t1.Timer.StartTimer(0.4, opt#1, "beat")
+WHEN t1.Timer.OnTimer("beat"):
+    t20.Play(["centipede_beat", false], opt#0, 0, "")
+# ==== GROUP: Life Lost State ====
+WHEN System.IsGroupActive("Life Lost State"):
+WHEN System.CompareVar(gvar:state, op=, $STATE_LIFELOST)  AND  System.TriggerOnce():
+    System.SubVar(gvar:lives, 1)
+    t5.CallFunction("RedrawLives", args())
+    t67.Destroy()
+    t31.Destroy()
+    t1.Spawn(OBJ:t14, layer:1, 0)
+    t1.SetVisible(opt#0)
+    t20.Play(["centipede_death", false], opt#0, 0, "")
+  WHEN System.PickAll(OBJ:t4):
+      t4.Destroy()
+  VAR fireTime = 0
+  WHEN System.ForEachOrdered(OBJ:t0, (t0.X() + (t0.Y() * 9999)), opt#0):
+      t0.Spawn(OBJ:t10, layer:0, 0)
+      System.AddVar(gvar:fireTime, 0.03)
+      t10.Timer.StartTimer($fireTime, opt#0, "start")
+      System.CreateObject(OBJ:t65, layer:"Objects", (layoutwidth() / 2), (layoutheight() / 2))
+      System.CreateObject(OBJ:t66, layer:"Objects", (layoutwidth() / 2), ((layoutheight() / 2) + 60))
+      t66.SetText($score)
+WHEN t10.Timer.OnTimer("start"):
+    t10.SetVisible(opt#1)
+    t10.Fade.StartFade()
+    t5.CallFunction("AddToScore", args(2))
+    t20.Play(["matching_combo_1", false], opt#0, 0, "")
+    t66.SetText($score)
+WHEN System.CompareVar(gvar:state, op=, $STATE_LIFELOST)  AND  System.Compare(t10.Count(), op=, 0):
+    t53.Destroy()
+    t1.SetVisible(opt#1)
+  WHEN System.CompareVar(gvar:lives, op>, 0):
+      System.SetVar(gvar:state, $STATE_NEWLEVEL)
+  WHEN System.Else():
+      System.SetVar(gvar:state, $STATE_GAMEOVER)
+# ==== GROUP: Game Over State ====
+WHEN System.IsGroupActive("Game Over State"):
+WHEN System.CompareVar(gvar:state, op=, $STATE_GAMEOVER)  AND  System.TriggerOnce():
+    System.SetLayerVisible(layer:"GameOver", opt#1)
+    t35.SetText($score)
+    t36.SetText($HighScore)
+    t44.arcadeActionGameOver("{}", "{}")
+WHEN t44.arcadeEventStart():
+    System.SetLayerVisible(layer:"GameOver", opt#0)
+    System.RestartLayout()
+
+##########################################################################################
+# SHEET: Spider, Scorpion and Flea
+##########################################################################################
+# ==== GROUP: Spider Code ====
+WHEN System.IsGroupActive("Spider Code"):
+WHEN System.OnLayoutStart():
+    t12.Destroy()
+    t1.Timer.StartTimer(random(4, 8), opt#0, "startspider")
+WHEN t1.Timer.OnTimer("startspider"):
+    t1.Timer.StartTimer(random(4, 8), opt#0, "startspider")
+  WHEN System.Compare(t12.Count(), op=, 0)  AND  System.CompareVar(gvar:isPlaying, op!=, 0):
+      System.CreateObject(OBJ:t12, layer:0, 0, 0)
+      t12.Sine.SetMagnitude(($CELLSIZE * 4))
+      t12.SetX(choose(0, ($CELLSIZE * $HCELLS)))
+      t12.SetY(((($TOPMARGIN + (($PLAYERAREA + $PLAYFIELD) * $CELLSIZE)) - t12.Sine.Magnitude()) + ($CELLSIZE / 2)))
+      t12.SetInstanceVar(ivar#0, ((t12.X() == 0) ? 1 : -1))
+      t1.Timer.StartTimer(random(3, 8), opt#0, "switchspider")
+WHEN System.EveryTick():
+    t12.SetX((t12.X() + (((t12.Sine.Magnitude() / t12.Sine.Period()) * t12.var0) * t12.dt())))
+WHEN t1.Timer.OnTimer("switchspider")  AND  System.Compare(t12.Count(), op>, 0):
+    t1.Timer.StartTimer(random(3, 8), opt#0, "switchspider")
+    t12.SetInstanceVar(ivar#0, ((t12.X() > t1.X()) ? -1 : 1))
+WHEN t12.OnCollision(OBJ:t2):
+    t20.Play(["centipede_bonus", false], opt#0, 0, "")
+    t27.ScrollTo.Shake(25, 0.4, opt#0)
+    t12.SubInstanceVar(ivar#1, 1)
+    t12.Spawn(OBJ:t28, layer:1, 0)
+  VAR spiderdistance = 0
+  WHEN System.EveryTick()  AND  t12.CompareInstanceVar(ivar#1, op<=, 0):
+      System.SetVar(gvar:spiderdistance, floor(((abs((t1.Y() - t12.Y())) / (t12.Sine.Magnitude() * 2)) * 3)))
+      System.SetVar(gvar:spiderdistance, (max(1, (3 - $spiderdistance)) * 300))
+      t5.CallFunction("AddToScore", args($spiderdistance))
+      t12.Spawn(OBJ:t24, layer:1, 0)
+      t24.SetAngle(0)
+      t24.SetText($spiderdistance)
+      t2.Destroy()
+      t12.Destroy()
+      t12.Spawn(OBJ:t14, layer:1, 0)
+      t1.SetInstanceVar(ivar#1, 0.075)
+      System.CreateObject(OBJ:t46, layer:"Objects", (layoutwidth() / 2), ((layoutheight() / 2) - 50))
+      System.Wait(10)
+      t1.SetInstanceVar(ivar#1, 0.15)
+WHEN t12.OnCreated():
+    t20.Play(["centipede_spiderloop", false], opt#1, 0, "spider")
+WHEN t12.OnDestroyed():
+    t20.Stop("spider")
+# ==== GROUP: Flea Code ====
+WHEN System.IsGroupActive("Flea Code"):
+WHEN System.OnLayoutStart():
+    t13.Destroy()
+    t1.Timer.StartTimer(1, opt#1, "startflea")
+WHEN t1.Timer.OnTimer("startflea")  AND  System.CompareVar(gvar:isPlaying, op!=, 0)  AND  System.Compare(t13.Count(), op=, 0)  AND  System.Compare($level, op>=, 2):
+  VAR count = 0
+  WHEN System.ForEach(OBJ:t0):
+    WHEN t0.CompareY(op>=, ($TOPMARGIN + ($PLAYFIELD * $CELLSIZE))):
+        System.AddVar(gvar:count, 1)
+  WHEN System.CompareVar(gvar:count, op<, min(15, (4 + $level))):
+      System.CreateObject(OBJ:t13, layer:1, (floor((random(1, ($HCELLS - 2)) * $CELLSIZE)) + $CELLSIZE), $TOPMARGIN)
+      t13.Bullet.SetAngleOfMotion(90)
+      t13.MoveToTop()
+      t20.Play(["centipede_flea", false], opt#0, 0, "")
+WHEN System.Compare((random(0, 1) * dt()), op<, 0.0007)  AND  t13.CompareY(op<, ($TOPMARGIN + (($PLAYFIELD + $PLAYERAREA) * $CELLSIZE)))  AND  NOT t13.IsOverlapping(OBJ:t0)  AND  t13.CompareX(op>=, $CELLSIZE)  AND  t13.CompareX(op<=, (layoutwidth() - $CELLSIZE)):
+    System.CreateObject(OBJ:t0, layer:0, (round((t13.X() / $CELLSIZE)) * $CELLSIZE), (round((t13.Y() / $CELLSIZE)) * $CELLSIZE))
+WHEN t13.OnCollision(OBJ:t8):
+    t13.Destroy()
+WHEN t13.OnCollision(OBJ:t2):
+    t13.SubInstanceVar(ivar#0, 1)
+    t20.Play(["centipede_bonus", false], opt#0, 0, "")
+    t27.ScrollTo.Shake(20, 0.4, opt#0)
+    t13.Spawn(OBJ:t28, layer:1, 0)
+  WHEN t13.CompareInstanceVar(ivar#0, op<=, 0):
+      t13.Spawn(OBJ:t24, layer:1, 0)
+      t5.CallFunction("AddToScore", args(200))
+      t24.SetText(200)
+      t2.Destroy()
+      t13.Spawn(OBJ:t14, layer:1, 0)
+      t13.Destroy()
+# ==== GROUP: Scorpion Code ====
+WHEN System.IsGroupActive("Scorpion Code"):
+WHEN System.OnLayoutStart():
+    t1.Timer.StartTimer(random(15, 30), opt#0, "startScorpion")
+WHEN t1.Timer.OnTimer("startScorpion"):
+    t1.Timer.StartTimer(random(15, 30), opt#0, "startScorpion")
+  WHEN System.Compare(t15.Count(), op=, 0)  AND  System.CompareVar(gvar:level, op>=, 3)  AND  System.CompareVar(gvar:isPlaying, op!=, 0):
+      System.CreateObject(OBJ:t15, layer:1, 0, ($TOPMARGIN + (floor(random(0, ($PLAYFIELD - 1))) * $CELLSIZE)))
+      t15.Bullet.SetAngleOfMotion(0)
+    WHEN System.Compare(random(0, 1), op<, 0.5):
+        t15.Bullet.SetAngleOfMotion(180)
+        t15.SetMirrored(opt#0)
+        t15.SetX(layoutwidth())
+WHEN t15.OnCollision(OBJ:t0)  AND  NOT t0.IsBoolInstanceVarSet(ivar#1):
+    t0.SetBoolInstanceVar(ivar#1, opt#1)
+    t0.SetAnim("Poison", opt#1)
+WHEN t15.OnCollision(OBJ:t2):
+    t27.ScrollTo.Shake(20, 0.4, opt#0)
+    t20.Play(["centipede_bonus", false], opt#0, 0, "")
+    t15.SubInstanceVar(ivar#0, 1)
+    t15.Spawn(OBJ:t28, layer:1, 0)
+  WHEN t15.CompareInstanceVar(ivar#0, op<=, 0):
+      t15.Spawn(OBJ:t24, layer:1, 0)
+      t5.CallFunction("AddToScore", args(1000))
+      t24.SetText(1000)
+      t2.Destroy()
+      t15.Spawn(OBJ:t14, layer:1, 0)
+    WHEN System.ForEach(OBJ:t0)  AND  t0.IsBoolInstanceVarSet(ivar#1)  AND  t0.CompareY(op=, t15.Y()):
+        t0.SetBoolInstanceVar(ivar#1, opt#0)
+        t5.CallFunction("ColourObject", args(t0.UID()))
+        t0.SetAnim("Normal", opt#1)
+    WHEN System.EveryTick():
+        t15.Destroy()
+# ==== GROUP: SPIDER BOSS ====
+WHEN System.IsGroupActive("SPIDER BOSS"):
+WHEN System.OnLayoutStart():
+    t31.Destroy()
+    t1.Timer.StartTimer(random(8, 15), opt#0, "SpiderBoss")
+WHEN System.Every(random(5, 7))  AND  t31.IsOnScreen():
+    t31.Spawn(OBJ:t32, layer:1, 1)
+WHEN t1.Timer.OnTimer("SpiderBoss"):
+    t1.Timer.StartTimer(random(8, 15), opt#0, "SpiderBoss")
+  WHEN System.Compare(t31.Count(), op=, 0)  AND  System.CompareVar(gvar:isPlaying, op!=, 0):
+      System.CreateObject(OBJ:t31, layer:1, 0, ($TOPMARGIN + (floor(random(0, ($PLAYFIELD - 1))) * $CELLSIZE)))
+      t31.Bullet.SetAngleOfMotion(0)
+    WHEN System.Compare(random(0, 1), op<, 0.5):
+        t31.Bullet.SetAngleOfMotion(180)
+        t31.SetMirrored(opt#0)
+        t31.SetX(layoutwidth())
+WHEN t31.OnCollision(OBJ:t2):
+    t27.ScrollTo.Shake(20, 0.4, opt#0)
+    t20.Play(["centipede_bonus", false], opt#0, 0, "")
+    t31.SubInstanceVar(ivar#0, 1)
+    t31.Spawn(OBJ:t28, layer:1, 0)
+  WHEN t31.CompareInstanceVar(ivar#0, op<=, 0):
+      t31.Spawn(OBJ:t24, layer:1, 0)
+      t5.CallFunction("AddToScore", args(2500))
+      t24.SetText(2500)
+      t2.Destroy()
+      t31.Spawn(OBJ:t14, layer:1, 0)
+    WHEN System.Repeat(10):
+        t31.Spawn(OBJ:t63, layer:"Objects", 0)
+        t63.Bullet.SetAngleOfMotion(((loopindex() * 36) - 90))
+        t31.Destroy()
+# ==== GROUP: MEGA BOSS! ====
+WHEN System.IsGroupActive("MEGA BOSS!"):
+WHEN System.OnLayoutStart():
+    t60.Destroy()
+    t1.Timer.StartTimer(random(8, 15), opt#0, "MegaBoss")
+WHEN System.Every(random(3, 5))  AND  System.CompareVar(gvar:isPlaying, op!=, 0)  AND  t60.IsOnScreen():
+    t20.Play(["shootplayer", false], opt#0, 20, "")
+    t60.Spawn(OBJ:t61, layer:"Objects", 1)
+    t60.Spawn(OBJ:t61, layer:"Objects", 3)
+    t60.Spawn(OBJ:t62, layer:"Objects", 2)
+    System.Wait(0.1)
+    t20.Play(["shootplayer", false], opt#0, 20, "")
+    t60.Spawn(OBJ:t61, layer:"Objects", 1)
+    t60.Spawn(OBJ:t61, layer:"Objects", 3)
+    System.Wait(0.1)
+    t20.Play(["shootplayer", false], opt#0, 20, "")
+    t60.Spawn(OBJ:t61, layer:"Objects", 1)
+    t60.Spawn(OBJ:t61, layer:"Objects", 3)
+    System.Wait(0.1)
+    t20.Play(["shootplayer", false], opt#0, 20, "")
+    t60.Spawn(OBJ:t61, layer:"Objects", 1)
+    t60.Spawn(OBJ:t61, layer:"Objects", 3)
+    System.Wait(0.1)
+    t20.Play(["shootplayer", false], opt#0, 20, "")
+    t60.Spawn(OBJ:t61, layer:"Objects", 1)
+    t60.Spawn(OBJ:t61, layer:"Objects", 3)
+  WHEN t60.CompareInstanceVar(ivar#0, op<=, 125):
+WHEN t1.Timer.OnTimer("MegaBoss"):
+    t1.Timer.StartTimer(random(8, 15), opt#0, "MegaBoss")
+  WHEN System.Compare(t60.Count(), op=, 0)  AND  System.CompareVar(gvar:isPlaying, op!=, 0)  AND  System.CompareVar(gvar:level, op>, 5):
+      System.CreateObject(OBJ:t60, layer:1, (layoutwidth() / 2), -100)
+      t60.Bullet.SetAngleOfMotion(90)
+WHEN t60.OnCollision(OBJ:t2):
+    t27.ScrollTo.Shake(20, 0.4, opt#0)
+    t20.Play(["centipede_bonus", false], opt#0, 0, "")
+    t60.SubInstanceVar(ivar#0, 1)
+    t60.Spawn(OBJ:t28, layer:1, 0)
+  WHEN t60.CompareInstanceVar(ivar#0, op<=, 0):
+      t60.Spawn(OBJ:t24, layer:1, 0)
+      t24.SetAngle(0)
+      t5.CallFunction("AddToScore", args(5000))
+      t24.SetText(5000)
+      t2.Destroy()
+      t60.Spawn(OBJ:t14, layer:1, 0)
+    WHEN System.Repeat(10):
+        t60.Spawn(OBJ:t63, layer:"Objects", 0)
+        t63.Bullet.SetAngleOfMotion(((loopindex() * 36) - 90))
+        t60.Destroy()
+
+##########################################################################################
+# SHEET: TitleSheet
+##########################################################################################
+VAR ARCADE_LOAD_READY = 0
+VAR R_Back = 'false'
+VAR G_Back = 'false'
+VAR B_Back = 'false'
+VAR R = 0
+VAR B = 0
+VAR G = 0
+WHEN t26.OnTouchStart():
+    System.GoToLayout(layout:Game)
+# ==== GROUP: ARCADE INITIALISATION ====
+WHEN System.IsGroupActive("ARCADE INITIALISATION"):
+WHEN System.OnLayoutStart()  AND  System.CompareVar(gvar:ARCADE_LOAD_READY, op=, 0):
+    t44.arcadeActionGameInit(opt#0)
+    t44.arcadeActionGameReady()
+    System.SetVar(gvar:ARCADE_LOAD_READY, 1)
+    t20.Play(["startup", false], opt#0, 0, "StartUp")
+
+##########################################################################################
+# SHEET: Arcade
+##########################################################################################
+# ==== GROUP: Save State ====
+WHEN System.IsGroupActive("Save State"):
+WHEN t44.arcadeEventOnInitialized():
+    t44.arcadeActionRequestPlayerData()
+  WHEN System.Compare(trim(t44.arcadeSaveState()), op!=, ""):
+      t45.StringToHashTable(t44.arcadeSaveState())
+    WHEN t45.KeyExists("data.HighScore"):
+        System.SetVar(gvar:HighScore, t45.At("data.HighScore"))
+    WHEN System.Else()  AND  t45.KeyExists($HIGHSCORE_KEY):
+        System.SetVar(gvar:HighScore, t45.At($HIGHSCORE_KEY))
+    WHEN System.Else():
+        t45.SetValueByKeyString($HIGHSCORE_KEY, 0)
+# ==== GROUP: Sounds ====
+WHEN System.IsGroupActive("Sounds"):
+WHEN t44.arcadeEventMute():
+    t20.SetSilent(opt#0)
+WHEN t44.arcadeEventUnmute():
+    t20.SetSilent(opt#1)
+# ==== GROUP: Pause ====
+WHEN System.IsGroupActive("Pause"):
+WHEN t44.arcadeEventStop():
+    System.SetTimescale(0)
+    System.SetObjectTimescale(OBJ:t68, 0)
+    System.SetVar(gvar:Pause, 1)
+    t20.SetSilent(opt#0)
+WHEN t44.arcadeEventResume():
+    System.SetTimescale(1)
+    System.SetObjectTimescale(OBJ:t68, 1)
+    System.SetVar(gvar:Pause, 0)
+    t20.SetSilent(opt#1)

@@ -51,6 +51,7 @@ from app.api.routes.admin.tickets import (
     handle_admin_ticket_reply,
     handle_admin_tickets,
 )
+from app.api.routes.admin.arcade_flags import handle_admin_arcade_flags
 from app.api.routes.admin.users import (
     handle_admin_reset_arcade,
     handle_admin_stats,
@@ -80,6 +81,7 @@ __all__ = [
     "handle_admin_pending_receipts",
     "handle_admin_recent_broadcasts",
     "handle_admin_receipt_detail",
+    "handle_admin_arcade_flags",
     "handle_admin_remove_vip",
     "handle_admin_reset_arcade",
     "handle_admin_search_user_for_vip",

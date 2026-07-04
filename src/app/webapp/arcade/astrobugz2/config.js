@@ -1,294 +1,279 @@
 /* ============================================================================
- * ASTROBUGZ — CONFIG
+ * ASTROBUGZ — CONFIG  (faithful port of the original Construct 2 game)
  * ----------------------------------------------------------------------------
- * THIS IS THE FILE YOU EDIT.  You almost never need to touch engine.js.
+ * Every value in this file was decoded from the original export
+ * (../astrobugz/data.js). Change a number here and the game changes —
+ * engine.js contains the logic, this file contains the tuning.
  *
- * Everything that defines how the game LOOKS and PLAYS lives here:
- *   THEME      — colors / palette
- *   PLAYER     — your ship
- *   WEAPONS    — how bullets behave
- *   CENTIPEDE  — the snake-bug chain (the star of the show)
- *   MUSHROOMS  — the obstacle field
- *   ENEMIES    — every other bug (spider, flea, scorpion...). ADD MORE HERE.
- *   POWERUPS   — pickups that drop from kills
- *   ABILITIES  — what a powerup actually DOES to the player
- *   LEVELS     — difficulty / pacing
+ * WORLD COORDINATES: the game simulates a fixed 720x1280 layout (like the
+ * original) and letterboxes it into the canvas. All positions/speeds below
+ * are in that 720x1280 space, px and px/second.
  *
- * --- HOW TO ADD A NEW ENEMY (the thing you asked for) ---
- *   1. Copy any block inside ENEMIES (e.g. "spider").
- *   2. Give it a new key, e.g. "wasp".
- *   3. Change the numbers and colors.
- *   4. Pick a `move` from the MOVEMENT LIBRARY (listed below) and a `shape`
- *      from the SHAPE LIBRARY. Done — it spawns automatically.
- *
- * MOVEMENT LIBRARY (use any of these as `move`):
- *   "drift"   — floats downward, soft horizontal sway   (params: vy, sway)
- *   "zigzag"  — bounces left/right while descending       (params: vx, vy)
- *   "dive"    — drops straight down fast                  (params: vy)
- *   "sine"    — snakes down in a sine wave                (params: vy, amp, freq)
- *   "strafe"  — flies across the screen sideways          (params: vx, y)
- *   "bounce"  — pinballs around the lower area            (params: speed)
- *   "homing"  — slowly steers toward the player           (params: speed, turn)
- *
- * SHAPE LIBRARY (use any of these as `shape`):
- *   "bug" "spider" "ship" "blob" "diamond" "star" "beetle" "saucer"
- *
- * Numbers are in pixels / pixels-per-second / milliseconds unless noted.
- * Colors are any CSS color string.
+ * --- MODDING CHEAT-SHEET -----------------------------------------------------
+ *  more/less lives ......... PLAYER.lives            (original shipped with 1!)
+ *  fire speed ............... PLAYER.fireInterval / doubleFireInterval
+ *  worm speed ............... CENTIPEDE.speed / fastSpeed
+ *  worm length .............. CENTIPEDE (chainSize / divers formulas)
+ *  bug toughness ............ each enemy's `hp`
+ *  scoring .................. each enemy's `points`
+ *  add a shield ............. see "SHIELD" notes in engine.js (hitPlayer())
  * ==========================================================================*/
 
 window.ASTRO_CONFIG = {
 
-  // Folder the original AstroBugz sprites live in (relative to this game's
-  // index.html). Each entity's `sprite:` is a filename inside this folder.
-  // If a sprite is missing/empty, the engine falls back to the vector `shape:`.
-  spriteBase: '../astrobugz/images/',
+  /* Where the original game's assets live (relative to this index.html). */
+  imageBase: '../astrobugz/images/',
+  soundBase: '../astrobugz/media/',
 
-  /* ---------------------------------------------------------------- THEME */
-  theme: {
-    bgTop:    '#1a0b2e',     // top of the background gradient
-    bgBottom: '#0b0617',     // bottom of the background gradient
-    starColor:'#a78bfa',     // parallax stars
-    floorColor:'#3a1d6e',    // the bar the player stands on
-    glow: true,              // neon glow (used by vector shapes + a soft sprite halo)
-    spriteGlow: false,       // set true to add a colored halo behind sprites
-    pixelArt: true,          // crisp (non-blurry) sprite scaling
-    screenShake: true,       // shake on explosions / hits
-    hudColor: '#f8fafc',
+  /* ------------------------------------------------------------------ GRID */
+  // The playfield is a grid of 48px cells. Grid positions sit on multiples
+  // of CELL (48, 96, 144, ...) exactly like the original.
+  WIDTH: 720,
+  HEIGHT: 1280,
+  CELL: 48,
+  TOPMARGIN: 48,      // empty band at the very top
+  PLAYFIELD: 14,      // rows of mushroom field below the top margin
+  PLAYERAREA: 6,      // rows of the bottom band the worm patrols
+  // derived (don't edit): HCELLS = 15, playfieldBottomY = 48+14*48 = 720,
+  // bandBottomY = 48+20*48 = 1008, playerY = 1008+64 = 1072.
+
+  /* ---------------------------------------------------------------- PLAYER */
+  PLAYER: {
+    w: 78, h: 48,               // drawn size (sprite is 52x32 at 1.5x)
+    sprite: 'player-sheet0.png',
+    touchSpeed: 300,            // px/s the ship chases your finger's X
+    keyboardSpeed: 600,         // px/s with arrow keys (accel/decel below)
+    keyboardAccel: 2000,
+    keyboardDecel: 2000,
+    lives: 1,                   // the original gives exactly ONE life
+    fireInterval: 0.15,         // seconds between shots while holding
+    // Double fire (spider-kill reward). The original was 0.075s for 10s —
+    // nerfed here because it felt overpowered. Raise/lower to taste.
+    doubleFireInterval: 0.1,    // 1.5x fire rate instead of the original 2x
+    doubleFireDuration: 6,      // ...for 6 seconds instead of 10
   },
 
-  /* --------------------------------------------------------------- PLAYER */
-  player: {
-    shape:       'ship',
-    sprite:      'player-sheet0.png',
-    color:       '#e8ecff',
-    accent:      '#39ff88',   // cockpit / engine glow (vector fallback only)
-    size:        17,          // half-size; sprite is drawn ~2x this tall
-    speed:       560,         // px/s for KEYBOARD left/right. Touch follows your finger exactly.
-    lives:       3,
-    moveAxis:    'x',         // 'x' = left/right only along the bottom (classic, ship anchored to
-                              //       your finger). 'xy' = free 2D movement in a bottom band.
-    bandRows:    11,          // only used when moveAxis is 'xy'
-    invulnMs:    1500,        // i-frames after taking a hit
+  BULLET: {
+    w: 4, h: 20,
+    sprite: 'missile-sheet0.png',
+    speed: 1400,                // px/s straight up
   },
 
-  /* -------------------------------------------------------------- WEAPONS */
-  // The "default" weapon is what you start with. Abilities can swap the
-  // active weapon (see ABILITIES.doublefire below).
-  weapons: {
-    default: {
-      color:      '#fff36b',
-      bulletSpeed:760,        // px/s upward
-      fireRate:   7,          // shots per second (auto-fires while held)
-      bulletW:    3,
-      bulletH:    12,
-      streams:    1,          // number of parallel bullets
-      spread:     0,          // px gap between streams
+  /* ------------------------------------------------------------- MUSHROOMS */
+  MUSHROOMS: {
+    w: 16, h: 20,
+    sprite: 'mushroom-sheet0.png',
+    poisonSprite: 'mushroom-sheet1.png',
+    hp: 3,                      // shots to destroy one
+    points: 1,                  // for destroying one
+    topRowCount: 3,             // seeded near the top row
+    scatterCount: 18,           // floor(PLAYFIELD * 1.3) random ones
+    sweepBonus: 2,              // end-of-life bonus per surviving mushroom
+    sweepStagger: 0.03,         // seconds between bonus pops
+  },
+
+  /* ------------------------------------------------------------- CENTIPEDE */
+  CENTIPEDE: {
+    size: 40,                   // segments are 40x40 on the 48px grid
+    headSprite: 'segment-sheet0.png',
+    bodySprite: 'segment-sheet1.png',
+    speed: 300,                 // px/s on normal waves
+    fastSpeed: 400,             // px/s on odd waves after wave 1
+    headPoints: 100,
+    bodyPoints: 10,
+    // Wave composition (wave = ((level-1) % 19) + 1):
+    //   main chain length = 9 - floor(wave/2)   (only while wave < 18)
+    //   extra single-segment "divers" = floor(wave/2)  (from wave 2)
+    mainChainBase: 9,
+    lastMainChainWave: 17,
+    waveLoop: 19,
+    beatInterval: 0.4,          // heartbeat sound cadence during play
+  },
+
+  /* ----------------------------------------------------- SPIDER (10 hits) */
+  SPIDER: {
+    w: 138, h: 102,
+    sprite: 'spider-sheet0.png',
+    hp: 10,
+    // score on kill = max(1, 3 - floor(|playerY-spiderY| / (2*bobMag) * 3)) * 300
+    pointsStep: 300,            // => 300 / 600 / 900 by proximity
+    spawnDelayMin: 4, spawnDelayMax: 8,     // seconds between spawn attempts
+    switchMin: 3, switchMax: 8,             // seconds between re-aiming at you
+    bobMagnitude: 192,          // vertical sine amplitude (CELL*4)
+    bobPeriod: 3,               // seconds per bob
+    wobbleDeg: 25, wobblePeriod: 6,         // visual angle wobble
+    // horizontal drift speed = bobMagnitude / bobPeriod = 64 px/s
+  },
+
+  /* -------------------------------------------- FLEA (5 hits, from wave 2) */
+  FLEA: {
+    w: 78, h: 84,
+    sprites: ['flea-sheet0.png', 'flea-sheet1.png'],  // 2-frame wing flap
+    animFps: 6,
+    hp: 5,
+    points: 200,
+    fromLevel: 2,
+    checkInterval: 1,           // spawn check every second
+    fallSpeed: 400,
+    swayMagnitude: -100, swayRandom: 50, swayPeriod: 4,
+    // spawns only while (mushrooms in the bottom band) < min(15, 4+level)
+    minBandMushroomsCap: 15,
+    minBandMushroomsBase: 4,
+    dropFactor: 0.0007,         // per-frame mushroom drop chance factor
+  },
+
+  /* --------------------------------------- SCORPION (10 hits, from wave 3) */
+  SCORPION: {
+    w: 56, h: 64,
+    sprite: 'scorpion-sheet0.png',
+    hp: 10,
+    points: 1000,
+    fromLevel: 3,
+    spawnDelayMin: 15, spawnDelayMax: 30,
+    speed: 100,                 // strafes across a random playfield row
+    // poisons mushrooms it touches (visual, as in the original);
+    // un-poisons its row when killed.
+  },
+
+  /* ----------------------------------------------- SPIDER BOSS (50 hits) */
+  SPIDERBOSS: {
+    w: 120, h: 168,
+    sprite: 'spiderboss-sheet0.png',
+    hp: 50,
+    points: 2500,
+    spawnDelayMin: 8, spawnDelayMax: 15,
+    speed: 50,                  // slow strafe across a random row
+    swayMagnitude: 100, swayPeriod: 10,
+    fireMin: 5, fireMax: 7,     // seconds between boss bullets
+    deathBombs: 10,             // pink bombs sprayed radially on death
+  },
+
+  BOSSBULLET: {
+    w: 48, h: 48,
+    sprite: 'bossbullet-sheet0.png',
+    speed: 400,                 // falls straight down, spinning
+    spinDegPerSec: 180,
+  },
+
+  /* ------------------------------------------ MEGA BOSS (250 hits, lvl 6+) */
+  MEGABOSS: {
+    w: 228, h: 204,             // on-screen footprint (34x38 sprite at 6x, rotated 90°)
+    sprites: ['megaboss-sheet0.png', 'megaboss-sheet1.png'],
+    animFps: 5,
+    hp: 250,
+    points: 5000,
+    fromLevel: 6,               // spawns when level > 5
+    spawnDelayMin: 8, spawnDelayMax: 15,
+    descendSpeed: 10,
+    sineVMag: 100, sineVPeriod: 10,
+    sineHMag: 100, sineHPeriod: 4,
+    volleyMin: 3, volleyMax: 5, // seconds between volleys
+    volleyBursts: 5,            // bursts per volley, 0.1s apart
+    burstGap: 0.1,
+    deathBombs: 10,
+  },
+
+  // w/h below are the ON-SCREEN footprint (these fly downward, drawn rotated 90°)
+  LASER:  { w: 9, h: 32,   sprite: 'laser-sheet0.png',  speed: 800 },
+  ROCKET: { w: 66, h: 108, sprites: ['rocket-sheet0.png', 'rocket-sheet1.png'],
+            frames: 4, animFps: 15, speed: 350 },
+  PINKBOMB: { w: 36, h: 36, sprite: 'pinkbomb-sheet0.png', speed: 500 },
+
+  /* -------------------------------------------------------------- POWERUPS */
+  // NEW (not in the original): floating tokens dropped by dying bugs.
+  // Uses the original's unused circleletter sprite + shield1a sound.
+  POWERUPS: {
+    sprite: 'circleletter-sheet0.png',   // round token, tinted per type
+    size: 56,                  // drawn size of the token
+    fallSpeed: 150,            // px/s downward drift
+    swayMag: 30, swayPeriod: 2.5,
+    letterScale: 0.6,          // sprite-font letter on the token
+    maxShields: 2,             // shields the ship can stack
+    shieldInvuln: 1.2,         // i-frames after a shield absorbs a hit
+    // chance to drop a token when each bug dies (0..1)
+    dropChance: { spider: 0.25, flea: 0.3, scorpion: 0.5,
+                  spiderboss: 1.0, megaboss: 1.0 },
+    // the token types — add your own and handle it in applyPowerup()
+    types: {
+      shield: { letter: 'S', color: '#39ff88', weight: 3, label: 'SHIELD' },
+      spread: { letter: 'W', color: '#7be0ff', weight: 3, label: '3-WAY',  duration: 8 },
+      pierce: { letter: 'P', color: '#ffd23f', weight: 2, label: 'PIERCE', duration: 6 },
+      bomb:   { letter: 'B', color: '#ff4fa3', weight: 1, label: 'BOMB' },
     },
-    double: {
-      color:      '#7be0ff',
-      bulletSpeed:820,
-      fireRate:   10,
-      bulletW:    3,
-      bulletH:    12,
-      streams:    2,
-      spread:     14,
+    spreadVx: 170,             // sideways speed of the two extra 3-WAY bullets
+    bombBossDamage: 10,        // bomb damage dealt to each big bug on screen
+  },
+
+  /* -------------------------------------------------------------- BOSS BAR */
+  BOSSBAR: {
+    h: 10,
+    spiderboss: { w: 130, color: '#c04dff' },
+    megaboss:   { w: 220, color: '#ffd23f' },
+  },
+
+  /* --------------------------------------------------------------- HAPTICS */
+  HAPTICS: { enabled: true, minGapMs: 60 },
+
+  /* --------------------------------------------------------------- EFFECTS */
+  EXPLOSION: { size: 140, sheet: 'explosion-sheet0.png', frames: 7, fps: 20,
+               fadeAfter: 0, fadeTime: 0.5 },
+  PARTICLES: { count: 40, speed: 100, size: 12, life: 1.0, sprite: 'particles.png' },
+  STARS:     { count: 15, speedMin: 10, speedMax: 80, sprite: 'star-sheet0.png' },
+  SHAKE:     { bigMag: 25, mag: 20, time: 0.4 },
+  BACKGROUND:{ tile: 'tiledbackground.png', tileSize: 641, scrollSpeed: 100, opacity: 0.25 },
+
+  /* ----------------------------------------------------------------- AUDIO */
+  // All files live in soundBase. Each has .ogg (+ .m4a fallback where noted).
+  AUDIO: {
+    volume: 1.0,
+    files: {
+      shoot:      'shoot-04',              // player fires
+      kill:       'centipede_kill',        // segment destroyed
+      bonus:      'centipede_bonus',       // any hit on a big bug
+      death:      'centipede_death',       // life lost
+      flea:       'centipede_flea',        // flea spawns
+      spiderloop: 'centipede_spiderloop',  // loops while a spider lives
+      beat:       'centipede_beat',        // 0.4s heartbeat during play
+      newlevel:   'collect-gem',           // wave starts (ogg only)
+      sweep:      'matching_combo_1',      // each mushroom bonus pop
+      bossshoot:  'shootplayer',           // megaboss volley
+      startup:    'startup',               // title screen
+      shield:     'shield1a',              // (unused by original — free for mods!)
     },
-    rapid: {
-      color:      '#ff8de0',
-      bulletSpeed:900,
-      fireRate:   16,
-      bulletW:    3,
-      bulletH:    10,
-      streams:    1,
-      spread:     0,
-    },
+    oggOnly: ['collect-gem', 'shield1a'],  // these have no .m4a fallback
   },
 
-  /* ------------------------------------------------------------ CENTIPEDE */
-  // The signature snake-bug. It marches across a row, drops down and reverses
-  // when it hits a wall or mushroom, and SPLITS into two when you shoot a
-  // middle segment. Each killed segment leaves a mushroom behind.
-  centipede: {
-    startLength:   10,        // segments in the first wave
-    lengthPerLevel:1,         // +segments each level (capped by maxLength)
-    maxLength:     16,
-    stepMs:        120,       // ms per grid-step (lower = faster)
-    speedPerLevel: 0.93,      // stepMs multiplier each level (<1 = faster)
-    minStepMs:     60,
-    patrolRows:    3,         // after descending, the centipede patrols this many rows
-                              // at the ship (stays low and hunts instead of fleeing up)
-    headSprite:    'segment-sheet0.png',
-    bodySprite:    'segment-sheet1.png',
-    headShape:     'bug',     // vector fallback
-    bodyShape:     'bug',
-    headColor:     '#ff4fa3',
-    bodyColor:     '#ff7ec2',
-    eyeColor:      '#1e1140',
-    headPoints:    100,
-    bodyPoints:    50,
-    leavesMushroom:true,      // killed segment becomes a mushroom (classic Centipede)
-    dropChance:    0.24,      // chance per step to dip a row — higher = descends at you faster
+  /* --------------------------------------------------------------- SPRITES */
+  // Extra art used by the title / HUD / game-over screens.
+  UI: {
+    titleSheet:   'superbugztitle-sheet0.png', // 8 frames of 75x14, 10fps
+    titleTable:   'sprite5-sheet0.png',        // the 100/200/300-900/1000/2500 table
+    titlePoints:  'sprite6-sheet0.png',        // "--POINTS--"
+    titleDashes:  'sprite4-sheet0.png',        // dashed line with arrows
+    titleHand:    'sprite3-sheet0.png',        // tap hand (slides side to side)
+    hudBar:       'sprite-sheet0.png',         // white bar above the score
+    font:         'scoretransient2.png',       // 50x38 white sprite font
+    doubleFire:   'doublefire-sheet0.png',     // "DOUBLE FIRE" banner
+    gameOverImg:  'gameoverimage-sheet0.png',  // pixel GAME OVER logo
+    dimmer:       'sprite2-sheet0.png',        // black square used as game-over veil
+    scoreMushroom:'scoremushroom-sheet0.png',  // sweep bonus flash
   },
 
-  /* ------------------------------------------------------------ MUSHROOMS */
-  mushrooms: {
-    shape:       'mushroom',
-    sprite:        'mushroom-sheet0.png',   // healthy
-    damagedSprite: 'mushroom-sheet1.png',   // shown once below half hp
-    hp:          4,
-    startCount:  48,          // scatter a proper field so the centipede zig-zags DOWN
-    maxCount:    72,
-    points:      5,           // for fully destroying one
-    capColor:    '#ff5d8f',   // vector fallback — cap changes shade as it loses hp
-    stalkColor:  '#39c0d6',
-    poisonColor: '#9dff3c',   // poisoned mushrooms (scorpion) — makes centipede dive
-    regrowPerLevel: 10,       // refill the field by this many each new level
-    clearBottomRows: 3,       // mushrooms stay this many rows ABOVE the ship lane, so they're
-                              // always shootable (worms may still descend lower than this)
+  // Sprite-font glyph widths (decoded from the original SpriteFontPlus data).
+  FONT: {
+    charW: 50, charH: 38, perRow: 10,
+    charset: "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789.,;:?!-_~#\"'&()[]|`\\/@\u00b0+=*$\u00a3\u20ac<>",
+    widths: [
+      [18, " "], [5, "\u00b0\u00a3\u20ac"], [9, ".,;:'|"], [12, "Ii!`"],
+      [15, "()[]"], [18, "1\"\\/<>"], [21, "_"], [24, "~"], [27, "-#+=*$"],
+      [30, "@"], [33, "023456789?"],
+      [36, "ABCDEFGHJKLNOPRSTUVXYZabcdefghjklnoprstuvxyz&"],
+      [39, "Qq"], [42, "Mm"], [48, "Ww"],
+    ],
   },
 
-  /* -------------------------------------------------------------- ENEMIES */
-  // Independent bugs. The engine spawns these based on `spawn` rules.
-  // >>> ADD NEW ENEMIES HERE by copying a block. <<<
-  enemies: {
-
-    spider: {
-      shape:    'spider',
-      sprite:   'spider-sheet0.png',
-      color:    '#ff2e6e',
-      accent:   '#1e1140',
-      size:     22,
-      hp:       2,                 // chunky — takes a couple hits
-      points:   [300, 600, 900],   // more points the closer it dies to the player
-      move:     'bounce',
-      moveParams:{ speed: 210, ceil: 0.42 },
-      eatsMushrooms: true,         // clears mushrooms it touches
-      touchKillsPlayer: true,
-      spawn:    { fromLevel: 1, everyMs: 4500, chance: 0.95, max: 3 },
-    },
-
-    flea: {                        // green winged bug — flies actively around the screen (200 pts)
-      shape:    'beetle',
-      sprite:   'flea-sheet0.png',
-      color:    '#9dff3c',
-      accent:   '#7a4b00',
-      size:     20,
-      hp:       3,                 // chunky — takes a few hits
-      points:   200,
-      move:     'bounce',
-      moveParams:{ speed: 200, ceil: 0.12 },  // roams almost the whole screen, swooping at you
-      touchKillsPlayer: true,
-      spawn:    { fromLevel: 1, everyMs: 4000, chance: 0.95, max: 2 },
-    },
-
-    scorpion: {
-      shape:    'bug',
-      sprite:   'scorpion-sheet0.png',
-      color:    '#ffd23f',
-      accent:   '#1b3d00',
-      size:     22,
-      hp:       3,                 // chunky
-      points:   1000,
-      move:     'strafe',
-      moveParams:{ vx: 190 },
-      poisonsMushrooms: true,      // turns mushrooms it passes into poison
-      touchKillsPlayer: true,
-      spawn:    { fromLevel: 2, everyMs: 7000, chance: 0.85, max: 2 },
-    },
-
-  },
-
-  /* --------------------------------------------------------------- BOSSES */
-  // A boss appears partway through a level (from `fromLevel`). Same data
-  // model as enemies, plus an attack.
-  boss: {
-    spiderboss: {
-      shape:    'spider',
-      sprite:   'spiderboss-sheet0.png',
-      color:    '#c04dff',
-      accent:   '#2a0a44',
-      size:     46,
-      hp:       24,
-      points:   2500,
-      move:     'strafe',
-      moveParams:{ vx: 120, y: 0.20 },   // y as a fraction of screen height
-      touchKillsPlayer: true,
-      attack:   { everyMs: 1200, bullet: 'pinkbomb' },
-      fromLevel:2,
-      appearAtFraction: 0.5,             // half-way through the level timer
-    },
-
-    megaboss: {                          // tougher boss for later levels
-      shape:    'spider',
-      sprite:   'megaboss-sheet0.png',
-      color:    '#ffd23f',
-      accent:   '#7a1d00',
-      size:     50,
-      hp:       40,
-      points:   5000,
-      move:     'strafe',
-      moveParams:{ vx: 150, y: 0.18 },
-      touchKillsPlayer: true,
-      attack:   { everyMs: 850, bullet: 'pinkbomb' },
-      fromLevel:6,
-    },
-  },
-
-  // Projectiles bosses fire. You can shoot these for points / powerups.
-  bossBullets: {
-    pinkbomb: {
-      shape:  'blob',
-      sprite: 'pinkbomb-sheet0.png',
-      color:  '#ff4fa3',
-      size:   10,
-      vy:     220,
-      hp:     1,
-      points: 50,
-      nukeChance: 0.2,                   // chance this one is a "nuke" (better reward)
-      nukeColor: '#ffd23f',
-    },
-  },
-
-  /* ------------------------------------------------------------- POWERUPS */
-  // The collectible that floats down. `ability` points at an ABILITIES entry.
-  powerups: {
-    doublefire: { shape:'diamond', color:'#7be0ff', size:14, vy:120, ability:'doublefire', weight:3 },
-    rapid:      { shape:'star', sprite:'star-sheet0.png', color:'#ff8de0', size:14, vy:120, ability:'rapid', weight:2 },
-    shield:     { shape:'blob',    color:'#39ff88', size:14, vy:120, ability:'shield',     weight:2 },
-  },
-
-  /* ------------------------------------------------------------ ABILITIES */
-  // What a powerup DOES. `effect` is a keyword the engine understands:
-  //   "weapon"  — switch the active weapon to `weapon` for `duration` ms
-  //   "shield"  — grant one free hit (no duration; lasts until used)
-  //   "score"   — instant points (`amount`)
-  // Add your own by adding an effect branch in engine.js applyAbility().
-  abilities: {
-    doublefire: { effect:'weapon', weapon:'double', duration:8000, hud:'2x FIRE', color:'#7be0ff' },
-    rapid:      { effect:'weapon', weapon:'rapid',  duration:6000, hud:'RAPID',   color:'#ff8de0' },
-    shield:     { effect:'shield',                                  hud:'SHIELD',  color:'#39ff88' },
-  },
-
-  /* --------------------------------------------------------------- LEVELS */
-  levels: {
-    secondsPerLevel: 0,        // 0 = no timer; clear the centipede to advance.
-                               // set e.g. 180 to add a 3-min "world nuke" timer.
-    startLevel: 1,
-    extraCentipedePerLevel: 0.5, // every other level spawns an extra short chain
-    bossEveryWaves: 2,         // a boss appears every Nth wave (from wave 2)
-    bossDelayMs: 3500,         // ...this many ms after the boss wave starts
-  },
-
-  /* ---------------------------------------------------------------- AUDIO */
-  // Optional. Drop .ogg/.m4a files in a /sfx folder and point to them here.
-  // Leave files null to run silently (engine won't error on missing audio).
-  audio: {
-    enabled: true,
-    shoot:   null,
-    explode: null,
-    powerup: null,
-    music:   null,
-    volume:  0.5,
+  TITLE: {
+    copyright: '2025 ASTROBYTE TECH & ENTERTAINMENT SYSTEM',
+    copyrightColor: 'rgb(0,230,0)',
   },
 };

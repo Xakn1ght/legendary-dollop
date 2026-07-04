@@ -1,13 +1,64 @@
 from datetime import date, datetime
 
+from sqlalchemy import func
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
 
 from app.core.settings import GAME_REWARDS
-from app.database.models import DailyGamePlay, User
+from app.database.models import ArcadeFlag, DailyGamePlay, User
 
 
 class _GameMixin:
+    @staticmethod
+    async def get_monthly_arcade_ranking(
+        db: AsyncSession, month_start: date, month_end: date, limit: int | None = None
+    ):
+        """The canonical monthly race ranking (also used for prize payouts):
+        per-user best VALIDATED daily-run score in the window, visible users
+        only, ties broken by whoever reached the score on an earlier day.
+        Returns rows of (user_id, top_score, first_play, display_name)."""
+        name = func.coalesce(
+            func.nullif(User.custom_username, ""),
+            func.nullif(User.username, ""),
+            func.nullif(User.full_name, ""),
+        )
+        q = (
+            select(
+                DailyGamePlay.user_id,
+                func.max(DailyGamePlay.best_score).label("top_score"),
+                func.min(DailyGamePlay.play_date).label("first_play"),
+                func.max(name).label("display_name"),
+            )
+            .join(User, User.id == DailyGamePlay.user_id)
+            .filter(
+                DailyGamePlay.play_date >= month_start,
+                DailyGamePlay.play_date <= month_end,
+                DailyGamePlay.rewarded == True,  # noqa: E712
+                DailyGamePlay.best_score > 0,
+                User.show_on_leaderboard == True,  # noqa: E712
+            )
+            .group_by(DailyGamePlay.user_id)
+            .order_by(
+                func.max(DailyGamePlay.best_score).desc(),
+                func.min(DailyGamePlay.play_date).asc(),
+                DailyGamePlay.user_id.asc(),
+            )
+        )
+        if limit:
+            q = q.limit(limit)
+        return (await db.execute(q)).all()
+
+    @staticmethod
+    async def add_arcade_flag(
+        db: AsyncSession, user_id: int, score: int, claimed_duration: int,
+        server_elapsed: int | None, reason: str,
+    ):
+        """Persist a rejected arcade submit for the admin cheat log."""
+        db.add(ArcadeFlag(
+            user_id=user_id, score=score, claimed_duration=claimed_duration,
+            server_elapsed=server_elapsed, reason=reason,
+        ))
+        await db.commit()
     @staticmethod
     async def get_or_create_daily_game_play(
         db: AsyncSession, user_id: int, date: datetime | None = None
@@ -218,14 +269,19 @@ class _GameMixin:
         reward_credit: int = 0,
         reward_stars: int = 0,
         reward_xp: int = 0,
+        count_for_leaderboard: bool = False,
     ):
+        """Record a play. best_score is ONLY updated when count_for_leaderboard
+        is True — i.e. by the single validated rewarded run per day. Practice,
+        already-played and rejected runs are stored for analytics but can never
+        reach a leaderboard or the monthly prize ranking (anti-cheat 2026-07-03)."""
         from app.database.repos.reward import RewardRepository as _RR
 
         today = date.today()
         existing = await _RR.check_daily_game_play(db, user_id, today)
 
         if existing:
-            if score > existing.best_score:
+            if count_for_leaderboard and score > existing.best_score:
                 existing.best_score = score
             existing.duration_seconds = duration
             existing.display_name = display_name or existing.display_name
@@ -240,7 +296,7 @@ class _GameMixin:
         play = DailyGamePlay(
             user_id=user_id,
             play_date=today,
-            best_score=score,
+            best_score=score if count_for_leaderboard else 0,
             duration_seconds=duration,
             display_name=display_name,
             rewarded=rewarded,

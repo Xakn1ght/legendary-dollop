@@ -1,966 +1,1540 @@
 /* ============================================================================
- * ASTROBUGZ — ENGINE
+ * ASTROBUGZ — ENGINE  (faithful vanilla-JS port of the Construct 2 original)
  * ----------------------------------------------------------------------------
- * The machine that runs the game described in config.js.
- * You normally DON'T edit this file — tweak config.js instead.
+ * The logic below is a 1:1 reimplementation of the original's event sheets
+ * (decoded from ../astrobugz/data.js). Where a behavior looks odd, it is
+ * probably deliberate — check DECODED_ORIGINAL_SPEC.txt in the backup folder
+ * before "fixing" it.
  *
- * It exposes window.AstroGame for the host page / bridge:
- *   AstroGame.start()           begin play
- *   AstroGame.restart()         reset and begin again
- *   AstroGame.setPaused(bool)   pause/resume (used by the pause button)
- *   AstroGame.setMuted(bool)    mute/unmute audio
+ * Load order: config.js → bridge.js → engine.js (this file).
+ * Exposes window.AstroGame = { start, restart, setPaused, setMuted, state }.
  *
- * It talks to the backend through window.AstroBridge (see bridge.js):
- *   AstroBridge.setScore(n)     update the on-screen score
- *   AstroBridge.gameOver()      submit the run to /api/arcade/submit
- * Both are optional — the engine no-ops if the bridge isn't present.
+ * --- SHIELD / MODDING NOTES -------------------------------------------------
+ * All player damage funnels through hitPlayer(). To add a shield:
+ *   1. add e.g. `player.shield = 1` somewhere (a powerup, a purchase, ...)
+ *   2. in hitPlayer(): if (player.shield > 0) { player.shield--;
+ *        Sound.play('shield'); return; }
+ * The original even ships an unused shield sound ('shield1a').
+ * New enemies: copy one of the spawn/update/draw triplets (flea is smallest).
  * ==========================================================================*/
-(() => {
+(function () {
   'use strict';
-  const CFG = window.ASTRO_CONFIG;
-  const Bridge = window.AstroBridge || { setScore() {}, gameOver() {} };
 
-  // ---- Canvas ----
-  const canvas = document.getElementById('game');
-  const ctx = canvas.getContext('2d');
-  let W = 0, H = 0, DPR = 1;
-  let GRID = 28, COLS = 0, ROWS = 0;
+  var C = window.ASTRO_CONFIG;
+  var W = C.WIDTH, H = C.HEIGHT, CELL = C.CELL;
+  var TOP = C.TOPMARGIN;
+  var HCELLS = Math.floor(W / CELL);                       // 15
+  var FIELD_BOTTOM = TOP + C.PLAYFIELD * CELL;             // 720
+  var BAND_BOTTOM = TOP + (C.PLAYFIELD + C.PLAYERAREA) * CELL; // 1008
+  var PLAYER_Y = BAND_BOTTOM + 64;                         // 1072
+  var LEFT_WALL = CELL;                                    // 48
+  var RIGHT_WALL = (HCELLS - 1) * CELL;                    // 672
 
-  function resize() {
-    DPR = Math.min(window.devicePixelRatio || 1, 2);
-    const cssW = canvas.clientWidth || window.innerWidth;
-    const cssH = canvas.clientHeight || window.innerHeight;
-    canvas.width = Math.floor(cssW * DPR);
-    canvas.height = Math.floor(cssH * DPR);
-    ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
-    W = cssW; H = cssH;
-    GRID = Math.max(20, Math.min(40, Math.floor(W / 15)));
-    COLS = Math.floor(W / GRID);
-    ROWS = Math.floor(H / GRID);
+  /* ============================================================= UTILITIES */
+  function rnd(a, b) { return a + Math.random() * (b - a); }
+  function irnd(a, b) { return Math.floor(rnd(a, b)); }
+  function choose() { return arguments[irnd(0, arguments.length)]; }
+  function clamp(v, a, b) { return v < a ? a : (v > b ? b : v); }
+
+  // AABB overlap of two centered boxes.
+  function hit(ax, ay, aw, ah, bx, by, bw, bh) {
+    return Math.abs(ax - bx) * 2 < (aw + bw) && Math.abs(ay - by) * 2 < (ah + bh);
   }
-  window.addEventListener('resize', () => { resize(); });
 
-  // ---- small helpers ----
-  const rand = (a, b) => a + Math.random() * (b - a);
-  const randInt = (a, b) => Math.floor(rand(a, b + 1));
-  const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
-  const cellX = gx => (gx + 0.5) * GRID;
-  const cellY = gy => (gy + 0.5) * GRID;
-  const dist2 = (ax, ay, bx, by) => { const dx = ax - bx, dy = ay - by; return dx * dx + dy * dy; };
-  const circleHit = (ax, ay, ar, bx, by, br) => dist2(ax, ay, bx, by) <= (ar + br) * (ar + br);
+  /* ================================================================ ASSETS */
+  var IMG = {};
+  var imagesPending = 0;
+  function loadImage(name) {
+    if (IMG[name]) return IMG[name];
+    var img = new Image();
+    imagesPending++;
+    img.onload = img.onerror = function () { imagesPending--; };
+    img.src = C.imageBase + name;
+    IMG[name] = img;
+    return img;
+  }
+  [
+    C.PLAYER.sprite, C.BULLET.sprite, C.MUSHROOMS.sprite, C.MUSHROOMS.poisonSprite,
+    C.CENTIPEDE.headSprite, C.CENTIPEDE.bodySprite, C.SPIDER.sprite,
+    C.FLEA.sprites[0], C.FLEA.sprites[1], C.SCORPION.sprite,
+    C.SPIDERBOSS.sprite, C.BOSSBULLET.sprite,
+    C.MEGABOSS.sprites[0], C.MEGABOSS.sprites[1],
+    C.LASER.sprite, C.ROCKET.sprites[0], C.ROCKET.sprites[1], C.PINKBOMB.sprite,
+    C.EXPLOSION.sheet, C.PARTICLES.sprite, C.STARS.sprite, C.BACKGROUND.tile,
+    C.UI.titleSheet, C.UI.titleTable, C.UI.titlePoints, C.UI.titleDashes,
+    C.UI.titleHand, C.UI.hudBar, C.UI.font, C.UI.doubleFire,
+    C.UI.gameOverImg, C.UI.dimmer, C.UI.scoreMushroom,
+  ].forEach(loadImage);
 
-  /* ===================================================================== */
-  /*  AUDIO  (safe — silently ignores missing files)                       */
-  /* ===================================================================== */
-  const Audio = (() => {
-    const cache = {};
-    let muted = false;
-    function load(key) {
-      const src = CFG.audio && CFG.audio[key];
-      if (!src) return null;
-      if (!cache[key]) { const a = new window.Audio(src); a.volume = CFG.audio.volume ?? 0.5; cache[key] = a; }
-      return cache[key];
+  /* ----------------------------------------------------------------- AUDIO */
+  // Web Audio API with pre-decoded buffers. HTMLAudio elements caused heavy
+  // main-thread jank on iOS when firing a sound every 150 ms — buffer sources
+  // are effectively free.
+  var Sound = (function () {
+    var muted = false;
+    var AC = window.AudioContext || window.webkitAudioContext;
+    var actx = AC ? new AC() : null;
+    var master = null;
+    if (actx) {
+      master = actx.createGain();
+      master.gain.value = C.AUDIO.volume;
+      master.connect(actx.destination);
+    }
+    var buffers = {};   // base name -> AudioBuffer | 'loading' | null(failed)
+    var loops = {};     // tag -> AudioBufferSourceNode
+    var pendingLoops = {}; // tag -> key (loop requested before its buffer decoded)
+    var probe = document.createElement('audio');
+    var canOgg = !!(probe.canPlayType && probe.canPlayType('audio/ogg; codecs="vorbis"'));
+
+    function url(base) {
+      var oggOnly = C.AUDIO.oggOnly.indexOf(base) >= 0;
+      return C.soundBase + base + ((canOgg || oggOnly) ? '.ogg' : '.m4a');
+    }
+    function load(base) {
+      if (!actx || buffers[base] !== undefined) return;
+      buffers[base] = 'loading';
+      fetch(url(base))
+        .then(function (r) { return r.arrayBuffer(); })
+        .then(function (ab) {
+          return new Promise(function (res, rej) { actx.decodeAudioData(ab, res, rej); });
+        })
+        .then(function (buf) {
+          buffers[base] = buf;
+          for (var tag in pendingLoops) {
+            if (C.AUDIO.files[pendingLoops[tag]] === base) {
+              var key = pendingLoops[tag];
+              delete pendingLoops[tag];
+              loop(key, tag);
+            }
+          }
+        })
+        .catch(function () { buffers[base] = null; });
+    }
+    // decode everything up front so the first shot doesn't hitch
+    for (var k in C.AUDIO.files) load(C.AUDIO.files[k]);
+
+    function unlock() {
+      if (actx && actx.state === 'suspended') actx.resume().catch(function () {});
+    }
+    function source(base, doLoop) {
+      var buf = buffers[base];
+      if (!buf || buf === 'loading') { load(base); return null; }
+      var src = actx.createBufferSource();
+      src.buffer = buf;
+      src.loop = !!doLoop;
+      src.connect(master);
+      return src;
+    }
+    function play(key) {
+      if (muted || !actx) return;
+      var base = C.AUDIO.files[key];
+      if (!base) return;
+      var src = source(base, false);
+      if (src) src.start();
+    }
+    function loop(key, tag) {
+      if (!actx || loops[tag]) return;
+      var src = source(C.AUDIO.files[key], true);
+      if (!src) { pendingLoops[tag] = key; return; }
+      loops[tag] = src;
+      src.start();
+    }
+    function stopLoop(tag) {
+      delete pendingLoops[tag];
+      var src = loops[tag];
+      if (src) { try { src.stop(); } catch (_) {} delete loops[tag]; }
+    }
+    function setMuted(m) {
+      muted = m;
+      if (master) master.gain.value = m ? 0 : C.AUDIO.volume;
+    }
+    return { play: play, loop: loop, stopLoop: stopLoop, setMuted: setMuted, unlock: unlock };
+  })();
+
+  /* --------------------------------------------------------------- HAPTICS */
+  // Telegram WebApp haptic feedback, throttled so rapid kills don't spam it.
+  var Haptics = (function () {
+    var hf = window.Telegram && window.Telegram.WebApp &&
+             window.Telegram.WebApp.HapticFeedback;
+    var last = 0;
+    function fire(fn, arg) {
+      if (!C.HAPTICS.enabled || !hf) return;
+      var now = Date.now();
+      if (now - last < C.HAPTICS.minGapMs) return;
+      last = now;
+      try { hf[fn](arg); } catch (_) {}
     }
     return {
-      play(key) {
-        if (muted || !CFG.audio || !CFG.audio.enabled) return;
-        const a = load(key); if (!a) return;
-        try { a.currentTime = 0; a.play().catch(() => {}); } catch (_) {}
-      },
-      music(on) {
-        if (!CFG.audio || !CFG.audio.enabled) return;
-        const a = load('music'); if (!a) return;
-        a.loop = true;
-        if (on && !muted) { try { a.play().catch(() => {}); } catch (_) {} } else { try { a.pause(); } catch (_) {} }
-      },
-      setMuted(m) { muted = m; if (m) Object.values(cache).forEach(a => { try { a.pause(); } catch (_) {} }); else this.music(true); },
+      tap:    function () { fire('impactOccurred', 'light');  },  // kills, pickups
+      thud:   function () { fire('impactOccurred', 'medium'); },  // big bug down
+      heavy:  function () { fire('impactOccurred', 'heavy');  },  // bomb
+      death:  function () { fire('notificationOccurred', 'error'); },
     };
   })();
 
-  /* ===================================================================== */
-  /*  RENDER PRIMITIVES                                                    */
-  /* ===================================================================== */
-  function glow(color, blur, fn) {
-    if (CFG.theme.glow) { ctx.save(); ctx.shadowColor = color; ctx.shadowBlur = blur; fn(); ctx.restore(); }
-    else fn();
-  }
-
-  // SHAPE LIBRARY — referenced by `shape:` in config. Each draws centered at (x,y).
-  const Shapes = {
-    ship(x, y, s, d) {
-      glow(d.color, 14, () => {
-        ctx.fillStyle = d.color;
-        ctx.beginPath();
-        ctx.moveTo(x, y - s);
-        ctx.lineTo(x + s * 0.9, y + s * 0.8);
-        ctx.lineTo(x, y + s * 0.4);
-        ctx.lineTo(x - s * 0.9, y + s * 0.8);
-        ctx.closePath(); ctx.fill();
-      });
-      ctx.fillStyle = d.accent || '#39ff88';
-      glow(d.accent, 10, () => { ctx.beginPath(); ctx.arc(x, y - s * 0.1, s * 0.28, 0, 7); ctx.fill(); });
-    },
-    bug(x, y, s, d) {
-      glow(d.color, 12, () => {
-        ctx.fillStyle = d.color;
-        roundRect(x - s, y - s * 0.8, s * 2, s * 1.6, s * 0.6); ctx.fill();
-      });
-      // legs
-      ctx.strokeStyle = d.color; ctx.lineWidth = 2;
-      for (let i = -1; i <= 1; i++) {
-        ctx.beginPath();
-        ctx.moveTo(x - s, y + i * s * 0.4); ctx.lineTo(x - s * 1.5, y + i * s * 0.4 - s * 0.2);
-        ctx.moveTo(x + s, y + i * s * 0.4); ctx.lineTo(x + s * 1.5, y + i * s * 0.4 - s * 0.2);
-        ctx.stroke();
-      }
-      eyes(x, y, s, d);
-    },
-    beetle(x, y, s, d) {
-      glow(d.color, 12, () => { ctx.fillStyle = d.color; ctx.beginPath(); ctx.ellipse(x, y, s, s * 1.1, 0, 0, 7); ctx.fill(); });
-      ctx.strokeStyle = d.accent || '#000'; ctx.lineWidth = 2;
-      ctx.beginPath(); ctx.moveTo(x, y - s); ctx.lineTo(x, y + s); ctx.stroke();
-      eyes(x, y - s * 0.4, s, d);
-    },
-    spider(x, y, s, d) {
-      ctx.strokeStyle = d.color; ctx.lineWidth = Math.max(2, s * 0.12);
-      glow(d.color, 12, () => {
-        for (let i = 0; i < 4; i++) {
-          const a = (i / 4) * Math.PI - Math.PI * 0.15;
-          for (const sgn of [-1, 1]) {
-            ctx.beginPath();
-            ctx.moveTo(x, y);
-            ctx.lineTo(x + sgn * Math.cos(a) * s * 1.6, y + Math.sin(a) * s * 1.4 - s * 0.3);
-            ctx.lineTo(x + sgn * Math.cos(a) * s * 2.0, y + Math.sin(a) * s * 1.4 + s * 0.3);
-            ctx.stroke();
-          }
+  /* ============================================================ SPRITE FONT */
+  // Renders text with the original's 50x38 white glyph atlas.
+  var Font = (function () {
+    var widths = {};
+    C.FONT.widths.forEach(function (pair) {
+      for (var i = 0; i < pair[1].length; i++) widths[pair[1][i]] = pair[0];
+    });
+    // charWidth(ch, spaceW): spaceW >= 0 overrides the width of ' '
+    // (the original's SpriteFontPlus "space width" property).
+    function charWidth(ch, spaceW) {
+      if (ch === ' ' && spaceW >= 0) return spaceW;
+      return widths[ch] || C.FONT.charW;
+    }
+    function glyph(ch) {
+      var idx = C.FONT.charset.indexOf(ch);
+      if (idx < 0) return null;
+      return { sx: (idx % C.FONT.perRow) * C.FONT.charW,
+               sy: Math.floor(idx / C.FONT.perRow) * C.FONT.charH };
+    }
+    function measure(text, scale, spaceW) {
+      var w = 0;
+      for (var i = 0; i < text.length; i++) w += charWidth(text[i], spaceW) * scale;
+      return w;
+    }
+    var scratch = document.createElement('canvas');
+    var sctx = scratch.getContext('2d');
+    function drawGlyphs(target, text, px, py, scale, spaceW) {
+      var img = IMG[C.UI.font];
+      for (var i = 0; i < text.length; i++) {
+        var g = glyph(text[i]);
+        if (g) {
+          target.drawImage(img, g.sx, g.sy, C.FONT.charW, C.FONT.charH,
+            px, py, C.FONT.charW * scale, C.FONT.charH * scale);
         }
-        ctx.fillStyle = d.color; ctx.beginPath(); ctx.arc(x, y, s * 0.7, 0, 7); ctx.fill();
-      });
-      eyes(x, y, s * 0.7, d);
-    },
-    blob(x, y, s, d) {
-      glow(d.color, 14, () => { ctx.fillStyle = d.color; ctx.beginPath(); ctx.arc(x, y, s, 0, 7); ctx.fill(); });
-    },
-    diamond(x, y, s, d) {
-      glow(d.color, 14, () => {
-        ctx.fillStyle = d.color; ctx.beginPath();
-        ctx.moveTo(x, y - s); ctx.lineTo(x + s, y); ctx.lineTo(x, y + s); ctx.lineTo(x - s, y);
-        ctx.closePath(); ctx.fill();
-      });
-    },
-    star(x, y, s, d) {
-      glow(d.color, 14, () => {
-        ctx.fillStyle = d.color; ctx.beginPath();
-        for (let i = 0; i < 10; i++) {
-          const r = i % 2 ? s * 0.45 : s;
-          const a = (i / 10) * Math.PI * 2 - Math.PI / 2;
-          const px = x + Math.cos(a) * r, py = y + Math.sin(a) * r;
-          i ? ctx.lineTo(px, py) : ctx.moveTo(px, py);
-        }
-        ctx.closePath(); ctx.fill();
-      });
-    },
-    saucer(x, y, s, d) {
-      glow(d.color, 14, () => { ctx.fillStyle = d.color; ctx.beginPath(); ctx.ellipse(x, y, s * 1.3, s * 0.55, 0, 0, 7); ctx.fill(); });
-      ctx.fillStyle = d.accent || '#0a2a44';
-      ctx.beginPath(); ctx.ellipse(x, y - s * 0.2, s * 0.6, s * 0.4, 0, Math.PI, 0); ctx.fill();
-    },
-    mushroom(x, y, s, hpFrac, d) {
-      ctx.fillStyle = d.stalkColor || '#39c0d6';
-      ctx.fillRect(x - s * 0.3, y - s * 0.1, s * 0.6, s * 0.7);
-      const cap = d.poisoned ? (CFG.mushrooms.poisonColor) : shade(d.capColor || '#ff5d8f', 0.5 + 0.5 * hpFrac);
-      glow(cap, 8, () => { ctx.fillStyle = cap; ctx.beginPath(); ctx.arc(x, y - s * 0.1, s * 0.7, Math.PI, 0); ctx.fill(); ctx.fillRect(x - s * 0.7, y - s * 0.12, s * 1.4, s * 0.15); });
-    },
-  };
-  function eyes(x, y, s, d) {
-    ctx.fillStyle = d.eyeColor || d.accent || '#1e1140';
-    ctx.beginPath(); ctx.arc(x - s * 0.35, y - s * 0.1, s * 0.18, 0, 7); ctx.arc(x + s * 0.35, y - s * 0.1, s * 0.18, 0, 7); ctx.fill();
-  }
-  function roundRect(x, y, w, h, r) {
-    ctx.beginPath();
-    ctx.moveTo(x + r, y); ctx.arcTo(x + w, y, x + w, y + h, r); ctx.arcTo(x + w, y + h, x, y + h, r);
-    ctx.arcTo(x, y + h, x, y, r); ctx.arcTo(x, y, x + w, y, r); ctx.closePath();
-  }
-  function shade(hex, f) {
-    const m = /^#?([0-9a-f]{6})$/i.exec(hex); if (!m) return hex;
-    const n = parseInt(m[1], 16);
-    const r = Math.round(((n >> 16) & 255) * f), g = Math.round(((n >> 8) & 255) * f), b = Math.round((n & 255) * f);
-    return `rgb(${clamp(r,0,255)},${clamp(g,0,255)},${clamp(b,0,255)})`;
-  }
-  function drawShape(name, x, y, s, def, extra) {
-    const fn = Shapes[name] || Shapes.blob;
-    if (name === 'mushroom') return fn(x, y, s, extra, def);
-    fn(x, y, s, def);
-  }
-
-  /* ---- Real AstroBugz sprite images (loaded from CFG.spriteBase) ---- */
-  const SPRITE_BASE = CFG.spriteBase || '';
-  const _imgCache = {};
-  function sprite(name) {
-    if (!name) return null;
-    let im = _imgCache[name];
-    if (!im) { im = new Image(); im.src = SPRITE_BASE + name; _imgCache[name] = im; }
-    return (im.complete && im.naturalWidth > 0) ? im : null;
-  }
-  function drawSpriteImg(im, x, y, h) {
-    const w = h * (im.naturalWidth / im.naturalHeight);
-    ctx.save();
-    if (CFG.theme.pixelArt) ctx.imageSmoothingEnabled = false;
-    ctx.drawImage(im, x - w / 2, y - h / 2, w, h);
-    ctx.restore();
-  }
-  // Draw the real sprite if it's loaded; otherwise fall back to the vector shape.
-  // `size` is a half-size (radius-ish); sprites render ~2x this tall.
-  function paint(spriteName, fallbackShape, x, y, size, def, extra) {
-    const im = sprite(spriteName);
-    if (im) {
-      if (CFG.theme.spriteGlow && def && def.color) glow(def.color, 12, () => drawSpriteImg(im, x, y, size * 2));
-      else drawSpriteImg(im, x, y, size * 2);
-    } else {
-      drawShape(fallbackShape || (def && def.shape) || 'blob', x, y, size, def || {}, extra);
-    }
-  }
-
-  /* ===================================================================== */
-  /*  MOVEMENT LIBRARY — referenced by `move:` in config                    */
-  /*  signature: (e, dt, G) -> mutate e.x / e.y                            */
-  /* ===================================================================== */
-  const Movements = {
-    drift(e, dt) {
-      e.y += e.p.vy * dt;
-      e.x += (e.swayDir || 1) * (e.p.sway || 30) * dt;
-      if (e.x < e.r || e.x > W - e.r) e.swayDir = -(e.swayDir || 1);
-    },
-    zigzag(e, dt) {
-      e.x += e.vx * dt; e.y += e.p.vy * dt;
-      if (e.x < e.r || e.x > W - e.r) e.vx = -e.vx;
-    },
-    dive(e, dt) { e.y += e.p.vy * dt; },
-    sine(e, dt) {
-      e.age += dt; e.y += e.p.vy * dt;
-      e.x = e.baseX + Math.sin(e.age * (e.p.freq || 2)) * (e.p.amp || 80);
-      e.x = clamp(e.x, e.r, W - e.r);
-    },
-    strafe(e, dt) {
-      e.x += e.vx * dt;
-      if (e.bounceWalls) { if (e.x < e.r || e.x > W - e.r) e.vx = -e.vx; }
-    },
-    bounce(e, dt) {
-      e.x += e.vx * dt; e.y += e.vy * dt;
-      const ceil = H * (e.p.ceil != null ? e.p.ceil : 0.4), floor = enemyFloorY();
-      if (e.x < e.r || e.x > W - e.r) e.vx = -e.vx;
-      if (e.y < ceil || e.y > floor) e.vy = -e.vy;
-      e.x = clamp(e.x, e.r, W - e.r); e.y = clamp(e.y, ceil, floor);
-    },
-    homing(e, dt, G) {
-      const dx = G.player.x - e.x, dy = G.player.y - e.y;
-      const a = Math.atan2(dy, dx);
-      e.heading = e.heading == null ? a : e.heading + clamp(a - e.heading, -(e.p.turn || 1.5) * dt, (e.p.turn || 1.5) * dt);
-      const sp = e.p.speed || 120;
-      e.x += Math.cos(e.heading) * sp * dt; e.y += Math.sin(e.heading) * sp * dt;
-    },
-  };
-
-  /* ===================================================================== */
-  /*  GAME STATE                                                           */
-  /* ===================================================================== */
-  let G = null;
-  function freshState() {
-    return {
-      started: false, over: false, paused: false,
-      level: CFG.levels.startLevel || 1,
-      score: 0, lives: CFG.player.lives,
-      t: 0, levelStart: 0, runStart: performance.now(),
-      player: { x: W / 2, y: H - GRID * 0.9, invulnUntil: 0 },
-      weapon: 'default', weaponUntil: 0, shield: false,
-      lastShotAt: 0,
-      bullets: [], bossBullets: [], enemies: [], powerups: [], particles: [],
-      chains: [], mushrooms: [], boss: null,
-      spawnTimers: {}, fleaTimers: {},
-      shake: 0, overlay: null, floatTexts: [],
-    };
-  }
-
-  // ---- Bottom boundary (the ship lane) ----
-  // The ship sits at shipBaseY. Nothing else (centipede, enemies, mushrooms) is
-  // allowed below enemyFloorY, so the field never spills under the ship.
-  const shipBaseY = () => H - GRID * 0.9;
-  // Enemies/worms come all the way down to the ship's own row, so they ram the
-  // ship from the side (where upward bullets can't save you). You must dodge.
-  const enemyFloorY = () => shipBaseY();
-  const bottomRowLimit = () => clamp(Math.floor(enemyFloorY() / GRID), 2, ROWS - 1);
-
-  // ---- Mushroom field ----
-  function mushAt(gx, gy) { return G.mushrooms.find(m => m.gx === gx && m.gy === gy); }
-  // Mushrooms stop a few rows ABOVE the worm floor, so they never land in the
-  // ship's row (where they'd be ugly and unshootable). Worms may still come lower.
-  function lowestMushRow() { return Math.max(1, bottomRowLimit() - (CFG.mushrooms.clearBottomRows || 0)); }
-  function addMushroom(gx, gy, opts) {
-    if (gx < 0 || gx >= COLS || gy < 1 || gy > lowestMushRow()) return;
-    if (mushAt(gx, gy)) return;
-    if (G.mushrooms.length >= CFG.mushrooms.maxCount) return;
-    G.mushrooms.push({ gx, gy, hp: CFG.mushrooms.hp, poisoned: !!(opts && opts.poisoned) });
-  }
-  function scatterMushrooms(n) {
-    for (let i = 0; i < n; i++) {
-      const gx = randInt(0, COLS - 1);
-      const gy = randInt(1, Math.max(1, lowestMushRow()));
-      addMushroom(gx, gy);
-    }
-  }
-
-  // ---- Centipede ----
-  function spawnChain(length, fast) {
-    const len = clamp(length, 1, CFG.centipede.maxLength);
-    const dir = Math.random() < 0.5 ? 1 : -1;
-    const gyStart = 1;
-    const startGX = dir === 1 ? 0 : COLS - 1;
-    const segs = [];
-    for (let i = 0; i < len; i++) {
-      const gx = clamp(startGX - dir * i, 0, COLS - 1);
-      segs.push({ gx, gy: gyStart, px: cellX(gx), py: cellY(gyStart), tx: cellX(gx), ty: cellY(gyStart), alive: true });
-    }
-    let step = CFG.centipede.stepMs * Math.pow(CFG.centipede.speedPerLevel, G.level - 1);
-    if (fast) step *= 0.75;
-    G.chains.push({ segs, dir, vdir: 1, accum: 0, stepMs: Math.max(CFG.centipede.minStepMs, step), dropRemaining: 0, poisonDive: 0 });
-  }
-  function chainsAlive() { return G.chains.some(c => c.segs.some(s => s.alive)); }
-
-  function stepChains(dt) {
-    for (const c of G.chains) {
-      c.accum += dt * 1000;
-      while (c.accum >= c.stepMs) {
-        c.accum -= c.stepMs;
-        const head = c.segs[0]; if (!head) break;
-        let ngx = head.gx, ngy = head.gy;
-
-        const bRow = bottomRowLimit();                // centipede can't go below the ship lane
-        const poisonHere = G.mushrooms.some(m => m.poisoned && m.gx === head.gx && Math.abs(m.gy - head.gy) <= 1);
-        if (poisonHere && !c.poisonDive) c.poisonDive = ROWS;
-
-        if (c.poisonDive > 0) {                       // poisoned: dive straight down
-          ngy = Math.min(bRow, head.gy + 1); c.poisonDive--;
-          if (head.gy >= bRow) { c.poisonDive = 0; c.vdir = -1; }
-        } else if (c.dropRemaining > 0) {             // mid drop+reverse
-          // Descend toward the player, then patrol the bottom band (don't climb
-          // all the way back to the top) so the centipede keeps attacking.
-          const patrolTop = Math.max(1, bRow - (CFG.centipede.patrolRows || 5));
-          if (head.gy >= bRow) c.vdir = -1; else if (head.gy <= patrolTop) c.vdir = 1;
-          ngy = clamp(head.gy + c.vdir, 1, bRow); c.dropRemaining--;
-        } else {                                      // normal horizontal march
-          let want = head.gx + c.dir;
-          if (want < 0 || want >= COLS) {              // hit a WALL: reverse + drop
-            c.dir = -c.dir; c.dropRemaining = 1; want = head.gx;
-          } else if (mushAt(want, head.gy)) {          // hit a MUSHROOM: drop a row, keep
-            c.vdir = 1;                                 // going the same way — tunnels DOWN
-            c.dropRemaining = 1; want = head.gx;        // (repeats each row until it's free)
-          } else if (Math.random() < CFG.centipede.dropChance) {
-            c.dropRemaining = 1;
-          }
-          ngx = want;
-        }
-        for (let i = c.segs.length - 1; i > 0; i--) {
-          c.segs[i].gx = c.segs[i - 1].gx; c.segs[i].gy = c.segs[i - 1].gy;
-          c.segs[i].tx = cellX(c.segs[i].gx); c.segs[i].ty = cellY(c.segs[i].gy);
-        }
-        head.gx = ngx; head.gy = ngy; head.tx = cellX(ngx); head.ty = cellY(ngy);
-      }
-      // smooth interpolation toward grid targets
-      const k = Math.min(1, dt * 14);
-      for (const s of c.segs) { s.px += (s.tx - s.px) * k; s.py += (s.ty - s.py) * k; }
-    }
-    G.chains = G.chains.filter(c => c.segs.some(s => s.alive));
-  }
-
-  function hitSegment(chainIdx, segIdx) {
-    const c = G.chains[chainIdx];
-    const seg = c.segs[segIdx];
-    seg.alive = false;
-    addScore(segIdx === 0 ? CFG.centipede.headPoints : CFG.centipede.bodyPoints, seg.px, seg.py);
-    if (CFG.centipede.leavesMushroom) addMushroom(seg.gx, seg.gy);
-    burst(seg.px, seg.py, CFG.centipede.bodyColor, 10);
-    Audio.play('explode');
-    const left = c.segs.slice(0, segIdx).filter(s => s.alive);
-    const right = c.segs.slice(segIdx + 1).filter(s => s.alive);
-    const make = (segs) => ({ segs, dir: Math.random() < 0.5 ? 1 : -1, vdir: 1, accum: 0, stepMs: c.stepMs, dropRemaining: 1, poisonDive: 0 });
-    const repl = [];
-    if (left.length) repl.push(make(left));
-    if (right.length) repl.push(make(right));
-    G.chains.splice(chainIdx, 1, ...repl);
-  }
-
-  // ---- Enemies (independent) ----
-  function spawnEnemy(key, def, isBoss) {
-    const r = def.size;
-    const e = {
-      key, def, isBoss: !!isBoss, r, hp: def.hp || 1,
-      x: rand(r, W - r), y: -r, age: 0, p: def.moveParams || {},
-      vx: 0, vy: 0, swayDir: Math.random() < 0.5 ? 1 : -1, alive: true,
-      lastAttack: 0,
-    };
-    const m = def.move;
-    if (m === 'zigzag') e.vx = (Math.random() < 0.5 ? 1 : -1) * (def.moveParams.vx || 120);
-    if (m === 'strafe') {
-      e.vx = (Math.random() < 0.5 ? 1 : -1) * (def.moveParams.vx || 120);
-      if (isBoss) {
-        // Enter from the top ON-SCREEN, bounce wall-to-wall, and descend to a
-        // target line so it's clearly visible and threatening.
-        e.x = W * 0.5; e.y = -r;
-        e.bounceWalls = true;
-        e.targetY = H * (def.moveParams.y || 0.28);
-      } else {
-        // Scorpion: sweep in from a side edge at an upper-mid row.
-        e.y = cellY(randInt(2, Math.max(3, Math.floor(ROWS * 0.4))));
-        e.x = e.vx > 0 ? -r : W + r;
+        px += charWidth(text[i], spaceW) * scale;
       }
     }
-    if (m === 'dive') {
-      // dive AT the player so it actually threatens (must be dodged), not a random column
-      e.x = clamp((G.player ? G.player.x : W / 2) + rand(-GRID, GRID), r, W - r);
-    }
-    if (m === 'sine') { e.baseX = e.x; }
-    if (m === 'bounce') {
-      // Spider-style: enter from a side edge in the lower half, then pinball
-      // diagonally around the player area (eating mushrooms) until shot.
-      const sp = def.moveParams.speed || 150;
-      const fromLeft = Math.random() < 0.5;
-      const a = rand(Math.PI * 0.18, Math.PI * 0.45);  // shallow-ish diagonal
-      e.x = fromLeft ? r : W - r;
-      e.y = clamp(rand(H * 0.55, enemyFloorY() - GRID), H * 0.42, enemyFloorY());
-      e.vx = (fromLeft ? 1 : -1) * Math.cos(a) * sp;
-      e.vy = (Math.random() < 0.5 ? -1 : 1) * Math.sin(a) * sp;
-    }
-    if (isBoss) G.boss = e; else G.enemies.push(e);
-    return e;
-  }
-
-  function updateEnemy(e, dt) {
-    (Movements[e.def.move] || Movements.drift)(e, dt, G);
-    e.age += dt;
-    // Boss descends from the top to its target line, then holds and harasses.
-    if (e.isBoss && e.targetY != null && e.y < e.targetY) e.y += 70 * dt;
-    // mushroom interactions
-    if (e.def.eatsMushrooms) {
-      for (let i = G.mushrooms.length - 1; i >= 0; i--) {
-        const m = G.mushrooms[i];
-        if (circleHit(e.x, e.y, e.r, cellX(m.gx), cellY(m.gy), GRID * 0.4)) G.mushrooms.splice(i, 1);
+    // draw at (x, y-center); optional CSS color tint (glyphs are white).
+    function draw(ctx, text, x, y, scale, spaceW, align, color) {
+      text = String(text);
+      var img = IMG[C.UI.font];
+      if (!img.complete || !img.naturalWidth) return;
+      var total = measure(text, scale, spaceW);
+      var px = align === 'left' ? x : (align === 'right' ? x - total : x - total / 2);
+      var py = y - (C.FONT.charH * scale) / 2;
+      if (!color) {
+        drawGlyphs(ctx, text, px, py, scale, spaceW);
+        return;
       }
+      var w = Math.ceil(total) + 2, h = Math.ceil(C.FONT.charH * scale) + 2;
+      if (scratch.width < w) scratch.width = w;
+      if (scratch.height < h) scratch.height = h;
+      sctx.clearRect(0, 0, scratch.width, scratch.height);
+      drawGlyphs(sctx, text, 0, 0, scale, spaceW);
+      sctx.globalCompositeOperation = 'source-in';
+      sctx.fillStyle = color;
+      sctx.fillRect(0, 0, w, h);
+      sctx.globalCompositeOperation = 'source-over';
+      ctx.drawImage(scratch, 0, 0, w, h, px, py, w, h);
     }
-    if (e.def.dropsMushrooms) {
-      e.dropAccum = (e.dropAccum || 0) + dt;
-      if (e.dropAccum > 0.18) { e.dropAccum = 0; if (Math.random() < 0.6) addMushroom(Math.floor(e.x / GRID), Math.floor(e.y / GRID)); }
-    }
-    if (e.def.poisonsMushrooms) {
-      G.mushrooms.forEach(m => { if (Math.abs(cellX(m.gx) - e.x) < GRID && Math.abs(cellY(m.gy) - e.y) < GRID) m.poisoned = true; });
-    }
-    // boss attack
-    if (e.isBoss && e.def.attack && performance.now() - e.lastAttack > e.def.attack.everyMs) {
-      e.lastAttack = performance.now();
-      fireBossBullet(e, e.def.attack.bullet);
-    }
-  }
+    return { draw: draw, measure: measure };
+  })();
 
-  function fireBossBullet(boss, key) {
-    const def = CFG.bossBullets[key]; if (!def) return;
-    const nuke = Math.random() < (def.nukeChance || 0);
-    G.bossBullets.push({ x: boss.x, y: boss.y + boss.r, vy: def.vy, r: def.size, hp: def.hp || 1, def, nuke });
-  }
+  /* ================================================================ CANVAS */
+  var canvas = document.getElementById('game');
+  // alpha:false lets Safari skip compositing the page behind the canvas
+  var ctx = canvas.getContext('2d', { alpha: false, desynchronized: true });
+  var view = { scale: 1, ox: 0, oy: 0, cw: 0, ch: 0, dpr: 1 };
 
-  // ---- Powerups ----
-  function powerupKeys() { return Object.keys(CFG.powerups); }
-  function weightedPowerup() {
-    const keys = powerupKeys();
-    const total = keys.reduce((s, k) => s + (CFG.powerups[k].weight || 1), 0);
-    let r = Math.random() * total;
-    for (const k of keys) { r -= (CFG.powerups[k].weight || 1); if (r <= 0) return k; }
-    return keys[0];
+  function resize() {
+    // Cap the backing store at 2x. The art is chunky pixel art — rendering at
+    // the iPhone's native 3x triples the fill cost for zero visible gain.
+    var dpr = Math.min(window.devicePixelRatio || 1, 2);
+    var cw = canvas.clientWidth, ch = canvas.clientHeight;
+    view.cw = cw; view.ch = ch; view.dpr = dpr;
+    canvas.width = Math.round(cw * dpr);
+    canvas.height = Math.round(ch * dpr);
+    var s = Math.min(canvas.width / W, canvas.height / H);
+    view.scale = s;
+    view.ox = (canvas.width - W * s) / 2;
+    view.oy = (canvas.height - H * s) / 2;
+    ctx.imageSmoothingEnabled = false;   // crisp pixel art, like the original
   }
-  function dropPowerup(x, y, forceKey) {
-    const key = forceKey || weightedPowerup();
-    const def = CFG.powerups[key];
-    G.powerups.push({ x, y, vy: def.vy || 110, r: def.size, key, def, age: 0 });
-  }
-  function applyAbility(key) {
-    const ab = CFG.abilities[key]; if (!ab) return;
-    Audio.play('powerup');
-    if (ab.effect === 'weapon') { G.weapon = ab.weapon; G.weaponUntil = performance.now() + ab.duration; G.weaponLabel = ab.hud || ab.weapon; }
-    else if (ab.effect === 'shield') { G.shield = true; }
-    else if (ab.effect === 'score') { addScore(ab.amount || 100, G.player.x, G.player.y); }
-    if (ab.hud) showOverlay(ab.hud, 900, ab.color);
-  }
+  window.addEventListener('resize', resize);
 
-  // ---- Bullets ----
-  function shoot() {
-    const w = CFG.weapons[G.weapon] || CFG.weapons.default;
-    const now = performance.now();
-    if (now - G.lastShotAt < 1000 / w.fireRate) return;
-    G.lastShotAt = now;
-    const x0 = G.player.x - (w.spread * (w.streams - 1)) / 2;
-    for (let i = 0; i < w.streams; i++) {
-      G.bullets.push({ x: x0 + i * w.spread, y: G.player.y - CFG.player.size, vy: -w.bulletSpeed, w: w.bulletW, h: w.bulletH, color: w.color });
-    }
-    Audio.play('shoot');
-  }
+  /* ================================================================= INPUT */
+  var input = { touching: false, tx: W / 2, left: false, right: false, tapped: false };
 
-  // ---- Particles / FX ----
-  function burst(x, y, color, n) {
-    for (let i = 0; i < n; i++) {
-      const a = rand(0, Math.PI * 2), sp = rand(40, 220);
-      G.particles.push({ x, y, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp, life: rand(0.3, 0.7), max: 0.7, color, r: rand(1.5, 3.5) });
-    }
-    if (CFG.theme.screenShake) G.shake = Math.min(12, G.shake + 5);
+  function toWorldX(clientX) {
+    var r = canvas.getBoundingClientRect();
+    return ((clientX - r.left) * view.dpr - view.ox) / view.scale;
   }
-  function showOverlay(text, ms, color) { G.overlay = { text, until: performance.now() + ms, color: color || CFG.theme.hudColor }; }
-  function addScore(n, x, y) {
-    G.score += n; Bridge.setScore(G.score);
-    if (x != null) G.floatTexts.push({ x, y, text: '+' + n, life: 0.8, vy: -40 });
-  }
-
-  // ---- Damage / lives ----
-  function hurtPlayer() {
-    const now = performance.now();
-    if (now < G.player.invulnUntil) return;
-    if (G.shield) { G.shield = false; G.player.invulnUntil = now + 600; burst(G.player.x, G.player.y, '#39ff88', 14); return; }
-    G.lives--;
-    burst(G.player.x, G.player.y, '#ff4040', 24);
-    G.shake = 14;
-    if (G.lives <= 0) { gameOver(); }
-    else { G.player.invulnUntil = now + CFG.player.invulnMs; showOverlay(G.lives + ' LIVES LEFT', 1200, '#ff8080'); }
-  }
-
-  function gameOver() {
-    if (G.over) return;
-    G.over = true;
-    showOverlay('GAME OVER', 4000, '#ff4f6e');
-    Audio.music(false);
-    setTimeout(() => { try { Bridge.gameOver(); } catch (_) {} }, 600);
-  }
-
-  // ---- Levels ----
-  function startLevel(first) {
-    G.levelStart = performance.now();
-    G.boss = null; G.bossBullets.length = 0;
-    G._bossSpawnedThisLevel = false;
-    G.chains.length = 0;
-    let len = CFG.centipede.startLength + Math.floor((G.level - 1) * CFG.centipede.lengthPerLevel);
-    spawnChain(len);
-    if (((G.level - 1) * (CFG.levels.extraCentipedePerLevel || 0)) % 1 < 0.5 && G.level > 1) spawnChain(Math.ceil(len / 2), true);
-    if (first) {
-      scatterMushrooms(CFG.mushrooms.startCount);   // lay down the starting field
-    } else {
-      // Persist the field between waves (no jarring "reset"); only top up if it
-      // has thinned out from being eaten/shot.
-      const target = Math.floor(CFG.mushrooms.startCount * 0.6);
-      const need = target - G.mushrooms.length;
-      if (need > 0) scatterMushrooms(Math.min(need, CFG.mushrooms.regrowPerLevel || 0));
-    }
-    // Send a spider sweeping in so a monster is visibly "coming" each wave.
-    if (CFG.enemies.spider) spawnEnemy('spider', CFG.enemies.spider, false);
-    showOverlay('WAVE ' + G.level, 1400, '#a78bfa');
-  }
-  function nextLevel() { G.level++; startLevel(false); }
-
-  // ---- Spawning loop (enemies + boss) ----
-  function trySpawns(dtMs) {
-    const now = performance.now();
-    // independent enemies
-    for (const key of Object.keys(CFG.enemies)) {
-      const def = CFG.enemies[key]; const sp = def.spawn || {};
-      if (G.level < (sp.fromLevel || 1)) continue;
-      const count = G.enemies.filter(e => e.key === key).length;
-      if (count >= (sp.max || 99)) continue;
-      if (sp.whenMushroomsBelow != null) {
-        const inZone = G.mushrooms.filter(m => m.gy >= bottomRowLimit() - 5).length;
-        if (inZone >= sp.whenMushroomsBelow) continue;
-      }
-      const last = G.spawnTimers[key] || 0;
-      if (now - last >= (sp.everyMs || 8000)) {
-        G.spawnTimers[key] = now;
-        if (Math.random() < (sp.chance ?? 1)) spawnEnemy(key, def, false);
-      }
-    }
-    // boss — every Nth wave is a "boss wave": the toughest eligible boss enters
-    // a few seconds in (waves clear too fast for a mid-wave timer to ever fire).
-    const everyWaves = CFG.levels.bossEveryWaves || 2;
-    const delay = CFG.levels.bossDelayMs != null ? CFG.levels.bossDelayMs : 3500;
-    if (!G.boss && !G._bossSpawnedThisLevel && G.level >= 2 && (G.level - 2) % everyWaves === 0) {
-      if (now - G.levelStart >= delay) {
-        let best = null;
-        for (const key of Object.keys(CFG.boss)) {
-          const def = CFG.boss[key];
-          if (G.level < (def.fromLevel || 99)) continue;
-          if (!best || (def.fromLevel || 0) > (best.def.fromLevel || 0)) best = { key, def };
-        }
-        if (best) {
-          G._bossSpawnedThisLevel = true;
-          spawnEnemy(best.key, best.def, true);
-          showOverlay('BOSS INCOMING', 1600, best.def.color);
-        }
-      }
-    }
-  }
-
-  /* ===================================================================== */
-  /*  COLLISIONS                                                           */
-  /* ===================================================================== */
-  function collisions() {
-    // bullets vs world
-    for (let i = G.bullets.length - 1; i >= 0; i--) {
-      const b = G.bullets[i]; let hit = false;
-      const bx = b.x, by = b.y, br = Math.max(b.w, b.h) * 0.5;
-
-      // enemies
-      for (let j = G.enemies.length - 1; j >= 0 && !hit; j--) {
-        const e = G.enemies[j];
-        if (circleHit(bx, by, br, e.x, e.y, e.r)) {
-          e.hp--; hit = true;
-          if (e.hp <= 0) {
-            const pts = Array.isArray(e.def.points)
-              ? e.def.points[clamp(Math.floor((e.y / H) * e.def.points.length), 0, e.def.points.length - 1)]
-              : e.def.points;
-            addScore(pts, e.x, e.y); burst(e.x, e.y, e.def.color, 14); Audio.play('explode');
-            if (e.def.dropsPowerup && Math.random() < e.def.dropsPowerup) dropPowerup(e.x, e.y);
-            G.enemies.splice(j, 1);
-          } else burst(e.x, e.y, e.def.color, 4);
-        }
-      }
-      // boss
-      if (!hit && G.boss && circleHit(bx, by, br, G.boss.x, G.boss.y, G.boss.r)) {
-        G.boss.hp--; hit = true; burst(bx, by, G.boss.def.color, 6);
-        if (G.boss.hp <= 0) {
-          addScore(G.boss.def.points, G.boss.x, G.boss.y); burst(G.boss.x, G.boss.y, G.boss.def.color, 40);
-          dropPowerup(G.boss.x, G.boss.y); G.boss = null; G.shake = 16;
-        }
-      }
-      // boss bullets (shootable)
-      for (let j = G.bossBullets.length - 1; j >= 0 && !hit; j--) {
-        const bb = G.bossBullets[j];
-        if (circleHit(bx, by, br, bb.x, bb.y, bb.r)) {
-          bb.hp--; hit = true;
-          if (bb.hp <= 0) {
-            addScore(bb.def.points, bb.x, bb.y); burst(bb.x, bb.y, bb.def.color, 8);
-            if (bb.nuke) dropPowerup(bb.x, bb.y);
-            G.bossBullets.splice(j, 1);
-          }
-        }
-      }
-      // mushrooms
-      if (!hit) {
-        const gx = Math.floor(bx / GRID), gy = Math.floor(by / GRID), m = mushAt(gx, gy);
-        if (m) {
-          m.hp--; hit = true; burst(cellX(gx), cellY(gy), CFG.mushrooms.capColor, 4);
-          if (m.hp <= 0) { addScore(CFG.mushrooms.points, cellX(gx), cellY(gy)); G.mushrooms.splice(G.mushrooms.indexOf(m), 1); }
-        }
-      }
-      // centipede segments
-      for (let ci = 0; ci < G.chains.length && !hit; ci++) {
-        const c = G.chains[ci];
-        for (let si = 0; si < c.segs.length && !hit; si++) {
-          const s = c.segs[si]; if (!s.alive) continue;
-          if (circleHit(bx, by, br, s.px, s.py, GRID * 0.45)) { hit = true; hitSegment(ci, si); if (!chainsAlive()) nextLevel(); }
-        }
-      }
-      if (hit) G.bullets.splice(i, 1);
-    }
-
-    // player vs threats
-    const p = G.player, pr = CFG.player.size * 0.7;
-    const invuln = performance.now() < p.invulnUntil;
-    if (!invuln) {
-      for (let j = G.enemies.length - 1; j >= 0; j--) {
-        const e = G.enemies[j];
-        if (e.def.touchKillsPlayer && circleHit(p.x, p.y, pr, e.x, e.y, e.r)) { G.enemies.splice(j, 1); hurtPlayer(); break; }
-      }
-      for (let j = G.bossBullets.length - 1; j >= 0; j--) {
-        const bb = G.bossBullets[j];
-        if (circleHit(p.x, p.y, pr, bb.x, bb.y, bb.r)) { G.bossBullets.splice(j, 1); hurtPlayer(); break; }
-      }
-      if (G.boss && G.boss.def.touchKillsPlayer && circleHit(p.x, p.y, pr, G.boss.x, G.boss.y, G.boss.r)) hurtPlayer();
-      for (const c of G.chains) for (const s of c.segs) {
-        if (s.alive && circleHit(p.x, p.y, pr, s.px, s.py, GRID * 0.45)) { hurtPlayer(); break; }
-      }
-    }
-    // powerups vs player
-    for (let j = G.powerups.length - 1; j >= 0; j--) {
-      const pu = G.powerups[j];
-      if (circleHit(p.x, p.y, pr + 8, pu.x, pu.y, pu.r)) { applyAbility(pu.key); G.powerups.splice(j, 1); }
-    }
-  }
-
-  /* ===================================================================== */
-  /*  INPUT                                                                */
-  /* ===================================================================== */
-  const input = { active: false, id: null, tx: null, ty: null, keys: {} };
-  // The player's reachable zone: a tall band at the bottom. Top is bandRows up
-  // from the floor (clamped so it never collides with the HUD); bottom is the
-  // floor itself, so nothing can sit unreachable below the ship.
-  function playerBounds() {
-    return {
-      top: Math.max(GRID * 2.2, (ROWS - CFG.player.bandRows) * GRID),
-      bottom: H - GRID * 0.5,
-      left: CFG.player.size,
-      right: W - CFG.player.size,
-    };
-  }
-  function pointerToBand(e) {
-    const rect = canvas.getBoundingClientRect();
-    const x = e.clientX - rect.left, y = e.clientY - rect.top;
-    const b = playerBounds();
-    input.tx = clamp(x, b.left, b.right);
-    input.ty = clamp(y, b.top, b.bottom);
-  }
-  canvas.addEventListener('pointerdown', e => {
+  canvas.addEventListener('pointerdown', function (e) {
+    input.touching = true; input.tx = toWorldX(e.clientX); input.tapped = true;
+    canvas.setPointerCapture && canvas.setPointerCapture(e.pointerId);
+    Sound.unlock();      // iOS resumes the AudioContext on a user gesture
     e.preventDefault();
-    if (!G || !G.started) { AstroGame.start(); }
-    input.active = true; input.id = e.pointerId;
-    try { canvas.setPointerCapture(e.pointerId); } catch (_) {}
-    pointerToBand(e);
-  }, { passive: false });
-  canvas.addEventListener('pointermove', e => { if (input.active && e.pointerId === input.id) pointerToBand(e); });
-  const endPtr = () => { input.active = false; input.id = null; };
-  canvas.addEventListener('pointerup', endPtr);
-  canvas.addEventListener('pointercancel', endPtr);
-  window.addEventListener('keydown', e => { input.keys[e.key] = true; if (!G || !G.started) AstroGame.start(); });
-  window.addEventListener('keyup', e => { input.keys[e.key] = false; });
+  });
+  canvas.addEventListener('pointermove', function (e) {
+    if (input.touching) input.tx = toWorldX(e.clientX);
+  });
+  function pointerUp() { input.touching = false; }
+  canvas.addEventListener('pointerup', pointerUp);
+  canvas.addEventListener('pointercancel', pointerUp);
+  window.addEventListener('keydown', function (e) {
+    if (e.key === 'ArrowLeft') input.left = true;
+    if (e.key === 'ArrowRight') input.right = true;
+  });
+  window.addEventListener('keyup', function (e) {
+    if (e.key === 'ArrowLeft') input.left = false;
+    if (e.key === 'ArrowRight') input.right = false;
+  });
 
-  function updatePlayer(dt) {
-    const p = G.player, sp = CFG.player.speed, k = input.keys;
-    const left = CFG.player.size, right = W - CFG.player.size;
+  /* ============================================================ GAME STATE */
+  var SCREEN_TITLE = 0, SCREEN_GAME = 1;
+  var ST_NEWLEVEL = 1, ST_PLAY = 2, ST_LIFELOST = 3, ST_GAMEOVER = 4;
 
-    if ((CFG.player.moveAxis || 'x') === 'xy') {
-      // --- free 2D mode (legacy) ---
-      const b = playerBounds();
-      let kx = 0, ky = 0;
-      if (k['ArrowLeft'] || k['a']) kx -= 1; if (k['ArrowRight'] || k['d']) kx += 1;
-      if (k['ArrowUp'] || k['w']) ky -= 1; if (k['ArrowDown'] || k['s']) ky += 1;
-      if (kx || ky) { p.x += kx * sp * dt; p.y += ky * sp * dt; }
-      if (input.active && input.tx != null) {
-        const dx = input.tx - p.x, dy = input.ty - p.y, d = Math.hypot(dx, dy);
-        if (d > 1) { const m = Math.min(d, sp * dt); p.x += (dx / d) * m; p.y += (dy / d) * m; }
+  var screen = SCREEN_TITLE;
+  var paused = false;
+  var G = null;          // all per-run state lives here
+  var titleTime = 0;
+  var startupPlayed = false;
+
+  // dev helper: append ?level=N to the URL to start on a later level
+  var startLevel = parseInt(new URLSearchParams(location.search).get('level'), 10) || 1;
+
+  function newRun() {
+    return {
+      state: ST_NEWLEVEL,
+      isPlaying: false,
+      score: 0,
+      lives: C.PLAYER.lives,
+      level: startLevel,
+      fastSpeed: false,
+      time: 0,
+
+      player: {
+        x: W / 2, y: PLAYER_Y, vx: 0,
+        nextFire: 0, fireInterval: C.PLAYER.fireInterval,
+        doubleFireUntil: -1, visible: true,
+        shields: 0,          // hits the ship can absorb (shield powerup)
+        invulnUntil: -1,     // i-frames after a shield absorbs a hit
+        spreadUntil: -1,     // 3-WAY weapon timer
+        pierceUntil: -1,     // PIERCE weapon timer
+      },
+      powerups: [],      // falling tokens: {type,x,y,swayPhase}
+      bullets: [],       // {x,y,vx,pierce,hits[]}
+      mushrooms: [],     // {x,y,hp,poison}
+      segments: [],      // {uid,x,y,tx,ty,head,dirX,dirY,speed,followerUid}
+      nextUid: 1,
+
+      spider: null,      // {x,y,baseY,bobPhase,wobblePhase,dir,hp}
+      spiderTimer: rnd(C.SPIDER.spawnDelayMin, C.SPIDER.spawnDelayMax),
+      spiderSwitchTimer: 0,
+
+      flea: null,        // {x,y,swayPhase,swayMag,hp,frame,frameT}
+      fleaTimer: C.FLEA.checkInterval,
+
+      scorpion: null,    // {x,y,dir,hp}
+      scorpionTimer: rnd(C.SCORPION.spawnDelayMin, C.SCORPION.spawnDelayMax),
+
+      spiderBoss: null,  // {x,y,baseY,swayPhase,dir,hp,fireTimer}
+      spiderBossTimer: rnd(C.SPIDERBOSS.spawnDelayMin, C.SPIDERBOSS.spawnDelayMax),
+
+      megaBoss: null,    // {x,y,baseX,baseY,phaseV,phaseH,hp,volleyTimer,bursts,burstTimer,frame,frameT}
+      megaBossTimer: rnd(C.MEGABOSS.spawnDelayMin, C.MEGABOSS.spawnDelayMax),
+
+      enemyShots: [],    // {kind:'bossbullet'|'laser'|'rocket'|'pinkbomb', x,y,vx,vy,angle,frame,frameT}
+
+      explosions: [],    // {x,y,t}
+      particles: [],     // {x,y,vx,vy,t}
+      popups: [],        // {x,y,text,scale,t}   (the +100/+200/... floaters)
+      banners: [],       // {img,x,y,w,h,t,wait,fade} (LEVEL n / DOUBLE FIRE)
+      levelText: null,   // {text,t}
+      sweep: [],         // pending mushroom-bonus pops: {x,y,at,done,t}
+      sweepStarted: false,
+      shake: { t: 0, mag: 0 },
+      flash: 0,          // white screen flash (BOMB powerup)
+      beatTimer: 0,
+      beatOn: false,
+      gameOverSent: false,
+    };
+  }
+
+  /* ------------------------------------------------------------ EFFECTS -- */
+  function explode(x, y) { G.explosions.push({ x: x, y: y, t: 0 }); }
+  function burst(x, y) {
+    for (var i = 0; i < C.PARTICLES.count; i++) {
+      var a = Math.random() * Math.PI * 2;
+      var s = C.PARTICLES.speed * (0.4 + Math.random() * 0.9);
+      G.particles.push({ x: x, y: y, vx: Math.cos(a) * s, vy: Math.sin(a) * s, t: 0 });
+    }
+  }
+  function popup(x, y, text) { G.popups.push({ x: x, y: y, text: String(text), t: 0 }); }
+  function shake(mag) { G.shake.t = C.SHAKE.time; G.shake.mag = mag; }
+
+  function addScore(n) {
+    G.score += n;
+    if (window.AstroBridge) window.AstroBridge.setScore(G.score);
+    try {
+      var hs = parseInt(localStorage.getItem('HighScore') || '0', 10);
+      if (G.score > hs) localStorage.setItem('HighScore', String(G.score));
+    } catch (_) {}
+  }
+
+  /* ----------------------------------------------------------- POWERUPS -- */
+  // NEW (not in the original). Big bugs can drop a floating token; catch it
+  // with the ship. Types/weights/drop chances live in config POWERUPS.
+  function pickPowerupType() {
+    var total = 0, k;
+    for (k in C.POWERUPS.types) total += C.POWERUPS.types[k].weight;
+    var r = Math.random() * total;
+    for (k in C.POWERUPS.types) {
+      r -= C.POWERUPS.types[k].weight;
+      if (r <= 0) return k;
+    }
+    return 'shield';
+  }
+  // sourceKind: 'spider' | 'flea' | 'scorpion' | 'spiderboss' | 'megaboss'
+  function maybeDropPowerup(sourceKind, x, y) {
+    var chance = C.POWERUPS.dropChance[sourceKind] || 0;
+    if (Math.random() >= chance) return;
+    G.powerups.push({ type: pickPowerupType(), x: x, y: y, swayPhase: 0 });
+  }
+
+  function updatePowerups(dt) {
+    var P = C.POWERUPS;
+    for (var i = G.powerups.length - 1; i >= 0; i--) {
+      var t = G.powerups[i];
+      t.swayPhase += (Math.PI * 2 / P.swayPeriod) * dt;
+      t.x = clamp(t.x + Math.cos(t.swayPhase) * P.swayMag * dt, P.size / 2, W - P.size / 2);
+      t.y += P.fallSpeed * dt;
+      if (t.y > H + P.size) { G.powerups.splice(i, 1); continue; }
+      if (hit(t.x, t.y, P.size, P.size,
+              G.player.x, G.player.y, C.PLAYER.w, C.PLAYER.h)) {
+        G.powerups.splice(i, 1);
+        applyPowerup(t.type);
       }
-      p.x = clamp(p.x, b.left, b.right);
-      p.y = clamp(p.y, b.top, b.bottom);
+    }
+  }
+
+  // What each token does. Add a new type in config, handle it here.
+  function applyPowerup(type) {
+    var def = C.POWERUPS.types[type];
+    var p = G.player;
+    Haptics.tap();
+    if (type === 'shield') {
+      p.shields = Math.min(C.POWERUPS.maxShields, p.shields + 1);
+      Sound.play('shield');
+    } else if (type === 'spread') {
+      p.spreadUntil = G.time + def.duration;
+      Sound.play('bonus');
+    } else if (type === 'pierce') {
+      p.pierceUntil = G.time + def.duration;
+      Sound.play('bonus');
+    } else if (type === 'bomb') {
+      applyBomb();
+      return;                       // bomb announces itself
+    }
+    G.popups.push({ x: p.x, y: p.y - 60, text: def.label, t: 0 });
+  }
+
+  // BOMB: wipes enemy fire, kills every worm segment on screen (normal
+  // scoring), and slams every big bug for POWERUPS.bombBossDamage hits.
+  function applyBomb() {
+    Haptics.heavy();
+    Sound.play('death');            // biggest boom sound in the original set
+    shake(C.SHAKE.bigMag);
+    G.flash = 0.25;
+    G.enemyShots.length = 0;
+    for (var i = G.segments.length - 1; i >= 0; i--) killSegment(i);
+    if (G.spider)     damageSpider(null, C.POWERUPS.bombBossDamage);
+    if (G.flea)       damageFlea(null, C.POWERUPS.bombBossDamage);
+    if (G.scorpion)   damageScorpion(null, C.POWERUPS.bombBossDamage);
+    if (G.spiderBoss) damageSpiderBoss(null, C.POWERUPS.bombBossDamage);
+    if (G.megaBoss)   damageMegaBoss(null, C.POWERUPS.bombBossDamage);
+    G.popups.push({ x: G.player.x, y: G.player.y - 60, text: C.POWERUPS.types.bomb.label, t: 0 });
+  }
+
+  /* ---------------------------------------------------------- MUSHROOMS -- */
+  function addMushroom(x, y) {
+    G.mushrooms.push({ x: x, y: y, hp: C.MUSHROOMS.hp, poison: false });
+  }
+  function mushroomAtCell(x, y) {
+    for (var i = 0; i < G.mushrooms.length; i++) {
+      var m = G.mushrooms[i];
+      if (m.x === x && m.y === y) return m;
+    }
+    return null;
+  }
+  function seedMushrooms() {
+    // 3 near the top row (columns ~1/4, 1/2, 3/4 of the field, jittered).
+    for (var i = 1; i <= C.MUSHROOMS.topRowCount; i++) {
+      var cx = Math.floor((i / 4) * HCELLS + choose(-1, 0, 1)) * CELL;
+      addMushroom(cx, TOP + CELL);
+    }
+    // Random scatter; one re-roll if a spot is taken (like the original).
+    for (var j = 0; j < C.MUSHROOMS.scatterCount; j++) {
+      var x = Math.floor(rnd(1, HCELLS)) * CELL;
+      var y = Math.floor(rnd(1, C.PLAYFIELD)) * CELL + TOP;
+      if (mushroomAtCell(x, y)) {
+        x = Math.floor(rnd(1, HCELLS)) * CELL;
+        y = Math.floor(rnd(1, C.PLAYFIELD)) * CELL + TOP;
+      }
+      addMushroom(x, y);
+    }
+  }
+
+  /* ---------------------------------------------------------- CENTIPEDE -- */
+  function createCentipede(size) {
+    var x = Math.floor(rnd(1, HCELLS - 1)) * CELL;
+    var y = TOP + CELL;
+    var speed = G.fastSpeed ? C.CENTIPEDE.fastSpeed : C.CENTIPEDE.speed;
+    var prevUid = 0;
+    // bodies first (each remembers the uid of the previously created segment,
+    // i.e. its follower), head last — exactly like the original.
+    for (var i = 0; i < size - 1; i++) {
+      var b = { uid: G.nextUid++, x: x, y: y, tx: x, ty: y, head: false,
+                dirX: 1, dirY: 1, speed: speed, followerUid: prevUid };
+      G.segments.push(b);
+      prevUid = b.uid;
+    }
+    var h = { uid: G.nextUid++, x: x, y: y, tx: x, ty: y, head: true,
+              dirX: choose(-1, 1), dirY: 1, speed: speed, followerUid: prevUid };
+    G.segments.push(h);
+  }
+
+  function createLevel(wave) {
+    G.fastSpeed = (wave > 1 && wave % 2 === 1);
+    G.levelText = { text: 'LEVEL ' + G.level, t: 0 };
+    Sound.play('newlevel');
+    if (wave > 1) {
+      for (var i = 0; i < Math.floor(wave / 2); i++) createCentipede(1); // divers
+    }
+    if (wave <= C.CENTIPEDE.lastMainChainWave) {
+      createCentipede(C.CENTIPEDE.mainChainBase - Math.floor(wave / 2));
+    }
+  }
+
+  function segByUid(uid) {
+    for (var i = 0; i < G.segments.length; i++)
+      if (G.segments[i].uid === uid) return G.segments[i];
+    return null;
+  }
+
+  // Follow-the-leader: give the follower the leader's current cell, recurse.
+  function passTargetDown(uid, x, y) {
+    var s = segByUid(uid);
+    if (!s) return;
+    var ox = s.x, oy = s.y;
+    s.tx = x; s.ty = y;
+    passTargetDown(s.followerUid, ox, oy);
+  }
+
+  function segmentOverlapsMushroom(seg, offX, offY) {
+    var sz = C.CENTIPEDE.size;
+    for (var i = 0; i < G.mushrooms.length; i++) {
+      var m = G.mushrooms[i];
+      if (hit(seg.x + offX, seg.y + offY, sz, sz, m.x, m.y, C.MUSHROOMS.w, C.MUSHROOMS.h))
+        return true;
+    }
+    return false;
+  }
+  function segmentOverlapsSegment(seg) {
+    var sz = C.CENTIPEDE.size - 2;   // slight inset ≈ the original's octagon poly
+    for (var i = 0; i < G.segments.length; i++) {
+      var o = G.segments[i];
+      if (o !== seg && hit(seg.x, seg.y, sz, sz, o.x, o.y, sz, sz)) return true;
+    }
+    return false;
+  }
+
+  function updateSegments(dt) {
+    if (!G.isPlaying) return;
+    // heads first, then bodies (original iterates ordered by head?1:2) —
+    // two passes over the array, no per-frame allocation
+    for (var pass = 0; pass < 2; pass++)
+    for (var i = 0; i < G.segments.length; i++) {
+      var s = G.segments[i];
+      if (s.head !== (pass === 0)) continue;
+      if (s.head && s.x === s.tx && s.y === s.ty) {
+        // arrived: hand my cell down the chain, then pick the next move
+        passTargetDown(s.followerUid, s.x, s.y);
+        var down = 0;
+        if (segmentOverlapsMushroom(s, 0, s.dirX * 4)) down = -s.dirX;
+        if (segmentOverlapsSegment(s)) down = choose(-1, 1);
+        if (s.x === RIGHT_WALL && s.dirX > 0) down = -1;
+        if (s.x === LEFT_WALL && s.dirX < 0) down = 1;
+        if (down === 0) {
+          s.tx += CELL * s.dirX;
+        } else {
+          s.ty += CELL * s.dirY;
+          s.dirX = down;
+          if (s.ty === BAND_BOTTOM) s.dirY = -1;      // bounce up off the floor
+          if (s.ty === FIELD_BOTTOM) s.dirY = 1;      // ...and back down
+        }
+      }
+      // glide toward the target, axis by axis, landing exactly on it
+      var step = dt * s.speed;
+      var dx = s.tx - s.x, dy = s.ty - s.y;
+      s.x += Math.min(Math.abs(dx), step) * Math.sign(dx);
+      s.y += Math.min(Math.abs(dy), step) * Math.sign(dy);
+      if (Math.abs(s.tx - s.x) < 0.001) s.x = s.tx;
+      if (Math.abs(s.ty - s.y) < 0.001) s.y = s.ty;
+    }
+  }
+
+  function killSegment(index) {
+    var s = G.segments[index];
+    Sound.play('kill');
+    Haptics.tap();
+    if (s.head) { addScore(C.CENTIPEDE.headPoints); popup(s.x, s.y, C.CENTIPEDE.headPoints); }
+    else addScore(C.CENTIPEDE.bodyPoints);
+    // leave a mushroom behind — but only in the upper field
+    // (the original creates it unconditionally, stacked mushrooms and all)
+    if (s.y < TOP + (C.PLAYFIELD - 1) * CELL) {
+      addMushroom(Math.round(s.x / CELL) * CELL, Math.round(s.y / CELL) * CELL);
+    }
+    var followerUid = s.followerUid;
+    G.segments.splice(index, 1);
+    var f = segByUid(followerUid);
+    if (f) f.head = true;                 // the split: follower becomes a head
+  }
+
+  /* ------------------------------------------------------------- PLAYER -- */
+  function updatePlayer(dt) {
+    var p = G.player;
+    // touch: chase the finger's X at 300 px/s (the original's laggy feel)
+    if (input.touching) {
+      var d = input.tx - p.x;
+      var step = C.PLAYER.touchSpeed * dt;
+      if (Math.abs(d) >= step) p.x += step * Math.sign(d);
+    }
+    // keyboard (the original's 8Direction, left/right only)
+    var want = (input.right ? 1 : 0) - (input.left ? 1 : 0);
+    if (want !== 0) p.vx = clamp(p.vx + want * C.PLAYER.keyboardAccel * dt, -C.PLAYER.keyboardSpeed, C.PLAYER.keyboardSpeed);
+    else if (p.vx !== 0) {
+      var dec = C.PLAYER.keyboardDecel * dt;
+      p.vx = Math.abs(p.vx) <= dec ? 0 : p.vx - dec * Math.sign(p.vx);
+    }
+    p.x += p.vx * dt;
+    p.x = clamp(p.x, C.PLAYER.w / 2, W - C.PLAYER.w / 2);
+    p.y = PLAYER_Y;
+
+    // double-fire wears off
+    if (p.doubleFireUntil >= 0 && G.time >= p.doubleFireUntil) {
+      p.fireInterval = C.PLAYER.fireInterval;
+      p.doubleFireUntil = -1;
+    }
+    // fire while touching (mouse counts, like the original's Touch plugin)
+    if (input.touching && G.isPlaying && G.time >= p.nextFire) {
+      var pierce = G.time < p.pierceUntil;
+      G.bullets.push({ x: p.x, y: p.y, vx: 0, pierce: pierce });
+      if (G.time < p.spreadUntil) {          // 3-WAY: two angled side shots
+        G.bullets.push({ x: p.x, y: p.y, vx: -C.POWERUPS.spreadVx, pierce: pierce });
+        G.bullets.push({ x: p.x, y: p.y, vx: C.POWERUPS.spreadVx, pierce: pierce });
+      }
+      p.nextFire = G.time + p.fireInterval;
+      Sound.play('shoot');
+    }
+  }
+
+  // ALL player damage goes through here.
+  function hitPlayer() {
+    if (G.state !== ST_PLAY) return;
+    var p = G.player;
+    if (G.time < p.invulnUntil) return;           // i-frames after a shield hit
+    if (p.shields > 0) {                          // SHIELD absorbs the hit
+      p.shields--;
+      p.invulnUntil = G.time + C.POWERUPS.shieldInvuln;
+      Sound.play('shield');
+      Haptics.thud();
+      shake(C.SHAKE.mag);
+      burst(p.x, p.y);
       return;
     }
-
-    // --- horizontal-only mode (default) ---
-    // Ship is pinned to the bottom lane and follows your finger's X exactly.
-    p.y = shipBaseY();
-    if (input.active && input.tx != null) p.x = input.tx;   // exact finger anchor
-    let kx = 0;
-    if (k['ArrowLeft'] || k['a']) kx -= 1; if (k['ArrowRight'] || k['d']) kx += 1;
-    if (kx) p.x += kx * sp * dt;
-    p.x = clamp(p.x, left, right);
+    Haptics.death();
+    G.state = ST_LIFELOST;
+    G.beatOn = false;
   }
 
-  /* ===================================================================== */
-  /*  MAIN LOOP                                                            */
-  /* ===================================================================== */
-  let lastT = performance.now();
-  function frame(now) {
-    const rawDt = (now - lastT) / 1000; lastT = now;
-    const dt = Math.min(0.05, rawDt);     // clamp big gaps (tab switches)
-    if (G && G.started && !G.paused && !G.over) update(dt);
-    render(now);
-    requestAnimationFrame(frame);
+  /* ------------------------------------------------------------ BULLETS -- */
+  function updateBullets(dt) {
+    var bw = C.BULLET.w, bh = C.BULLET.h;
+    outer:
+    for (var i = G.bullets.length - 1; i >= 0; i--) {
+      var b = G.bullets[i];
+      b.y -= C.BULLET.speed * dt;
+      if (b.vx) b.x += b.vx * dt;
+      if (b.y < -bh || b.x < -bw || b.x > W + bw) { G.bullets.splice(i, 1); continue; }
+
+      // mushrooms absorb the shot (PIERCE shots punch through, one hit each)
+      for (var m = 0; m < G.mushrooms.length; m++) {
+        var mu = G.mushrooms[m];
+        if (hit(b.x, b.y, bw, bh, mu.x, mu.y, C.MUSHROOMS.w, C.MUSHROOMS.h)) {
+          if (b.pierce) {
+            if (b.hits && b.hits.indexOf(mu) >= 0) continue;
+            (b.hits = b.hits || []).push(mu);
+            mu.hp--;
+            if (mu.hp <= 0) { G.mushrooms.splice(m, 1); addScore(C.MUSHROOMS.points); }
+            continue;               // keep flying, keep checking
+          }
+          mu.hp--;
+          G.bullets.splice(i, 1);
+          if (mu.hp <= 0) { G.mushrooms.splice(m, 1); addScore(C.MUSHROOMS.points); }
+          continue outer;
+        }
+      }
+      // segments absorb the shot (PIERCE kills and keeps flying)
+      for (var sIdx = 0; sIdx < G.segments.length; sIdx++) {
+        var seg = G.segments[sIdx];
+        if (hit(b.x, b.y, bw, bh, seg.x, seg.y, C.CENTIPEDE.size, C.CENTIPEDE.size)) {
+          if (b.pierce) {
+            killSegment(sIdx);
+            break;                  // indices shifted; next segment next frame
+          }
+          G.bullets.splice(i, 1);
+          killSegment(sIdx);
+          continue outer;
+        }
+      }
+      // big bugs: bullet flies THROUGH (only removed on the killing blow),
+      // exactly like the original.
+      if (G.spider && !b.hitSpider &&
+          hit(b.x, b.y, bw, bh, G.spider.x, G.spider.y, C.SPIDER.w * 0.8, C.SPIDER.h * 0.8)) {
+        b.hitSpider = true;
+        damageSpider(i);
+        if (!G.bullets[i] || G.bullets[i] !== b) continue outer;
+      }
+      if (G.flea && !b.hitFlea &&
+          hit(b.x, b.y, bw, bh, G.flea.x, G.flea.y, C.FLEA.w * 0.8, C.FLEA.h * 0.8)) {
+        b.hitFlea = true;
+        damageFlea(i);
+        if (!G.bullets[i] || G.bullets[i] !== b) continue outer;
+      }
+      if (G.scorpion && !b.hitScorpion &&
+          hit(b.x, b.y, bw, bh, G.scorpion.x, G.scorpion.y, C.SCORPION.w, C.SCORPION.h)) {
+        b.hitScorpion = true;
+        damageScorpion(i);
+        if (!G.bullets[i] || G.bullets[i] !== b) continue outer;
+      }
+      if (G.spiderBoss && !b.hitSpiderBoss &&
+          hit(b.x, b.y, bw, bh, G.spiderBoss.x, G.spiderBoss.y, C.SPIDERBOSS.w * 0.8, C.SPIDERBOSS.h * 0.8)) {
+        b.hitSpiderBoss = true;
+        damageSpiderBoss(i);
+        if (!G.bullets[i] || G.bullets[i] !== b) continue outer;
+      }
+      if (G.megaBoss && !b.hitMegaBoss &&
+          hit(b.x, b.y, bw, bh, G.megaBoss.x, G.megaBoss.y, C.MEGABOSS.w * 0.8, C.MEGABOSS.h * 0.8)) {
+        b.hitMegaBoss = true;
+        damageMegaBoss(i);
+        if (!G.bullets[i] || G.bullets[i] !== b) continue outer;
+      }
+    }
   }
 
+  /* ------------------------------------------------------------- SPIDER -- */
+  function spawnSpider() {
+    var mag = C.SPIDER.bobMagnitude;
+    var x = choose(0, CELL * HCELLS);
+    G.spider = {
+      x: x,
+      baseY: BAND_BOTTOM - mag + CELL / 2,
+      y: 0,
+      bobPhase: 0, wobblePhase: 0,
+      dir: (x === 0) ? 1 : -1,
+      hp: C.SPIDER.hp,
+    };
+    G.spider.y = G.spider.baseY;
+    G.spiderSwitchTimer = rnd(C.SPIDER.switchMin, C.SPIDER.switchMax);
+    Sound.loop('spiderloop', 'spider');
+  }
+  function updateSpider(dt) {
+    G.spiderTimer -= dt;
+    if (G.spiderTimer <= 0) {
+      G.spiderTimer = rnd(C.SPIDER.spawnDelayMin, C.SPIDER.spawnDelayMax);
+      if (!G.spider && G.isPlaying) spawnSpider();
+    }
+    var sp = G.spider;
+    if (!sp) return;
+    sp.bobPhase += (Math.PI * 2 / C.SPIDER.bobPeriod) * dt;
+    sp.wobblePhase += (Math.PI * 2 / C.SPIDER.wobblePeriod) * dt;
+    sp.y = sp.baseY + C.SPIDER.bobMagnitude * Math.sin(sp.bobPhase);
+    sp.x += (C.SPIDER.bobMagnitude / C.SPIDER.bobPeriod) * sp.dir * dt;
+    G.spiderSwitchTimer -= dt;
+    if (G.spiderSwitchTimer <= 0) {
+      G.spiderSwitchTimer = rnd(C.SPIDER.switchMin, C.SPIDER.switchMax);
+      sp.dir = (sp.x > G.player.x) ? -1 : 1;   // hunt the player
+    }
+    if (hit(sp.x, sp.y, C.SPIDER.w * 0.7, C.SPIDER.h * 0.7,
+            G.player.x, G.player.y, C.PLAYER.w * 0.8, C.PLAYER.h * 0.8)) hitPlayer();
+  }
+  // all damage functions: bulletIndex null = not from a bullet (e.g. BOMB)
+  function damageSpider(bulletIndex, dmg) {
+    var sp = G.spider;
+    Sound.play('bonus');
+    shake(C.SHAKE.bigMag);
+    explode(sp.x, sp.y);
+    sp.hp -= (dmg || 1);
+    if (sp.hp <= 0) {
+      // proximity scoring: 300 / 600 / 900
+      var d = Math.floor(Math.abs(G.player.y - sp.y) / (C.SPIDER.bobMagnitude * 2) * 3);
+      var pts = Math.max(1, 3 - d) * C.SPIDER.pointsStep;
+      addScore(pts);
+      popup(sp.x, sp.y, pts);
+      if (bulletIndex != null) G.bullets.splice(bulletIndex, 1);
+      burst(sp.x, sp.y);
+      Haptics.thud();
+      maybeDropPowerup('spider', sp.x, sp.y);
+      G.spider = null;
+      Sound.stopLoop('spider');
+      // DOUBLE FIRE: halved fire interval for 10 seconds
+      G.player.fireInterval = C.PLAYER.doubleFireInterval;
+      G.player.doubleFireUntil = G.time + C.PLAYER.doubleFireDuration;
+      G.banners.push({ img: C.UI.doubleFire, x: W / 2, y: H / 2 - 50,
+                       w: 356, h: 40, t: 0, wait: 1, fade: 0.5 });
+    }
+  }
+
+  /* --------------------------------------------------------------- FLEA -- */
+  function updateFlea(dt) {
+    G.fleaTimer -= dt;
+    if (G.fleaTimer <= 0) {
+      G.fleaTimer = C.FLEA.checkInterval;
+      if (G.isPlaying && !G.flea && G.level >= C.FLEA.fromLevel) {
+        var count = 0;
+        for (var i = 0; i < G.mushrooms.length; i++)
+          if (G.mushrooms[i].y >= FIELD_BOTTOM) count++;
+        var need = Math.min(C.FLEA.minBandMushroomsCap,
+                            C.FLEA.minBandMushroomsBase + G.level);
+        if (count < need) {
+          G.flea = {
+            x: Math.floor(rnd(1, HCELLS - 2) * CELL) + CELL,
+            y: TOP,
+            swayPhase: 0,
+            swayMag: C.FLEA.swayMagnitude + Math.random() * C.FLEA.swayRandom,
+            hp: C.FLEA.hp, frame: 0, frameT: 0,
+          };
+          Sound.play('flea');
+        }
+      }
+    }
+    var f = G.flea;
+    if (!f) return;
+    f.frameT += dt;
+    if (f.frameT > 1 / C.FLEA.animFps) { f.frameT = 0; f.frame = (f.frame + 1) % 2; }
+    var oldSway = f.swayMag * Math.sin(f.swayPhase);
+    f.swayPhase += (Math.PI * 2 / C.FLEA.swayPeriod) * dt;
+    f.x += f.swayMag * Math.sin(f.swayPhase) - oldSway;
+    f.y += C.FLEA.fallSpeed * dt;
+    // sprinkle mushrooms on the way down (~random chance per frame)
+    if (Math.random() * dt < C.FLEA.dropFactor && f.y < BAND_BOTTOM &&
+        f.x >= CELL && f.x <= W - CELL) {
+      var cx = Math.round(f.x / CELL) * CELL;
+      var cy = Math.round(f.y / CELL) * CELL;
+      var over = false;
+      for (var m = 0; m < G.mushrooms.length; m++) {
+        if (hit(f.x, f.y, C.FLEA.w, C.FLEA.h, G.mushrooms[m].x, G.mushrooms[m].y,
+                C.MUSHROOMS.w, C.MUSHROOMS.h)) { over = true; break; }
+      }
+      if (!over && !mushroomAtCell(cx, cy)) addMushroom(cx, cy);
+    }
+    if (f.y > H + C.FLEA.h) { G.flea = null; return; }
+    if (hit(f.x, f.y, C.FLEA.w * 0.7, C.FLEA.h * 0.7,
+            G.player.x, G.player.y, C.PLAYER.w * 0.8, C.PLAYER.h * 0.8)) hitPlayer();
+  }
+  function damageFlea(bulletIndex, dmg) {
+    var f = G.flea;
+    f.hp -= (dmg || 1);
+    Sound.play('bonus');
+    shake(C.SHAKE.mag);
+    explode(f.x, f.y);
+    if (f.hp <= 0) {
+      addScore(C.FLEA.points);
+      popup(f.x, f.y, C.FLEA.points);
+      if (bulletIndex != null) G.bullets.splice(bulletIndex, 1);
+      burst(f.x, f.y);
+      Haptics.thud();
+      maybeDropPowerup('flea', f.x, f.y);
+      G.flea = null;
+    }
+  }
+
+  /* ------------------------------------------------------------ SCORPION -- */
+  function updateScorpion(dt) {
+    G.scorpionTimer -= dt;
+    if (G.scorpionTimer <= 0) {
+      G.scorpionTimer = rnd(C.SCORPION.spawnDelayMin, C.SCORPION.spawnDelayMax);
+      if (!G.scorpion && G.level >= C.SCORPION.fromLevel && G.isPlaying) {
+        var y = TOP + Math.floor(rnd(0, C.PLAYFIELD - 1)) * CELL;
+        var fromRight = Math.random() < 0.5;
+        G.scorpion = { x: fromRight ? W : 0, y: y, dir: fromRight ? -1 : 1, hp: C.SCORPION.hp };
+      }
+    }
+    var sc = G.scorpion;
+    if (!sc) return;
+    sc.x += C.SCORPION.speed * sc.dir * dt;
+    if (sc.x < -C.SCORPION.w || sc.x > W + C.SCORPION.w) { G.scorpion = null; return; }
+    // poison every mushroom it passes
+    for (var i = 0; i < G.mushrooms.length; i++) {
+      var m = G.mushrooms[i];
+      if (!m.poison && hit(sc.x, sc.y, C.SCORPION.w, C.SCORPION.h, m.x, m.y,
+                           C.MUSHROOMS.w, C.MUSHROOMS.h)) m.poison = true;
+    }
+    if (hit(sc.x, sc.y, C.SCORPION.w * 0.8, C.SCORPION.h * 0.8,
+            G.player.x, G.player.y, C.PLAYER.w * 0.8, C.PLAYER.h * 0.8)) hitPlayer();
+  }
+  function damageScorpion(bulletIndex, dmg) {
+    var sc = G.scorpion;
+    shake(C.SHAKE.mag);
+    Sound.play('bonus');
+    explode(sc.x, sc.y);
+    sc.hp -= (dmg || 1);
+    if (sc.hp <= 0) {
+      addScore(C.SCORPION.points);
+      popup(sc.x, sc.y, C.SCORPION.points);
+      if (bulletIndex != null) G.bullets.splice(bulletIndex, 1);
+      burst(sc.x, sc.y);
+      Haptics.thud();
+      maybeDropPowerup('scorpion', sc.x, sc.y);
+      // heal this row's poison (yes, the original really does this)
+      for (var i = 0; i < G.mushrooms.length; i++)
+        if (G.mushrooms[i].poison && G.mushrooms[i].y === sc.y) G.mushrooms[i].poison = false;
+      G.scorpion = null;
+    }
+  }
+
+  /* --------------------------------------------------------- SPIDER BOSS -- */
+  function updateSpiderBoss(dt) {
+    G.spiderBossTimer -= dt;
+    if (G.spiderBossTimer <= 0) {
+      G.spiderBossTimer = rnd(C.SPIDERBOSS.spawnDelayMin, C.SPIDERBOSS.spawnDelayMax);
+      if (!G.spiderBoss && G.isPlaying) {
+        var y = TOP + Math.floor(rnd(0, C.PLAYFIELD - 1)) * CELL;
+        var fromRight = Math.random() < 0.5;
+        G.spiderBoss = { x: fromRight ? W : 0, baseX: fromRight ? W : 0, y: y,
+                         swayPhase: 0, dir: fromRight ? -1 : 1, hp: C.SPIDERBOSS.hp,
+                         fireTimer: rnd(C.SPIDERBOSS.fireMin, C.SPIDERBOSS.fireMax) };
+      }
+    }
+    var bb = G.spiderBoss;
+    if (!bb) return;
+    bb.swayPhase += (Math.PI * 2 / C.SPIDERBOSS.swayPeriod) * dt;
+    bb.baseX += C.SPIDERBOSS.speed * bb.dir * dt;
+    bb.x = bb.baseX + C.SPIDERBOSS.swayMagnitude * Math.sin(bb.swayPhase);
+    if (bb.baseX < -C.SPIDERBOSS.w * 2 || bb.baseX > W + C.SPIDERBOSS.w * 2) {
+      G.spiderBoss = null; return;
+    }
+    // drops a spinning boss bullet from its belly every 5–7 s while visible
+    if (bb.x > -C.SPIDERBOSS.w / 2 && bb.x < W + C.SPIDERBOSS.w / 2) {
+      bb.fireTimer -= dt;
+      if (bb.fireTimer <= 0) {
+        bb.fireTimer = rnd(C.SPIDERBOSS.fireMin, C.SPIDERBOSS.fireMax);
+        G.enemyShots.push({ kind: 'bossbullet', x: bb.x, y: bb.y + C.SPIDERBOSS.h / 2,
+                            vx: 0, vy: C.BOSSBULLET.speed, angle: 0 });
+      }
+    }
+    // NOTE: the original spider boss does NOT kill on touch (it isn't in the
+    // deadly family) — its bullets do. Kept faithful.
+  }
+  function damageSpiderBoss(bulletIndex, dmg) {
+    var bb = G.spiderBoss;
+    shake(C.SHAKE.mag);
+    Sound.play('bonus');
+    explode(bb.x, bb.y);
+    bb.hp -= (dmg || 1);
+    if (bb.hp <= 0) {
+      addScore(C.SPIDERBOSS.points);
+      popup(bb.x, bb.y, C.SPIDERBOSS.points);
+      if (bulletIndex != null) G.bullets.splice(bulletIndex, 1);
+      burst(bb.x, bb.y);
+      Haptics.thud();
+      maybeDropPowerup('spiderboss', bb.x, bb.y);
+      sprayBombs(bb.x, bb.y, C.SPIDERBOSS.deathBombs);
+      G.spiderBoss = null;
+    }
+  }
+
+  function sprayBombs(x, y, n) {
+    for (var i = 0; i < n; i++) {
+      var a = (i * (360 / n) - 90) * Math.PI / 180;
+      G.enemyShots.push({ kind: 'pinkbomb', x: x, y: y,
+                          vx: Math.cos(a) * C.PINKBOMB.speed,
+                          vy: Math.sin(a) * C.PINKBOMB.speed });
+    }
+  }
+
+  /* ----------------------------------------------------------- MEGA BOSS -- */
+  function updateMegaBoss(dt) {
+    G.megaBossTimer -= dt;
+    if (G.megaBossTimer <= 0) {
+      G.megaBossTimer = rnd(C.MEGABOSS.spawnDelayMin, C.MEGABOSS.spawnDelayMax);
+      if (!G.megaBoss && G.isPlaying && G.level > C.MEGABOSS.fromLevel - 1) {
+        G.megaBoss = { baseX: W / 2, baseY: -100, x: W / 2, y: -100,
+                       phaseV: 0, phaseH: 0, hp: C.MEGABOSS.hp,
+                       volleyTimer: rnd(C.MEGABOSS.volleyMin, C.MEGABOSS.volleyMax),
+                       bursts: 0, burstTimer: 0, frame: 0, frameT: 0 };
+      }
+    }
+    var mb = G.megaBoss;
+    if (!mb) return;
+    mb.frameT += dt;
+    if (mb.frameT > 1 / C.MEGABOSS.animFps) { mb.frameT = 0; mb.frame = (mb.frame + 1) % 2; }
+    mb.baseY += C.MEGABOSS.descendSpeed * dt;
+    mb.phaseV += (Math.PI * 2 / C.MEGABOSS.sineVPeriod) * dt;
+    mb.phaseH += (Math.PI * 2 / C.MEGABOSS.sineHPeriod) * dt;
+    mb.x = clamp(mb.baseX + C.MEGABOSS.sineHMag * Math.sin(mb.phaseH),
+                 C.MEGABOSS.w / 2, W - C.MEGABOSS.w / 2);
+    mb.y = Math.min(mb.baseY + C.MEGABOSS.sineVMag * Math.sin(mb.phaseV),
+                    H - C.MEGABOSS.h / 2);                     // BoundToLayout
+    // volley: 5 bursts, 0.1 s apart — 2 side lasers each, rocket in burst 1
+    if (mb.bursts > 0) {
+      mb.burstTimer -= dt;
+      if (mb.burstTimer <= 0) {
+        fireMegaBurst(mb, C.MEGABOSS.volleyBursts - mb.bursts === 0);
+        mb.bursts--;
+        mb.burstTimer = C.MEGABOSS.burstGap;
+      }
+    } else if (mb.y > 0) {
+      mb.volleyTimer -= dt;
+      if (mb.volleyTimer <= 0 && G.isPlaying) {
+        mb.volleyTimer = rnd(C.MEGABOSS.volleyMin, C.MEGABOSS.volleyMax);
+        mb.bursts = C.MEGABOSS.volleyBursts;
+        mb.burstTimer = 0;
+      }
+    }
+    if (hit(mb.x, mb.y, C.MEGABOSS.w * 0.8, C.MEGABOSS.h * 0.8,
+            G.player.x, G.player.y, C.PLAYER.w * 0.8, C.PLAYER.h * 0.8)) hitPlayer();
+  }
+  function fireMegaBurst(mb, withRocket) {
+    Sound.play('bossshoot');
+    // the boss is drawn rotated 90°; its two "flank" image points end up at
+    // the bottom corners and the middle one at the bottom center
+    var lx = mb.x - C.MEGABOSS.w * 0.35, rx = mb.x + C.MEGABOSS.w * 0.35;
+    var by = mb.y + C.MEGABOSS.h * 0.4;
+    G.enemyShots.push({ kind: 'laser', x: lx, y: by, vx: 0, vy: C.LASER.speed });
+    G.enemyShots.push({ kind: 'laser', x: rx, y: by, vx: 0, vy: C.LASER.speed });
+    if (withRocket)
+      G.enemyShots.push({ kind: 'rocket', x: mb.x, y: by, vx: 0, vy: C.ROCKET.speed,
+                          frame: 0, frameT: 0 });
+  }
+  function damageMegaBoss(bulletIndex, dmg) {
+    var mb = G.megaBoss;
+    shake(C.SHAKE.mag);
+    Sound.play('bonus');
+    explode(mb.x, mb.y);
+    mb.hp -= (dmg || 1);
+    if (mb.hp <= 0) {
+      addScore(C.MEGABOSS.points);
+      popup(mb.x, mb.y, C.MEGABOSS.points);
+      if (bulletIndex != null) G.bullets.splice(bulletIndex, 1);
+      burst(mb.x, mb.y);
+      Haptics.thud();
+      maybeDropPowerup('megaboss', mb.x, mb.y);
+      sprayBombs(mb.x, mb.y, C.MEGABOSS.deathBombs);
+      G.megaBoss = null;
+    }
+  }
+
+  /* --------------------------------------------------------- ENEMY SHOTS -- */
+  function updateEnemyShots(dt) {
+    for (var i = G.enemyShots.length - 1; i >= 0; i--) {
+      var s = G.enemyShots[i];
+      s.x += s.vx * dt;
+      s.y += s.vy * dt;
+      if (s.kind === 'bossbullet') s.angle = (s.angle || 0) + C.BOSSBULLET.spinDegPerSec * dt;
+      if (s.kind === 'rocket') {
+        s.frameT += dt;
+        if (s.frameT > 1 / C.ROCKET.animFps) { s.frameT = 0; s.frame = ((s.frame | 0) + 1) % C.ROCKET.frames; }
+      }
+      if (s.x < -80 || s.x > W + 80 || s.y < -300 || s.y > H + 80) {
+        G.enemyShots.splice(i, 1); continue;
+      }
+      var dim = { bossbullet: C.BOSSBULLET, laser: C.LASER, rocket: C.ROCKET, pinkbomb: C.PINKBOMB }[s.kind];
+      if (hit(s.x, s.y, dim.w * 0.8, dim.h * 0.8,
+              G.player.x, G.player.y, C.PLAYER.w * 0.8, C.PLAYER.h * 0.8)) {
+        hitPlayer();
+      }
+    }
+  }
+
+  /* ---------------------------------------------------- LIFE LOST / SWEEP -- */
+  function beginLifeLost() {
+    G.lives--;
+    Sound.play('death');
+    Sound.stopLoop('spider');
+    // clear every threat
+    G.spider = null; G.flea = null; G.scorpion = null;
+    G.spiderBoss = null; G.megaBoss = null;
+    G.enemyShots.length = 0;
+    G.segments.length = 0;
+    G.bullets.length = 0;
+    burst(G.player.x, G.player.y);
+    G.player.visible = false;
+    // queue the mushroom bonus sweep: top-to-bottom, left-to-right
+    var ordered = G.mushrooms.slice().sort(function (a, b) {
+      return (a.x + a.y * 9999) - (b.x + b.y * 9999);
+    });
+    G.sweep = ordered.map(function (m, i) {
+      return { x: m.x, y: m.y, at: (i + 1) * C.MUSHROOMS.sweepStagger, done: false, t: 0 };
+    });
+    G.sweepT = 0;
+    G.sweepStarted = true;
+  }
+
+  function updateLifeLost(dt) {
+    G.sweepT += dt;
+    var allDone = true;
+    for (var i = 0; i < G.sweep.length; i++) {
+      var s = G.sweep[i];
+      if (!s.done && G.sweepT >= s.at) {
+        s.done = true;
+        s.t = 0;
+        addScore(C.MUSHROOMS.sweepBonus);
+        Sound.play('sweep');
+      }
+      if (s.done) s.t += dt;
+      if (!s.done || s.t < 0.5) allDone = false;   // 0.4s show + 0.1s fade
+    }
+    if (allDone) {
+      G.player.visible = true;
+      if (G.lives > 0) {          // (unreachable with the original's 1 life,
+        G.state = ST_NEWLEVEL;    //  but works if you raise PLAYER.lives)
+        G.sweepStarted = false;
+        G.sweep = [];
+      } else {
+        G.state = ST_GAMEOVER;
+      }
+    }
+  }
+
+  /* ============================================================== UPDATE == */
   function update(dt) {
-    G.t += dt;
-    // weapon expiry
-    if (G.weapon !== 'default' && performance.now() > G.weaponUntil) G.weapon = 'default';
+    G.time += dt;
+
+    // ---- state machine (mirrors the original State sheet) ----
+    G.isPlaying = (G.state === ST_PLAY);
+
+    if (G.state === ST_NEWLEVEL) {
+      createLevel(((G.level - 1) % C.CENTIPEDE.waveLoop) + 1);
+      G.state = ST_PLAY;
+      G.beatOn = true;
+      G.beatTimer = C.CENTIPEDE.beatInterval;
+      G.isPlaying = true;
+    }
+
+    if (G.state === ST_PLAY && G.segments.length === 0) {
+      G.level++;
+      G.state = ST_NEWLEVEL;
+      G.beatOn = false;
+    }
+
+    if (G.beatOn && G.state === ST_PLAY) {
+      G.beatTimer -= dt;
+      if (G.beatTimer <= 0) { G.beatTimer = C.CENTIPEDE.beatInterval; Sound.play('beat'); }
+    }
 
     updatePlayer(dt);
-    shoot();                                   // auto-fire while running
-    stepChains(dt);
-    if (!chainsAlive() && G.chains.length === 0) { /* handled at kill time */ }
+    updateSegments(dt);
+    updateBullets(dt);
+    updatePowerups(dt);
+    updateSpider(dt);
+    updateFlea(dt);
+    updateScorpion(dt);
+    updateSpiderBoss(dt);
+    updateMegaBoss(dt);
+    updateEnemyShots(dt);
 
-    // independent enemies
-    for (let i = G.enemies.length - 1; i >= 0; i--) {
-      const e = G.enemies[i]; updateEnemy(e, dt);
-      // downward-moving enemies are removed at the ship lane so none slip under the ship
-      if (e.y > enemyFloorY() + e.r || e.x < -e.r * 3 || e.x > W + e.r * 3) G.enemies.splice(i, 1);
-    }
-    if (G.boss) updateEnemy(G.boss, dt);
-
-    // bullets
-    for (const b of G.bullets) b.y += b.vy * dt;
-    G.bullets = G.bullets.filter(b => b.y > -20);
-    for (const bb of G.bossBullets) bb.y += bb.vy * dt;
-    G.bossBullets = G.bossBullets.filter(bb => bb.y < H + 20);
-    // powerups
-    for (const pu of G.powerups) { pu.y += pu.vy * dt; pu.age += dt; }
-    G.powerups = G.powerups.filter(pu => pu.y < H + 20);
-    // particles
-    for (const pt of G.particles) { pt.x += pt.vx * dt; pt.y += pt.vy * dt; pt.vy += 240 * dt; pt.life -= dt; }
-    G.particles = G.particles.filter(pt => pt.life > 0);
-    for (const ft of G.floatTexts) { ft.y += ft.vy * dt; ft.life -= dt; }
-    G.floatTexts = G.floatTexts.filter(ft => ft.life > 0);
-
-    trySpawns(dt * 1000);
-    collisions();
-
-    // optional level timer ("world nuke")
-    if (CFG.levels.secondsPerLevel) {
-      const remain = CFG.levels.secondsPerLevel - (performance.now() - G.levelStart) / 1000;
-      if (remain <= 0) hurtPlayer(), G.levelStart = performance.now();
-    }
-    G.shake *= 0.86;
-  }
-
-  /* ===================================================================== */
-  /*  RENDER                                                               */
-  /* ===================================================================== */
-  const stars = [];
-  function initStars() { stars.length = 0; for (let i = 0; i < 90; i++) stars.push({ x: Math.random(), y: Math.random(), z: rand(0.3, 1), s: rand(0.6, 2) }); }
-
-  function render(now) {
-    // background gradient
-    const grad = ctx.createLinearGradient(0, 0, 0, H);
-    grad.addColorStop(0, CFG.theme.bgTop); grad.addColorStop(1, CFG.theme.bgBottom);
-    ctx.fillStyle = grad; ctx.fillRect(0, 0, W, H);
-
-    // parallax stars
-    ctx.fillStyle = CFG.theme.starColor;
-    const drift = (now * 0.00004);
-    for (const st of stars) {
-      const y = ((st.y + drift * st.z) % 1) * H;
-      ctx.globalAlpha = 0.3 + st.z * 0.5;
-      ctx.fillRect(st.x * W, y, st.s, st.s);
-    }
-    ctx.globalAlpha = 1;
-
-    ctx.save();
-    if (G && G.shake > 0.4) ctx.translate(rand(-G.shake, G.shake), rand(-G.shake, G.shake));
-
-    if (!G || !G.started) { drawStartScreen(now); ctx.restore(); return; }
-
-    // floor bar
-    glow(CFG.theme.floorColor, 12, () => { ctx.fillStyle = CFG.theme.floorColor; ctx.fillRect(0, H - 6, W, 6); });
-
-    // mushrooms
-    for (const m of G.mushrooms) {
-      const frac = m.hp / CFG.mushrooms.hp;
-      if (m.poisoned) {
-        drawShape('mushroom', cellX(m.gx), cellY(m.gy), GRID * 0.7, { ...CFG.mushrooms, poisoned: true }, frac);
-      } else {
-        const spn = (frac <= 0.5 && CFG.mushrooms.damagedSprite) ? CFG.mushrooms.damagedSprite : CFG.mushrooms.sprite;
-        paint(spn, 'mushroom', cellX(m.gx), cellY(m.gy), GRID * 0.55, { ...CFG.mushrooms }, frac);
+    // ship vs centipede (the worm can't normally reach the ship row, but the
+    // original checks anyway)
+    if (G.isPlaying) {
+      for (var i = 0; i < G.segments.length; i++) {
+        var s = G.segments[i];
+        if (hit(s.x, s.y, C.CENTIPEDE.size, C.CENTIPEDE.size,
+                G.player.x, G.player.y, C.PLAYER.w * 0.8, C.PLAYER.h * 0.8)) {
+          hitPlayer(); break;
+        }
       }
     }
 
-    // centipede
-    for (const c of G.chains) {
-      c.segs.forEach((s, i) => {
-        if (!s.alive) return;
-        paint(i === 0 ? CFG.centipede.headSprite : CFG.centipede.bodySprite,
-          i === 0 ? CFG.centipede.headShape : CFG.centipede.bodyShape, s.px, s.py, GRID * 0.5,
-          { color: i === 0 ? CFG.centipede.headColor : CFG.centipede.bodyColor, eyeColor: CFG.centipede.eyeColor });
-      });
+    if (G.state === ST_LIFELOST) {
+      if (!G.sweepStarted) beginLifeLost();
+      else updateLifeLost(dt);
     }
 
-    // enemies + boss
-    for (const e of G.enemies) paint(e.def.sprite, e.def.shape, e.x, e.y, e.r, e.def);
-    if (G.boss) {
-      paint(G.boss.def.sprite, G.boss.def.shape, G.boss.x, G.boss.y, G.boss.r, G.boss.def);
-      drawHpBar(G.boss);
+    if (G.state === ST_GAMEOVER && !G.gameOverSent) {
+      G.gameOverSent = true;
+      if (window.AstroBridge) window.AstroBridge.gameOver();
     }
 
-    // boss bullets
-    for (const bb of G.bossBullets) paint(bb.def.sprite, bb.def.shape, bb.x, bb.y, bb.r, { color: bb.nuke ? (bb.def.nukeColor || bb.def.color) : bb.def.color });
-
-    // powerups
-    for (const pu of G.powerups) { const bob = Math.sin(pu.age * 6) * 3; paint(pu.def.sprite, pu.def.shape, pu.x, pu.y + bob, pu.r, pu.def); }
-
-    // bullets
-    for (const b of G.bullets) glow(b.color, 8, () => { ctx.fillStyle = b.color; ctx.fillRect(b.x - b.w / 2, b.y - b.h, b.w, b.h); });
-
-    // player
-    const p = G.player;
-    const blink = performance.now() < p.invulnUntil && Math.floor(performance.now() / 100) % 2 === 0;
-    if (!blink) {
-      paint(CFG.player.sprite, CFG.player.shape, p.x, p.y, CFG.player.size, { color: CFG.player.color, accent: CFG.player.accent });
-      if (G.shield) glow('#39ff88', 14, () => { ctx.strokeStyle = '#39ff88'; ctx.lineWidth = 2.5; ctx.beginPath(); ctx.arc(p.x, p.y, CFG.player.size * 1.5, 0, 7); ctx.stroke(); });
+    // ---- effects ----
+    for (var e = G.explosions.length - 1; e >= 0; e--) {
+      G.explosions[e].t += dt;
+      var life = C.EXPLOSION.frames / C.EXPLOSION.fps + C.EXPLOSION.fadeTime;
+      if (G.explosions[e].t > life) G.explosions.splice(e, 1);
     }
+    for (var p = G.particles.length - 1; p >= 0; p--) {
+      var pt = G.particles[p];
+      pt.t += dt; pt.x += pt.vx * dt; pt.y += pt.vy * dt;
+      if (pt.t > C.PARTICLES.life) G.particles.splice(p, 1);
+    }
+    for (var o = G.popups.length - 1; o >= 0; o--) {
+      G.popups[o].t += dt;
+      if (G.popups[o].t > 0.4) G.popups.splice(o, 1);   // wait .2 + fade .2
+    }
+    for (var b = G.banners.length - 1; b >= 0; b--) {
+      G.banners[b].t += dt;
+      if (G.banners[b].t > G.banners[b].wait + G.banners[b].fade) G.banners.splice(b, 1);
+    }
+    if (G.levelText) {
+      G.levelText.t += dt;
+      if (G.levelText.t > 1.5) G.levelText = null;      // wait 1 + fade .5
+    }
+    if (G.shake.t > 0) G.shake.t -= dt;
+    if (G.flash > 0) G.flash -= dt;
 
-    // particles
-    for (const pt of G.particles) { ctx.globalAlpha = clamp(pt.life / pt.max, 0, 1); glow(pt.color, 6, () => { ctx.fillStyle = pt.color; ctx.beginPath(); ctx.arc(pt.x, pt.y, pt.r, 0, 7); ctx.fill(); }); }
-    ctx.globalAlpha = 1;
-
-    // float texts
-    ctx.font = 'bold 14px monospace'; ctx.textAlign = 'center';
-    for (const ft of G.floatTexts) { ctx.globalAlpha = clamp(ft.life, 0, 1); ctx.fillStyle = '#fff'; ctx.fillText(ft.text, ft.x, ft.y); }
-    ctx.globalAlpha = 1;
-
-    drawHUD();
-    if (G.overlay && performance.now() < G.overlay.until) drawOverlay();
-
-    ctx.restore();
-  }
-
-  function drawHpBar(b) {
-    const w = b.r * 2, x = b.x - b.r, y = b.y - b.r - 10;
-    ctx.fillStyle = 'rgba(0,0,0,0.5)'; ctx.fillRect(x, y, w, 4);
-    ctx.fillStyle = '#ff4f6e'; ctx.fillRect(x, y, w * (b.hp / b.def.hp), 4);
-  }
-
-  function drawHUD() {
-    ctx.textAlign = 'left'; ctx.font = 'bold 13px monospace'; ctx.fillStyle = CFG.theme.hudColor;
-    ctx.fillText('WAVE ' + G.level, 10, 20);
-    // lives
-    for (let i = 0; i < G.lives; i++) drawShape(CFG.player.shape, W - 16 - i * 22, 16, 8, { color: CFG.player.color, accent: CFG.player.accent });
-    // active weapon timer
-    if (G.weapon !== 'default') {
-      const left = Math.max(0, (G.weaponUntil - performance.now()) / 1000);
-      ctx.textAlign = 'center'; ctx.fillStyle = (CFG.weapons[G.weapon] || {}).color || '#fff';
-      ctx.fillText((G.weaponLabel || G.weapon) + ' ' + left.toFixed(1) + 's', W / 2, 20);
+    // background + stars scroll even outside PLAY
+    bgY += C.BACKGROUND.scrollSpeed * dt;
+    if (bgY > 0) bgY -= C.BACKGROUND.tileSize;
+    for (var st = 0; st < stars.length; st++) {
+      stars[st].y += stars[st].speed * dt;
+      if (stars[st].y > H) { stars[st].y -= H; stars[st].x = Math.random() * W; }
     }
   }
 
-  function drawOverlay() {
+  /* =============================================================== RENDER == */
+  var bgY = 0;
+  var stars = [];
+  function seedStars() {
+    stars.length = 0;
+    for (var i = 0; i < C.STARS.count; i++) {
+      var speed = rnd(C.STARS.speedMin, C.STARS.speedMax);
+      stars.push({ x: Math.random() * W, y: Math.random() * H,
+                   speed: speed, scale: speed / 220, opacity: speed / 100 });
+    }
+  }
+  seedStars();
+
+  function drawSprite(name, x, y, w, h, angleDeg) {
+    var img = IMG[name];
+    if (!img || !img.complete || !img.naturalWidth) return;
+    if (angleDeg) {
+      ctx.save();
+      ctx.translate(x, y);
+      ctx.rotate(angleDeg * Math.PI / 180);
+      ctx.drawImage(img, -w / 2, -h / 2, w, h);
+      ctx.restore();
+    } else {
+      ctx.drawImage(img, x - w / 2, y - h / 2, w, h);
+    }
+  }
+  function drawFrame(name, sx, sy, sw, sh, x, y, w, h, angleDeg) {
+    var img = IMG[name];
+    if (!img || !img.complete || !img.naturalWidth) return;
+    if (angleDeg) {
+      ctx.save();
+      ctx.translate(x, y);
+      ctx.rotate(angleDeg * Math.PI / 180);
+      ctx.drawImage(img, sx, sy, sw, sh, -w / 2, -h / 2, w, h);
+      ctx.restore();
+    } else {
+      ctx.drawImage(img, sx, sy, sw, sh, x - w / 2, y - h / 2, w, h);
+    }
+  }
+
+  // health bar floating above a boss (bug = the boss object with .hp).
+  // It follows the boss exactly — off-screen boss, off-screen bar.
+  function drawBossBar(bug, maxHp, spriteH, bar) {
+    var frac = clamp(bug.hp / maxHp, 0, 1);
+    var bx = bug.x;
+    var by = bug.y - spriteH / 2 - 22;
+    if (by < 8) by = bug.y + spriteH / 2 + 14;
     ctx.save();
-    ctx.textAlign = 'center';
-    ctx.fillStyle = G.overlay.color;
-    glow(G.overlay.color, 20, () => { ctx.font = 'bold 30px monospace'; ctx.fillText(G.overlay.text, W / 2, H * 0.42); });
-    if (G.over) { ctx.font = 'bold 18px monospace'; ctx.fillStyle = '#fff'; ctx.fillText('SCORE ' + G.score, W / 2, H * 0.42 + 36); }
+    ctx.fillStyle = 'rgba(0,0,0,0.55)';
+    ctx.fillRect(bx - bar.w / 2 - 2, by - 2, bar.w + 4, C.BOSSBAR.h + 4);
+    ctx.fillStyle = 'rgba(255,255,255,0.18)';
+    ctx.fillRect(bx - bar.w / 2, by, bar.w, C.BOSSBAR.h);
+    ctx.fillStyle = bar.color;
+    ctx.fillRect(bx - bar.w / 2, by, bar.w * frac, C.BOSSBAR.h);
     ctx.restore();
   }
 
-  function drawStartScreen(now) {
-    ctx.textAlign = 'center';
-    glow('#ff4fa3', 24, () => { ctx.fillStyle = '#ff7ec2'; ctx.font = 'bold 38px monospace'; ctx.fillText('ASTROBUGZ', W / 2, H * 0.36); });
-    ctx.fillStyle = '#cbd5e1'; ctx.font = '16px monospace';
-    const pulse = 0.6 + 0.4 * Math.sin(now * 0.004);
-    ctx.globalAlpha = pulse; ctx.fillText('TAP & HOLD TO PLAY', W / 2, H * 0.5); ctx.globalAlpha = 1;
-    ctx.fillStyle = '#94a3b8'; ctx.font = '13px monospace';
-    ctx.fillText('Drag to move • auto-fire', W / 2, H * 0.56);
-    ctx.fillText('Desktop: hold mouse / arrow keys', W / 2, H * 0.60);
+  function renderBackground() {
+    ctx.fillStyle = '#000';
+    ctx.fillRect(0, 0, W, H);
+    var img = IMG[C.BACKGROUND.tile];
+    if (img.complete && img.naturalWidth) {
+      ctx.globalAlpha = C.BACKGROUND.opacity;
+      var t = C.BACKGROUND.tileSize;
+      for (var y = bgY - t; y < H + t; y += t)
+        for (var x = -162; x < W; x += t)
+          ctx.drawImage(img, x, y, t, t);
+      ctx.globalAlpha = 1;
+    }
+    var starImg = IMG[C.STARS.sprite];
+    for (var i = 0; i < stars.length; i++) {
+      var s = stars[i];
+      ctx.globalAlpha = s.opacity;
+      if (starImg.complete && starImg.naturalWidth) {
+        var sz = 16 * s.scale;
+        ctx.drawImage(starImg, s.x - sz / 2, s.y - sz / 2, sz, sz);
+      }
+    }
+    ctx.globalAlpha = 1;
   }
 
-  /* ===================================================================== */
-  /*  PUBLIC API                                                           */
-  /* ===================================================================== */
-  function boot() {
-    resize(); initStars();
-    G = freshState();
+  function renderTitle() {
+    ctx.fillStyle = '#000';               // the original title is plain black
+    ctx.fillRect(0, 0, W, H);
+    // animated ASTROBUGZ logo: 8 frames of 75x14 stacked in a 128x128 sheet
+    var frame = Math.floor(titleTime * 10) % 8;
+    drawFrame(C.UI.titleSheet, 1, 1 + frame * 16, 75, 14, W / 2, 144, 600, 112);
+    drawSprite(C.UI.titlePoints, W / 2, 273, 292, 40);
+    drawSprite(C.UI.titleTable, W / 2, 546, 352, 412);
+    drawSprite(C.UI.titleDashes, W / 2, 919, 320, 40);
+    var handX = 368 + 100 * Math.sin(titleTime * Math.PI * 2 / 2);
+    drawSprite(C.UI.titleHand, handX, 1024, 112, 120);
+    // copyright line (green, like the original's tinted sprite font)
+    Font.draw(ctx, C.TITLE.copyright, W / 2, 1208, 0.5, 10, 'center', C.TITLE.copyrightColor);
+  }
+
+  function renderGame() {
+    ctx.save();
+    if (G.shake.t > 0) {
+      var m = G.shake.mag * (G.shake.t / C.SHAKE.time);
+      ctx.translate(rnd(-m, m), rnd(-m, m));
+    }
+    renderBackground();
+
+    // mushrooms
+    for (var i = 0; i < G.mushrooms.length; i++) {
+      var mu = G.mushrooms[i];
+      drawSprite(mu.poison ? C.MUSHROOMS.poisonSprite : C.MUSHROOMS.sprite,
+                 mu.x, mu.y, C.MUSHROOMS.w, C.MUSHROOMS.h);
+    }
+    // centipede
+    for (var s = 0; s < G.segments.length; s++) {
+      var seg = G.segments[s];
+      drawSprite(seg.head ? C.CENTIPEDE.headSprite : C.CENTIPEDE.bodySprite,
+                 seg.x, seg.y, C.CENTIPEDE.size, C.CENTIPEDE.size);
+    }
+    // bugs
+    if (G.scorpion) {
+      var sc = G.scorpion;
+      ctx.save();
+      ctx.translate(sc.x, sc.y);
+      if (sc.dir < 0) ctx.scale(-1, 1);            // mirrored when heading left
+      var scImg = IMG[C.SCORPION.sprite];
+      if (scImg.complete && scImg.naturalWidth)
+        ctx.drawImage(scImg, -C.SCORPION.w / 2, -C.SCORPION.h / 2, C.SCORPION.w, C.SCORPION.h);
+      ctx.restore();
+    }
+    if (G.spider)
+      drawSprite(C.SPIDER.sprite, G.spider.x, G.spider.y, C.SPIDER.w, C.SPIDER.h,
+                 C.SPIDER.wobbleDeg * Math.sin(G.spider.wobblePhase));
+    if (G.flea)
+      drawSprite(C.FLEA.sprites[G.flea.frame], G.flea.x, G.flea.y, C.FLEA.w, C.FLEA.h);
+    if (G.spiderBoss) {
+      drawSprite(C.SPIDERBOSS.sprite, G.spiderBoss.x, G.spiderBoss.y,
+                 C.SPIDERBOSS.w, C.SPIDERBOSS.h);
+      drawBossBar(G.spiderBoss, C.SPIDERBOSS.hp, C.SPIDERBOSS.h, C.BOSSBAR.spiderboss);
+    }
+    if (G.megaBoss) { // drawn rotated 90° like the original (screen footprint 228x204)
+      drawSprite(C.MEGABOSS.sprites[G.megaBoss.frame], G.megaBoss.x, G.megaBoss.y,
+                 C.MEGABOSS.h, C.MEGABOSS.w, 90);
+      drawBossBar(G.megaBoss, C.MEGABOSS.hp, C.MEGABOSS.h, C.BOSSBAR.megaboss);
+    }
+    // enemy shots
+    for (var e = 0; e < G.enemyShots.length; e++) {
+      var sh = G.enemyShots[e];
+      if (sh.kind === 'bossbullet')
+        drawSprite(C.BOSSBULLET.sprite, sh.x, sh.y, C.BOSSBULLET.w, C.BOSSBULLET.h, sh.angle);
+      else if (sh.kind === 'laser')
+        drawSprite(C.LASER.sprite, sh.x, sh.y, C.LASER.h, C.LASER.w, 90);
+      else if (sh.kind === 'rocket') {
+        var rf = sh.frame | 0;
+        var rsheet = rf < 2 ? C.ROCKET.sprites[0] : C.ROCKET.sprites[1];
+        drawFrame(rsheet, 1, 1 + (rf % 2) * 13, 18, 11, sh.x, sh.y, C.ROCKET.h, C.ROCKET.w, 90);
+      } else
+        drawSprite(C.PINKBOMB.sprite, sh.x, sh.y, C.PINKBOMB.w, C.PINKBOMB.h);
+    }
+    // powerup tokens (tinted circle + letter)
+    for (var pu2 = 0; pu2 < G.powerups.length; pu2++) {
+      var tok = G.powerups[pu2];
+      var def = C.POWERUPS.types[tok.type];
+      var pulse = 1 + 0.08 * Math.sin(G.time * 6);
+      var ts = C.POWERUPS.size * pulse;
+      drawSprite(C.POWERUPS.sprite, tok.x, tok.y, ts, ts);
+      ctx.save();
+      ctx.strokeStyle = def.color;
+      ctx.lineWidth = 4;
+      ctx.beginPath();
+      ctx.arc(tok.x, tok.y, ts / 2 + 4, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.restore();
+      Font.draw(ctx, def.letter, tok.x, tok.y, C.POWERUPS.letterScale, 0, 'center', '#1e1140');
+    }
+
+    // player (flickers during shield i-frames) + shield rings + bullets
+    if (G.player.visible) {
+      var invuln = G.time < G.player.invulnUntil;
+      if (!invuln || Math.floor(G.time * 12) % 2 === 0)
+        drawSprite(C.PLAYER.sprite, G.player.x, G.player.y, C.PLAYER.w, C.PLAYER.h);
+      for (var sr = 0; sr < G.player.shields; sr++) {
+        ctx.save();
+        ctx.strokeStyle = C.POWERUPS.types.shield.color;
+        ctx.globalAlpha = 0.55 + 0.25 * Math.sin(G.time * 5 + sr);
+        ctx.lineWidth = 3;
+        ctx.beginPath();
+        ctx.arc(G.player.x, G.player.y, 52 + sr * 9, 0, Math.PI * 2);
+        ctx.stroke();
+        ctx.restore();
+      }
+    }
+    for (var b = 0; b < G.bullets.length; b++)
+      drawSprite(C.BULLET.sprite, G.bullets[b].x, G.bullets[b].y, C.BULLET.w, C.BULLET.h);
+
+    // sweep flashes (life-lost mushroom bonus)
+    for (var sw = 0; sw < G.sweep.length; sw++) {
+      var sp = G.sweep[sw];
+      if (sp.done && sp.t < 0.5) {
+        ctx.globalAlpha = sp.t < 0.4 ? 1 : (1 - (sp.t - 0.4) / 0.1);
+        drawSprite(C.UI.scoreMushroom, sp.x, sp.y, 20, 20);
+        ctx.globalAlpha = 1;
+      }
+    }
+
+    // explosions (7 frames of 140px, then fade)
+    for (var x2 = 0; x2 < G.explosions.length; x2++) {
+      var ex = G.explosions[x2];
+      var f = Math.min(C.EXPLOSION.frames - 1, Math.floor(ex.t * C.EXPLOSION.fps));
+      var animEnd = C.EXPLOSION.frames / C.EXPLOSION.fps;
+      var alpha = ex.t < animEnd ? 1 : Math.max(0, 1 - (ex.t - animEnd) / C.EXPLOSION.fadeTime);
+      ctx.globalAlpha = alpha;
+      var col = f % 3, row = Math.floor(f / 3);
+      drawFrame(C.EXPLOSION.sheet, 1 + col * 142, 1 + row * 142, 140, 140,
+                ex.x, ex.y, C.EXPLOSION.size, C.EXPLOSION.size);
+      ctx.globalAlpha = 1;
+    }
+    // particles
+    var pimg = IMG[C.PARTICLES.sprite];
+    for (var p2 = 0; p2 < G.particles.length; p2++) {
+      var pp = G.particles[p2];
+      ctx.globalAlpha = Math.max(0, 1 - pp.t / C.PARTICLES.life);
+      if (pimg.complete) ctx.drawImage(pimg, pp.x - 6, pp.y - 6, C.PARTICLES.size, C.PARTICLES.size);
+      ctx.globalAlpha = 1;
+    }
+
+    // score popups (sprite font, scale .5, brief fade)
+    for (var po = 0; po < G.popups.length; po++) {
+      var pu = G.popups[po];
+      ctx.globalAlpha = pu.t < 0.2 ? 1 : Math.max(0, 1 - (pu.t - 0.2) / 0.2);
+      Font.draw(ctx, pu.text, pu.x, pu.y, 0.5, -1, 'center');
+      ctx.globalAlpha = 1;
+    }
+    // banners (DOUBLE FIRE etc.)
+    for (var ba = 0; ba < G.banners.length; ba++) {
+      var bn = G.banners[ba];
+      ctx.globalAlpha = bn.t < bn.wait ? 1 : Math.max(0, 1 - (bn.t - bn.wait) / bn.fade);
+      drawSprite(bn.img, bn.x, bn.y, bn.w, bn.h);
+      ctx.globalAlpha = 1;
+    }
+    // LEVEL n
+    if (G.levelText) {
+      var lt = G.levelText;
+      ctx.globalAlpha = lt.t < 1 ? 1 : Math.max(0, 1 - (lt.t - 1) / 0.5);
+      Font.draw(ctx, lt.text, W / 2, H / 2, 1.75, 10, 'center');
+      ctx.globalAlpha = 1;
+    }
+    // sweep "SCORE nnn" readout
+    if (G.state === ST_LIFELOST && G.sweepStarted) {
+      Font.draw(ctx, 'SCORE', W / 2, H / 2, 1.75, 10, 'center');
+      Font.draw(ctx, String(G.score), W / 2, H / 2 + 60, 1.75, 10, 'center');
+    }
+
+    // HUD: white bar + 6-digit score at the bottom right (like the original)
+    drawSprite(C.UI.hudBar, W / 2, 1152, 648, 28);
+    Font.draw(ctx, ('00000' + G.score).slice(-6), 686, 1162 + 19, 1, 1, 'right');
+
+    // BOMB white-out flash
+    if (G.flash > 0) {
+      ctx.globalAlpha = Math.min(1, G.flash / 0.25) * 0.8;
+      ctx.fillStyle = '#fff';
+      ctx.fillRect(0, 0, W, H);
+      ctx.globalAlpha = 1;
+    }
+
+    // game over veil + pixel logo (the HTML overlay sits on top of this)
+    if (G.state === ST_GAMEOVER) {
+      ctx.globalAlpha = 0.9;
+      ctx.fillStyle = '#000';
+      ctx.fillRect(0, 0, W, H);
+      ctx.globalAlpha = 1;
+      drawSprite(C.UI.gameOverImg, W / 2, 345, 342, 225);
+    }
+
+    ctx.restore();
+  }
+
+  /* ================================================================= LOOP == */
+  var lastT = 0;
+  function frame(t) {
     requestAnimationFrame(frame);
+    var dt = Math.min(0.1, (t - lastT) / 1000 || 0);
+    lastT = t;
+    if (canvas.clientWidth !== view.cw || canvas.clientHeight !== view.ch) resize();
+
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    ctx.fillStyle = '#000';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    ctx.setTransform(view.scale, 0, 0, view.scale, view.ox, view.oy);
+    ctx.imageSmoothingEnabled = false;
+
+    if (screen === SCREEN_TITLE) {
+      titleTime += dt;
+      if (!startupPlayed && input.tapped) { /* audio unlocks on first tap */ }
+      renderTitle();
+      if (input.tapped) {
+        input.tapped = false;
+        if (!startupPlayed) { startupPlayed = true; Sound.play('startup'); }
+        startGame();
+      }
+    } else {
+      input.tapped = false;
+      if (!paused) update(dt);
+      renderGame();
+    }
   }
 
-  const AstroGame = {
-    start() {
-      if (G && G.started) return;
-      if (!G) boot();
-      G.started = true; G.runStart = performance.now();
-      startLevel(true);
-      G._bossSpawnedThisLevel = false;
-      Audio.music(true);
-    },
-    restart() { const muted = false; G = freshState(); G.started = true; startLevel(true); Audio.music(true); },
-    setPaused(v) { if (G) { G.paused = !!v; Audio.music(!v); } },
-    setMuted(v) { Audio.setMuted(!!v); },
-    get state() { return G; },
-  };
-  window.AstroGame = AstroGame;
+  function startGame() {
+    screen = SCREEN_GAME;
+    G = newRun();
+    seedMushrooms();
+    seedStars();
+    // tell the backend a round just started (anti-cheat round token)
+    if (window.AstroBridge && window.AstroBridge.roundStart) window.AstroBridge.roundStart();
+    Sound.play('beat');   // the original plays one beat at layout start
+  }
 
-  boot();
+  /* ============================================================ PUBLIC API == */
+  window.AstroGame = {
+    start: startGame,
+    restart: function () { startGame(); },
+    setPaused: function (p) { paused = !!p; },
+    setMuted: function (m) { Sound.setMuted(!!m); },
+    state: function () {
+      return G ? { score: G.score, level: G.level, state: G.state,
+                   segments: G.segments.length, mushrooms: G.mushrooms.length,
+                   shields: G.player ? G.player.shields : 0,
+                   powerups: G.powerups.length }
+               : { screen: 'title' };
+    },
+  };
+
+  // dev hook (only with ?debug=1): poke the live game from the console
+  if (new URLSearchParams(location.search).get('debug') === '1') {
+    window.AstroGame._dev = {
+      run: function () { return G; },
+      powerup: applyPowerup,
+      hitPlayer: hitPlayer,
+    };
+  }
+
+  resize();
+  requestAnimationFrame(frame);
 })();

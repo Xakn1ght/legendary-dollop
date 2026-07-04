@@ -59,6 +59,9 @@ JOB_SCHEDULES = {
     "reminder_unclaimed_star_rewards_job": {"type": "interval", "hours": 12},
     "cleanup_draft_orders_job": {"type": "interval", "minutes": 10},
     "season_reset_job": {"type": "interval", "hours": 12},  # rotate season + expire coupons
+    # Idempotent: no-ops until a new month starts, then mints last month's
+    # arcade leaderboard prize coupons exactly once.
+    "arcade_monthly_prizes_job": {"type": "interval", "hours": 6},
 }
 
 _job_schedules_path = str(CORE_DIR / "job_schedules.json")

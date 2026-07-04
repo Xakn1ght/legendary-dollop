@@ -130,6 +130,22 @@ class DailyGamePlay(Base):
     user = relationship("User")
 
 
+class ArcadeFlag(Base):
+    """Anti-cheat audit trail: arcade submits rejected by the round-token /
+    plausibility gate (2026-07-03). Reviewed via /api/admin/arcade/flags."""
+    __tablename__ = "arcade_flags"
+
+    id = Column(Integer, primary_key=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    score = Column(Integer, default=0, nullable=False)
+    claimed_duration = Column(Integer, default=0, nullable=False)   # client-claimed seconds
+    server_elapsed = Column(Integer, nullable=True)                 # token age; None = no/invalid token
+    reason = Column(String(40), nullable=False)                     # no_token | implausible_score
+    created_at = Column(DateTime, default=datetime.datetime.utcnow)
+
+    user = relationship("User")
+
+
 class UserAnalytics(Base):
     """Daily user behavior analytics."""
     __tablename__ = "user_analytics"

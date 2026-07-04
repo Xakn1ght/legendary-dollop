@@ -1,13 +1,11 @@
 import re
-from datetime import datetime
-from typing import Any, List, Literal, Optional
+from typing import Literal, Optional
 
 from pydantic import (
     BaseModel,
     ConfigDict,
     Field,
     field_validator,
-    model_validator,
 )
 
 
@@ -41,7 +39,12 @@ class ArcadeSubmitRequest(BaseModel):
         max_length=40,
         description="Display name for leaderboard"
     )
-    
+    round_token: Optional[str] = Field(
+        default=None,
+        max_length=64,
+        description="Single-use token from /api/arcade/round-start (required for rewards)"
+    )
+
     @field_validator('display_name')
     @classmethod
     def sanitize_display_name(cls, v: Optional[str]) -> Optional[str]:

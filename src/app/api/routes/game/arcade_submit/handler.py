@@ -4,6 +4,7 @@ from aiohttp import web
 
 from app.api.deps import _verify_webapp_auth
 from app.api.routes.game.common import logger
+from app.api.routes.game.round_start import consume_round_token
 from app.api.schemas import ArcadeSubmitRequest, validate_request
 from app.core.settings import GAME_REWARDS
 from app.database import crud
@@ -26,6 +27,7 @@ async def handle_arcade_submit(request: web.Request):
     duration = validated.duration
     is_practice = validated.practice
     display_name = validated.display_name or ""
+    round_token = validated.round_token or ""
 
     user_chat_id, _new_session_token = _verify_webapp_auth(request)
     if not user_chat_id:
@@ -40,15 +42,23 @@ async def handle_arcade_submit(request: web.Request):
         if not user:
             return web.json_response({"ok": False, "error": "not_registered"}, status=403)
 
+        # Practice runs are recorded for analytics only — they never touch
+        # best_score, so they can't reach any leaderboard or prize ranking.
         if is_practice:
-            await crud.save_game_play(session, user.id, score, duration, display_name, rewarded=False)
+            await crud.save_game_play(
+                session, user.id, score, duration, display_name,
+                rewarded=False, count_for_leaderboard=False,
+            )
             return web.json_response({"ok": True, "practice": True, "score": score, "message": "Practice mode - no rewards"})
 
         today = date.today()
         existing_play = await crud.check_daily_game_play(session, user.id, today)
 
         if existing_play and existing_play.rewarded:
-            await crud.save_game_play(session, user.id, score, duration, display_name, rewarded=False)
+            await crud.save_game_play(
+                session, user.id, score, duration, display_name,
+                rewarded=False, count_for_leaderboard=False,
+            )
             return web.json_response(
                 {
                     "ok": True,
@@ -58,9 +68,40 @@ async def handle_arcade_submit(request: web.Request):
                 }
             )
 
+        # ── Anti-cheat gate ─────────────────────────────────────────────
+        # 1. A valid single-use round token must exist (issued when the round
+        #    started). Consuming it yields the SERVER-measured round length —
+        #    the client cannot lie about duration or replay a submit.
+        server_elapsed = await consume_round_token(round_token, user_chat_id)
+        if server_elapsed is None:
+            logger.warning(f"[ARCADE] Rejected submit without valid round token: user={user_chat_id} score={score}")
+            await crud.add_arcade_flag(session, user.id, score, duration, None, "no_token")
+            await crud.save_game_play(
+                session, user.id, score, duration, display_name,
+                rewarded=False, count_for_leaderboard=False,
+            )
+            return web.json_response(
+                {
+                    "ok": True,
+                    "rejected": True,
+                    "score": score,
+                    "message": "Round could not be verified. Please reopen the game and try again.",
+                }
+            )
+
+        # 2. Plausibility: server-side elapsed time bounds the duration, and
+        #    the score is capped by a generous points-per-second ceiling.
         min_duration = GAME_REWARDS.get("min_session_seconds", 20)
-        if duration < min_duration:
-            await crud.save_game_play(session, user.id, score, duration, display_name, rewarded=False)
+        duration_slack = GAME_REWARDS.get("duration_slack_seconds", 30)
+        max_rate = GAME_REWARDS.get("max_points_per_second", 500)
+        max_score = GAME_REWARDS.get("max_score_absolute", 500_000)
+        effective_duration = min(duration, server_elapsed + duration_slack)
+
+        if server_elapsed < min_duration:
+            await crud.save_game_play(
+                session, user.id, score, duration, display_name,
+                rewarded=False, count_for_leaderboard=False,
+            )
             return web.json_response(
                 {
                     "ok": True,
@@ -69,6 +110,27 @@ async def handle_arcade_submit(request: web.Request):
                     "message": f"Game too short. Play at least {min_duration} seconds for rewards!",
                 }
             )
+
+        if score > max_score or score > max_rate * max(server_elapsed, 1):
+            logger.warning(
+                f"[ARCADE] Rejected implausible score: user={user_chat_id} score={score} "
+                f"server_elapsed={server_elapsed}s client_duration={duration}s"
+            )
+            await crud.add_arcade_flag(session, user.id, score, duration, server_elapsed, "implausible_score")
+            await crud.save_game_play(
+                session, user.id, 0, effective_duration, display_name,
+                rewarded=False, count_for_leaderboard=False,
+            )
+            return web.json_response(
+                {
+                    "ok": True,
+                    "rejected": True,
+                    "score": score,
+                    "message": "Score could not be validated.",
+                }
+            )
+
+        duration = effective_duration
 
         thresholds = GAME_REWARDS.get("thresholds", [])
         credits = 0
@@ -139,6 +201,8 @@ async def handle_arcade_submit(request: web.Request):
             notes=f"Score: {score} | {credits} Cr, {xp} XP, {star_pieces} pieces, {stars_awarded} stars",
         )
 
+        # The single validated daily run is the ONLY thing that sets
+        # best_score — leaderboards and monthly prizes rank exactly this.
         await crud.save_game_play(
             session,
             user.id,
@@ -149,6 +213,7 @@ async def handle_arcade_submit(request: web.Request):
             reward_credit=credits,
             reward_stars=stars_awarded,
             reward_xp=xp,
+            count_for_leaderboard=True,
         )
 
         await session.commit()
