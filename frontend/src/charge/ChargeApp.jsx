@@ -268,7 +268,9 @@ export function ChargeApp() {
 
   const cancelOrder = useCallback(async () => {
     const tt = makeT(langRef.current);
-    if (!orderIdRef.current) { goToStep(1); return; }
+    // Cancelling means "I'm done here" — leave the charge flow entirely rather
+    // than dumping the user back on the choose-a-subscription step.
+    if (!orderIdRef.current) { goToDashboard(); return; }
     const ok = await astroConfirm({
       title: tt('cancel'),
       message: tt('cancelConfirm'),
@@ -282,9 +284,9 @@ export function ChargeApp() {
         await api('/api/dashboard/charge/cancel', { method: 'POST', body: JSON.stringify({ order_id: orderIdRef.current }) });
       } catch (e) { console.error('Failed to cancel order:', e); }
       orderIdRef.current = null;
-      goToStep(1);
+      goToDashboard();
     });
-  }, [busy, goToStep]);
+  }, [busy]);
 
   const copyCardNumber = useCallback(() => {
     const tt = makeT(langRef.current);

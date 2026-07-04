@@ -1170,6 +1170,44 @@
       gap:4px;
       padding:0 8px;
     }
+    /* Gliding "liquid" indicator — a single pill that travels to the active
+       item instead of each item painting its own static background. Position
+       (translate) + size are set inline from measured item geometry; the
+       travel easing gives the same smooth, physical feel as the theme toggle. */
+    .nav-indicator{
+      position:absolute;
+      top:0;
+      left:0;
+      width:56px;
+      height:56px;
+      border-radius:16px;
+      background:rgba(var(--brandRgb), 0.14);
+      box-shadow:
+        inset 0 1px 0 rgba(255,255,255,0.18),
+        0 6px 18px rgba(var(--brandRgb), 0.22);
+      opacity:0;
+      transform-origin:center;
+      pointer-events:none;
+      z-index:1;
+      /* No travel on first paint; .glide turns it on so it snaps into place. */
+      transition:opacity 0.28s ease;
+      will-change:transform, width;
+    }
+    .nav-indicator.on{
+      opacity:1;
+    }
+    .nav-indicator.glide{
+      transition:
+        transform 0.5s cubic-bezier(0.34, 1.4, 0.5, 1),
+        width 0.42s cubic-bezier(0.34, 1.4, 0.5, 1),
+        opacity 0.28s ease;
+    }
+    [data-theme="light"] .nav-indicator{
+      background:rgba(var(--brandRgb), 0.12);
+      box-shadow:
+        inset 0 1.5px 0 rgba(255,255,255,0.95),
+        0 6px 16px rgba(var(--brandRgb), 0.16);
+    }
     [data-theme="light"] .nav-container{
       padding:0 8px;
     }
@@ -1267,6 +1305,10 @@
       top:50%;
       left:50%;
       transform:translate(-50%, -50%);
+      /* Decorative pulse ring: must never catch taps. It is larger than the
+         button and animated, so with the default pointer-events it stole clicks
+         in a shifting ring that didn't match the visible circle. */
+      pointer-events:none;
     }
     [data-theme="light"] .nav-item-notch::before{
       border:2px solid rgba(var(--brandRgb), 0.25);
@@ -1284,6 +1326,7 @@
       top:50%;
       left:50%;
       transform:translate(-50%, -50%);
+      pointer-events:none;  /* decorative ring — see ::before */
     }
     [data-theme="light"] .nav-item-notch::after{
       border:1.5px solid rgba(var(--brandRgb), 0.2);
@@ -1294,13 +1337,25 @@
       height:36px !important;
       transform:scale(1) !important;
     }
+    /* The arcade glyph is a stroke (line-art) icon: fill:none, stroke=currentColor.
+       Forcing fill + a heavy white glow turned the controller into an unreadable
+       white blob. Keep it stroked and crisp with a soft depth shadow instead. */
     .nav-item-notch .nav-item-icon svg{
       color:#fff !important;
-      fill:currentColor !important;
-      filter:drop-shadow(0 2px 12px rgba(255, 255, 255, 0.6)) drop-shadow(0 0 6px rgba(255, 255, 255, 0.9)) !important;
+      fill:none !important;
+      stroke:#fff !important;
+      filter:drop-shadow(0 2px 5px rgba(0, 0, 0, 0.28)) !important;
     }
+    /* Press feedback: the notchFloat animation owns the button's `transform`,
+       so a `:active` transform on the notch itself is dead on arrival. Scale the
+       (un-animated) inner icon and dim the button instead — reads as a real press
+       without fighting the float. */
     .nav-item-notch:active{
-      transform:scale(0.92) translateY(0px);
+      filter:brightness(0.93);
+    }
+    .nav-item-notch:active .nav-item-icon{
+      transform:scale(0.8) !important;
+      transition:transform 0.12s cubic-bezier(0.34, 1.56, 0.64, 1);
     }
     [data-theme="light"] .nav-item:not(.active):not(.nav-item-notch){
       background:transparent;
@@ -1318,6 +1373,7 @@
       opacity:0;
       transform:scale(0.7);
       transition:all 0.5s cubic-bezier(0.34, 1.56, 0.64, 1);
+      pointer-events:none;  /* decorative tap ripple, never a hit target */
     }
     .nav-item:active::before{
       opacity:0.9;
@@ -1326,7 +1382,10 @@
     .nav-item-icon{
       width:24px;
       height:24px;
-      transition:all 0.4s cubic-bezier(0.68, -0.55, 0.265, 1.55);
+      /* Explicit transform-only transition (not `all`): a snappy forward
+         overshoot for the active "pop". The old curve began with a backward
+         anticipation (-0.55) that read as lag on a tab tap. */
+      transition:transform 0.32s cubic-bezier(0.34, 1.56, 0.64, 1);
       position:relative;
       z-index:3;
     }
@@ -1335,7 +1394,18 @@
       height:100%;
       color:var(--muted);
       fill:currentColor;
-      transition:all 0.4s cubic-bezier(0.68, -0.55, 0.265, 1.55);
+      transition:color 0.24s ease-out, fill 0.24s ease-out, filter 0.24s ease-out;
+    }
+    /* Staggered fade-in as the bar first rises. Opacity-only on purpose so it
+       never fights the active-lift transform or the notch float. Runs once
+       (the .visible class is added a single time and stays). */
+    .bottom-nav.visible .nav-item-icon{
+      animation:navIconIn 0.42s ease-out backwards;
+      animation-delay:calc(var(--nav-i, 0) * 55ms + 0.14s);
+    }
+    @keyframes navIconIn{
+      from{opacity:0;}
+      to{opacity:1;}
     }
     .nav-item.active .nav-item-icon svg{
       color:#fff;
@@ -1357,15 +1427,13 @@
     }
     [data-theme="light"] .nav-item-notch .nav-item-icon svg{
       color:#fff !important;
-      fill:currentColor !important;
+      fill:none !important;
+      stroke:#fff !important;
     }
-    .nav-item.active:not(.nav-item-notch){
-      background:rgba(var(--brandRgb), 0.08);
-    }
+    /* Active background is drawn by the gliding .nav-indicator, not per-item. */
+    .nav-item.active:not(.nav-item-notch),
     [data-theme="light"] .nav-item.active:not(.nav-item-notch){
-      background:rgba(var(--brandRgb), 0.12);
-      border-radius:14px;
-      box-shadow:0 2px 8px rgba(var(--brandRgb), 0.15);
+      background:transparent;
     }
     .nav-item.active .nav-item-icon{
       transform:scale(1.2) translateY(-3px);
@@ -1430,9 +1498,17 @@
       .nav-item-icon,
       .nav-item-icon svg,
       .nav-item-label,
+      .nav-item-notch,
+      .nav-item-notch::before,
+      .nav-item-notch::after,
       .bottom-nav{
         transition:none !important;
         animation:none !important;
+      }
+      /* Indicator still repositions (that's information, not decoration) but
+         it jumps rather than glides. */
+      .nav-indicator.glide{
+        transition:opacity 0.2s ease !important;
       }
     }
     /* Subtle content loading effect and disable the full-screen overlay */

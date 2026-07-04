@@ -63,7 +63,14 @@ async def handle_dashboard_referrals(request: web.Request):
                 bot_username = "AstroByteBot"
             
             referral_link = f"https://t.me/{bot_username}?start={user.referral_code}" if user.referral_code else None
-            
+
+            # Whether the user has already been attributed to a referrer — the
+            # Rewards page uses this to show/hide the "enter a friend's code" box.
+            existing_ref = await session.execute(
+                select(Referral).filter(Referral.referee_id == user.id)
+            )
+            has_referrer = existing_ref.scalars().first() is not None
+
             resp = web.json_response(
                 {
                     "ok": True,
@@ -72,6 +79,7 @@ async def handle_dashboard_referrals(request: web.Request):
                     "earned": total_earned,
                     "referral_code": user.referral_code,
                     "referral_link": referral_link,
+                    "has_referrer": has_referrer,
                     "referrals": referral_list[:20],  # Limit to 20 most recent
                 }
             )

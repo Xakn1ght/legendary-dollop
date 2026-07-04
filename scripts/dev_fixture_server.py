@@ -251,6 +251,7 @@ async def notif_mark_read(_): return j({"ok": True})
 async def notif_clear(_): return j({"ok": True})
 async def referrals(_): return j({"ok": True, "referral_code": "FRIEND",
                                   "referral_link": "https://t.me/AstroByteBot?start=FRIEND",
+                                  "has_referrer": False,
                                   "total": 7, "active": 3, "earned": 145000,
                                   "referrals": [
                                       {"full_name": "Ali R.", "username": "ali", "is_active": True},

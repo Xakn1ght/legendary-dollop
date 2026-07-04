@@ -164,6 +164,40 @@ export function TasksPage() {
     } else copyRefLink();
   };
 
+  // ── Enter a friend's invite code (moved off the old first-launch screen) ──
+  const [friendCode, setFriendCode] = useState('');
+  const [friendMsg, setFriendMsg] = useState(null); // { type:'error'|'ok', text }
+  const [friendBusy, setFriendBusy] = useState(false);
+  const submitFriendCode = async () => {
+    const code = friendCode.trim().toUpperCase();
+    if (!/^[A-Z0-9]{6}$/.test(code)) {
+      setFriendMsg({ type: 'error', text: tt('friendCodeErrFormat') });
+      return;
+    }
+    setFriendBusy(true);
+    setFriendMsg(null);
+    try {
+      const res = await api('/api/dashboard/referrals/enter', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ referral_code: code }),
+      });
+      if (res && res.ok) {
+        setFriendMsg({ type: 'ok', text: tt('friendCodeApplied') });
+        setFriendCode('');
+        hapticNotify('success');
+        fetchReferrals();
+      } else {
+        const map = { invalid_format: 'friendCodeErrFormat', invalid_code: 'friendCodeErrInvalid', own_code: 'friendCodeErrOwn', already_used: 'friendCodeErrUsed' };
+        setFriendMsg({ type: 'error', text: tt(map[res && res.error] || 'friendCodeErrServer') });
+        hapticNotify('error');
+      }
+    } catch (_) {
+      setFriendMsg({ type: 'error', text: tt('friendCodeErrServer') });
+    }
+    setFriendBusy(false);
+  };
+
   // ── Redeem sheet ────────────────────────────────────────────────
   const voucherOptions = (reward) => {
     const opts = [];
@@ -419,6 +453,32 @@ export function TasksPage() {
           <div className="referral-code-row">
             <div className="referral-code" id="referralCode">{referralData?.referral_code || '—'}</div>
           </div>
+
+          {referralData?.has_referrer === false && (
+            <div className="friend-code-box">
+              <div className="friend-code-label">{tt('friendCodeTitle')}</div>
+              <div className="friend-code-row">
+                <input
+                  className={`friend-code-input${friendMsg?.type === 'error' ? ' is-error' : ''}`}
+                  type="text"
+                  inputMode="text"
+                  maxLength={6}
+                  autoComplete="off"
+                  autoCorrect="off"
+                  spellCheck={false}
+                  placeholder={tt('friendCodePlaceholder')}
+                  value={friendCode}
+                  onChange={(e) => { setFriendCode(e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, '')); setFriendMsg(null); }}
+                  onKeyDown={(e) => { if (e.key === 'Enter') submitFriendCode(); }}
+                />
+                <button className="friend-code-btn" type="button" disabled={friendBusy || friendCode.length !== 6} onClick={submitFriendCode}>
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" width="18" height="18"><path d="M5 12h14M12 5l7 7-7 7" /></svg>
+                </button>
+              </div>
+              {friendMsg && <div className={`friend-code-msg is-${friendMsg.type}`}>{friendMsg.text}</div>}
+            </div>
+          )}
+
           <div className="referral-stats">
             <div className="ref-stat">
               <div id="refTotal">{fmt(referralData?.total || 0)}</div>

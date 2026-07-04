@@ -485,7 +485,7 @@ export function PurchaseApp() {
             t={t} fmt={fmt} lang={lang}
             plans={plans}
             autoDiscounts={userInfo?.auto_discounts}
-            showReferral={!!userInfo && !userInfo.has_referrer && !userInfo.is_og}
+            showReferral={!!userInfo && !userInfo.has_referrer}
             autoRenewal={autoRenewal}
             onAutoRenewalChange={onAutoRenewalChange}
             selectedRenewalPlan={selectedRenewalPlan}

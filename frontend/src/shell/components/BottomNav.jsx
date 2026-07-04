@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useLayoutEffect, useRef, useState } from 'react';
 
 import { hapticImpact } from '../../shared/telegram.js';
 
@@ -52,15 +52,84 @@ const NAV_ITEMS = [
   },
 ];
 
+const prefersReducedMotion = () => {
+  try { return window.matchMedia('(prefers-reduced-motion: reduce)').matches; }
+  catch (_) { return false; }
+};
+
 export function BottomNav({ t, activePage, onNavigate }) {
   const [visible, setVisible] = useState(false);
   const [bouncing, setBouncing] = useState(null);
+  // Gliding "liquid" indicator that travels to the active item. `glide` gates
+  // the travel transition so it snaps into place on first paint instead of
+  // sliding in from the left edge. `sx` is a transient horizontal stretch that
+  // makes the pill bulge in the direction of travel, then settle — the same
+  // liquid feel as the theme toggle.
+  const [indicator, setIndicator] = useState({ x: 0, y: 0, w: 0, h: 0, on: false, sx: 1 });
+  const [glide, setGlide] = useState(false);
   const bounceTimer = useRef(null);
+  const stretchTimer = useRef(null);
+  const prevXRef = useRef(null);
+  const glideRef = useRef(false);
+  const containerRef = useRef(null);
+  const itemRefs = useRef({});
 
   useEffect(() => {
     const timer = setTimeout(() => setVisible(true), 300);
-    return () => { clearTimeout(timer); clearTimeout(bounceTimer.current); };
+    return () => { clearTimeout(timer); clearTimeout(bounceTimer.current); clearTimeout(stretchTimer.current); };
   }, []);
+
+  // Measure the active item and park the indicator under it. The notch is its
+  // own floating button, so the pill hides while arcade is active. `travel`
+  // (only on a real tab change) triggers the liquid stretch.
+  const positionIndicator = (travel) => {
+    const container = containerRef.current;
+    const el = itemRefs.current[activePage];
+    const item = NAV_ITEMS.find((i) => i.page === activePage);
+    if (!container || !el || !item || item.notch) {
+      prevXRef.current = null;
+      setIndicator((prev) => (prev.on ? { ...prev, on: false, sx: 1 } : prev));
+      return;
+    }
+    const c = container.getBoundingClientRect();
+    const b = el.getBoundingClientRect();
+    const x = b.left - c.left;
+
+    let sx = 1;
+    const dist = prevXRef.current == null ? 0 : Math.abs(x - prevXRef.current);
+    if (travel && dist > 4 && glideRef.current && !prefersReducedMotion()) {
+      // Bulge grows with distance, capped so a home↔profile jump stays tasteful.
+      sx = 1 + Math.min(dist / 190, 1) * 0.34;
+      clearTimeout(stretchTimer.current);
+      // Relax mid-flight so the pill arrives settled, not stretched.
+      stretchTimer.current = setTimeout(() => {
+        setIndicator((prev) => ({ ...prev, sx: 1 }));
+      }, 210);
+    }
+    prevXRef.current = x;
+    setIndicator({ x, y: b.top - c.top, w: b.width, h: b.height, on: true, sx });
+  };
+
+  useLayoutEffect(() => { positionIndicator(true); }, [activePage, visible]);
+
+  // Enable the travel transition only after the first placement.
+  useEffect(() => {
+    const id = requestAnimationFrame(() => { glideRef.current = true; setGlide(true); });
+    return () => cancelAnimationFrame(id);
+  }, []);
+
+  // Re-measure on viewport change and on language flip (RTL reorders items).
+  // These are layout corrections, not navigations, so they never stretch.
+  useEffect(() => {
+    const reflow = () => positionIndicator(false);
+    window.addEventListener('resize', reflow);
+    window.addEventListener('tma:lang', reflow);
+    return () => {
+      window.removeEventListener('resize', reflow);
+      window.removeEventListener('tma:lang', reflow);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- positionIndicator reads latest activePage via closure recreation
+  }, [activePage]);
 
   const handleClick = (page) => {
     hapticImpact('light');
@@ -73,12 +142,23 @@ export function BottomNav({ t, activePage, onNavigate }) {
 
   return (
     <nav className={`bottom-nav${visible ? ' visible' : ''}`}>
-      <div className="nav-container">
-        {NAV_ITEMS.map((item) => (
+      <div className="nav-container" ref={containerRef}>
+        <span
+          className={`nav-indicator${indicator.on ? ' on' : ''}${glide ? ' glide' : ''}`}
+          aria-hidden="true"
+          style={{
+            transform: `translate(${indicator.x}px, ${indicator.y}px) scaleX(${indicator.sx})`,
+            width: `${indicator.w}px`,
+            height: `${indicator.h}px`,
+          }}
+        />
+        {NAV_ITEMS.map((item, i) => (
           <div
             key={item.page}
+            ref={(el) => { itemRefs.current[item.page] = el; }}
             className={`nav-item${item.notch ? ' nav-item-notch' : ''}${activePage === item.page ? ' active' : ''}${bouncing === item.page ? ' bouncing' : ''}`}
             data-page={item.page}
+            style={{ '--nav-i': i }}
             role="button"
             tabIndex={0}
             onClick={() => handleClick(item.page)}

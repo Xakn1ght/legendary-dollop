@@ -10,7 +10,6 @@ import { BottomNav } from './components/BottomNav.jsx';
 import { Header } from './components/Header.jsx';
 import { NotificationsPanel } from './components/NotificationsPanel.jsx';
 import { AddSubSheet, ConfirmRemoveSheet, ExportModal } from './components/ShellSheets.jsx';
-import { WelcomeScreen } from './components/WelcomeScreen.jsx';
 import { fmtNum } from './format.js';
 import { HomePage } from './home/HomePage.jsx';
 import { ShellContext } from './ShellContext.js';
@@ -104,7 +103,6 @@ export function ShellApp() {
   const [addSheetOpen, setAddSheetOpen] = useState(false);
   const [removeTarget, setRemoveTarget] = useState(null); // { label, id }
   const [exportState, setExportState] = useState(null);   // { link, showQRFirst }
-  const [welcome, setWelcome] = useState(null);           // { ownCode, hasUsedRef }
   const [authHelp, setAuthHelp] = useState(false);
   const [notRegistered, setNotRegistered] = useState(false);
   const [dataLoading, setDataLoading] = useState(false);
@@ -118,6 +116,11 @@ export function ShellApp() {
   const overviewAbortRef = useRef(null);
   const lastOverviewUpdateRef = useRef(null);
   const notifPollRef = useRef(null);
+  const notifDelayRef = useRef(5000);
+  const notifSigRef = useRef('');
+  const notifStopRef = useRef(false);
+  const notifHiddenRef = useRef(typeof document !== 'undefined' && document.hidden);
+  const notifBoostRef = useRef(null);
   langRef.current = lang;
   pageRef.current = page;
   currentSubIdRef.current = currentSubId;
@@ -418,12 +421,23 @@ export function ShellApp() {
     try {
       const data = await api('/api/dashboard/notifications');
       if (data.ok) {
-        setNotifications(data.notifications || []);
+        const list = data.notifications || [];
+        setNotifications(list);
         setUnreadCount(data.unread_count || 0);
+        // Adaptive cadence: reset to fast on any change, otherwise ease the
+        // interval up so an idle app stops polling every 5s (battery/data).
+        const sig = `${data.unread_count || 0}|${list.map((n) => `${n.id}:${n.read ? 1 : 0}`).join(',')}`;
+        if (sig !== notifSigRef.current) {
+          notifSigRef.current = sig;
+          notifDelayRef.current = 5000;
+        } else {
+          notifDelayRef.current = Math.min(Math.round(notifDelayRef.current * 1.6), 30000);
+        }
       }
     } catch (e) {
       if (e && e.message === 'HTTP 404') {
-        if (notifPollRef.current) { clearInterval(notifPollRef.current); notifPollRef.current = null; }
+        notifStopRef.current = true;
+        if (notifPollRef.current) { clearTimeout(notifPollRef.current); notifPollRef.current = null; }
       }
     }
   }, []);
@@ -615,17 +629,6 @@ export function ShellApp() {
         } finally { setPrefsApplying(false); }
       }
 
-      // Welcome screen for first-time users.
-      const welcomeShownLocal = (() => { try { return localStorage.getItem('astro_welcome_shown') === '1'; } catch (_) { return false; } })();
-      if (!(bootPrefs && bootPrefs.welcome_shown === true) && !welcomeShownLocal) {
-        try {
-          const rr = await api('/api/dashboard/referrals');
-          if (!cancelled && rr && rr.ok) {
-            setWelcome({ ownCode: rr.referral_code || '------', hasUsedRef: !!(bootPrefs && bootPrefs.ref_entered) });
-          }
-        } catch (_) { /* ignore */ }
-      }
-
       // Geo, overview, subs.
       try {
         const result = await api('/api/dashboard/detect-country');
@@ -692,16 +695,39 @@ export function ShellApp() {
       }
     } catch (_) { setTimeout(splashOnce, 1200); }
 
-    // Notification polling (5s), paused on astro-visibility hidden.
-    fetchNotifications();
-    notifPollRef.current = setInterval(fetchNotifications, 5000);
+    // Adaptive notification polling: fast (5s) right after a change or when the
+    // user re-engages, easing to 30s while idle, and fully paused while the
+    // WebApp is hidden (astro-visibility). Beats a flat 5s poll on battery/data.
+    // A generation token makes restarts race-free: an in-flight poll whose gen
+    // was superseded by a boost/restart quietly stops instead of double-chaining.
+    let pollGen = 0;
+    const runNotifPoll = async (gen) => {
+      await fetchNotifications();
+      if (gen !== pollGen || notifStopRef.current || notifHiddenRef.current || cancelled) return;
+      notifPollRef.current = setTimeout(() => runNotifPoll(gen), notifDelayRef.current);
+    };
+    const startNotifPoll = () => {
+      if (notifPollRef.current) { clearTimeout(notifPollRef.current); notifPollRef.current = null; }
+      if (notifStopRef.current || notifHiddenRef.current || cancelled) return;
+      pollGen += 1;
+      runNotifPoll(pollGen);
+    };
+    const boostNotifPoll = () => {
+      // Snap back to the fast cadence and poll now (user is engaged again).
+      notifDelayRef.current = 5000;
+      startNotifPoll();
+    };
+    notifBoostRef.current = boostNotifPoll;
+    startNotifPoll();
     const onAstroVisibility = (e) => {
       try {
         if (e.detail && e.detail.hidden) {
-          if (notifPollRef.current) { clearInterval(notifPollRef.current); notifPollRef.current = null; }
-        } else if (!notifPollRef.current) {
-          fetchNotifications();
-          notifPollRef.current = setInterval(fetchNotifications, 5000);
+          notifHiddenRef.current = true;
+          pollGen += 1; // supersede any in-flight poll so it won't reschedule
+          if (notifPollRef.current) { clearTimeout(notifPollRef.current); notifPollRef.current = null; }
+        } else {
+          notifHiddenRef.current = false;
+          boostNotifPoll();
         }
       } catch (_) { /* ignore */ }
     };
@@ -759,7 +785,8 @@ export function ShellApp() {
 
     return () => {
       cancelled = true;
-      if (notifPollRef.current) clearInterval(notifPollRef.current);
+      if (notifPollRef.current) clearTimeout(notifPollRef.current);
+      notifBoostRef.current = null;
       if (closingTimer) clearInterval(closingTimer);
       window.removeEventListener('astro-visibility', onAstroVisibility);
       clearTimeout(swipeTimer);
@@ -798,18 +825,9 @@ export function ShellApp() {
           lang={lang}
           onLangToggle={() => setLanguage(lang === 'en' ? 'fa' : 'en')}
           unreadCount={unreadCount}
-          onBellClick={() => setPanelOpen(true)}
+          onBellClick={() => { setPanelOpen(true); notifBoostRef.current?.(); }}
           fmt={fmt}
         />
-
-        {welcome && (
-          <WelcomeScreen
-            t={t}
-            ownCode={welcome.ownCode}
-            hasUsedRef={welcome.hasUsedRef}
-            onDismiss={() => setWelcome(null)}
-          />
-        )}
 
         {updateReady && !netDown && (
           <div className="net-banner update-banner" role="status">

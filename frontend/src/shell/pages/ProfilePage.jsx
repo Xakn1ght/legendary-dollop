@@ -2,7 +2,6 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react';
 
 import { useBackClose } from '../../shared/backstack.js';
 import { getTelegramPhotoUrl, getWebApp, hapticSelection } from '../../shared/telegram.js';
-import { astroConfirm } from '../../shared/ui.js';
 import { api, getUrlAuthToken } from '../api.js';
 import { useShell } from '../ShellContext.js';
 import { showToast } from '../toast.js';
@@ -88,6 +87,9 @@ export function ProfilePage() {
   const [perfMode, setPerfMode] = useState(perfStoredMode());
   const [autoClaim, setAutoClaim] = useState({ open: false, enabled: false, subId: '', subs: [], pickerOpen: false });
   const [vip, setVip] = useState(null); // { step, plans, cardNumber, selectedPlanId, orderId, amount, receiptData, receiptName }
+  // Telegram home-screen shortcut (Bot API 8.0). Only shown when the client
+  // supports it and the icon isn't already installed.
+  const [canAddHome, setCanAddHome] = useState(false);
 
   // Back unwinds overlays innermost-first: voucher picker → auto-claim modal;
   // in the VIP modal it steps payment→plans before closing.
@@ -282,20 +284,28 @@ export function ProfilePage() {
     } catch (_) { /* ignore */ }
   };
 
-  const logout = async () => {
-    const fa = lang === 'fa';
-    const ok = await astroConfirm({
-      title: fa ? 'خروج از حساب' : 'Log out',
-      message: fa ? 'آیا مطمئن هستید؟' : 'Are you sure you want to log out?',
-      okText: fa ? 'خروج' : 'Log out',
-      cancelText: fa ? 'انصراف' : 'Cancel',
-      danger: true,
-    });
-    if (!ok) return;
-    try { localStorage.clear(); } catch (_) { /* ignore */ }
+  // Install the Mini App as a home-screen shortcut (opens straight back into
+  // Telegram, so auth keeps working — a plain PWA can't, the dashboard is
+  // Telegram-only). Re-checks status after the prompt to hide the row on add.
+  const addToHomeScreen = () => {
     const tg = getWebApp();
-    if (tg?.close) tg.close(); else window.location.href = '/';
+    if (!tg || typeof tg.addToHomeScreen !== 'function') return;
+    hapticSelection();
+    try { tg.addToHomeScreen(); } catch (_) { /* ignore */ }
+    try {
+      tg.checkHomeScreenStatus?.((status) => {
+        if (status === 'added' || status === 'unsupported') setCanAddHome(false);
+      });
+    } catch (_) { /* ignore */ }
   };
+
+  useEffect(() => {
+    const tg = getWebApp();
+    if (!tg || typeof tg.checkHomeScreenStatus !== 'function') return;
+    try {
+      tg.checkHomeScreenStatus((status) => { setCanAddHome(status === 'missed'); });
+    } catch (_) { /* ignore */ }
+  }, []);
 
   // VIP promo copy (hardcoded fa/en, legacy parity)
   const vipPromo = useMemo(() => {
@@ -675,17 +685,16 @@ export function ProfilePage() {
             desc={tt('appTutorialDesc')}
             right={<Arrow />}
           />
+          {canAddHome && (
+            <SettingsRow
+              onClick={addToHomeScreen}
+              icon={<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" width="18" height="18"><rect x="5" y="2" width="14" height="20" rx="3" /><path d="M12 7v6M9 10h6" /></svg>}
+              title={tt('addToHome')}
+              desc={tt('addToHomeDesc')}
+              right={<Arrow />}
+            />
+          )}
         </div>
-      </section>
-
-      <section className="profile-section danger-zone">
-        <div className="profile-section-title">
-          <div className="icon-box" style={{ background: 'linear-gradient(135deg, #f87171, #dc2626)' }}>
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" width="15" height="15"><path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" /><line x1="12" y1="9" x2="12" y2="13" /><line x1="12" y1="17" x2="12.01" y2="17" /></svg>
-          </div>
-          <span>{tt('dangerZone')}</span>
-        </div>
-        <button className="danger-btn" onClick={logout}>{tt('logout')}</button>
       </section>
 
       {/* ── Auto-claimer modal ── */}
