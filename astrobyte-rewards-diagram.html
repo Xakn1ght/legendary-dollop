@@ -1,0 +1,368 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>ASTROBYTE Rewards System</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --bg: #f4f7fb;
+      --ink: #111827;
+      --muted: #4b5563;
+      --line: #cbd5e1;
+      --money: #b7791f;
+      --money-bg: #fff7df;
+      --money-soft: #fffaf0;
+      --status: #2474a6;
+      --status-bg: #eaf6ff;
+      --status-soft: #f4fbff;
+      --danger: #9f1239;
+      --danger-bg: #fff1f4;
+      --disabled-bg: #eeeeee;
+      --disabled-ink: #5f6670;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    html,
+    body {
+      margin: 0;
+      min-height: 100%;
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      background: var(--bg);
+      color: var(--ink);
+    }
+
+    body {
+      padding: 18px;
+    }
+
+    main {
+      width: min(1500px, 100%);
+      margin: 0 auto;
+      background: #ffffff;
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      padding: 20px;
+    }
+
+    header {
+      display: grid;
+      grid-template-columns: 1fr auto;
+      gap: 18px;
+      align-items: center;
+      margin-bottom: 16px;
+    }
+
+    h1 {
+      margin: 0;
+      font-size: 42px;
+      line-height: 1.05;
+      letter-spacing: 0;
+    }
+
+    .subtitle {
+      margin: 7px 0 0;
+      max-width: 900px;
+      color: var(--muted);
+      font-size: 18px;
+      line-height: 1.35;
+    }
+
+    .iron-rule {
+      border: 2px solid #f0b5c5;
+      background: var(--danger-bg);
+      color: var(--danger);
+      border-radius: 10px;
+      padding: 12px 16px;
+      text-align: center;
+      font-size: 17px;
+      font-weight: 900;
+      line-height: 1.2;
+      min-width: 260px;
+    }
+
+    .worlds {
+      display: grid;
+      grid-template-columns: minmax(0, 1.18fr) minmax(0, 0.82fr);
+      gap: 18px;
+      align-items: start;
+    }
+
+    .world {
+      border: 2px solid var(--line);
+      border-radius: 12px;
+      padding: 16px;
+      min-height: 690px;
+    }
+
+    .money {
+      background: var(--money-soft);
+      border-color: #e5b94f;
+    }
+
+    .status {
+      background: var(--status-soft);
+      border-color: #78b9df;
+    }
+
+    .world-title {
+      margin: 0 0 12px;
+      display: flex;
+      align-items: baseline;
+      justify-content: space-between;
+      gap: 12px;
+      font-size: 26px;
+      line-height: 1.1;
+    }
+
+    .world-title span {
+      color: var(--muted);
+      font-size: 16px;
+      font-weight: 700;
+    }
+
+    .flow {
+      display: grid;
+      gap: 9px;
+    }
+
+    .step {
+      border: 2px solid var(--line);
+      border-radius: 10px;
+      background: #ffffff;
+      padding: 12px 14px;
+      font-size: 18px;
+      line-height: 1.28;
+      font-weight: 750;
+    }
+
+    .step small {
+      display: block;
+      margin-top: 6px;
+      color: var(--muted);
+      font-size: 15px;
+      line-height: 1.3;
+      font-weight: 650;
+    }
+
+    .money .step {
+      border-color: #d79d19;
+      background: var(--money-bg);
+    }
+
+    .status .step {
+      border-color: #3692c7;
+      background: var(--status-bg);
+    }
+
+    .arrow {
+      display: grid;
+      place-items: center;
+      height: 20px;
+      color: #64748b;
+      font-size: 22px;
+      font-weight: 900;
+      line-height: 1;
+    }
+
+    .split {
+      display: grid;
+      grid-template-columns: 1fr 0.65fr;
+      gap: 10px;
+      align-items: stretch;
+    }
+
+    .milestones {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 7px;
+      margin-top: 8px;
+    }
+
+    .coupon {
+      border: 1px solid #e0ad28;
+      background: #ffffff;
+      border-radius: 8px;
+      padding: 8px;
+      font-size: 15px;
+      line-height: 1.15;
+      font-weight: 850;
+      text-align: center;
+    }
+
+    .coupon.disabled {
+      border-color: #a8afb8;
+      background: var(--disabled-bg);
+      color: var(--disabled-ink);
+    }
+
+    .wallet {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 8px;
+      margin-top: 8px;
+    }
+
+    .rule {
+      border: 1px solid #d6a020;
+      background: #ffffff;
+      border-radius: 8px;
+      padding: 8px;
+      color: #3f2c05;
+      font-size: 15px;
+      font-weight: 800;
+      text-align: center;
+    }
+
+    .xp-note {
+      border: 2px dashed #8fb4d1;
+      background: #ffffff;
+      border-radius: 10px;
+      color: #214963;
+      padding: 10px;
+      font-size: 16px;
+      font-weight: 850;
+      text-align: center;
+    }
+
+    .notes {
+      display: grid;
+      grid-template-columns: repeat(6, minmax(0, 1fr));
+      gap: 8px;
+      margin: 16px 0 0;
+      padding: 0;
+      list-style: none;
+    }
+
+    .notes li {
+      border: 1px solid var(--line);
+      background: #f8fafc;
+      border-radius: 10px;
+      padding: 10px;
+      color: #344054;
+      font-size: 14px;
+      line-height: 1.25;
+      font-weight: 700;
+    }
+
+    @media (max-width: 1100px) {
+      body {
+        padding: 10px;
+      }
+
+      header,
+      .worlds,
+      .split,
+      .notes {
+        grid-template-columns: 1fr;
+      }
+
+      h1 {
+        font-size: 34px;
+      }
+
+      .iron-rule {
+        min-width: 0;
+      }
+
+      .world {
+        min-height: auto;
+      }
+
+      .milestones,
+      .wallet {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+      }
+    }
+  </style>
+</head>
+<body>
+  <main>
+    <header>
+      <div>
+        <h1>ASTROBYTE Rewards</h1>
+        <p class="subtitle">Two separate worlds. Money rewards have real value. Status rewards are just for fun.</p>
+      </div>
+      <div class="iron-rule">Iron rule:<br>Status never gives money</div>
+    </header>
+
+    <section class="worlds" aria-label="ASTROBYTE rewards diagram">
+      <section class="world money">
+        <h2 class="world-title">💸 MONEY world <span>real value</span></h2>
+        <div class="flow">
+          <div class="step">User invites a friend</div>
+          <div class="arrow">↓</div>
+          <div class="step">Friend buys a plan</div>
+          <div class="arrow">↓</div>
+          <div class="split">
+            <div class="step">
+              Inviter gets a voucher
+              <small>Pick ONE: 10% store credit, 10% extra GB, 10% extra days, or Stars.</small>
+            </div>
+            <div class="xp-note">Every referral also gives +50 XP<br>XP is status only</div>
+          </div>
+          <div class="arrow">↓</div>
+          <div class="step">Stars are referral-only and seasonal <small>Stars reset to 0 every 90 days.</small></div>
+          <div class="arrow">↓</div>
+          <div class="step">
+            Stars automatically unlock coupons
+            <div class="milestones">
+              <div class="coupon">3★<br>10% off</div>
+              <div class="coupon">5★<br>20% off</div>
+              <div class="coupon">10★<br>free 10GB</div>
+              <div class="coupon">15★<br>50% off</div>
+              <div class="coupon">20★<br>free 20GB plan</div>
+              <div class="coupon">25★<br>free 40GB plan</div>
+              <div class="coupon">30★<br>free auto-renewal</div>
+              <div class="coupon disabled">40★<br>VIP pack<br>not yet</div>
+              <div class="coupon disabled">50★<br>Legend pack<br>not yet</div>
+            </div>
+          </div>
+          <div class="arrow">↓</div>
+          <div class="step">
+            Coupons live in the wallet
+            <div class="wallet">
+              <div class="rule">VPN plans only</div>
+              <div class="rule">Expire in 45 days</div>
+              <div class="rule">One coupon per purchase</div>
+              <div class="rule">No stacking</div>
+            </div>
+          </div>
+          <div class="arrow">↓</div>
+          <div class="step">At checkout, apply one coupon <small>It discounts the order or adds bonus GB. Then the coupon is used up.</small></div>
+        </div>
+      </section>
+
+      <section class="world status">
+        <h2 class="world-title">🏅 STATUS world <span>just for fun</span></h2>
+        <div class="flow">
+          <div class="step">Play the game</div>
+          <div class="arrow">↓</div>
+          <div class="step">Earn XP</div>
+          <div class="arrow">↓</div>
+          <div class="step">Level up</div>
+          <div class="arrow">↓</div>
+          <div class="step">Unlock badges, themes, and leaderboard status</div>
+          <div class="arrow">↓</div>
+          <div class="step">Daily check-in also gives status progress</div>
+          <div class="arrow">↓</div>
+          <div class="step">Never becomes cash, credit, coupons, free GB, or free days</div>
+        </div>
+      </section>
+    </section>
+
+    <ul class="notes">
+      <li>Only referrals and purchases can create money rewards.</li>
+      <li>The friend must buy a plan before the inviter gets a voucher.</li>
+      <li>The inviter chooses one voucher reward.</li>
+      <li>Stars are referral-only and reset every 90 days.</li>
+      <li>Wallet coupons expire in 45 days and cannot stack.</li>
+      <li>XP, levels, badges, themes, and leaderboard status never pay money.</li>
+    </ul>
+  </main>
+</body>
+</html>

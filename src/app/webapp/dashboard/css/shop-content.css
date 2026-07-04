@@ -12,9 +12,10 @@
 :root {
   --shop-ease: cubic-bezier(0.23, 1, 0.32, 1);
   --shop-ease-soft: cubic-bezier(0.4, 0, 0.2, 1);
-  /* Glass surfaces — translucent so lava blobs show through */
-  --shop-surface:    rgba(10, 18, 34, 0.55);
-  --shop-surface-hi: rgba(14, 24, 44, 0.65);
+  /* Glass surfaces — translucent so lava blobs show through.
+     Neutral graphite (the old navy tint read "too blue" against the brand). */
+  --shop-surface:    rgba(16, 18, 23, 0.55);
+  --shop-surface-hi: rgba(21, 24, 30, 0.65);
   --shop-stroke: rgba(255, 255, 255, 0.08);
   --shop-stroke-hi: rgba(255, 255, 255, 0.13);
   --shop-text-soft: rgba(245, 242, 234, 0.56);
@@ -33,7 +34,9 @@
 /* ── PAGE GRID ─────────────────────────────────────────────────── */
 .content {
   padding: 16px;
-  padding-bottom: calc(96px + env(safe-area-inset-bottom, 0px));
+  /* .wrap already reserves bottom-nav clearance; stacking 96px more here
+     created a huge dead area at the bottom of every tab. */
+  padding-bottom: calc(16px + env(safe-area-inset-bottom, 0px));
   display: grid;
   gap: 14px;
   flex: 1;
@@ -434,6 +437,11 @@ html[dir="rtl"] .card.shop-hero::before { right: auto; left: -60px; }
   background: rgba(var(--brandRgb), 0.09);
 }
 
+/* Size-order segmented control (the only remaining plan sort) */
+.shop-size-order {
+  margin-bottom: 14px;
+}
+
 /* Small filter inputs */
 .shop-input-sm {
   height: 40px;
@@ -655,12 +663,6 @@ html[dir="rtl"] .shop-plan-card:hover .shop-plan-chevron {
   font-variant-numeric: tabular-nums;
 }
 
-.shop-plan-pill.best {
-  border-color: rgba(var(--brandRgb), 0.30);
-  background: rgba(var(--brandRgb), 0.14);
-  color: var(--brand);
-  font-weight: 800;
-}
 .shop-plan-pill.off {
   border-color: rgba(52, 211, 153, 0.24);
   background: rgba(52, 211, 153, 0.08);
@@ -705,42 +707,93 @@ html[dir="rtl"] .shop-plan-card:hover .shop-plan-chevron {
   line-height: 1.2;
 }
 
-/* ═══════════════════════════════════════════════════════════════
-   FEATURED CARD — when the plan has the `.best` pill, give it
-   the hero treatment. :has() works on modern Telegram WebView.
-   ═══════════════════════════════════════════════════════════════ */
-.shop-plan-card:has(.shop-plan-pill.best) {
-  background:
-    radial-gradient(80% 120% at 0% 0%, rgba(var(--brandRgb), 0.14) 0%, transparent 60%),
-    var(--shop-surface);
-  border-color: rgba(var(--brandRgb), 0.32);
-  box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.06),
-    0 6px 22px rgba(var(--brandRgb), 0.12);
+/* Price column: price on top, unit price hint underneath (replaces the
+   removed sort/filter controls as the comparison aid). */
+.shop-plan-price-col {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 2px;
+  flex-shrink: 0;
 }
-.shop-plan-card:has(.shop-plan-pill.best)::after {
+html[dir="rtl"] .shop-plan-price-col { align-items: flex-start; }
+.shop-plan-pergb {
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--shop-text-dim);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   LAVA LAMP — a soft brand-tinted blob drifts slowly inside each
+   card, behind the content. Transform-only (GPU), no filters.
+   With `isolation: isolate`, the negative z-index pseudo paints
+   above the card background but below the text.
+   ═══════════════════════════════════════════════════════════════ */
+.shop-plan-card {
+  overflow: hidden;
+  isolation: isolate;
+}
+.shop-plan-card::before {
   content: '';
   position: absolute;
-  top: 0; bottom: 0;
-  left: 0;
-  width: 3px;
-  background: var(--brand);
-  border-radius: 16px 0 0 16px;
+  z-index: -1;
+  top: -60%;
+  left: -20%;
+  width: 75%;
+  height: 220%;
+  border-radius: 50%;
+  background: radial-gradient(closest-side, rgba(var(--brandRgb), 0.13), transparent 72%);
+  animation: shop-lava-drift 13s ease-in-out infinite alternate;
+  pointer-events: none;
+  will-change: transform;
 }
-html[dir="rtl"] .shop-plan-card:has(.shop-plan-pill.best)::after {
-  left: auto;
-  right: 0;
-  border-radius: 0 16px 16px 0;
+/* Second, smaller blob on the other side — slower, out of phase. */
+.shop-plan-card::after {
+  content: '';
+  position: absolute;
+  z-index: -1;
+  bottom: -70%;
+  right: -12%;
+  width: 55%;
+  height: 190%;
+  border-radius: 50%;
+  background: radial-gradient(closest-side, rgba(var(--brandRgb), 0.09), transparent 74%);
+  animation: shop-lava-drift 17s ease-in-out infinite alternate-reverse;
+  pointer-events: none;
+  will-change: transform;
 }
-[data-theme="light"] .shop-plan-card:has(.shop-plan-pill.best) {
-  background:
-    radial-gradient(80% 120% at 0% 0%, rgba(var(--brandRgb), 0.08) 0%, transparent 60%),
-    #ffffff;
-  border-color: rgba(var(--brandRgb), 0.28);
-  box-shadow:
-    0 6px 18px rgba(var(--brandRgb), 0.10),
-    0 1px 2px rgba(15, 23, 42, 0.04);
+/* Desync: every card gets its own duration AND phase offset. Different
+   durations mean the cards can never drift back into lockstep. */
+.shop-plans-grid > .shop-plan-card:nth-child(4n+1)::before { animation-duration: 12.5s; animation-delay: -3.2s; }
+.shop-plans-grid > .shop-plan-card:nth-child(4n+2)::before { animation-duration: 15.5s; animation-delay: -7.8s; }
+.shop-plans-grid > .shop-plan-card:nth-child(4n+3)::before { animation-duration: 13.8s; animation-delay: -11.4s; }
+.shop-plans-grid > .shop-plan-card:nth-child(4n)::before   { animation-duration: 16.6s; animation-delay: -5.1s; }
+.shop-plans-grid > .shop-plan-card:nth-child(4n+1)::after { animation-duration: 18.3s; animation-delay: -9.6s; }
+.shop-plans-grid > .shop-plan-card:nth-child(4n+2)::after { animation-duration: 14.7s; animation-delay: -2.4s; }
+.shop-plans-grid > .shop-plan-card:nth-child(4n+3)::after { animation-duration: 17.2s; animation-delay: -13.9s; }
+.shop-plans-grid > .shop-plan-card:nth-child(4n)::after   { animation-duration: 15.9s; animation-delay: -6.7s; }
+@keyframes shop-lava-drift {
+  0%   { transform: translate3d(0, 0, 0) scale(1); }
+  50%  { transform: translate3d(26%, 14%, 0) scale(1.28); }
+  100% { transform: translate3d(-10%, 26%, 0) scale(0.92); }
 }
+.shop-charge-card::before {
+  background: radial-gradient(closest-side, rgba(43, 191, 180, 0.11), transparent 72%);
+}
+.shop-charge-card::after {
+  background: radial-gradient(closest-side, rgba(43, 191, 180, 0.07), transparent 74%);
+}
+[data-theme="light"] .shop-plan-card::before {
+  background: radial-gradient(closest-side, rgba(var(--brandRgb), 0.08), transparent 72%);
+}
+[data-theme="light"] .shop-plan-card::after {
+  background: radial-gradient(closest-side, rgba(var(--brandRgb), 0.05), transparent 74%);
+}
+/* The drift is transform-only on pre-painted gradients (no per-frame
+   paint), so it stays enabled even in perf-lite mode. Only the OS-level
+   reduced-motion preference freezes it (see the media query below). */
 
 /* Very small screens */
 @media (max-width: 360px) {
@@ -960,6 +1013,8 @@ html[dir="rtl"] .shop-sub-select {
    ══════════════════════════════════════════════════════════════ */
 @media (prefers-reduced-motion: reduce) {
   .shop-plans-grid > .shop-plan-card,
+  .shop-plan-card::before,
+  .shop-plan-card::after,
   .shop-tab-content.active,
   .shop-skeleton,
   .shop-badge::before {

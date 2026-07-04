@@ -135,14 +135,17 @@ def _verify_webapp_auth(request: web.Request):
             new_token = create_session_token(user_id, session_secret, ttl_seconds=86400)
             return user_id, new_token
 
-    # 2. Check query param (legacy/fallback)
+    # 2. Query-param token — WebSocket upgrades ONLY (WS can't send headers).
+    # Plain-HTTP ?auth= was the "raw link" leak: any pasted URL granted a
+    # session in a normal browser. Telegram-only policy killed it.
     auth_query = request.query.get("auth", "")
-    if auth_query:
+    is_ws_upgrade = request.headers.get("Upgrade", "").lower() == "websocket"
+    if auth_query and is_ws_upgrade:
         user_id = verify_session_token(auth_query, session_secret)
         if user_id:
             new_token = create_session_token(user_id, session_secret, ttl_seconds=86400)
             try:
-                request["auth_method"] = "query_auth"
+                request["auth_method"] = "query_auth_ws"
             except Exception:
                 pass
             return user_id, new_token
@@ -160,8 +163,9 @@ def _verify_webapp_auth(request: web.Request):
                 pass
             return user_id, new_token
 
-    # 4. Check init_data (initial handshake)
-    init_data = request.query.get("init_data", "")
+    # 4. init_data in query — WebSocket handshake only (headers impossible
+    # there). HTTP callers must send it via the X-Telegram-Init header.
+    init_data = request.query.get("init_data", "") if is_ws_upgrade else ""
     if init_data and verify_init_data(init_data, BOT_TOKEN):
         user_id = _extract_user_id_from_init(init_data)
         if user_id:

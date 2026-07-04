@@ -2691,23 +2691,9 @@ html:not([data-theme="light"]) .usage-badge {
   border: 1.5px solid rgba(255, 255, 255, 0.10) !important;
 }
 
-/* ── 5. SHOP — shop-content.css owns all visual design.
-   glass.css only adds backdrop-filter and dark-mode ::before glow. */
-[data-theme="light"] .shop-plan-card::before {
-  display: none !important;
-}
-
-/* Dark mode: accent bar glow */
-html[data-theme="dark"] .shop-plan-card::before,
-html:not([data-theme="light"]) .shop-plan-card::before {
-  background: linear-gradient(
-    180deg,
-    rgba(var(--brandRgb), 0.80) 0%,
-    rgba(var(--brandRgb), 0.12) 100%
-  ) !important;
-  opacity: 0.90 !important;
-  box-shadow: 0 0 8px rgba(var(--brandRgb), 0.30) !important;
-}
+/* ── 5. SHOP — shop-content.css owns all visual design (including the
+   lava-lamp ::before/::after blobs inside plan cards). The old accent-bar
+   ::before overrides were removed with that design. */
 
 /* ══════════════════════════════════════════════════════════════════
    MOBILE PERFORMANCE — ≤768px

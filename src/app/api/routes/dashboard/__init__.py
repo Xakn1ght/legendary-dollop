@@ -12,6 +12,7 @@ from app.api.routes.dashboard.index_auth import (
     handle_dashboard_login,
     handle_dashboard_submit_referral,
 )
+from app.api.routes.dashboard.profile_photo import handle_profile_photo
 from app.api.routes.dashboard.referrals import (
     handle_dashboard_enter_referral,
     handle_dashboard_redeem_referral_reward,
@@ -65,6 +66,7 @@ __all__ = [
     "handle_dashboard_submit_referral",
     "handle_dashboard_wallet_cashout",
     "handle_dashboard_wallet_convert_loyalty",
+    "handle_profile_photo",
     "handle_vip_plans",
     "handle_vip_purchase",
     "handle_vip_upload_receipt",

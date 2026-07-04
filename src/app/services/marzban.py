@@ -411,7 +411,7 @@ class MarzbanAPI:
         session = await self._get_session()
         headers = await self._get_headers()
 
-        # Step 1: Reset user traffic
+        # Reset user traffic
         reset_url = f"{self.base_url}/api/user/{username}/reset"
         async with session.post(reset_url, headers=headers) as resp:
             if resp.status not in (200, 204):
@@ -435,7 +435,7 @@ class MarzbanAPI:
                     )
                     return False
 
-        # Step 2: Modify data limit and expiration
+        # Extend data limit and expiration
         modify_url = f"{self.base_url}/api/user/{username}"
         payload = {
             "data_limit": max(int(new_data_limit_bytes or 0), 0),

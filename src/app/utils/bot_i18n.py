@@ -115,7 +115,7 @@ STRINGS: dict[str, dict[str, str]] = {
     "add_subscription_invalid_format": {"fa": "لینک اشتراک نامعتبر است. لطفاً دوباره امتحان کنید یا از پشتیبانی کمک بگیرید.", "en": "Invalid subscription link. Please try again or contact support."},
     "add_subscription_fetch_failed": {"fa": "نتوانستم اطلاعات اشتراک را از لینک دریافت کنم. لینک را بررسی کنید.", "en": "Could not fetch subscription info from the link. Please check the link."},
     "add_subscription_no_username": {"fa": "لینک معتبر نیست یا نام کاربری در پاسخ وجود ندارد.", "en": "The link is not valid (username not found)."},
-    "add_subscription_marzban_not_found": {"fa": "❌ کاربری با این نام در مارزبان یافت نشد. لطفاً دوباره تلاش کنید یا با پشتیبانی تماس بگیرید.", "en": "❌ No user found on Marzban for this username. Please try again or contact support."},
+    "add_subscription_marzban_not_found": {"fa": "❌ سرویسی با این نام یافت نشد. لطفاً دوباره تلاش کنید یا با پشتیبانی تماس بگیرید.", "en": "❌ No subscription found for this name. Please try again or contact support."},
     "add_subscription_success": {"fa": "✅ سرویس شما با موفقیت اضافه شد و اکنون در بخش مدیریت سرویس قابل مشاهده است.", "en": "✅ Your service was added successfully and is now available in My Services."},
     "add_subscription_existing_added": {"fa": "✅ سرویس موجود به لیست شما اضافه شد.", "en": "✅ Existing service added to your list."},
 
@@ -186,12 +186,12 @@ STRINGS: dict[str, dict[str, str]] = {
     },
     "admin_charge_not_found": {"fa": "درخواست شارژ یافت نشد.", "en": "Charge request not found."},
     "admin_charge_not_found_or_handled": {"fa": "درخواست شارژ یافت نشد یا قبلاً پردازش شده است.", "en": "Charge request not found or already handled."},
-    "admin_charge_sub_invalid": {"fa": "اطلاعات اشتراک نامعتبر است یا نام کاربری Marzban موجود نیست.", "en": "Subscription record is invalid or missing Marzban username."},
+    "admin_charge_sub_invalid": {"fa": "اطلاعات اشتراک نامعتبر است یا نام کاربری سرویس موجود نیست.", "en": "Subscription record is invalid or missing its service username."},
     "admin_charge_user_missing": {"fa": "کاربر مربوط به این درخواست یافت نشد.", "en": "User record linked to this request was not found."},
     "admin_charge_sub_inactive": {"fa": "اشتراک فعال نیست و امکان شارژ وجود ندارد.", "en": "Subscription is not active – cannot add charge."},
-    "admin_charge_fetch_marzban_failed": {"fa": "خطا در دریافت اطلاعات از Marzban.", "en": "Failed to fetch user info from Marzban."},
-    "admin_charge_marzban_reset_failed": {"fa": "خطا در ریست/آپدیت Marzban.", "en": "Marzban reset/update failed."},
-    "admin_charge_marzban_update_failed": {"fa": "خطا در آپدیت Marzban.", "en": "Marzban update failed."},
+    "admin_charge_fetch_marzban_failed": {"fa": "خطا در دریافت اطلاعات از پنل.", "en": "Failed to fetch account info from the panel."},
+    "admin_charge_marzban_reset_failed": {"fa": "خطا در ریست/آپدیت پنل.", "en": "Panel reset/update failed."},
+    "admin_charge_marzban_update_failed": {"fa": "خطا در آپدیت پنل.", "en": "Panel update failed."},
     "admin_charge_approved": {"fa": "شارژ تایید شد ✅", "en": "Charge approved!"},
     "admin_charge_denied": {"fa": "درخواست رد شد.", "en": "Request denied."},
     "admin_booking_invalid_payload": {"fa": "اطلاعات رزرو نامعتبر است.", "en": "Invalid booking payload."},
@@ -205,14 +205,14 @@ STRINGS: dict[str, dict[str, str]] = {
             "🆕 درخواست اشتراک #{id}\n"
             "کاربر: {user}\n"
             "پلن: {plan}\n"
-            "نام کاربری Marzban: {username}\n\n"
+            "نام سرویس: {username}\n\n"
             "لطفاً تایید یا رد کنید:"
         ),
         "en": (
             "🆕 Subscription request #{id}\n"
             "User: {user}\n"
             "Plan: {plan}\n"
-            "Marzban username: {username}\n\n"
+            "Service name: {username}\n\n"
             "Approve or deny:"
         ),
     },
@@ -287,7 +287,7 @@ STRINGS: dict[str, dict[str, str]] = {
     "admin_toggle_sub_not_found": {"fa": "اشتراک یافت نشد.", "en": "Subscription not found."},
     "admin_toggle_already_disabled": {"fa": "این سرویس قبلاً غیرفعال شده است.", "en": "Already disabled."},
     "admin_toggle_invalid_disable": {"fa": "وضعیت اشتراک برای تایید غیرفعال‌سازی معتبر نیست.", "en": "Invalid status for disable approval."},
-    "admin_toggle_marzban_failed": {"fa": "خطا در ارتباط با Marzban.", "en": "Marzban API failed."},
+    "admin_toggle_marzban_failed": {"fa": "خطا در ارتباط با پنل.", "en": "Panel API failed."},
     "admin_toggle_disabled": {"fa": "غیرفعال شد.", "en": "Disabled."},
     "admin_toggle_request_denied": {"fa": "درخواست رد شد.", "en": "Request denied."},
     "admin_toggle_already_active": {"fa": "این سرویس قبلاً فعال است.", "en": "Already active."},

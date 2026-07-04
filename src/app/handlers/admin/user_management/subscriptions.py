@@ -89,13 +89,13 @@ async def _build_subscription_details_view(
                     f"\n📈 <b>اطلاعات مرزبان:</b>\n"
                     f"🌐 مصرف: <code>{used_gb:.2f} GB</code> از <code>{limit_gb:.2f} GB</code>\n"
                     f"⏰ انقضا: {expire_date}\n"
-                    f"🔄 وضعیت مرزبان: {marzban_status_emoji}\n"
+                    f"🔄 وضعیت پنل: {marzban_status_emoji}\n"
                 )
     except Exception as e:
         bot_logger.error(
             f"Could not fetch marzban info for {subscription.marzban_username}: {e}"
         )
-        marzban_info = "\n⚠️ unable to fetch marzban info"
+        marzban_info = "\n⚠️ unable to fetch panel info"
 
     text = (
         f"<b>جزئیات اشتراک</b>\n\n"

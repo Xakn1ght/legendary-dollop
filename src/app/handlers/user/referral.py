@@ -3,17 +3,16 @@ from aiogram.types import Message, WebAppInfo
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.settings import BOT_TOKEN, DASHBOARD_PUBLIC_BASE_URL, WEBAPP_SESSION_SECRET
+from app.core.settings import DASHBOARD_PUBLIC_BASE_URL
 from app.database import crud
 from app.utils.bot_i18n import normalize_lang, set_cached_lang, t, text_matches
-from app.utils.webapp_verify import create_one_time_token
 
 router = Router()
 
 def _build_rewards_webapp_url(user_chat_id: int) -> str:
-    session_secret = WEBAPP_SESSION_SECRET or BOT_TOKEN
-    auth_token = create_one_time_token(user_chat_id, session_secret, ttl_seconds=15 * 60)
-    return f"{DASHBOARD_PUBLIC_BASE_URL}/webapp/dashboard/tasks.html?auth={auth_token}"
+    # WebAppInfo button → Telegram injects signed initData; no URL token
+    # (raw links with tokens must never grant access — Telegram-only policy).
+    return f"{DASHBOARD_PUBLIC_BASE_URL}/webapp/dashboard/#page=tasks"
 
 @router.message(text_matches("btn_invite"))
 async def referral_handler(message: Message, session: AsyncSession):

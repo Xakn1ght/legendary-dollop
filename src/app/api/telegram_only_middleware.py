@@ -13,12 +13,15 @@ logger = logging.getLogger(__name__)
 
 def is_telegram_webapp_request(request: web.Request) -> bool:
     """
-    Check if the request comes from a Telegram WebApp.
-    
-    Returns:
-        bool: True if the request is from Telegram, False otherwise
+    Cheap outer gate: does the request carry any credential that could only
+    have been minted through Telegram? (Cryptographic verification of those
+    credentials happens in the handlers via ``_verify_webapp_auth``.)
+
+    Deliberately NOT checked: User-Agent / Referer — both trivially spoofable
+    and not needed, since every legitimate call carries initData or a session
+    minted from initData.
     """
-    # 1. Check for Telegram initData in headers (most reliable)
+    # 1. Telegram initData in headers (WebApp runtime attaches it per call)
     init_headers = [
         request.headers.get("X-Telegram-Init"),
         request.headers.get("X-Telegram-WebApp-InitData"),
@@ -26,29 +29,15 @@ def is_telegram_webapp_request(request: web.Request) -> bool:
     ]
     if any(h and len(h) > 20 for h in init_headers):
         return True
-    
-    # 2. Check User-Agent for Telegram indicators
-    user_agent = request.headers.get("User-Agent", "").lower()
-    telegram_ua_indicators = [
-        "telegram",
-        "telegrambot",
-    ]
-    if any(indicator in user_agent for indicator in telegram_ua_indicators):
+
+    # 2. Bearer session — only ever issued by /login after HMAC-verified initData
+    if request.headers.get("Authorization", "").startswith("Bearer "):
         return True
-    
-    # 3. Check Referer header for Telegram origins
-    referer = request.headers.get("Referer", "").lower()
-    telegram_referers = [
-        "telegram.org",
-        "t.me",
-        "web.telegram.org",
-    ]
-    if any(ref in referer for ref in telegram_referers):
+
+    # 3. Session cookie — same origin story as the bearer
+    if request.cookies.get("tma_session") or request.cookies.get("auth_token"):
         return True
-    
-    # REMOVED: Same-origin check - this was allowing browsers to access once they loaded the page!
-    # We ONLY allow requests that have Telegram indicators, not just same-origin requests.
-    
+
     return False
 
 

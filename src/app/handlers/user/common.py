@@ -5,7 +5,7 @@ from aiogram.types import CallbackQuery, Message, WebAppInfo
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.settings import BOT_TOKEN, DASHBOARD_PUBLIC_BASE_URL, WEBAPP_SESSION_SECRET
+from app.core.settings import DASHBOARD_PUBLIC_BASE_URL
 from app.database import crud
 from app.database.cached_crud import get_user_with_cache, invalidate_user_cache
 from app.handlers.user.add_subscription import AddSubState
@@ -35,7 +35,6 @@ from app.utils.bot_i18n import (
     t,
     text_matches,
 )
-from app.utils.webapp_verify import create_one_time_token
 
 router = Router()
 
@@ -135,13 +134,11 @@ async def back_to_main(message: Message, state: FSMContext, session: AsyncSessio
 
 def _build_support_webapp_url(user_chat_id: int) -> str:
     """
-    Bot-side Support must be WebApp-only:
-    - issue a short-lived URL token (more leak-prone than cookies)
-    - send the user to the dashboard support page
+    Bot-side Support opens the dashboard support page as a WebAppInfo button:
+    Telegram injects signed initData, so the URL carries no token
+    (raw links with tokens must never grant access — Telegram-only policy).
     """
-    session_secret = WEBAPP_SESSION_SECRET or BOT_TOKEN
-    auth_token = create_one_time_token(user_chat_id, session_secret, ttl_seconds=15 * 60)  # 15 minutes
-    return f"{DASHBOARD_PUBLIC_BASE_URL}/webapp/dashboard/support.html?auth={auth_token}"
+    return f"{DASHBOARD_PUBLIC_BASE_URL}/webapp/dashboard/support.html"
 
 
 @router.message(Command("support"))

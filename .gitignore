@@ -36,6 +36,8 @@ backups/
 
 # App runtime state / local data
 src/app/data/*.json
+src/app/data/avatars/
+src/app/data/client_errors.jsonl*
 src/app/webapp/admin/uploads/
 
 # Captured network traces / local misc

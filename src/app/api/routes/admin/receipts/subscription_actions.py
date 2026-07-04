@@ -121,7 +121,7 @@ async def handle_admin_deny_receipt(request: web.Request):
                         db=session,
                         user_id=result.user_id,
                         type='purchase_denied',
-                        title='❌ درخواست رد شد',
+                        title='درخواست رد شد',
                         message=notif_msg,
                         sent_to_webapp=True,
                         sent_to_bot=False

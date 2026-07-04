@@ -1,0 +1,21 @@
+{
+  "name": "astrobyte-dashboard-react",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview"
+  },
+  "devDependencies": {
+    "@fontsource-variable/urbanist": "^5.2.7",
+    "@vitejs/plugin-react": "^6.0.3",
+    "react": "^19.2.7",
+    "react-dom": "^19.2.7",
+    "vazirmatn": "^33.0.3",
+    "vite": "^8.1.3"
+  },
+  "dependencies": {
+    "qrcode": "^1.5.4"
+  }
+}

@@ -17,7 +17,7 @@ def setup_admin_password(password: str):
     """
     hash_value = generate_password_hash(password)
     print(f"\n{'=' * 60}")
-    print("🔐 Argon2 Password Hash Generated")
+    print("Argon2 password hash generated")
     print("=" * 60)
     print("Add this to your .env file:")
     print(f"ADMIN_PANEL_PASSWORD_HASH={hash_value}")

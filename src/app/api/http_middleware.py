@@ -45,7 +45,7 @@ async def security_headers_middleware(request: web.Request, handler):
         "script-src 'self' 'unsafe-inline' https://telegram.org; "
         "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://cdn.jsdelivr.net; "
         "font-src 'self' https://fonts.gstatic.com https://cdn.jsdelivr.net data:; "
-        "img-src 'self' data: blob: https://flagcdn.com https://*.flagcdn.com; "
+        "img-src 'self' data: blob: https://flagcdn.com https://*.flagcdn.com https://t.me https://*.t.me https://telegram.org https://*.telegram.org https://*.telegram-cdn.org; "
         "connect-src 'self' https: http: wss: ws:; "
         "form-action 'self'"
     )
@@ -60,8 +60,16 @@ async def security_headers_middleware(request: web.Request, handler):
 
     # Force no-cache for all webapp assets so design changes are picked up immediately.
     # Telegram Desktop and Telegram Web can cache mini-app resources aggressively.
+    # Exception: Vite build output under react/assets/ has content-hashed filenames,
+    # so it can never go stale — cache it hard (big win on slow connections; the
+    # no-store HTML entry points always reference the current hashes).
     path = request.path
-    if path.startswith("/webapp/") and path.endswith((".css", ".js", ".html")):
+    if path.startswith("/webapp/dashboard/react/assets/"):
+        resp.headers["Cache-Control"] = "public, max-age=31536000, immutable"
+    elif path.startswith("/webapp/static/fonts/"):
+        # Self-hosted fonts effectively never change; cache for 30 days.
+        resp.headers["Cache-Control"] = "public, max-age=2592000"
+    elif path.startswith("/webapp/") and path.endswith((".css", ".js", ".html")):
         resp.headers["Cache-Control"] = "no-store, no-cache, must-revalidate"
         resp.headers["Pragma"] = "no-cache"
         resp.headers["Expires"] = "0"

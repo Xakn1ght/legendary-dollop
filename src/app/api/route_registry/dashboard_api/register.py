@@ -25,6 +25,7 @@ from .handlers import (
     handle_dashboard_ping,
     handle_dashboard_preferences_get,
     handle_dashboard_preferences_patch,
+    handle_profile_photo,
     handle_dashboard_redeem_referral_reward,
     handle_dashboard_referral_rewards,
     handle_dashboard_referrals,
@@ -75,6 +76,7 @@ def register_dashboard_api_routes(app: web.Application) -> None:
     app.router.add_post(DASHBOARD_API_BASE_PATH + "/subscriptions/{sub_id}/revoke", handle_dashboard_revoke)
     app.router.add_delete(DASHBOARD_API_BASE_PATH + "/subscriptions/{sub_id}", handle_dashboard_remove_local)
     app.router.add_get(DASHBOARD_API_BASE_PATH + "/overview", handle_dashboard_overview)
+    app.router.add_get(DASHBOARD_API_BASE_PATH + "/profile-photo", handle_profile_photo)
 
     app.router.add_get(DASHBOARD_API_BASE_PATH + "/ping", handle_dashboard_ping)
     app.router.add_get(DASHBOARD_API_BASE_PATH + "/speed-dl", handle_dashboard_speed_dl)

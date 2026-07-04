@@ -4,7 +4,7 @@ from aiogram.types import CallbackQuery, InlineKeyboardButton, InlineKeyboardMar
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.settings import BOT_TOKEN, DASHBOARD_PUBLIC_BASE_URL, WEBAPP_SESSION_SECRET
+from app.core.settings import DASHBOARD_PUBLIC_BASE_URL
 from app.database.crud import (
     add_credit,
     get_unspent_rewards_by_referrer,
@@ -14,14 +14,13 @@ from app.database.crud import (
 )
 from app.keyboards.inline import get_reward_voucher_keyboard
 from app.utils.text_format import to_jalali_date, to_persian_digits
-from app.utils.webapp_verify import create_one_time_token
 
 router = Router()
 
 def _build_rewards_webapp_url(user_chat_id: int) -> str:
-    session_secret = WEBAPP_SESSION_SECRET or BOT_TOKEN
-    auth_token = create_one_time_token(user_chat_id, session_secret, ttl_seconds=15 * 60)
-    return f"{DASHBOARD_PUBLIC_BASE_URL}/webapp/dashboard/tasks.html?auth={auth_token}"
+    # WebAppInfo button → Telegram injects signed initData; no URL token
+    # (raw links with tokens must never grant access — Telegram-only policy).
+    return f"{DASHBOARD_PUBLIC_BASE_URL}/webapp/dashboard/#page=tasks"
 
 # -----------------------------
 #  Integrated Wallet

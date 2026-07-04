@@ -15,7 +15,7 @@ def _migrate_password_hash(password: str) -> str | None:
         _state_log.info("[ADMIN AUTH] Password migrated from SHA-256 to Argon2")
 
         print("\n" + "=" * 60)
-        print("🔐 SECURITY UPDATE: Password Hash Migrated to Argon2")
+        print("SECURITY UPDATE: password hash migrated to Argon2")
         print("=" * 60)
         print("\nYour password hash has been automatically upgraded to Argon2.")
         print("Please update your .env file with the new hash:\n")

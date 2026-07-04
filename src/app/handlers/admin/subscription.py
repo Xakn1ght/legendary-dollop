@@ -126,7 +126,7 @@ async def approve_subscription(callback: CallbackQuery, session: AsyncSession, b
                     db=session,
                     user_id=user_id,
                     type='purchase_approved',
-                    title='✅ سرویس فعال شد',
+                    title='سرویس فعال شد',
                     message=notif_msg,
                     sent_to_webapp=True,
                     sent_to_bot=False
@@ -217,7 +217,7 @@ async def deny_subscription(callback: CallbackQuery, session: AsyncSession, bot:
                 db=session,
                 user_id=result.user_id,
                 type='purchase_denied',
-                title='❌ درخواست رد شد',
+                title='درخواست رد شد',
                 message=notif_msg,
                 sent_to_webapp=True,
                 sent_to_bot=False

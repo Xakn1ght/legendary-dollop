@@ -13,6 +13,8 @@ from .handlers import build_dashboard_web_handlers
 def register_dashboard_web_routes(app: web.Application, wd: Path) -> None:
     (
         handle_dashboard_shop,
+        handle_dashboard_tasks,
+        handle_dashboard_index_html,
         handle_dashboard_purchase,
         handle_dashboard_charge,
         handle_dashboard_support,
@@ -21,9 +23,16 @@ def register_dashboard_web_routes(app: web.Application, wd: Path) -> None:
 
     app.router.add_get(DASHBOARD_WEB_BASE, handle_dashboard_index)
     app.router.add_get(DASHBOARD_WEB_BASE + "/", handle_dashboard_index)
+    # Legacy URL aliases → React shell tabs (old bot messages keep working).
+    app.router.add_get(DASHBOARD_WEB_BASE + "/index.html", handle_dashboard_index_html)
 
     app.router.add_get(DASHBOARD_WEB_BASE + "/shop.html", handle_dashboard_shop)
     app.router.add_get(DASHBOARD_WEB_BASE + "/shop", handle_dashboard_shop)
+
+    app.router.add_get(DASHBOARD_WEB_BASE + "/tasks.html", handle_dashboard_tasks)
+    app.router.add_get(DASHBOARD_WEB_BASE + "/tasks", handle_dashboard_tasks)
+
+    app.router.add_get(DASHBOARD_WEB_BASE + "/profile.html", handle_profile_index)
 
     app.router.add_get(DASHBOARD_WEB_BASE + "/purchase.html", handle_dashboard_purchase)
     app.router.add_get(DASHBOARD_WEB_BASE + "/purchase", handle_dashboard_purchase)

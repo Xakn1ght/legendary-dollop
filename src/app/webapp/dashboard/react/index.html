@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+  <title>AstroByte VPN Dashboard</title>
+  <!-- Production console silencer: runs before every other script so neither
+       our code nor telegram-web-app.js prints anything. Re-enable logs with
+       localStorage.astro_debug='1' (or ?debug=1) — dev hosts keep logs. -->
+  <script>(function(){try{var h=location.hostname;if(h==='localhost'||h==='127.0.0.1')return;var d=false;try{d=localStorage.getItem('astro_debug')==='1'}catch(e){}try{if(new URLSearchParams(location.search).get('debug')==='1'){d=true;try{localStorage.setItem('astro_debug','1')}catch(e){}}}catch(e){}if(d)return;var n=function(){};['log','info','debug','warn','error','trace','table','group','groupCollapsed','groupEnd','dir','dirxml','count','timeLog'].forEach(function(k){try{console[k]=n}catch(e){}})}catch(e){}})();</script>
+  <!-- Shared legacy boot chain (served by aiohttp outside the Vite build). -->
+  <script src="https://telegram.org/js/telegram-web-app.js"></script>
+  <script src="/webapp/dashboard/js/head-boot.js?v=19"></script>
+  <script src="/webapp/dashboard/ui.js?v=3"></script>
+  <script src="/webapp/dashboard/tour.js" defer></script>
+  <link rel="stylesheet" href="/webapp/static/fonts/fonts.css?v=1">
+  <link rel="stylesheet" href="/webapp/dashboard/scrollbar-hide.css">
+  <link rel="stylesheet" href="/webapp/dashboard/css/index.css?v=24">
+  <link rel="stylesheet" href="/webapp/dashboard/css/tasks-content.css?v=3">
+  <link rel="stylesheet" href="/webapp/dashboard/css/shop-content.css?v=5">
+  <link rel="stylesheet" href="/webapp/dashboard/css/profile.css?v=bump5">
+  <link rel="stylesheet" href="/webapp/dashboard/css/glass.css?v=50">
+  <link rel="stylesheet" href="/webapp/dashboard/css/skeleton.css?v=2">
+  <script src="/webapp/dashboard/js/skeleton.js?v=1"></script>
+  <style>#root { display: contents; }</style>
+  <script type="module" crossorigin src="/webapp/dashboard/react/assets/index-B7H8f1_1.js"></script>
+  <link rel="modulepreload" crossorigin href="/webapp/dashboard/react/assets/rolldown-runtime-Bh1tDfsg.js">
+  <link rel="modulepreload" crossorigin href="/webapp/dashboard/react/assets/jsx-runtime-tl0d2NTx.js">
+  <link rel="modulepreload" crossorigin href="/webapp/dashboard/react/assets/backstack-BqOAMXI0.js">
+</head>
+<body data-page="home" class="skel-on">
+  <script>/* skeleton fail-safe: never leave content hidden */setTimeout(function(){try{document.body.classList.add('app-ready');}catch(e){}},8000);</script>
+  <div id="astro-lava" aria-hidden="true"><div class="lava-blob lava-blob-1"></div><div class="lava-blob lava-blob-2"></div><div class="lava-blob lava-blob-3"></div><div class="lava-blob lava-blob-4"></div><div class="lava-blob lava-blob-5"></div></div>
+  <div id="bootSplash" aria-hidden="true"><div class="inner">
+    <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" aria-hidden="true" width="24" height="24" fill="none">
+      <circle cx="12" cy="10" r="6" stroke="currentColor" stroke-width="2"/>
+      <rect x="7" y="15" width="10" height="4" rx="2" fill="currentColor"/>
+      <circle cx="12" cy="10" r="3" fill="currentColor"/>
+    </svg>
+  </div></div>
+  <!-- Skeleton loading screen (home-shaped); removed by AstroSkeleton.ready() -->
+  <div class="skel-screen" aria-hidden="true">
+    <div class="sk-row">
+      <div class="sk sk-btn"></div>
+      <div class="sk sk-btn"></div>
+      <div class="sk sk-line" style="flex:1; height:44px; border-radius:12px;"></div>
+    </div>
+    <div class="sk-card sk-hero">
+      <div class="sk-row">
+        <div class="sk sk-circle"></div>
+        <div class="sk sk-pill"></div>
+      </div>
+      <div class="sk-col gap-12">
+        <div class="sk sk-line h-40 w-60"></div>
+        <div class="sk sk-line h-8 w-40"></div>
+      </div>
+      <div class="sk sk-line h-8 w-100"></div>
+      <div class="sk-row">
+        <div class="sk sk-pill"></div>
+        <div class="sk-row start" style="gap:8px;">
+          <div class="sk sk-btn"></div><div class="sk sk-btn"></div><div class="sk sk-btn"></div>
+        </div>
+      </div>
+    </div>
+    <div class="sk-card">
+      <div class="sk sk-line w-40 h-16"></div>
+      <div class="sk-grid-4">
+        <div class="sk-tile"><div class="sk sk-circle"></div><div class="sk sk-line w-70 h-8"></div></div>
+        <div class="sk-tile"><div class="sk sk-circle"></div><div class="sk sk-line w-70 h-8"></div></div>
+        <div class="sk-tile"><div class="sk sk-circle"></div><div class="sk sk-line w-70 h-8"></div></div>
+        <div class="sk-tile"><div class="sk sk-circle"></div><div class="sk sk-line w-70 h-8"></div></div>
+      </div>
+    </div>
+    <div class="sk-card">
+      <div class="sk-row"><div class="sk sk-line w-50 h-16"></div><div class="sk sk-line w-30 h-16"></div></div>
+      <div class="sk sk-line w-100"></div>
+      <div class="sk sk-line w-85"></div>
+    </div>
+  </div>
+  <div id="root"></div>
+</body>
+</html>

@@ -57,12 +57,17 @@
     (function(){
       'use strict';
       
-      // Primary check: Telegram WebApp object must exist
+      // Telegram-only gate. Accepted signals — each one can only exist after
+      // a genuine Telegram launch:
+      //   - live initData (Telegram injects it into the WebView)
+      //   - tgWebAppData in the URL (some clients pass it this way)
+      //   - session cookie / bearer in localStorage (minted by /login after
+      //     HMAC-verifying initData; carries auth across internal page hops)
+      // NOT accepted: the mere presence of the telegram-web-app.js object
+      // (defined in any browser) or bare ?auth= URL tokens (raw-link leak).
       const tg = window.Telegram && window.Telegram.WebApp ? window.Telegram.WebApp : null;
-      const hasTelegramWebApp = !!(tg && typeof tg.initDataUnsafe !== 'undefined');
       const hasInitData = !!(tg && tg.initData && tg.initData.length > 10);
-      
-      // Fallback: Check for initData in URL (some Telegram clients pass it this way)
+
       let hasUrlInitData = false;
       try {
         const urlParams = new URLSearchParams(window.location.search);
@@ -71,34 +76,29 @@
         const fromHash = hashParams.get('tgWebAppData') || hashParams.get('tg_web_app_data');
         hasUrlInitData = !!(fromQuery && fromQuery.length > 10) || !!(fromHash && fromHash.length > 10);
       } catch (_) {}
-      
-      // Check for valid session cookie (minted after Telegram auth verification)
+
       let hasValidSession = false;
       try {
         const cookies = document.cookie.split(';');
         for (let cookie of cookies) {
           const [name] = cookie.trim().split('=');
-          if (name === 'tma_session') {
+          if (name === 'tma_session' || name === 'auth_token') {
             hasValidSession = true;
             break;
           }
         }
       } catch (_) {}
-      
-      // Check for auth token in URL (short-lived token minted by bot)
-      let hasAuthToken = false;
+
+      let hasBearer = false;
       try {
-        const urlParams = new URLSearchParams(window.location.search);
-        const auth = urlParams.get('auth');
-        hasAuthToken = !!(auth && auth.length > 10);
+        const bt = localStorage.getItem('tma_bearer_token');
+        hasBearer = !!(bt && bt.length > 10);
       } catch (_) {}
-      
-      // BLOCK ACCESS if none of the Telegram authentication methods are present
-      // This ensures the dashboard can ONLY be accessed through Telegram Mini App
-      if (!hasTelegramWebApp && !hasInitData && !hasUrlInitData && !hasValidSession && !hasAuthToken) {
+
+      if (!hasInitData && !hasUrlInitData && !hasValidSession && !hasBearer) {
         // Immediately replace page content with block message
         document.open();
-        document.write('<!DOCTYPE html><html><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Access Restricted</title><style>body{font-family:system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;display:flex;align-items:center;justify-content:center;min-height:100vh;margin:0;background:#0d1a22;color:#F9F6EE;text-align:center;padding:20px;line-height:1.6;}div{max-width:450px;}h1{color:#ec5652;margin:0 0 20px;font-size:28px;font-weight:700;}p{margin:12px 0;opacity:0.9;font-size:16px;}.icon{font-size:64px;margin-bottom:20px;}</style></head><body><div><div class="icon">🔒</div><h1>Access Restricted</h1><p>This dashboard can only be accessed through the Telegram Mini App.</p><p>Please open this page from within Telegram.</p></div></body></html>');
+        document.write('<!DOCTYPE html><html><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Access Restricted</title><style>body{font-family:system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;display:flex;align-items:center;justify-content:center;min-height:100vh;margin:0;background:#0d1a22;color:#F9F6EE;text-align:center;padding:20px;line-height:1.6;}div{max-width:450px;}h1{color:#ec5652;margin:0 0 20px;font-size:28px;font-weight:700;}p{margin:12px 0;opacity:0.9;font-size:16px;}.icon{font-size:64px;margin-bottom:20px;}</style></head><body><div><div class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="#ec5652" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="64" height="64"><rect x="4" y="10" width="16" height="11" rx="2.5"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/><circle cx="12" cy="15.5" r="1.4" fill="#ec5652" stroke="none"/></svg></div><h1>Access Restricted</h1><p>This dashboard can only be accessed through the Telegram Mini App.</p><p>Please open this page from within Telegram.</p></div></body></html>');
         document.close();
         // Prevent any further script execution
         throw new Error('Telegram WebApp required - access blocked');
@@ -131,8 +131,8 @@
 
     // Perf-lite for weak devices: html[data-perf="lite"] makes glass.css drop
     // backdrop blur + freeze decorative animation (see PERF-LITE block there).
-    // Android-only heuristics; iOS always gets the full look. A one-shot FPS
-    // probe persists lite mode if the device proves slow in practice.
+    // Heuristics cover weak Androids AND old iPhones; a one-shot FPS probe runs
+    // on every device and persists lite mode if it proves slow in practice.
     // Manual override: localStorage.astro_perf = 'lite' | 'full' (or AstroPerf.set()).
     (function () {
       'use strict';
@@ -147,16 +147,23 @@
         try {
           const ua = navigator.userAgent || '';
           const isAndroid = /Android/i.test(ua);
+          const isIOS = /iPhone|iPad|iPod/i.test(ua);
           const andrVer = ua.match(/Android (\d+)/);
+          const iosVer = ua.match(/OS (\d+)_/); // "iPhone OS 15_7 like Mac OS X"
           const mem = navigator.deviceMemory || 0;            // Chrome/Android only
           const cores = navigator.hardwareConcurrency || 0;
           if (isAndroid && mem && mem <= 4) lite = true;      // ≤4GB RAM (low/mid tier)
           if (isAndroid && cores && cores <= 4) lite = true;  // weak CPU
           if (andrVer && parseInt(andrVer[1], 10) <= 10) lite = true; // old OS = old GPU
+          // Old iPhones: stuck on iOS ≤14 means iPhone 6s/7 era hardware; the
+          // blur+animation stack is too heavy there.
+          if (isIOS && iosVer && parseInt(iosVer[1], 10) <= 14) lite = true;
           if (localStorage.getItem('astro_perf_auto') === 'lite') lite = true; // earlier probe verdict
           apply(lite);
-          if (!lite && isAndroid) {
+          if (!lite) {
             // Probe after boot jank settles; abort if backgrounded (rAF pauses → fake low fps).
+            // Runs on ALL platforms: a phone that can't hold ~45fps on the live
+            // background gets lite mode persisted for future opens.
             setTimeout(() => {
               if (document.hidden) return;
               let frames = 0;

@@ -98,7 +98,7 @@ async def approve_deletion_request(callback: CallbackQuery, session: AsyncSessio
         # Delete from Marzban
         success = await marzban_api.delete_user(subscription.marzban_username)
         if not success:
-            await callback.answer("خطا در حذف سرویس از Marzban", show_alert=True)
+            await callback.answer("خطا در حذف سرویس از پنل", show_alert=True)
             return
         
         # Update deletion request status

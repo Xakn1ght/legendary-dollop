@@ -415,7 +415,7 @@
  }
  html[dir="rtl"] .referral-card{
    padding-left: 24px;
-   padding-right: 30px;
+   padding-right: 24px;
  }
 
 .referral-card:hover {
@@ -434,32 +434,8 @@
   background: radial-gradient(circle at 20% 0%, rgba(255, 202, 40, 0.08) 0%, transparent 55%);
   pointer-events: none;
 }
- .referral-card::after{
-   content:"";
-   position:absolute;
-   left: 12px;
-   top: 16px;
-   bottom: 16px;
-   width: 5px;
-   border-radius: 999px;
-   background: var(--accent, rgba(255,202,40,0.95));
-  opacity: 1;
-  box-shadow: 
-    0 0 12px var(--accent),
-    0 0 24px var(--accent),
-    0 0 0 1px rgba(255,255,255,0.15);
-   pointer-events:none;
-   animation: glow 2s ease-in-out infinite;
- }
- html[dir="rtl"] .referral-card::after{
-   left: auto;
-   right: 12px;
- }
-
-@keyframes glow {
-  0%, 100% { opacity: 1; }
-  50% { opacity: 0.7; box-shadow: 0 0 16px var(--accent), 0 0 32px var(--accent); }
-}
+ /* (Removed) The pulsing neon accent bar on each card read as noise —
+    the per-card --accent hue lives on in small elements like .jump-dot. */
 #dailyGameCard::before { 
   background: radial-gradient(
     ellipse at 15% 0%, 
@@ -600,7 +576,7 @@
 
   /* Collapsible reward cards to reduce long scrolling */
   .reward-body{
-    margin-top: 16px;
+    margin-top: 20px;
   }
 
   .reward-toggle{
@@ -757,13 +733,16 @@
      font-size: 13px;
      font-weight: 800;
      cursor: pointer;
-   transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+   transition:
+     transform 180ms cubic-bezier(0.23, 1, 0.32, 1),
+     background 180ms ease,
+     border-color 180ms ease,
+     box-shadow 180ms ease;
   white-space: nowrap;
   box-shadow: 
     0 2px 8px rgba(0, 0, 0, 0.2),
     0 0 0 1px rgba(255, 255, 255, 0.05) inset;
      position: relative;
-     overflow: hidden;
    }
    .referral-actions .ref-btn{ width: 100%; }
    .ref-btn:disabled{
@@ -773,29 +752,22 @@
    }
    .ref-btn[hidden]{ display:none !important; }
 
-.ref-btn::before {
-  content: '';
-  position: absolute;
-  top: 50%;
-  left: 50%;
-  width: 0;
-  height: 0;
-  border-radius: 50%;
-  background: rgba(255, 255, 255, 0.2);
-  transform: translate(-50%, -50%);
-  transition: width 0.4s, height 0.4s;
-}
-
-.ref-btn:hover::before {
-  width: 200%;
-  height: 200%;
-}
-
-.ref-btn:hover {
-  transform: translateY(-2px);
-  box-shadow: 
-    0 4px 12px rgba(0, 0, 0, 0.3),
-    0 0 0 1px rgba(255, 255, 255, 0.1) inset;
+/* Hover: calm brighten + tiny lift, real pointers only (the old expanding
+   ripple blob washed the label out and stuck on touch screens). */
+@media (hover: hover) and (pointer: fine) {
+  .ref-btn:hover {
+    background: rgba(255, 255, 255, 0.12);
+    border-color: rgba(255, 255, 255, 0.24);
+    transform: translateY(-1px);
+  }
+  .ref-btn.primary:hover {
+    background: linear-gradient(135deg, rgba(255, 202, 40, 0.28), rgba(255, 202, 40, 0.20));
+    border-color: rgba(255, 202, 40, 0.55);
+    box-shadow:
+      0 6px 16px rgba(255, 202, 40, 0.30),
+      0 0 0 1px rgba(255, 202, 40, 0.22) inset;
+    transform: translateY(-1px);
+  }
 }
 
 .ref-btn.primary {
@@ -805,17 +777,9 @@
     0 4px 12px rgba(255, 202, 40, 0.25),
     0 0 0 1px rgba(255, 202, 40, 0.15) inset;
 }
-.ref-btn.primary:active { transform: scale(0.97); }
-.ref-btn.primary:hover { 
-  background: linear-gradient(135deg, rgba(255, 202, 40, 0.28), rgba(255, 202, 40, 0.20));
-  box-shadow: 
-    0 6px 16px rgba(255, 202, 40, 0.35),
-    0 0 0 1px rgba(255, 202, 40, 0.25) inset;
-  transform: translateY(-3px);
-}
 
 .ref-btn:active {
-  transform: scale(0.98);
+  transform: scale(0.97);
 }
 
    .jump-row{
@@ -1460,7 +1424,7 @@ html[dir="rtl"] .referral-code {
   align-items: center;
   justify-content: space-between;
   gap: 10px;
-  margin-bottom: 10px;
+  margin-bottom: 12px;
 }
 .season-next-label{
   font-size: 12px;
@@ -1495,7 +1459,7 @@ html[dir="rtl"] .referral-code {
   transition: width 0.7s cubic-bezier(0.4,0,0.2,1);
 }
 .season-next-reward{
-  margin-top: 10px;
+  margin-top: 12px;
   font-size: 13px;
   font-weight: 700;
   color: var(--text);
@@ -1552,7 +1516,10 @@ html[dir="rtl"] .referral-code {
 .season-rung-stars{
   font-size: 11px;
   color: var(--muted);
-  margin-top: 2px;
+  margin-top: 3px;
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
 }
 .season-rung-state{ font-size: 15px; flex-shrink: 0; }
 
@@ -1615,8 +1582,8 @@ html[data-theme="light"] .season-rung-node{ background: rgba(0,0,0,0.05); border
 .season-count{
   display: flex;
   align-items: baseline;
-  gap: 8px;
-  margin-bottom: 18px;
+  gap: 10px;
+  margin-bottom: 22px;
 }
 .season-count-num{
   font-size: 40px;
@@ -1632,25 +1599,31 @@ html[data-theme="light"] .season-rung-node{ background: rgba(0,0,0,0.05); border
   text-transform: uppercase;
   letter-spacing: 0.4px;
 }
-.season-next-block{ margin-bottom: 16px; }
+.season-next-block{ margin-bottom: 18px; }
 .season-togo{
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
   font-size: 12px;
   font-weight: 800;
   color: rgba(255,202,40,0.95);
 }
 .season-progress-nums{
-  margin-top: 6px;
+  margin-top: 8px;
   font-size: 12px;
   font-weight: 700;
   color: var(--muted);
-  text-align: right;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  justify-content: flex-end;
 }
-html[dir="rtl"] .season-progress-nums{ text-align: left; }
+html[dir="rtl"] .season-progress-nums{ justify-content: flex-start; }
 .season-ends{
   font-size: 13px;
   font-weight: 600;
   color: var(--muted);
-  margin-bottom: 16px;
+  margin: 0 0 18px;
 }
 .season-ends:empty{ display: none; }
 .season-ladder-toggle{

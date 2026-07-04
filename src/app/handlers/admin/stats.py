@@ -14,7 +14,7 @@ async def show_stats(message: Message, session: AsyncSession):
     if message.from_user.id not in ADMIN_IDS:
         return
 
-    # Redirect to the new comprehensive dashboard
+    # Redirect to the web dashboard
     await message.answer("📊 آمار سیستم منتقل شد به داشبورد جدید. لطفاً از دکمه '📊 داشبورد' استفاده کنید.")
     
     # Call the new dashboard function

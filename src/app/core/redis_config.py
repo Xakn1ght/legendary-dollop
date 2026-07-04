@@ -88,11 +88,11 @@ async def init_redis():
         # Test connection
         await redis_client.ping()
         
-        logging.info("✅ Redis connection established successfully")
+        logging.info("Redis connection established")
         return True
         
     except Exception as e:
-        logging.error(f"❌ Failed to connect to Redis: {e}")
+        logging.error(f"Failed to connect to Redis: {e}")
         # Ensure we clean up if half-initialized
         if redis_client:
             await redis_client.close()
@@ -121,7 +121,7 @@ async def close_redis():
         await redis_pool.disconnect()
         redis_pool = None
     
-    logging.info("🔌 Redis connections closed")
+    logging.info("Redis connections closed")
 
 class RedisCache:
     """Redis caching utility class with in-memory fallback"""

@@ -112,7 +112,7 @@ async def handle_admin_deny_vip_order(request: web.Request):
                     db=session,
                     user_id=user.id,
                     type='vip_denied',
-                    title='❌ درخواست VIP رد شد',
+                    title='درخواست VIP رد شد',
                     message='درخواست خرید VIP شما رد شد. برای اطلاعات بیشتر با پشتیبانی تماس بگیرید.',
                     sent_to_webapp=True,
                     sent_to_bot=True

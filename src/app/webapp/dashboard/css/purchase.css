@@ -133,6 +133,13 @@ html[lang="fa"] .back-btn svg {
   box-sizing: border-box;
 }
 
+/* Keyboard up (Android pan-mode WebView): reserve scroll room equal to the
+   keyboard height so focused inputs can scroll above it. --kb-height is set
+   by the shared keyboard watcher. */
+html.kb-open .content {
+  padding-bottom: calc(var(--kb-height, 0px) + 24px);
+}
+
 @media (min-width: 500px) {
   .content {
     padding: 20px;
@@ -325,21 +332,16 @@ html[lang="fa"] .back-btn svg {
   color: var(--text);
 }
 
+/* In-flow badge row (was absolute top-right: two badges stacked down and
+   overlapped the GB number). Flow layout can never overlap card content. */
 .plan-badges{
-  position:absolute;
-  top:8px;
-  right:8px;
   display:flex;
-  flex-direction:column;
+  flex-wrap:wrap;
+  justify-content:center;
   gap:4px;
-  z-index:2;
+  margin:-6px 0 8px;
+  padding:0 24px;
   pointer-events:none;
-  align-items:flex-end;
-}
-html[dir="rtl"] .plan-badges{
-  right:auto;
-  left:8px;
-  align-items:flex-start;
 }
 .plan-badge{
   display:inline-flex;
@@ -1021,6 +1023,56 @@ html[lang="fa"] .discount-tag {
   padding: 14px;
   border: 1.5px dashed rgba(var(--brandRgb), 0.35);
   background: linear-gradient(180deg, rgba(var(--brandRgb),0.06), rgba(var(--brandRgb),0.02));
+}
+
+/* Android Telegram: keyboard overlays the page and defeats scrolling, so
+   while the GB number is being edited the whole editor floats to the top of
+   the screen (under the page header / Telegram chrome) where it is always
+   visible. Solid surface so it reads over whatever is behind it. */
+.custom-plan-pop.kb-float {
+  position: fixed;
+  top: calc(env(safe-area-inset-top, 0px) + 118px);
+  left: 14px;
+  right: 14px;
+  z-index: 4000;
+  border-style: solid;
+  border-color: rgba(var(--brandRgb), 0.55);
+  background: var(--panel, #0d1523);
+  box-shadow: 0 18px 50px rgba(0, 0, 0, 0.55);
+  animation: kbFloatIn 200ms cubic-bezier(0.23, 1, 0.32, 1);
+}
+[data-theme="light"] .custom-plan-pop.kb-float {
+  background: #ffffff;
+  box-shadow: 0 18px 50px rgba(15, 23, 42, 0.25);
+}
+/* Real backdrop (not just a shadow): swallows every tap behind the floating
+   editor so nothing can be misclicked; tapping it dismisses the editor. */
+.kb-float-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 3990;
+  background: rgba(0, 0, 0, 0.45);
+  touch-action: none;
+  animation: kbFadeIn 180ms ease-out;
+}
+[data-theme="light"] .kb-float-backdrop { background: rgba(15, 23, 42, 0.28); }
+@keyframes kbFloatIn {
+  from { opacity: 0; transform: translateY(-8px) scale(0.97); }
+  to { opacity: 1; transform: none; }
+}
+@keyframes kbFadeIn { from { opacity: 0; } }
+@media (prefers-reduced-motion: reduce) {
+  .custom-plan-pop.kb-float, .kb-float-backdrop { animation: none; }
+}
+/* backdrop-filter / transform / filter on an ancestor turn it into the
+   containing block for position:fixed — the float would anchor to the card
+   instead of the screen. Strip them while the editor is floating. */
+html:has(.custom-plan-pop.kb-float) :is(.card, .section, .content, .container) {
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+  transform: none !important;
+  filter: none !important;
+  will-change: auto !important;
 }
 .custom-plan-row { display: flex; align-items: center; gap: 12px; }
 .custom-gb-range { flex: 1; accent-color: var(--brand); min-width: 0; }

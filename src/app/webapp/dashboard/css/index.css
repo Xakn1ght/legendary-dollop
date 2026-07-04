@@ -100,14 +100,16 @@
       align-items:center;
       justify-content:center;
       cursor:pointer;
-      transition:all 0.3s ease;
+      transition:transform 180ms cubic-bezier(0.23, 1, 0.32, 1), border-color 180ms ease;
     }
-    .notification-bell:hover{
-      transform:scale(1.05) rotate(15deg);
-      border-color:var(--brand);
+    @media (hover: hover) and (pointer: fine){
+      .notification-bell:hover{
+        transform:scale(1.06);
+        border-color:var(--brand);
+      }
     }
     .notification-bell:active{
-      transform:scale(0.95) rotate(-5deg);
+      transform:scale(0.94);
     }
     .notification-bell svg{
       width:16px;
@@ -142,15 +144,32 @@
       50%{transform:scale(1.2);}
       100%{transform:scale(1);}
     }
-    .notification-bell.has-notification{
-      animation:bellRing 2s ease-in-out infinite;
+    /* Swing only the bell glyph from its hinge (top), not the whole button
+       with its badge. Short decaying shake every 5s instead of a constant
+       2s wobble — noticeable without being nagging. */
+    .notification-bell.has-notification svg{
+      transform-origin: 50% 15%;
+      animation: bellSwing 5s linear infinite;
     }
-    @keyframes bellRing{
-      0%, 90%, 100%{transform:rotate(0deg);}
-      92%{transform:rotate(15deg);}
-      94%{transform:rotate(-15deg);}
-      96%{transform:rotate(10deg);}
-      98%{transform:rotate(-10deg);}
+    @keyframes bellSwing{
+      0%, 84%, 100%{transform:rotate(0deg);}
+      86%{transform:rotate(14deg);}
+      88.5%{transform:rotate(-12deg);}
+      91%{transform:rotate(8deg);}
+      93.5%{transform:rotate(-5deg);}
+      96%{transform:rotate(2deg);}
+    }
+    /* Badge pops in — never from scale(0). */
+    .notification-bell .badge{
+      animation: badgePop .32s cubic-bezier(0.23, 1, 0.32, 1) both;
+    }
+    @keyframes badgePop{
+      from{transform:scale(0.6); opacity:0;}
+      to{transform:scale(1); opacity:1;}
+    }
+    @media (prefers-reduced-motion: reduce){
+      .notification-bell.has-notification svg{ animation:none; }
+      .notification-bell .badge{ animation:none; }
     }
     @keyframes notificationPulse{
       0%, 100%{transform:scale(1);}
@@ -591,6 +610,22 @@
       border-radius:20px;
       font-size:10.5px; font-weight:700; color:rgba(255,255,255,0.82);
       letter-spacing:0.4px; text-transform:uppercase;
+      /* Badge is also the refresh button for the card */
+      cursor:pointer; font-family:inherit;
+      transition:transform 160ms cubic-bezier(0.23, 1, 0.32, 1);
+      -webkit-tap-highlight-color:transparent;
+    }
+    .vpn-card .status-badge:active{ transform:scale(0.95); }
+    .vpn-card .status-badge .badge-refresh-ic{
+      width:11px; height:11px; flex-shrink:0; opacity:0.75;
+    }
+    .vpn-card .status-badge.refreshing .badge-refresh-ic{
+      animation:badgeSpin 0.8s linear infinite;
+      opacity:1;
+    }
+    @keyframes badgeSpin{ to{ transform:rotate(360deg); } }
+    @media (prefers-reduced-motion: reduce){
+      .vpn-card .status-badge.refreshing .badge-refresh-ic{ animation:none; }
     }
     .vpn-card .status-badge::before{
       content:''; width:6px; height:6px; border-radius:50%;
@@ -603,6 +638,38 @@
     .vpn-card .status-badge.expired::before,
     .vpn-card .status-badge.disabled::before{ background:#f87171; box-shadow:0 0 8px #f87171; }
     .vpn-card .status-badge.limited::before{ background:#fbbf24; box-shadow:0 0 8px #fbbf24; }
+    /* Status tints — badge text/border take the state colour too */
+    .vpn-card .status-badge.active{
+      background:rgba(34,197,94,0.16);
+      border-color:rgba(74,222,128,0.50);
+      color:#bbf7d0;
+    }
+    .vpn-card .status-badge.expired,
+    .vpn-card .status-badge.disabled{
+      background:rgba(239,68,68,0.14);
+      border-color:rgba(248,113,113,0.45);
+      color:#fecaca;
+    }
+    .vpn-card .status-badge.limited{
+      background:rgba(234,179,8,0.14);
+      border-color:rgba(251,191,36,0.45);
+      color:#fef3c7;
+    }
+    .vpn-card .status-badge.on_hold{
+      background:rgba(96,165,250,0.14);
+      border-color:rgba(147,197,253,0.45);
+      color:#dbeafe;
+    }
+    [data-theme="light"] .vpn-card .status-badge.active{
+      background:rgba(34,197,94,0.14); border-color:rgba(22,163,74,0.40); color:#166534;
+    }
+    [data-theme="light"] .vpn-card .status-badge.expired,
+    [data-theme="light"] .vpn-card .status-badge.disabled{
+      background:rgba(239,68,68,0.10); border-color:rgba(220,38,38,0.35); color:#991b1b;
+    }
+    [data-theme="light"] .vpn-card .status-badge.limited{
+      background:rgba(234,179,8,0.14); border-color:rgba(202,138,4,0.35); color:#854d0e;
+    }
 
     @media(prefers-reduced-motion:reduce){
       .vpn-blob{ animation:none; }
@@ -640,7 +707,11 @@
     /* Location */
     .location{display:flex; align-items:center; gap:10px; margin-top:12px}
     .location .flag{width:36px; height:27px; display:flex; align-items:center; justify-content:center;
-      border-radius:6px; overflow:hidden; box-shadow:0 2px 6px rgba(0,0,0,0.15)}
+      border-radius:6px; overflow:hidden;
+      /* Ring outline so light flag stripes stay visible on any surface */
+      box-shadow:0 0 0 1.5px rgba(255,255,255,0.28), 0 2px 8px rgba(0,0,0,0.35)}
+    [data-theme="light"] .location .flag{
+      box-shadow:0 0 0 1.5px rgba(15,23,42,0.22), 0 2px 6px rgba(15,23,42,0.18)}
     .location .flag svg{width:100%!important; height:100%!important; display:block}
     .location .flag img{width:100%; height:100%; object-fit:cover}
     .location .name{font-size:15px; font-weight:600; color:var(--lightText)}
@@ -679,10 +750,22 @@
       justify-content:center; border-radius:12px}
     .btn-icon svg{transition:all 0.2s; stroke:var(--muted)}
     .btn-icon:hover svg{stroke:var(--lightText)}
-    .btn-remove{background:rgba(248, 113, 113, 0.1); border-color:rgba(248, 113, 113, 0.3)}
-    .btn-remove svg{stroke:var(--bad)!important}
-    .btn-remove:hover{background:var(--bad); border-color:var(--bad)}
-    .btn-remove:hover svg{stroke:#fff!important}
+    .btn-remove{
+      background:rgba(239, 68, 68, 0.16)!important;
+      border:1px solid rgba(239, 68, 68, 0.45)!important;
+      box-shadow:0 2px 10px rgba(239, 68, 68, 0.14)!important;
+    }
+    .btn-remove svg{stroke:#f87171!important}
+    [data-theme="light"] .btn-remove{
+      background:rgba(239, 68, 68, 0.10)!important;
+      border-color:rgba(220, 38, 38, 0.40)!important;
+    }
+    [data-theme="light"] .btn-remove svg{stroke:#dc2626!important}
+    @media (hover: hover) and (pointer: fine){
+      .btn-remove:hover{background:var(--bad)!important; border-color:var(--bad)!important}
+      .btn-remove:hover svg{stroke:#fff!important}
+    }
+    .btn-remove:active{transform:scale(0.94)}
 
     /* + button actions dropdown */
     .sub-actions-menu{
@@ -697,10 +780,10 @@
       overflow: hidden;
       z-index: 1300;
       transform-origin: top right;
-      transform: translateY(-4px) scale(0.98);
+      transform: translateY(-6px) scale(0.95);
       opacity: 0;
       pointer-events: none;
-      transition: transform .14s ease, opacity .14s ease;
+      transition: transform .2s cubic-bezier(0.23, 1, 0.32, 1), opacity .16s ease-out;
     }
     html[dir="rtl"] .sub-actions-menu{
       right: auto;
@@ -713,73 +796,90 @@
       pointer-events: auto;
     }
     .sub-actions-menu .menu-head{
-      padding: 10px 12px;
+      padding: 12px 14px 10px;
       display:flex;
       align-items:center;
       justify-content:space-between;
       gap: 10px;
       border-bottom: 1px solid var(--line);
-      background: linear-gradient(135deg, rgba(var(--brandRgb),0.12), rgba(255,255,255,0.04));
     }
     .sub-actions-menu .menu-title{
-      font-weight: 900;
-      font-size: 13px;
-      letter-spacing: .2px;
-      color: var(--lightText);
+      font-weight: 800;
+      font-size: 12px;
+      letter-spacing: .6px;
+      text-transform: uppercase;
+      color: var(--muted);
       display:flex;
       align-items:center;
       gap: 8px;
     }
-    .sub-actions-menu .menu-list{ padding: 8px; display:grid; gap: 6px; }
+    .sub-actions-menu .menu-list{ padding: 8px; display:grid; gap: 2px; }
     .sub-actions-menu .menu-item{
       width: 100%;
-      border: 1px solid var(--line);
-      background: var(--chip);
+      border: none;
+      background: transparent;
       color: var(--lightText);
-      border-radius: 14px;
-      padding: 10px 12px;
+      border-radius: 13px;
+      padding: 11px 12px;
       display:flex;
       align-items:center;
-      gap: 10px;
+      gap: 12px;
       cursor:pointer;
       font-family: inherit;
-      transition: background .15s ease, border-color .15s ease, transform .08s ease;
       text-align: left;
+      /* Staggered entrance: rows rise in just after the panel scales open */
+      opacity: 0;
+      transform: translateY(7px);
+      transition:
+        background .15s ease,
+        transform .24s cubic-bezier(0.23, 1, 0.32, 1),
+        opacity .2s ease-out;
     }
     html[dir="rtl"] .sub-actions-menu .menu-item{ text-align: right; }
-    .sub-actions-menu .menu-item:hover{
-      background: var(--chipHover);
-      border-color: rgba(var(--brandRgb), 0.45);
+    .sub-actions-menu.open .menu-item{ opacity: 1; transform: translateY(0); }
+    .sub-actions-menu.open .menu-item:nth-child(2){ transition-delay: 30ms; }
+    .sub-actions-menu.open .menu-item:nth-child(3){ transition-delay: 60ms; }
+    .sub-actions-menu.open .menu-item:nth-child(4){ transition-delay: 90ms; }
+    .sub-actions-menu.open .menu-item:nth-child(5){ transition-delay: 120ms; }
+    @media (hover: hover) and (pointer: fine){
+      .sub-actions-menu .menu-item:hover{ background: var(--chipHover); }
     }
-    .sub-actions-menu .menu-item:active{ transform: translateY(1px); }
+    .sub-actions-menu.open .menu-item:active{ transform: scale(0.97); transition-delay: 0ms; }
+    @media (prefers-reduced-motion: reduce){
+      .sub-actions-menu .menu-item{ transform: none; transition: background .15s ease, opacity .2s ease; }
+      .sub-actions-menu.open .menu-item{ transition-delay: 0ms !important; }
+    }
     .sub-actions-menu .mi-ic{
-      width: 34px;
-      height: 34px;
-      border-radius: 12px;
+      width: 36px;
+      height: 36px;
+      border-radius: 11px;
       display:flex;
       align-items:center;
       justify-content:center;
-      flex: 0 0 34px;
-      color: #fff;
-      background: linear-gradient(135deg, var(--brand), var(--brandDark));
-      box-shadow: 0 10px 28px rgba(var(--brandRgb),0.28);
+      flex: 0 0 36px;
+      color: var(--brand);
+      background: rgba(var(--brandRgb), 0.14);
+      border: 1px solid rgba(var(--brandRgb), 0.22);
     }
     .sub-actions-menu .mi-ic.secondary{
-      background: linear-gradient(135deg, #10b981, #059669);
-      box-shadow: 0 10px 28px rgba(16,185,129,0.22);
+      color: #10b981;
+      background: rgba(16,185,129,0.13);
+      border-color: rgba(16,185,129,0.22);
     }
     .sub-actions-menu .mi-ic.blue{
-      background: linear-gradient(135deg, #3b82f6, #1d4ed8);
-      box-shadow: 0 10px 28px rgba(59,130,246,0.22);
+      color: #60a5fa;
+      background: rgba(59,130,246,0.13);
+      border-color: rgba(59,130,246,0.22);
     }
     .sub-actions-menu .mi-ic.gray{
-      background: linear-gradient(135deg, rgba(148,163,184,0.45), rgba(148,163,184,0.22));
-      box-shadow: 0 10px 28px rgba(0,0,0,0.12);
-      color: var(--lightText);
+      color: var(--muted);
+      background: rgba(148,163,184,0.13);
+      border-color: rgba(148,163,184,0.22);
     }
-    .sub-actions-menu .mi-text{ display:flex; flex-direction:column; gap: 1px; flex:1; min-width: 0; }
-    .sub-actions-menu .mi-text .title{ font-weight: 900; font-size: 13px; }
-    .sub-actions-menu .mi-text .sub{ font-size: 11px; color: var(--muted); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+    [data-theme="light"] .sub-actions-menu .mi-ic.blue{ color: #2563eb; }
+    .sub-actions-menu .mi-text{ display:flex; flex-direction:column; gap: 2px; flex:1; min-width: 0; }
+    .sub-actions-menu .mi-text .title{ font-weight: 700; font-size: 13.5px; }
+    .sub-actions-menu .mi-text .sub{ font-size: 11.5px; color: var(--muted); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
     /* Subs dropdown */
     .subs-dd{
       position:relative; margin-top:8px; display:none;
@@ -803,8 +903,23 @@
     .subs-dd .item .meta{display:flex; gap:8px; align-items:center}
     .subs-dd .item .name{font-weight:700; font-size:13px}
     .subs-dd .item .badge{font-size:11px; color:var(--muted)}
-    .subs-dd .item .star{width:22px; height:22px; border-radius:6px; display:flex; align-items:center; justify-content:center;
-      border:1px solid var(--line); background:transparent}
+    .subs-dd .item .star{
+      width:34px; height:34px; border-radius:10px; flex:0 0 34px;
+      display:flex; align-items:center; justify-content:center;
+      border:1px solid var(--line); background:var(--chip);
+      color:var(--muted); cursor:pointer; padding:0;
+      transition:transform .16s cubic-bezier(0.23, 1, 0.32, 1), background .15s ease, color .15s ease, border-color .15s ease;
+    }
+    .subs-dd .item .star svg{width:17px; height:17px; display:block}
+    .subs-dd .item .star:active{transform:scale(0.88)}
+    @media (hover: hover) and (pointer: fine){
+      .subs-dd .item .star:hover{color:#f59e0b; border-color:rgba(245,158,11,0.45)}
+    }
+    .subs-dd .item .star.active{
+      color:#f59e0b;
+      background:rgba(245,158,11,0.14);
+      border-color:rgba(245,158,11,0.5);
+    }
     .subs-dd .footer{display:flex; flex-wrap:wrap; gap:8px; margin-top:10px}
     .subs-dd .footer .btn{padding:8px 12px; font-size:12px}
     
@@ -855,7 +970,7 @@
     }
     .usage-ring-svg .progress{
       stroke:var(--brand); filter:drop-shadow(0 2px 8px var(--orangeGlow));
-      transition:stroke-dashoffset .5s ease;
+      transition:stroke-dashoffset .5s cubic-bezier(0.23, 1, 0.32, 1), stroke .4s ease;
     }
     .usage-ring-svg .progress.ok{stroke:var(--ok)}
     .usage-ring-svg .progress.warn{stroke:var(--warn)}
@@ -1485,6 +1600,36 @@
       font-size: 14px;
       color: var(--lightText);
       flex: 1;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      min-width: 0;
+    }
+    /* Status icon chip (replaces the old ✅/❌ emoji in titles) */
+    .notification-icon {
+      width: 22px;
+      height: 22px;
+      border-radius: 7px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+    }
+    .notification-icon svg { width: 14px; height: 14px; }
+    .notification-icon.ok {
+      color: #34d399;
+      background: rgba(52, 211, 153, 0.14);
+      border: 1px solid rgba(52, 211, 153, 0.25);
+    }
+    .notification-icon.bad {
+      color: #f87171;
+      background: rgba(239, 68, 68, 0.13);
+      border: 1px solid rgba(239, 68, 68, 0.25);
+    }
+    .notification-icon.info {
+      color: var(--brand);
+      background: rgba(var(--brandRgb), 0.13);
+      border: 1px solid rgba(var(--brandRgb), 0.24);
     }
     .notification-time {
       font-size: 11px;
@@ -1496,19 +1641,62 @@
       color: var(--muted);
       line-height: 1.5;
     }
+    /* Offline banner — slim strip under the header, calm not alarming */
+    .net-banner{
+      display:flex;
+      align-items:center;
+      gap:8px;
+      margin:0 20px 4px;
+      padding:8px 14px;
+      border-radius:12px;
+      background:rgba(251, 191, 36, 0.10);
+      border:1px solid rgba(251, 191, 36, 0.28);
+      color:#fbbf24;
+      font-size:12.5px;
+      font-weight:600;
+      animation:netBannerIn .24s cubic-bezier(0.23, 1, 0.32, 1);
+    }
+    .net-banner span{flex:1; min-width:0}
+    .net-banner button{
+      appearance:none;
+      border:1px solid rgba(251, 191, 36, 0.4);
+      background:rgba(251, 191, 36, 0.14);
+      color:#fbbf24;
+      border-radius:9px;
+      padding:5px 12px;
+      font-size:12px;
+      font-weight:700;
+      font-family:inherit;
+      cursor:pointer;
+      flex-shrink:0;
+      transition:transform .15s cubic-bezier(0.23, 1, 0.32, 1);
+    }
+    .net-banner button:active{transform:scale(0.94)}
+    [data-theme="light"] .net-banner{
+      background:rgba(202, 138, 4, 0.10);
+      border-color:rgba(202, 138, 4, 0.30);
+      color:#854d0e;
+    }
+    [data-theme="light"] .net-banner button{
+      border-color:rgba(202, 138, 4, 0.35);
+      background:rgba(202, 138, 4, 0.12);
+      color:#854d0e;
+    }
+    @keyframes netBannerIn{
+      from{opacity:0; transform:translateY(-6px)}
+      to{opacity:1; transform:none}
+    }
+
+    /* Inline dot at the title's reading start (flex gap handles spacing;
+       dir=rtl puts it on the right automatically). */
     .unread-indicator {
-      position: absolute;
-      top: 12px;
-      right: 12px;
+      display: inline-block;
       width: 8px;
       height: 8px;
       background: var(--brand);
       border-radius: 50%;
-      box-shadow: 0 0 0 2px var(--chip);
-    }
-    html[dir="rtl"] .unread-indicator {
-      right: auto;
-      left: 12px;
+      margin-inline: -2px;
+      flex-shrink: 0;
     }
 
     /* ============================================================

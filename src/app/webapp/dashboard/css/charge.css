@@ -219,21 +219,16 @@ html[lang="fa"] .back-btn svg { transform: rotate(180deg); }
 
 .plans-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; }
 
+/* In-flow badge row (was absolute top-right: two badges stacked down and
+   overlapped the GB number). Flow layout can never overlap card content. */
 .plan-badges{
-  position:absolute;
-  top:8px;
-  right:8px;
   display:flex;
-  flex-direction:column;
+  flex-wrap:wrap;
+  justify-content:center;
   gap:4px;
-  z-index:2;
+  margin:-6px 0 8px;
+  padding:0 24px;
   pointer-events:none;
-  align-items:flex-end;
-}
-html[dir="rtl"] .plan-badges{
-  right:auto;
-  left:8px;
-  align-items:flex-start;
 }
 .plan-badge{
   display:inline-flex;
@@ -548,7 +543,9 @@ body[data-charge-step="1"] #section-sub > .card {
   background: transparent;
   border: none;
   box-shadow: none;
-  padding: 0;
+  /* Keep horizontal breathing room — padding:0 squeezed the title, search
+     and sub cards flush against the screen edges. */
+  padding: 0 clamp(12px, 3.5vw, 18px);
 }
 
 body[data-charge-step="1"] #subsContainer {
@@ -558,6 +555,12 @@ body[data-charge-step="1"] #subsContainer {
   min-height: 0;
   gap: 14px;
   overflow: hidden;
+}
+
+/* Inset the scroll area slightly so selected-card borders never clip. */
+body[data-charge-step="1"] .subs-scroll {
+  padding: 2px;
+  margin: -2px;
 }
 
 body[data-charge-step="1"] .sub-search {

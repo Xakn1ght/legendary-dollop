@@ -24,6 +24,7 @@ from app.api.routes.dashboard import (
     handle_dashboard_submit_referral,
     handle_dashboard_wallet_cashout,
     handle_dashboard_wallet_convert_loyalty,
+    handle_profile_photo,
     handle_vip_plans,
     handle_vip_purchase,
     handle_vip_upload_receipt,
