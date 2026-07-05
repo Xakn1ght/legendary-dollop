@@ -8,8 +8,13 @@ the channel, DB candidates, calling the approve path) lives in
 ``services/sms_ingest.py``.
 
 Safety stance (money is involved):
-  - amounts must match EXACTLY (to the toman); no fuzzy amounts.
+  - amounts must match EXACTLY (to the toman); no fuzzy amounts. Bank SMS
+    amounts are RIAL, order prices are TOMAN — the deposit is converted
+    (rial // 10) before comparison; a rial amount not divisible by 10 never
+    matches anything.
   - a deposit auto-approves at most ONE order, and only when unambiguous.
+  - a ref-number join (receipt's شماره مرجع == SMS's شماره بازیابی/پیگیری) may
+    break an amount collision, but never overrides the amount gate.
   - the caller dedups by the bank's tracking number (and a cross-system claim)
     so one deposit can never approve twice.
 """
@@ -43,11 +48,18 @@ def parse_bank_sms(text: str) -> dict | None:
         return None
     t = normalize_digits(text)
 
-    m = re.search(r'مبلغ\s*[:：]?\s*([+\-])?\s*([\d,]+)', t)
+    # RTL rendering means the sign can appear before OR after the digits
+    # ("مبلغ:+850,000" vs "مبلغ:850,000+"), so accept both positions. The
+    # trailing-sign lookahead must not cross the line break (the next line is
+    # the balance, which carries its own digits).
+    m = re.search(r'مبلغ\s*[:：]?\s*([+\-])?\s*([\d,]+)[^\S\n]*([+\-])?', t)
     if not m:
         return None
-    sign, raw_amount = m.group(1), m.group(2)
-    if sign == '-':
+    lead, raw_amount, trail = m.group(1), m.group(2), m.group(3)
+    if lead == '-' or trail == '-':
+        return None  # outgoing / debit
+    # Withdrawal SMS sometimes carry no sign at all — the keyword is the tell.
+    if 'برداشت' in t and lead != '+' and trail != '+':
         return None
     try:
         amount = int(raw_amount.replace(',', ''))
@@ -77,7 +89,8 @@ def parse_bank_sms(text: str) -> dict | None:
         dedup_id = 'h' + hashlib.sha256(basis.encode('utf-8')).hexdigest()[:16]
 
     return {
-        'amount': amount,
+        'amount': amount,          # as printed in the SMS (rial for PARSIAN)
+        'amount_unit': 'rial',
         'source_last4': source_last4,
         'dest_last4': dest_last4,
         'dest_card': dest_card,
@@ -86,6 +99,25 @@ def parse_bank_sms(text: str) -> dict | None:
         'dedup_id': dedup_id,
         'raw': text,
     }
+
+
+def deposit_amount_toman(deposit: dict) -> int | None:
+    """Deposit amount converted to toman (order prices are toman).
+
+    PARSIAN SMS amounts are rial (1 toman = 10 rial). Deposits pooled before
+    this field existed default to rial too. A rial amount not divisible by 10
+    is malformed — return None so it can never match. ``amount_unit`` may be
+    set to 'toman' by the caller for sources that already report toman.
+    """
+    try:
+        amount = int(deposit.get('amount', 0))
+    except (TypeError, ValueError):
+        return None
+    if amount <= 0:
+        return None
+    if deposit.get('amount_unit') == 'toman':
+        return amount
+    return amount // 10 if amount % 10 == 0 else None
 
 
 def dest_card_allowed(deposit: dict, allowed_last4: set[str]) -> bool:
@@ -101,13 +133,16 @@ def pick_match(deposit: dict, candidates: list[dict], deposit_ts: int,
                window_sec: int) -> tuple[str, list]:
     """Decide which pending order (if any) a deposit belongs to.
 
-    `candidates`: [{'order_id': str, 'amount': int, 'receipt_ts': int,
-                    'receipt_last4': str|None}]. `order_id` is a typed id like
-    'sub:12' / 'charge:5' / 'vip:3' in ASTROBYTE.
+    `candidates`: [{'order_id': str, 'amount': int (TOMAN), 'receipt_ts': int,
+                    'receipt_last4': str|None, 'refs': iterable[str] (opt)}].
+    `order_id` is a typed id like 'sub:12' / 'charge:5' / 'vip:3' in ASTROBYTE.
+    `refs` are reference numbers read off the customer's receipt image.
 
     Returns ('approve', order_id) | ('ambiguous', [ids]) | ('none', []).
     """
-    amt = deposit['amount']
+    amt = deposit_amount_toman(deposit)
+    if amt is None:
+        return ('none', [])
     in_window = [
         c for c in candidates
         if int(c.get('amount', -1)) == amt
@@ -115,6 +150,16 @@ def pick_match(deposit: dict, candidates: list[dict], deposit_ts: int,
     ]
     if not in_window:
         return ('none', [])
+
+    # Ref-number join beats everything else (still inside the amount gate):
+    # the receipt's شماره مرجع equals the SMS's بازیابی/پیگیری only for the
+    # actual transfer, so a unique hit is definitive even in a collision.
+    dep_refs = {r for r in (deposit.get('tracking'), deposit.get('retrieval')) if r}
+    if dep_refs:
+        ref_hits = [c for c in in_window if dep_refs & {str(r) for r in (c.get('refs') or ())}]
+        if len(ref_hits) == 1:
+            return ('approve', ref_hits[0]['order_id'])
+
     if len(in_window) == 1:
         return ('approve', in_window[0]['order_id'])
 

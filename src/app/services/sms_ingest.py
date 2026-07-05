@@ -27,10 +27,10 @@ import time
 
 from sqlalchemy import select
 
-from app.core.paths import data_path
+from app.core.paths import data_path, webapp_path
 from app.core.settings import ADMIN_ID
-from app.database.models import AsyncSessionLocal, ChargeRequest, Subscription, User, VipOrder
-from app.services import sms_autoapprove
+from app.database.models import AsyncSessionLocal, ChargeRequest, Subscription, VipOrder
+from app.services import sms_ai, sms_autoapprove
 from app.utils.logger import bot_logger
 
 _SYSTEM = 'astrobyte'
@@ -147,9 +147,27 @@ def _allowed_dest_last4() -> set:
     return allowed
 
 
+# One AI read per order per process: typed id -> {'receipt_last4':…, 'refs':[…]}
+# ({} = tried and got nothing usable, so we don't burn quota again).
+_ai_read_cache: dict = {}
+
+
+def _local_receipt_path(receipt_image_url: str | None) -> str | None:
+    """Local file for a dashboard-uploaded receipt (/admin/uploads/receipts/x)."""
+    if not receipt_image_url:
+        return None
+    fname = os.path.basename(receipt_image_url)
+    if not fname or fname in ('.', '..'):
+        return None
+    path = webapp_path('admin', 'uploads', 'receipts', fname)
+    return path if os.path.isfile(path) else None
+
+
 async def _candidates(session) -> list:
     """Receipt-backed pending orders across purchase / charge / VIP, shaped for
-    sms_autoapprove.pick_match(). Amount is the net the buyer transfers."""
+    sms_autoapprove.pick_match(). Amount is the net the buyer transfers (toman);
+    pick_match converts the rial SMS amount itself. `image` is the local
+    receipt file used for lazy AI enrichment on collisions."""
     out = []
     subs = (await session.execute(
         select(Subscription).where(Subscription.status == 'pending')
@@ -157,21 +175,63 @@ async def _candidates(session) -> list:
     for s in subs:
         amt = s.paid_amount if s.paid_amount is not None else s.price
         out.append({'order_id': f'sub:{s.id}', 'amount': int(amt or 0),
-                    'receipt_ts': _epoch(s.created_at), 'receipt_last4': None})
+                    'receipt_ts': _epoch(s.created_at),
+                    'image': _local_receipt_path(s.receipt_image_url)})
     charges = (await session.execute(
         select(ChargeRequest).where(ChargeRequest.status == 'pending')
     )).scalars().all()
     for c in charges:
         amt = c.paid_amount if c.paid_amount is not None else c.price
         out.append({'order_id': f'charge:{c.id}', 'amount': int(amt or 0),
-                    'receipt_ts': _epoch(c.created_at), 'receipt_last4': None})
+                    'receipt_ts': _epoch(c.created_at),
+                    'image': _local_receipt_path(c.receipt_image_url)})
     vips = (await session.execute(
         select(VipOrder).where(VipOrder.status == 'pending')
     )).scalars().all()
     for v in vips:
         out.append({'order_id': f'vip:{v.id}', 'amount': int(v.price or 0),
-                    'receipt_ts': _epoch(v.created_at), 'receipt_last4': None})
+                    'receipt_ts': _epoch(v.created_at),
+                    'image': _local_receipt_path(v.receipt_image_url)})
+    for c in out:
+        cached = _ai_read_cache.get(c['order_id']) or {}
+        c['receipt_last4'] = cached.get('receipt_last4')
+        c['refs'] = cached.get('refs') or []
     return out
+
+
+async def _ai_enrich(cands: list) -> bool:
+    """AI-read receipt images of the given candidates (once per order). Returns
+    True if anything new was learned. Fields with an amount that contradicts
+    the order are discarded (wrong screenshot -> human)."""
+    if not sms_ai.ai_available():
+        return False
+    learned = False
+    for c in cands:
+        oid = c['order_id']
+        if oid in _ai_read_cache or not c.get('image'):
+            continue
+        try:
+            with open(c['image'], 'rb') as f:
+                blob = f.read()
+        except OSError:
+            _ai_read_cache[oid] = {}
+            continue
+        mime = 'image/png' if c['image'].lower().endswith('.png') else 'image/jpeg'
+        fields = await sms_ai.extract_receipt_fields(blob, mime)
+        entry: dict = {}
+        if fields:
+            rec_toman = sms_ai.receipt_amount_toman(fields)
+            if rec_toman is not None and rec_toman != int(c.get('amount', -1)):
+                bot_logger.info(f'[SMS] receipt of {oid}: amount {rec_toman} toman != order '
+                                f'{c.get("amount")} — ignoring extracted fields')
+            else:
+                entry = {'receipt_last4': fields.get('source_card_last4'),
+                         'refs': fields.get('ref_numbers') or []}
+                bot_logger.info(f"[SMS] receipt of {oid} AI-read: card …{entry.get('receipt_last4') or '—'} "
+                                f"refs {entry.get('refs') or '—'}")
+        _ai_read_cache[oid] = entry
+        learned = learned or bool(entry)
+    return learned
 
 
 def _epoch(dt) -> int:
@@ -208,7 +268,9 @@ async def handle_incoming_sms(bot, text: str) -> None:
         dep['matched'] = None
         deps.append(dep)
         _save_deposits(deps)
-    bot_logger.info(f"[SMS] deposit amount={dep['amount']} tracking={dep.get('tracking')} pooled")
+    bot_logger.info(f"[SMS] deposit pooled: {dep['amount']} rial "
+                    f"({sms_autoapprove.deposit_amount_toman(dep)} toman) "
+                    f"tracking={dep.get('tracking')}")
     await _sweep(bot)
 
 
@@ -235,6 +297,12 @@ async def _sweep(bot) -> None:
             return
         for dep in pending:
             kind, res = sms_autoapprove.pick_match(dep, cands, int(dep['ts']), SMS_MATCH_WINDOW_SEC)
+            if kind == 'ambiguous' and sms_ai.ai_available():
+                # Same-amount collision: AI-read the colliding receipts (once
+                # each) to fill card last-4 + refs, then re-pick.
+                if await _ai_enrich([c for c in cands if c['order_id'] in res]):
+                    cands = await _candidates(session)
+                kind, res = sms_autoapprove.pick_match(dep, cands, int(dep['ts']), SMS_MATCH_WINDOW_SEC)
             if kind == 'approve':
                 ok = await _approve(bot, session, res, dep)
                 if ok:
@@ -242,11 +310,15 @@ async def _sweep(bot) -> None:
                     # This order is consumed; drop it from the candidate pool.
                     cands = [c for c in cands if c['order_id'] != res]
             elif kind == 'ambiguous':
+                hint = await sms_ai.match_hint(
+                    dep.get('raw', ''), dep, [c for c in cands if c['order_id'] in res]) or ''
                 await _notify_admin(
                     bot,
                     '🤖 واریز بانکی با چند سفارش هم‌خوانی داشت (تأیید دستی لازم):\n'
-                    f'مبلغ: {dep["amount"]:,} تومان · پیگیری: {dep.get("tracking") or "—"}\n'
-                    f'سفارش‌ها: {", ".join(res)}')
+                    f'مبلغ: {sms_autoapprove.deposit_amount_toman(dep) or 0:,} تومان'
+                    f' · پیگیری: {dep.get("tracking") or "—"}\n'
+                    f'سفارش‌ها: {", ".join(res)}'
+                    + (f'\n\n💡 پیشنهاد هوش مصنوعی:\n{hint}' if hint else ''))
 
 
 def _mark_matched(dedup_id: str, order_id: str) -> None:
