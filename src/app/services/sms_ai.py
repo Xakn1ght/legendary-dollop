@@ -164,6 +164,7 @@ Rules:
 - source_card_last4: last 4 REAL digits of the SENDER card (کارت مبدا / از کارت). Cards may be masked like ‎6219 86** **** 7804 — take the last visible 4 digits.
 - dest_card_last4: same for the RECEIVING card (کارت مقصد / به کارت).
 - ref_numbers: every reference-like number on the receipt (شماره مرجع، شماره پیگیری، شماره بازیابی، کد رهگیری), digits only, as strings.
+- CRITICAL: transcribe long numbers DIGIT BY DIGIT, exactly as printed — never drop, add or reorder a digit. Re-read each ref number once to verify before answering.
 - time_text: the receipt's own date/time line verbatim, if any.
 Output the JSON object only — no prose, no markdown."""
 
