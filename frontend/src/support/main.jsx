@@ -7,7 +7,10 @@ import { scrubTelegramLaunchParams } from '../shared/telegram.js';
 
 import { SupportApp } from './SupportApp.jsx';
 
-initErrorLog();
-initKeyboardWatcher();
-createRoot(document.getElementById('root')).render(<SupportApp />);
-setTimeout(scrubTelegramLaunchParams, 1200);
+// head-boot's Telegram-only gate: don't mount anything on the block screen.
+if (!window.__astroBlocked) {
+  initErrorLog();
+  initKeyboardWatcher();
+  createRoot(document.getElementById('root')).render(<SupportApp />);
+  setTimeout(scrubTelegramLaunchParams, 1200);
+}

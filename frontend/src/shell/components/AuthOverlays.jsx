@@ -10,7 +10,7 @@ export function AuthHelpOverlay({ lang }) {
     ? 'مشکل ورود. لطفاً از این صفحه خارج شوید و در چت ربات دستور /start را ارسال کنید، سپس دوباره داشبورد را باز کنید.'
     : 'Login problem. Please close this page, send /start to the bot, then open the dashboard again.';
   return (
-    <div style={{ position: 'fixed', inset: 0, zIndex: 9999, background: 'rgba(0,0,0,.72)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
+    <div style={{ position: 'fixed', inset: 0, zIndex: 9999, background: 'rgba(12,9,26,.9)', backdropFilter: 'blur(16px) saturate(150%)', WebkitBackdropFilter: 'blur(16px) saturate(150%)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
       <div style={{ width: '100%', maxWidth: 420, background: 'var(--panel)', border: '1px solid var(--line)', borderRadius: 16, padding: 14, color: 'var(--lightText)' }}>
         <div style={{ fontWeight: 800, marginBottom: 6 }}>{fa ? 'مشکل در ورود' : 'Login problem'}</div>
         <div style={{ opacity: 0.9, fontSize: 13, lineHeight: 1.5, marginBottom: 10 }}>{msg}</div>

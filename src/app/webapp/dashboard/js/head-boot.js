@@ -96,11 +96,30 @@
       } catch (_) {}
 
       if (!hasInitData && !hasUrlInitData && !hasValidSession && !hasBearer) {
-        // Immediately replace page content with block message
-        document.open();
-        document.write('<!DOCTYPE html><html><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Access Restricted</title><style>body{font-family:system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;display:flex;align-items:center;justify-content:center;min-height:100vh;margin:0;background:#0d1a22;color:#F9F6EE;text-align:center;padding:20px;line-height:1.6;}div{max-width:450px;}h1{color:#ec5652;margin:0 0 20px;font-size:28px;font-weight:700;}p{margin:12px 0;opacity:0.9;font-size:16px;}.icon{font-size:64px;margin-bottom:20px;}</style></head><body><div><div class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="#ec5652" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="64" height="64"><rect x="4" y="10" width="16" height="11" rx="2.5"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/><circle cx="12" cy="15.5" r="1.4" fill="#ec5652" stroke="none"/></svg></div><h1>Access Restricted</h1><p>This dashboard can only be accessed through the Telegram Mini App.</p><p>Please open this page from within Telegram.</p></div></body></html>');
-        document.close();
-        // Prevent any further script execution
+        // document.write() from a parser-inserted script does NOT replace the
+        // document (it injects mid-parse), so the app used to keep booting
+        // around the block screen. Instead: flag the block for every later
+        // script (the React entries refuse to mount on it) and paint an
+        // opaque max-z overlay that owns the whole viewport.
+        window.__astroBlocked = true;
+        try { document.title = 'Access Restricted'; } catch (_) {}
+        var blockEl = document.createElement('div');
+        blockEl.id = 'astro-access-blocked';
+        blockEl.setAttribute('style',
+          'position:fixed;inset:0;z-index:2147483647;background:#0d1a22;color:#F9F6EE;' +
+          'display:flex;align-items:center;justify-content:center;text-align:center;' +
+          'padding:20px;line-height:1.6;font-family:system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;');
+        blockEl.innerHTML =
+          '<div style="max-width:450px">' +
+          '<div style="margin-bottom:20px"><svg viewBox="0 0 24 24" fill="none" stroke="#ec5652" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="64" height="64"><rect x="4" y="10" width="16" height="11" rx="2.5"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/><circle cx="12" cy="15.5" r="1.4" fill="#ec5652" stroke="none"/></svg></div>' +
+          '<h1 style="color:#ec5652;margin:0 0 20px;font-size:28px;font-weight:700">Access Restricted</h1>' +
+          '<p style="margin:12px 0;opacity:.9;font-size:16px">This dashboard can only be accessed through the Telegram Mini App.</p>' +
+          '<p style="margin:12px 0;opacity:.9;font-size:16px">Please open this page from within Telegram.</p>' +
+          '<p style="margin:12px 0;opacity:.9;font-size:15px" dir="rtl">این داشبورد فقط از داخل تلگرام (مینی‌اپ) قابل دسترسی است.</p>' +
+          '</div>';
+        // <body> may not exist yet (we run in <head>) — <html> always does.
+        (document.body || document.documentElement).appendChild(blockEl);
+        // Stop the rest of head-boot (theme/lang boot is pointless now).
         throw new Error('Telegram WebApp required - access blocked');
       }
     })();
@@ -443,7 +462,8 @@
       ].join('\n');
       const wipeFirstRun = () => {
         try {
-          ['astro_welcome_shown', 'astro_perf', 'astro_perf_auto'].forEach((k) => localStorage.removeItem(k));
+          ['astro_welcome_shown', 'hasSeenWelcome', 'astro_tour_v1', 'astro_device_id',
+           'astro_perf', 'astro_perf_auto'].forEach((k) => localStorage.removeItem(k));
         } catch (_) {}
         // welcome_shown also lives in server prefs — clear it too or the
         // welcome screen stays blocked after a local-only wipe.

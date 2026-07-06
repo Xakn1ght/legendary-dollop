@@ -107,6 +107,11 @@ export function ShellApp() {
   const [notRegistered, setNotRegistered] = useState(false);
   const [dataLoading, setDataLoading] = useState(false);
 
+  // Terminal auth failure: the overlay is the ONLY thing allowed on screen.
+  const authBlocked = authHelp || notRegistered;
+  const authBlockedRef = useRef(false);
+  authBlockedRef.current = authBlocked;
+
   const t = useMemo(() => makeT(lang), [lang]);
 
   const langRef = useRef(lang);
@@ -399,8 +404,16 @@ export function ShellApp() {
 
   const startInteractiveTour = useCallback(() => {
     try {
+      if (authBlockedRef.current) return; // auth failed: error screen only
       if (!(window.AstroTour && typeof window.AstroTour.start === 'function')) return;
-      const doStart = () => { try { window.AstroTour.start(TOUR_STEPS); } catch (_) { /* ignore */ } };
+      // Completion (finish OR skip) is the only thing that marks the tour as
+      // seen — locally AND in server prefs, so the flag survives webview
+      // localStorage eviction and follows the USER, not the device.
+      const onComplete = () => {
+        try { localStorage.setItem('hasSeenWelcome', 'true'); } catch (_) { /* ignore */ }
+        schedulePrefsSave({ welcome_shown: true });
+      };
+      const doStart = () => { try { window.AstroTour.start(TOUR_STEPS, { onComplete }); } catch (_) { /* ignore */ } };
       if (pageRef.current !== 'home') {
         navigateRef.current('home');
         setTimeout(doStart, 400);
@@ -602,6 +615,11 @@ export function ShellApp() {
     } catch (_) { setAccent('red', { silent: true }); }
     setLanguage(lang, { save: false });
 
+    // First-launch truth comes from server prefs (welcome_shown). Resolved by
+    // boot() below: true = seen, false = fresh user, null = couldn't reach API.
+    let _welcomeResolve;
+    const welcomeShownPromise = new Promise((res) => { _welcomeResolve = res; });
+
     async function boot() {
       // Server prefs (cross-device theme/lang/accent/sub selection).
       let bootPrefs = null;
@@ -609,6 +627,7 @@ export function ShellApp() {
         const r = await api('/api/dashboard/preferences');
         if (r && r.ok && r.prefs) bootPrefs = r.prefs;
       } catch (_) { /* ignore */ }
+      _welcomeResolve(bootPrefs ? bootPrefs.welcome_shown === true : null);
       if (cancelled) return;
       if (bootPrefs) {
         setPrefsApplying(true);
@@ -650,7 +669,15 @@ export function ShellApp() {
     boot();
 
     // Splash hide + first-launch tour.
-    const checkFirstLaunch = () => {
+    //
+    // Decision order (server is the source of truth — device storage in
+    // Telegram webviews is unreliable AND survives DB resets):
+    //   1. #tour=1 deep link            → always replay.
+    //   2. server welcome_shown true    → never auto-show (sync local flags).
+    //   3. server welcome_shown false   → SHOW, even if this device saw it
+    //      before (fresh user / fresh DB — device memory is stale).
+    //   4. server unreachable (null)    → fall back to local flags only.
+    const checkFirstLaunch = async () => {
       try {
         const hashP = new URLSearchParams(String(location.hash || '').replace(/^#/, ''));
         if (hashP.get('tour') === '1') {
@@ -659,20 +686,33 @@ export function ShellApp() {
           setTimeout(() => startInteractiveTour(), 500);
           return;
         }
-        let oldSeen = false, tourDone = false, deviceKnown = false;
-        try { oldSeen = localStorage.getItem('hasSeenWelcome') === 'true'; } catch (_) { /* ignore */ }
-        try { tourDone = window.AstroTour && window.AstroTour.isCompleted(); } catch (_) { /* ignore */ }
-        try { deviceKnown = localStorage.getItem('astro_device_id') !== null; } catch (_) { /* ignore */ }
-        if (!deviceKnown) {
-          try {
-            localStorage.setItem('astro_device_id', 'd_' + Date.now().toString(36) + '_' + Math.random().toString(36).slice(2, 8));
-          } catch (_) { /* ignore */ }
-        }
-        let shouldShow = (!oldSeen && !tourDone) || (!deviceKnown && !tourDone);
-        if (shouldShow) {
+        let serverShown = null;
+        try {
+          serverShown = await Promise.race([
+            welcomeShownPromise,
+            new Promise((res) => setTimeout(() => res(null), 7000)),
+          ]);
+        } catch (_) { /* ignore */ }
+        if (cancelled) return;
+
+        let localSeen = false;
+        try {
+          localSeen = localStorage.getItem('hasSeenWelcome') === 'true'
+            || !!(window.AstroTour && window.AstroTour.isCompleted());
+        } catch (_) { /* ignore */ }
+
+        let shouldShow;
+        if (serverShown === true) {
+          shouldShow = false;
+          // Backfill device flags so the offline fallback stays consistent.
           try { localStorage.setItem('hasSeenWelcome', 'true'); } catch (_) { /* ignore */ }
-          setTimeout(() => startInteractiveTour(), 600);
+        } else if (serverShown === false) {
+          shouldShow = true;
+          if (window.AstroTour) window.AstroTour.reset(); // clear stale device flag
+        } else {
+          shouldShow = !localSeen;
         }
+        if (shouldShow) setTimeout(() => startInteractiveTour(), 600);
       } catch (_) { /* ignore */ }
     };
     const hideSplash = () => {
@@ -795,6 +835,15 @@ export function ShellApp() {
     // eslint-disable-next-line react-hooks/exhaustive-deps -- mount-only boot sequence
   }, []);
 
+  // Auth failed for good: tear down anything that could show or run behind
+  // the error screen (active tour, notification polling).
+  useEffect(() => {
+    if (!authBlocked) return;
+    try { if (window.AstroTour && window.AstroTour.active) window.AstroTour.stop(true); } catch (_) { /* ignore */ }
+    notifStopRef.current = true;
+    if (notifPollRef.current) { clearTimeout(notifPollRef.current); notifPollRef.current = null; }
+  }, [authBlocked]);
+
   const fmt = useCallback((n, d = 1) => fmtNum(n, lang, d), [lang]);
 
   // Back closes open shell overlays before navigating.
@@ -815,6 +864,17 @@ export function ShellApp() {
     openPurchasePage, openChargePage, openSupportPage, openTutorial,
     setAccent,
   }), [t, lang, setLanguage, page, navigate, currentSubId, cachedSubs, subsLoaded, selectSub, setDefaultSub, loadSubscriptions, overview, overviewUpdatedAt, fetchOverview, fetchOverviewById, dataLoading, geo, openExportModal, openPurchasePage, openChargePage, openSupportPage, openTutorial, setAccent]);
+
+  // Terminal auth failure: render ONLY the error screen (no header, content,
+  // nav, sheets — nothing else). Toasts stay so the Copy button gives feedback.
+  if (authBlocked) {
+    return (
+      <>
+        <div id="toastContainer" className="toasts" aria-live="polite" aria-atomic="true" />
+        {notRegistered ? <NotRegisteredOverlay initialLang={lang} /> : <AuthHelpOverlay lang={lang} />}
+      </>
+    );
+  }
 
   return (
     <ShellContext.Provider value={ctx}>
@@ -894,9 +954,6 @@ export function ShellApp() {
       <BottomNav t={t} activePage={page} onNavigate={navigate} />
 
       <div className="page-transition-layer" id="pageTransitionLayer" aria-hidden="true" />
-
-      {authHelp && <AuthHelpOverlay lang={lang} />}
-      {notRegistered && <NotRegisteredOverlay initialLang={lang} />}
     </ShellContext.Provider>
   );
 }
