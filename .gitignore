@@ -34,11 +34,9 @@ backups/
 *.sqlite
 *.sqlite3
 
-# App runtime state / local data
-src/app/data/*.json
-src/app/data/avatars/
-src/app/data/client_errors.jsonl*
-src/app/data/ticket_uploads/
+# App runtime state / local data — blanket: sessions, uploads, receipts,
+# user photos. NOTHING under data/ may ever land in git.
+src/app/data/
 src/app/webapp/admin/uploads/
 
 # Captured network traces / local misc
@@ -64,6 +62,8 @@ bin/
 *.sql
 
 # Internal notes / planning docs / scratch (kept on the server, not in the repo)
+BGs/
+docs/astro/
 handoff.md
 HANDOFF.md
 FLOWS_HANDOFF.md
