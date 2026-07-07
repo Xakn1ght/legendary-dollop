@@ -53,6 +53,7 @@ from .handlers import (
     handle_admin_sessions_revoke_others,
     handle_admin_set_vip,
     handle_admin_stats,
+    handle_admin_set_hwid_limit,
     handle_admin_subscription_delete,
     handle_admin_subscription_extend,
     handle_admin_subscription_usage,
@@ -98,6 +99,7 @@ def register_admin_api_routes(app: web.Application) -> None:
 
     app.router.add_get(ADMIN_API_BASE + "/subscriptions", handle_admin_subscriptions)
     app.router.add_post(ADMIN_API_BASE + "/subscriptions/{username}/extend", handle_admin_subscription_extend)
+    app.router.add_post(ADMIN_API_BASE + "/subscriptions/{username}/hwid", handle_admin_set_hwid_limit)
     app.router.add_delete(ADMIN_API_BASE + "/subscriptions/{username}", handle_admin_subscription_delete)
     app.router.add_get(ADMIN_API_BASE + "/subscriptions/{username}/usage", handle_admin_subscription_usage)
     app.router.add_get(ADMIN_API_BASE + "/servers", handle_admin_servers)

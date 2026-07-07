@@ -122,6 +122,17 @@ async def process_approved_subscription(sub_id: int, session: AsyncSession, bot:
     except Exception:
         pass
 
+    # Reward free-plan orders (fully coupon-paid, zero toman moved) provision
+    # as on_hold — the plan's days start at the user's FIRST CONNECT, so an
+    # unused gift never quietly burns down. Paid orders are never on_hold.
+    try:
+        coupon = await crud.get_coupon_by_id(session, getattr(subscription, "applied_coupon_id", None))
+        fully_free = int(getattr(subscription, "paid_amount", None) or getattr(subscription, "price", 0) or 0) == 0
+        if coupon and coupon.coupon_type == "free_plan" and fully_free:
+            plan_info = {**plan_info, "on_hold": True}
+    except Exception:
+        pass
+
     try:
         marzban_user = await crud.create_subscription_on_marzban(subscription, plan_info)
     except Exception as e:

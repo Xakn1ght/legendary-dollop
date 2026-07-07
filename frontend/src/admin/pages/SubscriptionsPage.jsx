@@ -231,6 +231,19 @@ function SubDetail({ sub, onClose, onChanged }) {
       await modal.alert('Server usage', lines);
     } else await modal.alert('No usage', 'No server usage data yet.');
   }
+  // Manual per-user device cap (PasarGuard hwid_limit). Only Hiddify-family
+  // clients report device ids, so this is a targeted anti-sharing tool, not
+  // a plan feature — see handle_admin_set_hwid_limit.
+  async function deviceCap() {
+    const cur = sub.hwid_limit || 0;
+    const v = await modal.prompt('Device cap', `Max devices for "${sub.username}" (0 = unlimited). Current: ${cur || 'unlimited'}`, String(cur), { okText: 'Set' });
+    if (v == null) return;
+    const n = parseInt(v);
+    if (Number.isNaN(n) || n < 0 || n > 50) { toast('Enter 0–50', 'error'); return; }
+    const { data } = await postJson(`/api/admin/subscriptions/${encodeURIComponent(sub.username)}/hwid`, { limit: n });
+    if (data.ok) { toast(n ? `Capped at ${n} device(s)` : 'Device cap removed', 'success'); onChanged(); }
+    else await modal.alert('Error', data.error || 'Failed to set device cap');
+  }
 
   return (
     <div className="v3-modal-backdrop open" onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}>
@@ -261,6 +274,9 @@ function SubDetail({ sub, onClose, onChanged }) {
         </div>
         <div className="v3-modal-actions" style={{ flexWrap: 'wrap', gap: 8 }}>
           <button className="btn btn-secondary" onClick={usage}>Usage</button>
+          <button className="btn btn-secondary" onClick={deviceCap} title="Max simultaneous devices (PasarGuard hwid)">
+            Devices{sub.hwid_limit ? `: ${sub.hwid_limit}` : ''}
+          </button>
           <button className="btn btn-secondary" onClick={toggle}>{sub.status === 'active' ? 'Disable' : 'Enable'}</button>
           <button className="btn btn-secondary btn-danger" onClick={del}>Delete</button>
           <button className="btn btn-primary" onClick={save} disabled={busy}>{busy ? '…' : 'Save'}</button>

@@ -162,7 +162,8 @@ class MarzbanAPI:
         except Exception:
             return configured
 
-    async def add_user(self, username: str, data_limit_gb: int, expire_days: int):
+    async def add_user(self, username: str, data_limit_gb: int, expire_days: int,
+                       on_hold_days: int | None = None):
         import time
         start_time = time.time()
         await self.invalidate_user_info(username)
@@ -187,6 +188,13 @@ class MarzbanAPI:
                 "status": "active",
                 "username": username
             }
+            # "Days start at first connect": PasarGuard on_hold users sit idle
+            # until their client connects once, then the countdown begins.
+            # Used for reward free-plans so a gift never burns while unused.
+            if on_hold_days and on_hold_days > 0:
+                user_data["status"] = "on_hold"
+                user_data["expire"] = 0
+                user_data["on_hold_expire_duration"] = int(on_hold_days) * 86400
             
             try:
                 async with session.post(url, headers=headers, json=user_data) as response:

@@ -39,6 +39,7 @@ from app.api.routes.admin import (
     handle_admin_servers,
     handle_admin_set_vip,
     handle_admin_stats,
+    handle_admin_set_hwid_limit,
     handle_admin_subscription_delete,
     handle_admin_subscription_extend,
     handle_admin_subscription_usage,

@@ -383,7 +383,12 @@ class SubscriptionRepository:
 
         try:
             plan_days = int(plan_info.get("days", 35) or 35)
-            marzban_user = await marzban_api.add_user(subscription.marzban_username, gb, plan_days)
+            # Reward free-plans provision as on_hold: countdown starts at the
+            # user's first connection instead of at approval time.
+            on_hold_days = plan_days if plan_info.get("on_hold") else None
+            marzban_user = await marzban_api.add_user(
+                subscription.marzban_username, gb, plan_days, on_hold_days=on_hold_days
+            )
             
             # If add_user failed (returns None), check if user already exists (from partial approval)
             if marzban_user is None:

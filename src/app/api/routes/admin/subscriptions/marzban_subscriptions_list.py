@@ -77,7 +77,9 @@ async def handle_admin_subscriptions(request: web.Request):
                 "last_online": last_online,
                 "note": u.get('note', ''),
                 "data_limit_reset_strategy": u.get('data_limit_reset_strategy', ''),
-                "inbounds": u.get('inbounds', {})
+                "inbounds": u.get('inbounds', {}),
+                # PasarGuard device cap (0/None = unlimited) — editable from the panel UI
+                "hwid_limit": u.get('hwid_limit'),
             })
         
         # Sort the data
