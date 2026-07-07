@@ -1,21 +1,27 @@
 import React, { useEffect, useRef, useState } from 'react';
 
 import { getRawAuthHeaders, withUrlAuth } from '../../shared/auth.js';
-import { hapticImpact } from '../../shared/telegram.js';
+import { useBackClose } from '../../shared/backstack.js';
 import { parseTs } from '../translations.js';
+
+import { Lightbox } from './Lightbox.jsx';
 
 // file_name -> objectURL (persists across chat opens; photos are immutable)
 const photoCache = new Map();
 
-function isPhoneDevice() {
-  const hasTouch = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
-  const isSmallScreen = window.innerWidth <= 480;
-  const isMobileUA = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
-  const isTablet = window.innerWidth > 480 && window.innerWidth <= 768 && hasTouch;
-  return hasTouch && isSmallScreen && isMobileUA && !isTablet;
+// Consecutive same-sender messages within this window render as one visual group.
+const GROUP_WINDOW_MS = 3 * 60 * 1000;
+
+function sameGroup(a, b) {
+  if (!a || !b || !!a.from_admin !== !!b.from_admin) return false;
+  const ta = parseTs(a.created_at).getTime();
+  const tb = parseTs(b.created_at).getTime();
+  // Optimistic bubbles may not have a timestamp yet: group by sender alone.
+  if (Number.isNaN(ta) || Number.isNaN(tb)) return true;
+  return Math.abs(tb - ta) <= GROUP_WINDOW_MS;
 }
 
-function PhotoBubble({ ticketId, fileName, localUrl, uploadPending, onOpenLightbox }) {
+function PhotoBubble({ ticketId, fileName, localUrl, uploadPending, uploadFailed, onOpenLightbox, onRetry }) {
   const [src, setSrc] = useState(localUrl || photoCache.get(fileName) || '');
   const [failed, setFailed] = useState(false);
 
@@ -39,60 +45,136 @@ function PhotoBubble({ ticketId, fileName, localUrl, uploadPending, onOpenLightb
     return () => { cancelled = true; };
   }, [src, fileName, ticketId]);
 
+  // Placeholders keep the exact final square so hydration never shifts layout.
   if (failed) {
     return (
       <div className="message-bubble msg-photo">
-        <div className="msg-photo-fail">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" width="22" height="22" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="3" /><circle cx="8.5" cy="8.5" r="1.5" /><path d="M21 15l-5-5L5 21" /><line x1="3" y1="3" x2="21" y2="21" /></svg>
+        <div className="msg-photo-ph">
+          <div className="msg-photo-fail">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" width="22" height="22" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="3" /><circle cx="8.5" cy="8.5" r="1.5" /><path d="M21 15l-5-5L5 21" /><line x1="3" y1="3" x2="21" y2="21" /></svg>
+          </div>
         </div>
       </div>
     );
   }
-  if (!src) return <div className="message-bubble msg-photo"><div className="msg-photo-spin" /></div>;
+  if (!src) {
+    return (
+      <div className="message-bubble msg-photo">
+        <div className="msg-photo-ph"><div className="msg-photo-spin" style={{ margin: 0 }} /></div>
+      </div>
+    );
+  }
+  const onClick = uploadFailed ? onRetry : (uploadPending ? undefined : () => onOpenLightbox(src));
   return (
-    <div className={`message-bubble msg-photo${uploadPending ? ' upload-pending' : ''}`} onClick={() => onOpenLightbox(src)}>
+    <div
+      className={`message-bubble msg-photo${uploadPending ? ' upload-pending' : ''}${uploadFailed ? ' upload-failed' : ''}`}
+      onClick={onClick}
+      role={uploadFailed ? 'button' : undefined}
+      aria-label={uploadFailed ? 'Retry upload' : undefined}
+    >
       <img src={src} alt="" />
+      {uploadPending && <div className="msg-photo-overlay"><div className="msg-photo-spin" style={{ margin: 0 }} /></div>}
+      {uploadFailed && (
+        <div className="msg-photo-overlay">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+            <path d="M21 12a9 9 0 1 1-2.64-6.36" /><polyline points="21 3 21 9 15 9" />
+          </svg>
+        </div>
+      )}
     </div>
   );
 }
 
-function Message({ m, lang, t, ticketId, onOpenLightbox }) {
+// The user's own Telegram avatar (authed blob; the endpoint 404s when they
+// have no photo — falls back to the generic icon).
+let _myAvatarUrl; // undefined = not fetched, null = no photo, string = blob url
+function useMyAvatar() {
+  const [url, setUrl] = useState(_myAvatarUrl || null);
+  useEffect(() => {
+    if (_myAvatarUrl !== undefined) return;
+    _myAvatarUrl = null;
+    (async () => {
+      try {
+        const { getRawAuthHeaders } = await import('../../shared/auth.js');
+        const r = await fetch('/api/dashboard/profile-photo', { headers: await getRawAuthHeaders(), credentials: 'include' });
+        if (!r.ok) return;
+        _myAvatarUrl = URL.createObjectURL(await r.blob());
+        setUrl(_myAvatarUrl);
+      } catch (_) { /* keep fallback icon */ }
+    })();
+  }, []);
+  return url;
+}
+
+function Message({ m, lang, t, ticketId, grpFollow, isGroupEnd, onOpenLightbox, onRetryPhoto, myAvatar }) {
+  // Grouped bubbles hide their timestamp; a tap reveals it.
+  const [timeRevealed, setTimeRevealed] = useState(false);
   const locale = lang === 'fa' ? 'fa-IR' : 'en-US';
-  const time = m.pending
+  const statusLine = m.pending
     ? t('sending')
     : m.failedText
       ? m.failedText
-      : (m.created_at ? parseTs(m.created_at).toLocaleTimeString(locale, { hour: '2-digit', minute: '2-digit' }) : '');
+      : m.uploadFailed
+        ? t('photoFailedRetry')
+        : (m.created_at ? parseTs(m.created_at).toLocaleTimeString(locale, { hour: '2-digit', minute: '2-digit' }) : '');
+  const showTime = !!statusLine && (isGroupEnd || m.pending || !!m.failedText || m.uploadFailed || timeRevealed);
   return (
-    <div className={`message ${m.from_admin ? 'admin' : 'user'}${m.pending ? ' pending' : ''}`} style={m.pending ? { opacity: 0.7 } : undefined}>
+    <div
+      className={`message ${m.from_admin ? 'admin' : 'user'}${m.pending ? ' pending' : ''}${grpFollow ? ' grp-follow' : ''}`}
+      style={m.pending ? { opacity: 0.7 } : undefined}
+    >
       <div className="message-avatar">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-          <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" /><circle cx="12" cy="7" r="4" />
-        </svg>
+        {!m.from_admin && myAvatar
+          ? <img src={myAvatar} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: '50%' }} />
+          : (
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" /><circle cx="12" cy="7" r="4" />
+            </svg>
+          )}
       </div>
       <div style={{ display: 'flex', flexDirection: 'column', maxWidth: '100%' }}>
         {m.content_type === 'photo'
-          ? <PhotoBubble ticketId={ticketId} fileName={m.file_name} localUrl={m.local_url} uploadPending={m.uploadPending} onOpenLightbox={onOpenLightbox} />
-          : <div className="message-bubble">{m.message}</div>}
-        <div className="message-time">{time}</div>
+          ? (
+            <PhotoBubble
+              ticketId={ticketId}
+              fileName={m.file_name}
+              localUrl={m.local_url}
+              uploadPending={m.uploadPending}
+              uploadFailed={m.uploadFailed}
+              onOpenLightbox={onOpenLightbox}
+              onRetry={() => onRetryPhoto(m.key)}
+            />
+          )
+          : (
+            <div className="message-bubble" onClick={() => { if (!isGroupEnd) setTimeRevealed((v) => !v); }}>
+              {m.message}
+            </div>
+          )}
+        {showTime && <div className="message-time">{statusLine}</div>}
       </div>
     </div>
   );
 }
 
 export function ChatView({
-  t, lang, active, ticket, messages, messagesLoading,
-  onClose, onDelete, onSend, onSendPhoto,
+  t, lang, active, ticket, messages, messagesLoading, adminTyping,
+  onClose, onDelete, onSend, onSendPhoto, onRetryPhoto, onTyping,
 }) {
   const [draft, setDraft] = useState('');
   const [lightboxSrc, setLightboxSrc] = useState('');
+  const myAvatar = useMyAvatar();
+  // Reacts LIVE to a status_change pushed over the WS (admin closed/reopened
+  // the ticket): banner + disabled composer, no refresh needed.
+  const isClosed = !!ticket && (ticket.status === 'closed' || ticket.status === 'archived');
   const messagesRef = useRef(null);
   const chatViewRef = useRef(null);
   const inputRef = useRef(null);
   const photoInputRef = useRef(null);
   const preventBlurUntilRef = useRef(0);
   const sendingRef = useRef(false);
-  const [showDismissBtn, setShowDismissBtn] = useState(false);
+
+  // Hardware/gesture back closes the lightbox before the chat.
+  useBackClose(!!lightboxSrc, () => setLightboxSrc(''));
 
   // Android (Telegram WebView) keeps the layout viewport full-height when
   // the keyboard opens, leaving the fixed reply bar hidden behind it. Size
@@ -130,28 +212,30 @@ export function ChatView({
     };
   }, []);
 
-  useEffect(() => {
-    setShowDismissBtn(isPhoneDevice());
-    let timer;
-    const onResize = () => {
-      clearTimeout(timer);
-      timer = setTimeout(() => setShowDismissBtn(isPhoneDevice()), 100);
-    };
-    window.addEventListener('resize', onResize);
-    return () => { window.removeEventListener('resize', onResize); clearTimeout(timer); };
-  }, []);
-
-  // Auto-scroll on new messages when the user is near the bottom.
+  // Auto-scroll on new messages: always for the user's own sends, otherwise
+  // only when already near the bottom (photo bubbles are ~190px tall, so the
+  // threshold must be taller than one of them).
   const prevCountRef = useRef(0);
   useEffect(() => {
     const el = messagesRef.current;
     if (!el) return;
-    const nearBottom = (el.scrollHeight - el.scrollTop - el.clientHeight) < 120;
-    if (messages.length > prevCountRef.current && (nearBottom || prevCountRef.current === 0)) {
+    const nearBottom = (el.scrollHeight - el.scrollTop - el.clientHeight) < 260;
+    const last = messages[messages.length - 1];
+    const ownSend = !!last && !last.from_admin && (last.pending || last.uploadPending);
+    if (messages.length > prevCountRef.current && (nearBottom || ownSend || prevCountRef.current === 0)) {
       el.scrollTop = el.scrollHeight;
     }
     prevCountRef.current = messages.length;
   }, [messages]);
+
+  // Keep the typing indicator in view when it pops in.
+  useEffect(() => {
+    if (!adminTyping) return;
+    const el = messagesRef.current;
+    if (!el) return;
+    const nearBottom = (el.scrollHeight - el.scrollTop - el.clientHeight) < 260;
+    if (nearBottom) el.scrollTop = el.scrollHeight;
+  }, [adminTyping]);
 
   const autoResize = (el) => {
     el.style.height = 'auto';
@@ -164,13 +248,6 @@ export function ChatView({
     el.focus();
     requestAnimationFrame(() => el.focus());
     [0, 10, 50, 100].forEach((ms) => setTimeout(() => el.focus(), ms));
-  };
-
-  const dismissKeyboard = () => {
-    preventBlurUntilRef.current = 0;
-    inputRef.current?.blur();
-    document.activeElement?.blur();
-    hapticImpact('light');
   };
 
   const doSend = async () => {
@@ -190,6 +267,14 @@ export function ChatView({
     keepKeyboardOpen();
   };
 
+  // Ticket closed while typing → drop focus/keyboard along with the composer.
+  useEffect(() => {
+    if (isClosed) {
+      preventBlurUntilRef.current = 0;
+      try { inputRef.current?.blur(); } catch (_) { /* ignore */ }
+    }
+  }, [isClosed]);
+
   return (
     <>
       <div className={`chat-backdrop${active ? ' active' : ''}`} id="chatBackdrop" onClick={onClose} />
@@ -203,6 +288,7 @@ export function ChatView({
               {ticket ? `${t('support')} #${ticket.user_ticket_number || ticket.id}` : ''}
             </div>
             <div className="header-subtitle" id="chatStatus">
+              {isClosed && <span style={{ color: 'var(--danger)', fontWeight: 700 }}>{(t('closed') || 'CLOSED').toUpperCase()} · </span>}
               {ticket ? (t(ticket.category) || ticket.category || '').toUpperCase() : ''}
             </div>
           </div>
@@ -227,27 +313,47 @@ export function ChatView({
           {!messagesLoading && messages.length === 0 && (
             <div style={{ textAlign: 'center', color: 'var(--text-muted)', marginTop: 40 }}>{t('noMessages')}</div>
           )}
-          {!messagesLoading && messages.map((m) => (
-            <Message key={m.key} m={m} lang={lang} t={t} ticketId={ticket?.id} onOpenLightbox={setLightboxSrc} />
+          {!messagesLoading && messages.map((m, i) => (
+            <Message
+              key={m.key}
+              m={m}
+              lang={lang}
+              t={t}
+              ticketId={ticket?.id}
+              grpFollow={sameGroup(messages[i - 1], m)}
+              isGroupEnd={!sameGroup(m, messages[i + 1])}
+              onOpenLightbox={setLightboxSrc}
+              onRetryPhoto={onRetryPhoto}
+              myAvatar={myAvatar}
+            />
           ))}
+          {!messagesLoading && adminTyping && (
+            <div className="message admin typing-msg">
+              <div className="message-avatar">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" /><circle cx="12" cy="7" r="4" />
+                </svg>
+              </div>
+              <div className="message-bubble typing-bubble">
+                <span className="typing-dot" /><span className="typing-dot" /><span className="typing-dot" />
+              </div>
+            </div>
+          )}
         </div>
 
+        {isClosed && (
+          <div className="reply-area" style={{ justifyContent: 'center' }}>
+            <div style={{
+              display: 'flex', alignItems: 'center', gap: 8, padding: '12px 16px',
+              color: 'var(--text-muted)', fontSize: 14, fontWeight: 600,
+            }}>
+              <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" /><path d="M7 11V7a5 5 0 0 1 10 0v4" /></svg>
+              {lang === 'fa' ? 'این تیکت بسته شده است' : 'This ticket is closed'}
+            </div>
+          </div>
+        )}
+        {!isClosed && (
         <div className="reply-area">
-          {showDismissBtn && (
-            <button
-              className="keyboard-dismiss-btn"
-              id="keyboardDismissBtn"
-              type="button"
-              title="Hide keyboard"
-              style={{ display: 'flex' }}
-              onTouchEnd={(e) => { e.preventDefault(); e.stopPropagation(); dismissKeyboard(); }}
-              onClick={(e) => { e.preventDefault(); dismissKeyboard(); }}
-            >
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                <path d="M4 6h16M4 10h16M4 14h16M8 18l4 3 4-3" />
-              </svg>
-            </button>
-          )}
           <button className="attach-btn" id="attachBtn" type="button" title="Send photo" onClick={() => photoInputRef.current?.click()}>
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
               <rect x="3" y="3" width="18" height="18" rx="3" /><circle cx="8.5" cy="8.5" r="1.5" /><path d="M21 15l-5-5L5 21" />
@@ -257,10 +363,11 @@ export function ChatView({
             type="file"
             id="photoInput"
             ref={photoInputRef}
-            accept="image/jpeg,image/png,image/webp"
+            accept="image/*"
             style={{ display: 'none' }}
             onChange={(e) => {
               const f = e.target.files && e.target.files[0];
+              // Reset so picking the same file again still fires a change event.
               e.target.value = '';
               if (f) onSendPhoto(f);
             }}
@@ -272,7 +379,7 @@ export function ChatView({
             rows={1}
             placeholder={t('typeMessage')}
             value={draft}
-            onChange={(e) => { setDraft(e.target.value); autoResize(e.target); }}
+            onChange={(e) => { setDraft(e.target.value); autoResize(e.target); if (e.target.value.trim()) onTyping?.(); }}
             onKeyDown={(e) => {
               // Enter inserts a newline (send is button-only, legacy parity)
               if (e.key === 'Enter' && !e.shiftKey) {
@@ -305,11 +412,10 @@ export function ChatView({
             <svg viewBox="0 0 24 24"><path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z" /></svg>
           </button>
         </div>
+        )}
       </div>
 
-      <div className={`photo-lightbox${lightboxSrc ? ' active' : ''}`} id="photoLightbox" onClick={() => setLightboxSrc('')}>
-        <img id="photoLightboxImg" src={lightboxSrc || undefined} alt="" />
-      </div>
+      {lightboxSrc && <Lightbox src={lightboxSrc} onClose={() => setLightboxSrc('')} />}
     </>
   );
 }

@@ -1603,3 +1603,201 @@
       transform: rotate(-45deg) translate(0, -1px);
       filter: drop-shadow(0 1px 1px rgba(0,0,0,0.45));
     }
+
+/* ═══ VIP rework 2026-07 — platinum hero, richer benefits, plan math ═══ */
+.vip-modal-header {
+  background: linear-gradient(135deg, rgba(201,214,232,0.16), rgba(147,169,196,0.06)) !important;
+}
+.vip-modal-title .svg-icon.vip-crown { color: #e8c66a; filter: drop-shadow(0 0 8px rgba(232,198,106,0.5)); }
+.vip-hero { margin: 2px 0 14px; display: flex; align-items: center; gap: 14px; }
+.vip-hero-copy { min-width: 0; }
+/* Platinum medal — the "platinum look" made visible. Transform-only float,
+   icy glow via drop-shadow; still under DESIGN.md's one-accent rule since the
+   medal is a neutral silver. */
+.vip-hero-medal {
+  width: 74px; height: 74px; object-fit: contain; flex-shrink: 0;
+  filter: drop-shadow(0 6px 16px rgba(147, 169, 196, 0.45)) drop-shadow(0 0 2px rgba(201, 214, 232, 0.35));
+  animation: vipMedalFloat 4.5s ease-in-out infinite;
+}
+@keyframes vipMedalFloat {
+  0%, 100% { transform: translateY(0) rotate(-2deg); }
+  50% { transform: translateY(-5px) rotate(2deg); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .vip-hero-medal { animation: none; }
+}
+.vip-hero-tag {
+  display: inline-block; font-size: 10.5px; font-weight: 800; letter-spacing: 1.5px;
+  text-transform: uppercase; padding: 3px 10px; border-radius: 999px;
+  background: linear-gradient(135deg, rgba(232,198,106,0.22), rgba(201,214,232,0.18));
+  border: 1px solid rgba(232,198,106,0.35); color: #e8c66a; margin-bottom: 8px;
+}
+.vip-hero-line { font-size: 15px; font-weight: 800; line-height: 1.45; }
+.vip-status-card {
+  border-radius: 14px; padding: 12px 14px; margin-bottom: 14px;
+  background: linear-gradient(135deg, rgba(232,198,106,0.14), rgba(201,214,232,0.10));
+  border: 1px solid rgba(232,198,106,0.35);
+}
+.vip-status-title { display: flex; align-items: center; gap: 8px; font-weight: 800; font-size: 14px; color: #e8c66a; }
+.vip-status-sub { margin-top: 4px; font-size: 12px; color: var(--muted); }
+.vip-benefit-col { display: flex; flex-direction: column; gap: 1px; min-width: 0; }
+.vip-benefit-sub { font-size: 11px; color: var(--muted); line-height: 1.5; }
+.vip-plan-permonth { font-size: 11px; color: var(--muted); opacity: 0.85; }
+.vip-plan-save {
+  font-size: 10.5px; font-weight: 800; padding: 3px 8px; border-radius: 999px;
+  background: rgba(52,211,153,0.16); color: #34d399; border: 1px solid rgba(52,211,153,0.3);
+  margin-inline-start: auto; margin-inline-end: 8px; flex-shrink: 0;
+}
+.vip-receipt-upload { position: relative; }
+.receipt-remove-btn {
+  position: absolute; top: 8px; inset-inline-end: 8px;
+  width: 30px; height: 30px; border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  background: rgba(0,0,0,0.55); color: #fff;
+  border: 1px solid rgba(255,255,255,0.25);
+  cursor: pointer; z-index: 3;
+}
+.receipt-remove-btn:active { opacity: 0.7; }
+
+/* ═══════════════════════════════════════════════════════════════
+   VIP MODAL v2 (2026-07) — solid surfaces, gold identity, sticky
+   header/footer, readable plan cards. Overrides the legacy purple.
+   ═══════════════════════════════════════════════════════════════ */
+.vip-modal-overlay {
+  background: rgba(4, 8, 14, 0.88) !important;
+  backdrop-filter: blur(10px) !important;
+  -webkit-backdrop-filter: blur(10px) !important;
+  padding: 12px !important;
+}
+.vip-modal {
+  display: flex; flex-direction: column;
+  background: linear-gradient(180deg, #101a24 0%, #0b131c 100%) !important;
+  border: 1px solid rgba(232, 198, 106, 0.22) !important;
+  box-shadow: 0 30px 80px rgba(0,0,0,0.75), 0 0 0 1px rgba(255,255,255,0.04) inset !important;
+  max-height: 88vh !important;
+  overflow: hidden !important;       /* body scrolls, not the whole card */
+  border-radius: 22px !important;
+}
+.vip-modal-header {
+  flex-shrink: 0;
+  background: linear-gradient(135deg, rgba(232,198,106,0.16), rgba(232,198,106,0.04)) !important;
+  border-bottom: 1px solid rgba(232,198,106,0.18) !important;
+  padding: 14px 18px !important;
+}
+.vip-modal-body {
+  overflow-y: auto !important;
+  -webkit-overflow-scrolling: touch;
+  padding: 16px 16px 8px !important;
+  min-height: 0;
+}
+.vip-modal-footer {
+  flex-shrink: 0;
+  border-top: 1px solid rgba(255,255,255,0.07) !important;
+  background: rgba(8, 13, 20, 0.96) !important;
+  padding: 12px 16px calc(12px + env(safe-area-inset-bottom)) !important;
+}
+
+/* Benefits: compact rows on a visible strip */
+.vip-benefits { margin-bottom: 16px !important; border-radius: 14px; background: rgba(255,255,255,0.028); border: 1px solid rgba(255,255,255,0.06); padding: 2px 12px; }
+.vip-benefit-item { padding: 9px 0 !important; gap: 11px !important; }
+.vip-benefit-icon {
+  background: rgba(232,198,106,0.10) !important;
+  border-color: rgba(232,198,106,0.30) !important;
+  color: #e8c66a !important;
+}
+.vip-benefit-text { font-size: 13.5px !important; font-weight: 700; }
+
+/* Plan cards: real surfaces + clear selected state (gold, not purple) */
+.vip-plan-card {
+  background: rgba(255,255,255,0.035) !important;
+  border: 1.5px solid rgba(255,255,255,0.09) !important;
+  border-radius: 14px !important;
+  padding: 13px 14px !important;
+  position: relative;
+}
+.vip-plan-card:hover { background: rgba(255,255,255,0.05) !important; }
+.vip-plan-card.selected {
+  border-color: #e8c66a !important;
+  background: rgba(232,198,106,0.09) !important;
+  box-shadow: 0 0 0 1px rgba(232,198,106,0.35), 0 6px 22px rgba(232,198,106,0.12) !important;
+}
+.vip-plan-card.selected::after {
+  content: '✓';
+  position: absolute; inset-inline-end: 12px; top: 10px;
+  width: 20px; height: 20px; border-radius: 50%;
+  background: #e8c66a; color: #1a1206; font-size: 12px; font-weight: 900;
+  display: flex; align-items: center; justify-content: center;
+}
+.vip-plan-duration { font-size: 15px !important; font-weight: 800 !important; }
+.vip-plan-price { font-size: 13px !important; color: var(--lightText, #fff) !important; opacity: 0.9; }
+.vip-plan-badge { background: rgba(232,198,106,0.16) !important; color: #e8c66a !important; }
+.vip-plan-card.popular .vip-plan-badge { background: rgba(232,198,106,0.2) !important; color: #e8c66a !important; }
+
+/* CTA: gold gradient with dark text — the VIP signature, not generic purple */
+.vip-purchase-btn, .vip-submit-btn {
+  background: linear-gradient(135deg, #f0d27c 0%, #d9a93e 55%, #b8860b 100%) !important;
+  color: #1a1206 !important;
+  font-weight: 900 !important;
+  border: none !important;
+  border-radius: 13px !important;
+  box-shadow: 0 8px 24px rgba(216,169,62,0.35), inset 0 1px 0 rgba(255,255,255,0.4) !important;
+}
+.vip-purchase-btn:disabled, .vip-submit-btn:disabled {
+  opacity: 0.45 !important;
+  box-shadow: none !important;
+}
+.vip-back-btn { background: rgba(255,255,255,0.06) !important; color: var(--lightText,#fff) !important; border: 1px solid rgba(255,255,255,0.12) !important; border-radius: 13px !important; }
+.vip-modal-close { background: rgba(255,255,255,0.08) !important; border: 1px solid rgba(255,255,255,0.14) !important; }
+.vip-card-info, .vip-amount-display { background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.07); border-radius: 14px; padding: 12px 14px; margin-bottom: 12px; }
+.vip-receipt-upload { border: 1.5px dashed rgba(232,198,106,0.4) !important; border-radius: 14px !important; background: rgba(232,198,106,0.05) !important; }
+
+/* Light theme */
+[data-theme="light"] .vip-modal { background: linear-gradient(180deg, #ffffff 0%, #f4f1e9 100%) !important; border-color: rgba(184,134,11,0.3) !important; }
+[data-theme="light"] .vip-modal-footer { background: rgba(255,255,255,0.97) !important; }
+[data-theme="light"] .vip-benefits { background: rgba(184,134,11,0.05); border-color: rgba(184,134,11,0.14); }
+[data-theme="light"] .vip-plan-card { background: rgba(0,0,0,0.03) !important; border-color: rgba(0,0,0,0.10) !important; }
+[data-theme="light"] .vip-plan-card.selected { background: rgba(216,169,62,0.12) !important; }
+[data-theme="light"] .vip-plan-price { color: #1c2733 !important; }
+
+/* VIP modal above ALL app chrome (header z:100, nav, notch) — it was rendering
+   underneath the sticky header/bottom-nav on phones. */
+.vip-modal-overlay {
+  z-index: 100000 !important;
+  padding-top: calc(env(safe-area-inset-top) + 14px) !important;
+  padding-bottom: calc(env(safe-area-inset-bottom) + 14px) !important;
+}
+/* Telegram fullscreen chrome sits higher on phones */
+body.platform-android .vip-modal-overlay { padding-top: calc(env(safe-area-inset-top) + 84px) !important; }
+body.platform-ios .vip-modal-overlay { padding-top: calc(env(safe-area-inset-top) + 60px) !important; }
+.vip-modal { max-height: calc(100vh - env(safe-area-inset-top) - env(safe-area-inset-bottom) - 120px) !important; }
+
+/* Profile upsell button — gold VIP identity (was legacy purple) */
+.vip-promo-btn {
+  background: linear-gradient(135deg, #f0d27c 0%, #d9a93e 55%, #b8860b 100%) !important;
+  color: #1a1206 !important;
+  font-weight: 900 !important;
+  border: none !important;
+  box-shadow: 0 6px 20px rgba(216,169,62,0.35), inset 0 1px 0 rgba(255,255,255,0.4) !important;
+}
+.vip-promo-btn:active { transform: scale(0.97); }
+.vip-promo-icon { color: #e8c66a !important; }
+.vip-promo-section {
+  background: linear-gradient(135deg, rgba(232,198,106,0.10), rgba(232,198,106,0.03)) !important;
+  border: 1px solid rgba(232,198,106,0.28) !important;
+}
+
+/* Purple purge on VIP surfaces — everything gold now */
+.vip-promo-section:not(.is-vip) {
+  background: linear-gradient(135deg, rgba(232,198,106,0.10), rgba(232,198,106,0.03)) !important;
+  border-color: rgba(232,198,106,0.28) !important;
+}
+.vip-promo-section:not(.is-vip)::before {
+  background: radial-gradient(circle, rgba(232,198,106,0.18) 0%, transparent 70%) !important;
+}
+.vip-promo-icon {
+  background: rgba(232,198,106,0.12) !important;
+  border-color: rgba(232,198,106,0.3) !important;
+}
+.vip-promo-title { color: #e8c66a !important; }
+.vip-promo-section.is-vip .vip-promo-title { color: #34d399 !important; }
+.vip-modal-title .svg-icon { color: #e8c66a !important; }

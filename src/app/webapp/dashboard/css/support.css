@@ -52,13 +52,11 @@ html[dir="rtl"] .form-select {
   direction: rtl;
   text-align: right;
 }
-/* RTL support for reply area */
-/* RTL: no row-reverse — dir=rtl already mirrors the flex row, so the send
-   button lands on the LEFT and attach on the RIGHT (true mirror). The old
-   row-reverse rule was cancelling that mirror out. */
-/* RTL support for send button icon - flip horizontally */
-html[dir="rtl"] .send-btn svg {
-  transform: scaleX(-1);
+/* Composer is pinned to visual LTR in BOTH languages (owner spec): attach on
+   the left, input in the middle, send on the right with a right-pointing
+   icon (no RTL mirror). dir=rtl mirrors flex rows, so re-reverse it back. */
+html[dir="rtl"] .reply-area {
+  flex-direction: row-reverse;
 }
 /* RTL support for ticket cards */
 html[dir="rtl"] .ticket-card {
@@ -118,6 +116,10 @@ body.platform-ios .header { padding-top: calc(env(safe-area-inset-top) + 50px) !
 .header-content { flex: 1; }
 .header-title { font-size: 18px; font-weight: 700; margin-bottom: 2px; }
 .header-subtitle { font-size: 12px; color: var(--text-muted); }
+/* Back control sits top-LEFT next to the title in BOTH languages. dir=rtl
+   mirrors the header row (back drifted top-right) — pin it back to LTR. */
+html[dir="rtl"] .header { flex-direction: row-reverse; }
+html[dir="rtl"] .header-content { text-align: left; }
 
 .filter-tabs { padding: 12px 20px; display: flex; gap: 8px; overflow-x: auto; scrollbar-width: none; flex-shrink: 0; }
 .filter-tabs::-webkit-scrollbar { display: none; }
@@ -174,9 +176,32 @@ body.platform-ios .header { padding-top: calc(env(safe-area-inset-top) + 50px) !
 .ticket-preview { font-size: 13px; color: var(--text-muted); margin-bottom: 12px; display: -webkit-box; -webkit-line-clamp: 2; line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
 .ticket-footer { display: flex; justify-content: space-between; align-items: center; font-size: 11px; color: var(--text-dim); }
 
-.empty-state { padding: 60px 20px; text-align: center; color: var(--text-muted); display: flex; flex-direction: column; align-items: center; }
+/* Empty list: the whole block (icon + text + CTA) floats vertically centred. */
+.tickets-list.is-empty { display: flex; flex-direction: column; }
+.empty-state { padding: 24px 20px; text-align: center; color: var(--text-muted); display: flex; flex-direction: column; align-items: center; margin: auto; }
 .empty-icon { width: 80px; height: 80px; border-radius: 50%; background: var(--bg-glass); display: flex; align-items: center; justify-content: center; margin-bottom: 20px; border: 1px solid var(--border-subtle); }
 .empty-icon svg { width: 32px; height: 32px; color: var(--text-dim); }
+.empty-cta {
+  margin-top: 28px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  min-width: 220px;
+  padding: 16px 32px;
+  border: none;
+  border-radius: 18px;
+  background: linear-gradient(135deg, var(--primary), var(--brandDark));
+  color: #fff;
+  font-family: inherit;
+  font-size: 16px;
+  font-weight: 700;
+  cursor: pointer;
+  box-shadow: 0 8px 24px rgba(var(--brandRgb), 0.35);
+  transition: transform 0.15s ease;
+}
+.empty-cta:active { transform: scale(0.97); }
+.empty-cta svg { width: 20px; height: 20px; flex-shrink: 0; }
 
 .fab { position: fixed; bottom: calc(max(24px, env(safe-area-inset-bottom)) + var(--astro-safe-bottom-extra, 0px)); right: 24px; width: 56px; height: 56px; border-radius: 50%; background: linear-gradient(135deg, var(--primary), var(--brandDark)); box-shadow: 0 4px 20px rgba(var(--brandRgb), 0.4); border: none; color: white; display: flex; align-items: center; justify-content: center; cursor: pointer; z-index: 100; }
 .fab:active { transform: scale(0.9); }
@@ -186,9 +211,11 @@ body.platform-ios .header { padding-top: calc(env(safe-area-inset-top) + 50px) !
 .chat-backdrop.active { opacity: 1; pointer-events: auto; }
 .chat-view { position: fixed; inset: 0; background: var(--bg-base); z-index: 200; display: flex; flex-direction: column; transform: translateX(100%); transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1); }
 .chat-view.active { transform: translateX(0); }
-.chat-messages { flex: 1; overflow-y: auto; padding: 20px; display: flex; flex-direction: column; gap: 16px; -webkit-overflow-scrolling: touch; }
+/* Spacing lives on the items (not flex gap) so same-sender runs can tighten. */
+.chat-messages { flex: 1; overflow-y: auto; padding: 20px; display: flex; flex-direction: column; -webkit-overflow-scrolling: touch; }
 
-.message { display: flex; gap: 10px; max-width: 85%; animation: slideUp 0.3s ease; }
+.message { display: flex; gap: 10px; max-width: 85%; margin-top: 16px; animation: slideUp 0.3s ease; }
+.message:first-child { margin-top: 0; }
 @keyframes slideUp { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
 .message.user { align-self: flex-end; flex-direction: row-reverse; }
 html[dir="rtl"] .message.user { align-self: flex-start; flex-direction: row; }
@@ -201,6 +228,12 @@ html[dir="rtl"] .message.admin { align-self: flex-end; flex-direction: row-rever
 .message.user .message-bubble { background: linear-gradient(135deg, var(--primary), var(--brandDark)); border: none; color: white; border-radius: 18px; border-top-right-radius: 4px; }
 .message-time { font-size: 10px; color: var(--text-dim); margin-top: 4px; padding: 0 4px; }
 .message.user .message-time { text-align: right; }
+/* Grouped run (same sender within 3 min): only the first bubble keeps the
+   tail + avatar; followers are plain rounded and sit tight together. */
+.message.grp-follow { margin-top: 3px; }
+.message.grp-follow .message-avatar { visibility: hidden; }
+.message.admin.grp-follow .message-bubble { border-radius: 18px; }
+.message.user.grp-follow .message-bubble { border-radius: 18px; }
 
 .reply-area { padding: 16px 20px; padding-bottom: calc(env(safe-area-inset-bottom) + 20px + var(--astro-safe-bottom-extra, 0px)); background: var(--bg-panel); border-top: 1px solid var(--border-subtle); display: flex; gap: 12px; align-items: flex-end; flex-shrink: 0; }
 /* Keyboard up: the chat view is resized to the visible viewport (JS), so the
@@ -217,18 +250,16 @@ html.kb-open .chat-view {
   transition: none;
 }
 html.kb-open .chat-view .reply-area { padding-bottom: 12px; }
-.keyboard-dismiss-btn { width: 36px; height: 36px; background: transparent; border: 1px solid var(--border-subtle); border-radius: var(--radius-sm); color: var(--text-muted); display: none; align-items: center; justify-content: center; cursor: pointer; flex-shrink: 0; opacity: 0.6; }
-.keyboard-dismiss-btn:active { opacity: 1; background: var(--bg-glass); }
-.keyboard-dismiss-btn svg { width: 18px; height: 18px; }
-/* Only show on phone devices (max-width: 480px and touch device) */
-@media (max-width: 480px) and (pointer: coarse) { 
-  .keyboard-dismiss-btn { display: flex; } 
-}
+/* glass.css v49 ALSO lifts the chat with padding-bottom: var(--kb) — stacked
+   with the height shrink above, the composer floated mid-screen with a dead
+   gap under it (Samsung). The height shrink is the single owner here; the
+   doubled class out-specifies glass's !important rule. */
+html.kb-open .chat-view.chat-view.active { padding-bottom: 0 !important; }
+/* (keyboard-dismiss button removed — tap outside the field dismisses via head-boot.js) */
 .reply-input { flex: 1; background: var(--bg-glass); border: 1px solid var(--border-subtle); border-radius: 24px; padding: 12px 18px; color: var(--text-main); font-family: inherit; font-size: 16px; resize: none; overflow-y: auto; min-height: 48px; max-height: 120px; outline: none; line-height: 1.4; }
 .reply-input:focus { border-color: var(--primary); background: rgba(255,255,255,0.05); }
 .send-btn { width: 48px; height: 48px; border-radius: 50%; background: var(--primary); border: none; color: white; display: flex; align-items: center; justify-content: center; cursor: pointer; flex-shrink: 0; box-shadow: 0 4px 15px var(--primary-glow); }
 .send-btn svg { width: 20px; height: 20px; margin-left: 2px; fill: currentColor; transition: transform 0.2s ease; }
-html[dir="rtl"] .send-btn svg { margin-left: 0; margin-right: 2px; }
 
 .modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.8); backdrop-filter: blur(4px); z-index: 1000; display: flex; align-items: center; justify-content: center; opacity: 0; pointer-events: none; transition: opacity 0.3s ease; }
 .modal-overlay.active { opacity: 1; pointer-events: auto; }
@@ -499,13 +530,48 @@ html[dir="rtl"] .picker-search input{ direction: rtl; text-align: right; }
 .attach-btn:active { color: var(--primary); border-color: var(--primary); }
 .attach-btn svg { width: 20px; height: 20px; }
 
-.message-bubble.msg-photo { padding: 4px; overflow: hidden; cursor: pointer; min-width: 120px; min-height: 90px; display: flex; align-items: center; justify-content: center; }
-.msg-photo img { display: block; max-width: min(240px, 60vw); max-height: 280px; border-radius: calc(var(--radius-md) - 2px); object-fit: cover; }
+.message-bubble.msg-photo { position: relative; padding: 4px; overflow: hidden; cursor: pointer; display: flex; align-items: center; justify-content: center; }
+/* Fixed square thumbnail; the lightbox shows the real image. */
+.msg-photo img { display: block; width: min(180px, 56vw); height: min(180px, 56vw); border-radius: calc(var(--radius-md) - 2px); object-fit: cover; }
+/* Loading/broken placeholders reserve the same square (no layout jump). */
+.msg-photo-ph { width: min(180px, 56vw); height: min(180px, 56vw); border-radius: calc(var(--radius-md) - 2px); background: rgba(255, 255, 255, 0.04); display: flex; align-items: center; justify-content: center; }
+.msg-photo-ph .msg-photo-fail { margin: 0; }
 .msg-photo-spin { width: 26px; height: 26px; margin: 28px; border: 3px solid var(--border-subtle); border-top-color: var(--primary); border-radius: 50%; animation: msgPhotoSpin 0.8s linear infinite; }
 .msg-photo-fail { font-size: 28px; opacity: 0.5; margin: 24px; }
 @keyframes msgPhotoSpin { to { transform: rotate(360deg); } }
-.msg-photo[data-upload-pending] { opacity: 0.65; }
+/* Upload states: dim + spinner while sending; dim + retry glyph on failure. */
+.msg-photo-overlay { position: absolute; inset: 4px; border-radius: calc(var(--radius-md) - 2px); display: flex; align-items: center; justify-content: center; background: rgba(8, 12, 18, 0.42); pointer-events: none; }
+.msg-photo-overlay svg { width: 30px; height: 30px; color: #fff; filter: drop-shadow(0 2px 6px rgba(0, 0, 0, 0.5)); }
+.msg-photo.upload-pending img { opacity: 0.85; }
+.msg-photo.upload-failed { box-shadow: 0 0 0 2px rgba(239, 68, 68, 0.65); }
+.msg-photo.upload-failed img { opacity: 0.6; }
 
-.photo-lightbox { position: fixed; inset: 0; z-index: 6000; background: rgba(0,0,0,0.92); display: none; align-items: center; justify-content: center; padding: 24px; }
-.photo-lightbox.active { display: flex; }
-.photo-lightbox img { max-width: 100%; max-height: 100%; border-radius: var(--radius-md); }
+/* Fullscreen zoomable lightbox (pinch / double-tap / pan via pointer events). */
+.photo-lightbox { position: fixed; inset: 0; z-index: 6000; background: rgba(0, 0, 0, 0.94); display: flex; align-items: center; justify-content: center; touch-action: none; overscroll-behavior: contain; animation: lightboxIn 0.18s ease; }
+@keyframes lightboxIn { from { opacity: 0; } to { opacity: 1; } }
+.photo-lightbox img { max-width: 100%; max-height: 100%; will-change: transform; transform-origin: center center; user-select: none; -webkit-user-select: none; -webkit-user-drag: none; }
+.lightbox-close { position: absolute; top: calc(env(safe-area-inset-top) + 16px); right: 16px; width: 46px; height: 46px; border-radius: 50%; border: 1.5px solid rgba(255, 255, 255, 0.45); background: rgba(0, 0, 0, 0.78); color: #fff; display: flex; align-items: center; justify-content: center; cursor: pointer; z-index: 1; box-shadow: 0 4px 18px rgba(0,0,0,0.6), inset 0 1px 0 rgba(255,255,255,0.18); }
+.lightbox-close:active { transform: scale(0.94); }
+.lightbox-close svg { width: 21px; height: 21px; }
+/* Telegram overlays its own controls at the top on mobile — sit below them. */
+body.platform-android .lightbox-close { top: calc(env(safe-area-inset-top) + 90px); }
+body.platform-ios .lightbox-close { top: calc(env(safe-area-inset-top) + 60px); }
+
+/* Save-to-gallery button — mirrors the close button on the other corner. */
+.lightbox-save { position: absolute; top: calc(env(safe-area-inset-top) + 16px); left: 16px; width: 46px; height: 46px; border-radius: 50%; border: 1.5px solid rgba(255, 255, 255, 0.45); background: rgba(0, 0, 0, 0.78); color: #fff; display: flex; align-items: center; justify-content: center; cursor: pointer; z-index: 1; box-shadow: 0 4px 18px rgba(0,0,0,0.6), inset 0 1px 0 rgba(255,255,255,0.18); }
+.lightbox-save:active { transform: scale(0.94); }
+.lightbox-save svg { width: 21px; height: 21px; }
+body.platform-android .lightbox-save { top: calc(env(safe-area-inset-top) + 90px); }
+body.platform-ios .lightbox-save { top: calc(env(safe-area-inset-top) + 60px); }
+
+/* Admin "typing…" bubble: three dots, transform/opacity only. currentColor:
+   support.css bridges --text-muted onto itself (cycle -> invalid), so custom
+   props are unsafe for backgrounds here; inherited text color always works. */
+.typing-bubble { display: inline-flex; align-items: center; gap: 5px; padding: 15px 16px; }
+.typing-dot { width: 7px; height: 7px; border-radius: 50%; background: currentColor; animation: typingDot 1.2s ease-in-out infinite; }
+.typing-dot:nth-child(2) { animation-delay: 0.15s; }
+.typing-dot:nth-child(3) { animation-delay: 0.3s; }
+@keyframes typingDot {
+  0%, 60%, 100% { transform: translateY(0); opacity: 0.45; }
+  30% { transform: translateY(-4px); opacity: 1; }
+}

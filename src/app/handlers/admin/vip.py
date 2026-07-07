@@ -3,6 +3,7 @@ from datetime import datetime, timedelta
 
 from aiogram import Bot, F, Router
 from aiogram.types import CallbackQuery
+from sqlalchemy import update as _sql_update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.settings import BOT_TOKEN
@@ -42,17 +43,45 @@ async def _notify_user_via_main_bot(chat_id: int, text: str, parse_mode: str = "
         return
 
 
+async def claim_pending_vip_order(session: AsyncSession, order_id: int) -> bool:
+    """Atomic pending → processing claim (same pattern as the admin panel's
+    vip_orders handlers) so a double-tap or panel+bot race can't approve or
+    deny the same order twice. Returns False when someone else already took it."""
+    res = await session.execute(
+        _sql_update(VipOrder)
+        .where(VipOrder.id == order_id, VipOrder.status == "pending")
+        .values(status="processing")
+    )
+    await session.commit()
+    return (res.rowcount or 0) > 0
+
+
+async def unclaim_vip_order(session: AsyncSession, order_id: int) -> None:
+    try:
+        await session.execute(
+            _sql_update(VipOrder)
+            .where(VipOrder.id == order_id, VipOrder.status == "processing")
+            .values(status="pending")
+        )
+        await session.commit()
+    except Exception:
+        logging.exception(f"[VIP] could not release claim on order {order_id}")
+
+
 async def activate_vip_order(session: AsyncSession, vip_order: VipOrder, *,
                              approved_by: int | None = None,
-                             notify_user_bot=None) -> bool:
+                             notify_user_bot=None,
+                             claimed: bool = False) -> bool:
     """Grant VIP for an order and notify the user. Shared by the admin Approve
     button and the SMS auto-approver so both paths behave identically.
 
-    Only acts on a still-'pending' order (idempotent). ``notify_user_bot`` is an
-    optional live user-bot to DM through; falls back to a short-lived bot.
-    Returns True if it flipped the order to approved.
+    Only acts on a still-'pending' order (idempotent), or a 'processing' one
+    when the caller already won the atomic claim (``claimed=True``).
+    ``notify_user_bot`` is an optional live user-bot to DM through; falls back
+    to a short-lived bot. Returns True if it flipped the order to approved.
     """
-    if vip_order.status != "pending":
+    expected = "processing" if claimed else "pending"
+    if vip_order.status != expected:
         return False
     user: User | None = await session.get(User, vip_order.user_id)
     if not user:
@@ -125,12 +154,11 @@ async def approve_vip_order(callback: CallbackQuery, session: AsyncSession, bot:
         await callback.answer("Invalid order id", show_alert=True)
         return
 
-    vip_order: VipOrder | None = await session.get(VipOrder, order_id)
-    if not vip_order:
-        await callback.answer("Order not found", show_alert=True)
-        return
-
-    if vip_order.status != "pending":
+    if not await claim_pending_vip_order(session, order_id):
+        vip_order = await session.get(VipOrder, order_id)
+        if not vip_order:
+            await callback.answer("Order not found", show_alert=True)
+            return
         await callback.answer("Already processed", show_alert=True)
         try:
             await callback.message.delete()
@@ -138,8 +166,12 @@ async def approve_vip_order(callback: CallbackQuery, session: AsyncSession, bot:
             pass
         return
 
-    activated = await activate_vip_order(session, vip_order, approved_by=callback.from_user.id)
+    vip_order: VipOrder | None = await session.get(VipOrder, order_id)
+    await session.refresh(vip_order)
+
+    activated = await activate_vip_order(session, vip_order, approved_by=callback.from_user.id, claimed=True)
     if not activated:
+        await unclaim_vip_order(session, order_id)
         await callback.answer("User not found", show_alert=True)
         return
 
@@ -166,12 +198,11 @@ async def deny_vip_order(callback: CallbackQuery, session: AsyncSession, bot: Bo
         await callback.answer("Invalid order id", show_alert=True)
         return
 
-    vip_order: VipOrder | None = await session.get(VipOrder, order_id)
-    if not vip_order:
-        await callback.answer("Order not found", show_alert=True)
-        return
-
-    if vip_order.status != "pending":
+    if not await claim_pending_vip_order(session, order_id):
+        vip_order = await session.get(VipOrder, order_id)
+        if not vip_order:
+            await callback.answer("Order not found", show_alert=True)
+            return
         await callback.answer("Already processed", show_alert=True)
         try:
             await callback.message.delete()
@@ -179,6 +210,8 @@ async def deny_vip_order(callback: CallbackQuery, session: AsyncSession, bot: Bo
             pass
         return
 
+    vip_order: VipOrder | None = await session.get(VipOrder, order_id)
+    await session.refresh(vip_order)
     user: User | None = await session.get(User, vip_order.user_id)
 
     vip_order.status = "denied"

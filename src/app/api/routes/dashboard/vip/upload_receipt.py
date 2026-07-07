@@ -6,6 +6,7 @@ import string
 import traceback
 
 from aiogram.types import FSInputFile
+from aiogram.utils.keyboard import InlineKeyboardBuilder
 from aiohttp import web
 from sqlalchemy.future import select
 
@@ -55,6 +56,13 @@ async def handle_vip_upload_receipt(request: web.Request):
             if order.status not in ("draft", "pending"):
                 return web.json_response({"ok": False, "error": "order_already_processed"}, status=400)
 
+            # Idempotent re-submit: the receipt already landed and the admin was
+            # notified — spam-tapping Confirm must not DM the admin again.
+            if order.status == "pending" and order.receipt_image_url:
+                return web.json_response(
+                    {"ok": True, "message": "already_submitted", "order_id": order.id, "status": "pending"}
+                )
+
             try:
                 if "," in receipt_image_b64:
                     receipt_image_b64 = receipt_image_b64.split(",")[1]
@@ -80,22 +88,40 @@ async def handle_vip_upload_receipt(request: web.Request):
             order.status = "pending"
             await session.commit()
 
+            # Live-update the admin panel receipts list/badge (same-process WS).
+            try:
+                import asyncio
+
+                from app.api.routes.admin_ws import broadcast_admin_event
+
+                asyncio.create_task(broadcast_admin_event("receipts_updated", {"order_id": order.id, "type": "vip"}))
+            except Exception:
+                pass
+
             try:
                 admin_bot = get_admin_bot()
                 if admin_bot and ADMIN_ID:
                     plan_info = VIP_PLANS.get(order.plan_id, {})
 
-                    admin_msg = (
+                    caption = (
                         f"🆕 <b>درخواست خرید VIP جدید</b>\n\n"
                         f"👤 کاربر: {user.full_name or user.username or user.chat_id}\n"
                         f"📦 پلن: {plan_info.get('label_fa', order.plan_id)}\n"
                         f"💰 مبلغ: {order.price:,} تومان\n"
-                        f"🔢 شماره سفارش: #VIP{order.id}\n\n"
-                        f"برای تایید یا رد، از پنل ادمین استفاده کنید."
+                        f"🔢 شماره سفارش: #VIP{order.id}"
                     )
-                    await admin_bot.send_message(ADMIN_ID, admin_msg, parse_mode="HTML")
-
-                    await admin_bot.send_photo(ADMIN_ID, FSInputFile(fpath), caption=f"رسید سفارش VIP #VIP{order.id}")
+                    kb = InlineKeyboardBuilder()
+                    kb.button(text="✅ تایید", callback_data=f"approve_vip_{order.id}")
+                    kb.button(text="❌ رد", callback_data=f"deny_vip_{order.id}")
+                    kb.adjust(2)
+                    # ONE message: photo + details + approve/deny buttons
+                    await admin_bot.send_photo(
+                        ADMIN_ID,
+                        FSInputFile(fpath),
+                        caption=caption,
+                        parse_mode="HTML",
+                        reply_markup=kb.as_markup(),
+                    )
                 elif not admin_bot:
                     logger.warning("ADMIN_BOT_TOKEN not set; VIP receipt not sent to Telegram (saved in panel)")
             except Exception as e:

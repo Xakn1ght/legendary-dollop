@@ -1,6 +1,7 @@
 import asyncio
 
 from aiogram import Bot, Dispatcher
+from aiogram.client.default import DefaultBotProperties
 from aiogram.enums import ParseMode
 from aiogram.types import BotCommand
 
@@ -25,6 +26,7 @@ from app.handlers.admin import (
     system,
     toggle,
     user_management,
+    vip,
 )
 from app.handlers.admin import (
     settings as admin_settings,
@@ -97,7 +99,9 @@ async def main() -> None:
         log_error(e, {"operation": "admin_bot_redis_init"})
         bot_logger.warning("Redis init failed for admin bot, continuing without cache")
 
-    bot = Bot(token=ADMIN_BOT_TOKEN, default_parse_mode=ParseMode.HTML)
+    # aiogram 3.7+ dropped the `default_parse_mode` kwarg; it was silently
+    # swallowed by **kwargs so /errors etc. showed raw <b> tags (audit fix).
+    bot = Bot(token=ADMIN_BOT_TOKEN, default=DefaultBotProperties(parse_mode=ParseMode.HTML))
     dp = Dispatcher()
 
     # Middlewares
@@ -125,6 +129,7 @@ async def main() -> None:
         support.router,
         system.router,
         user_management.router,
+        vip.router,
     ]
     for r in routers:
         try:

@@ -93,7 +93,11 @@ function renderDebug() {
 
 function apply() {
   raf = 0;
-  const kb = Math.max(vvKb, tgKb, estKb);
+  // A real measurement beats the estimate: max() let the ~45% guess override
+  // smaller true keyboards and over-lift the composer on devices that DO
+  // report. The estimate only fills in when nothing was measured.
+  const measured = Math.max(vvKb, tgKb);
+  const kb = measured > 60 ? measured : estKb;
   const root = document.documentElement;
   root.style.setProperty('--kb-height', kb + 'px');
   root.classList.toggle('kb-open', kb > 60);
@@ -143,9 +147,13 @@ export function initKeyboardWatcher() {
   } catch (_) { /* ignore */ }
 
   // Action layer: act on focus immediately — no detection required.
+  // Samsung keyboards with number row + suggestions measure ~49% of the
+  // webview (42-45% left the composer clipped), so Android estimates half.
   document.addEventListener('focusin', (e) => {
     if (!isEditable(e.target) || !isTouchLike()) return;
-    estKb = Math.round(Math.min(420, (window.innerHeight || 800) * 0.45));
+    const frac = isAndroidLike() ? 0.5 : 0.45;
+    const cap = isAndroidLike() ? 480 : 420;
+    estKb = Math.round(Math.min(cap, (window.innerHeight || 800) * frac));
     schedule();
     startPinning(e.target);
   });

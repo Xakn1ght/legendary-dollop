@@ -2,6 +2,7 @@ import logging
 import traceback
 
 from aiohttp import web
+from sqlalchemy.future import select
 
 from app.api.deps import _verify_webapp_auth, set_tma_session_cookie
 from app.core.settings import PAYMENT_CARD_NUMBER, VIP_PLANS
@@ -34,16 +35,31 @@ async def handle_vip_purchase(request: web.Request):
 
             plan = VIP_PLANS[plan_id]
 
-            order = VipOrder(
-                user_id=user.id,
-                plan_id=plan_id,
-                days=plan["days"],
-                price=plan["price"],
-                status="draft",
-            )
-            session.add(order)
-            await session.commit()
-            await session.refresh(order)
+            # One VIP order at a time: a receipt already awaiting review blocks
+            # a new order (spam-tapping the flow created piles of drafts), and
+            # an existing draft for the same plan is simply reused.
+            existing = (await session.execute(
+                select(VipOrder)
+                .filter(VipOrder.user_id == user.id, VipOrder.status.in_(("draft", "pending")))
+                .order_by(VipOrder.id.desc())
+            )).scalars().all()
+            pending = next((o for o in existing if o.status == "pending"), None)
+            if pending:
+                return web.json_response(
+                    {"ok": False, "error": "pending_exists", "order_id": pending.id}, status=409
+                )
+            order = next((o for o in existing if o.plan_id == plan_id), None)
+            if not order:
+                order = VipOrder(
+                    user_id=user.id,
+                    plan_id=plan_id,
+                    days=plan["days"],
+                    price=plan["price"],
+                    status="draft",
+                )
+                session.add(order)
+                await session.commit()
+                await session.refresh(order)
 
             resp = web.json_response(
                 {

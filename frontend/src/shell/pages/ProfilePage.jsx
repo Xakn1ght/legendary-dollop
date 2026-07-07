@@ -1,7 +1,8 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import { createPortal } from 'react-dom';
 
 import { useBackClose } from '../../shared/backstack.js';
-import { getTelegramPhotoUrl, getWebApp, hapticSelection } from '../../shared/telegram.js';
+import { BOT_USERNAME, getTelegramPhotoUrl, getWebApp, hapticSelection } from '../../shared/telegram.js';
 import { api, getUrlAuthToken } from '../api.js';
 import { useShell } from '../ShellContext.js';
 import { showToast } from '../toast.js';
@@ -14,6 +15,7 @@ const ACCENTS = [
   { key: 'emerald', swatch: '#34d399' },
   { key: 'violet', swatch: '#a78bfa' },
   { key: 'amber', swatch: '#fbbf24' },
+  { key: 'vip', swatch: '#c9d6e8', locked: true },
   { key: 'champion', swatch: '#e8a300', locked: true },
   { key: 'legend', swatch: '#c026d3', locked: true },
 ];
@@ -22,7 +24,7 @@ const ACHIEVEMENTS = [
   { key: 'firstLaunch', unlocked: () => true },
   { key: 'starCollector', unlocked: (u) => (u.stars || 0) > 0 },
   { key: 'champion', unlocked: (u) => (u.stars || 0) >= 5 },
-  { key: 'vipMember', unlocked: (u) => !!u.is_vip },
+  { key: 'vipMember', unlocked: (u) => !!u.is_vip, img: '/webapp/static/badges/vip.png' },
   { key: 'taskMaster', unlocked: (u) => (u.referral_count || 0) >= 1 },
   { key: 'superStar', unlocked: (u) => (u.stars || 0) >= 10 },
   { key: 'royalty', unlocked: (u) => (u.stars || 0) >= 20 },
@@ -85,25 +87,27 @@ export function ProfilePage() {
     try { return localStorage.getItem('notifications') !== 'off'; } catch (_) { return true; }
   });
   const [perfMode, setPerfMode] = useState(perfStoredMode());
-  const [autoClaim, setAutoClaim] = useState({ open: false, enabled: false, subId: '', subs: [], pickerOpen: false });
   const [vip, setVip] = useState(null); // { step, plans, cardNumber, selectedPlanId, orderId, amount, receiptData, receiptName }
   // Telegram home-screen shortcut (Bot API 8.0). Only shown when the client
   // supports it and the icon isn't already installed.
   const [canAddHome, setCanAddHome] = useState(false);
+  const [faqOpen, setFaqOpen] = useState(false);
 
   // Back unwinds overlays innermost-first: voucher picker → auto-claim modal;
   // in the VIP modal it steps payment→plans before closing.
-  useBackClose(autoClaim.open && !autoClaim.pickerOpen, () => setAutoClaim((c) => ({ ...c, open: false })));
-  useBackClose(autoClaim.open && autoClaim.pickerOpen, () => setAutoClaim((c) => ({ ...c, pickerOpen: false })));
   useBackClose(!!vip && vip.step !== 2, () => setVip(null));
   useBackClose(!!vip && vip.step === 2, () => setVip((cur) => (cur ? { ...cur, step: 1 } : cur)));
 
   const isVip = !!user?.is_vip;
 
   const loadProfile = useCallback(async () => {
+    let vipActive = false;
     try {
       const data = await api('/api/dashboard/overview');
-      if (data.ok && data.user) setUser(data.user);
+      if (data.ok && data.user) {
+        setUser(data.user);
+        vipActive = !!data.user.is_vip;
+      }
     } catch (_) { /* ignore */ }
     try {
       const subs = await api('/api/dashboard/subscriptions');
@@ -131,6 +135,7 @@ export function ProfilePage() {
           if (p.badge && (c.coupon_type === 'legend_pack' || !badge)) badge = p.badge;
         });
       } catch (_) { /* ignore */ }
+      if (vipActive) themes.add('vip'); // active VIP unlocks the platinum accent
       setUnlockedThemes([...themes]);
       setPackBadge(badge);
     } catch (_) { /* ignore */ }
@@ -154,7 +159,7 @@ export function ProfilePage() {
   };
 
   const referralLink = referrals?.referral_link
-    || (user?.referral_code ? `https://t.me/AstroByteBot?start=${user.referral_code}` : '');
+    || (user?.referral_code ? `https://t.me/${BOT_USERNAME}?start=${user.referral_code}` : '');
 
   const cyclePerf = () => {
     const order = ['auto', 'lite', 'full'];
@@ -174,47 +179,6 @@ export function ProfilePage() {
     return `${tt('perfAuto')} (${resolved})`;
   };
 
-  // ── Auto-claimer ──────────────────────────────────────────────────
-  const openAutoClaim = async () => {
-    let enabled = false, subId = '', subs = [];
-    try {
-      const r = await api('/api/dashboard/preferences');
-      if (r && r.ok && r.prefs) {
-        enabled = !!r.prefs.auto_claim;
-        subId = r.prefs.voucher_auto_sub_id ? String(r.prefs.voucher_auto_sub_id) : '';
-      }
-    } catch (_) { /* ignore */ }
-    try {
-      const r = await api('/api/dashboard/subscriptions');
-      subs = (r.ok && r.subscriptions ? r.subscriptions : [])
-        .filter((s) => String(s.status || '').toLowerCase() === 'active' && (s.marzban_username || s.username));
-    } catch (_) { /* ignore */ }
-    setAutoClaim({ open: true, enabled, subId, subs, pickerOpen: false });
-  };
-
-  const saveAutoClaim = async () => {
-    if (!isVip) { showToast(tt('vipRequired'), 'error'); return; }
-    try {
-      const r = await api('/api/dashboard/preferences', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ auto_claim: autoClaim.enabled, voucher_auto_sub_id: autoClaim.subId || null }),
-      });
-      if (r && r.ok) {
-        showToast(tt('save'), 'success');
-        setAutoClaim((c) => ({ ...c, open: false }));
-      } else {
-        showToast(r?.error === 'vip_required' ? tt('vipRequired') : tt('failedToLoad'), 'error');
-      }
-    } catch (_) { showToast(tt('failedToLoad'), 'error'); }
-  };
-
-  const autoClaimSubLabel = autoClaim.subId
-    ? (autoClaim.subs.find((s) => String(s.id) === autoClaim.subId)?.name
-      || autoClaim.subs.find((s) => String(s.id) === autoClaim.subId)?.marzban_username
-      || '#' + autoClaim.subId)
-    : tt('noActiveSubscription');
-
   // ── VIP flow ──────────────────────────────────────────────────────
   const authQS = () => {
     const token = getUrlAuthToken();
@@ -222,11 +186,17 @@ export function ProfilePage() {
   };
 
   const openVipPurchase = async () => {
-    setVip({ step: 1, plans: null, cardNumber: '', selectedPlanId: null });
+    setVip({ step: 1, plans: null, cardNumber: '', selectedPlanId: null, isVip: false, vipUntil: null });
     try {
       const r = await api('/api/dashboard/vip/plans' + authQS());
       if (r && r.ok) {
-        setVip((cur) => (cur ? { ...cur, plans: r.plans || [], cardNumber: r.card_number || '' } : cur));
+        setVip((cur) => (cur ? {
+          ...cur,
+          plans: r.plans || [],
+          cardNumber: r.card_number || '',
+          isVip: !!r.is_vip,
+          vipUntil: r.vip_until || null,
+        } : cur));
       } else {
         setVip((cur) => (cur ? { ...cur, plans: [] } : cur));
       }
@@ -234,7 +204,8 @@ export function ProfilePage() {
   };
 
   const continueVip = async () => {
-    if (!vip?.selectedPlanId) return;
+    if (!vip?.selectedPlanId || vip.busy) return;
+    setVip((cur) => (cur ? { ...cur, busy: true } : cur));
     try {
       const r = await api('/api/dashboard/vip/purchase' + authQS(), {
         method: 'POST',
@@ -243,20 +214,29 @@ export function ProfilePage() {
       });
       if (r && r.ok) {
         const plan = vip.plans.find((p) => p.id === vip.selectedPlanId);
-        setVip((cur) => ({ ...cur, step: 2, orderId: r.order_id, amount: plan?.price || 0, cardNumber: r.card_number || cur.cardNumber }));
+        setVip((cur) => ({ ...cur, busy: false, step: 2, orderId: r.order_id, amount: plan?.price || 0, cardNumber: r.card_number || cur.cardNumber }));
+      } else if (r && r.error === 'pending_exists') {
+        setVip((cur) => (cur ? { ...cur, busy: false } : cur));
+        showToast(lang === 'fa'
+          ? 'یک سفارش VIP در انتظار تایید دارید — منتظر بررسی ادمین بمانید'
+          : 'You already have a VIP order awaiting review', 'error');
       } else {
+        setVip((cur) => (cur ? { ...cur, busy: false } : cur));
         showToast(String(r?.error || tt('failedToLoad')), 'error');
       }
-    } catch (e) { showToast(String(e?.message || tt('failedToLoad')), 'error'); }
+    } catch (e) {
+      setVip((cur) => (cur ? { ...cur, busy: false } : cur));
+      showToast(String(e?.message || tt('failedToLoad')), 'error');
+    }
   };
 
   const onVipReceipt = (e) => {
     const file = e.target.files && e.target.files[0];
     e.target.value = '';
     if (!file) return;
-    const allowed = ['image/jpeg', 'image/png', 'image/jpg'];
-    if (!allowed.includes(file.type) && !/\.(jpg|jpeg|png)$/i.test(file.name)) {
-      showToast('فقط فایل‌های JPG و PNG مجاز است', 'error');
+    const looksImage = (file.type || '').startsWith('image/') || /\.(jpg|jpeg|png|webp|heic|heif)$/i.test(file.name);
+    if (!looksImage) {
+      showToast('فقط فایل تصویر مجاز است', 'error');
       return;
     }
     const reader = new FileReader();
@@ -265,16 +245,26 @@ export function ProfilePage() {
   };
 
   const submitVip = async () => {
-    if (!vip?.orderId || !vip?.receiptData) return;
+    if (!vip?.orderId || !vip?.receiptData || vip.busy) return;
+    // Instant feedback: the receipt is a base64 image inside JSON, which can
+    // take several seconds to upload — the button locks and shows progress so
+    // nobody spam-taps it (which used to pile up orders + admin DMs).
+    setVip((cur) => (cur ? { ...cur, busy: true } : cur));
     try {
       const r = await api('/api/dashboard/vip/receipt' + authQS(), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ order_id: vip.orderId, receipt_image: vip.receiptData }),
       });
-      if (r && r.ok) setVip((cur) => ({ ...cur, step: 3 }));
-      else showToast(String(r?.error || tt('failedToLoad')), 'error');
-    } catch (e) { showToast(String(e?.message || tt('failedToLoad')), 'error'); }
+      if (r && r.ok) setVip((cur) => ({ ...cur, busy: false, step: 3 }));
+      else {
+        setVip((cur) => (cur ? { ...cur, busy: false } : cur));
+        showToast(String(r?.error || tt('failedToLoad')), 'error');
+      }
+    } catch (e) {
+      setVip((cur) => (cur ? { ...cur, busy: false } : cur));
+      showToast(String(e?.message || tt('failedToLoad')), 'error');
+    }
   };
 
   const copyVipCard = async () => {
@@ -352,6 +342,7 @@ export function ProfilePage() {
   // Avatar: Telegram only exposes photo_url to attachment-menu apps, so the
   // backend fetches it via the Bot API — load it as an authed blob.
   const [fetchedAvatar, setFetchedAvatar] = useState(null);
+  const [avatarBroken, setAvatarBroken] = useState(false);
   useEffect(() => {
     let cancelled = false;
     let objUrl = null;
@@ -362,13 +353,18 @@ export function ProfilePage() {
         if (blob && blob.size > 100 && !cancelled) {
           objUrl = URL.createObjectURL(blob);
           setFetchedAvatar(objUrl);
+          setAvatarBroken(false);
         }
       } catch (_) { /* no photo / offline — initial letter stays */ }
     })();
     return () => { cancelled = true; if (objUrl) URL.revokeObjectURL(objUrl); };
   }, []);
 
-  const avatarUrl = user?.photo_url || fetchedAvatar || getTelegramPhotoUrl();
+  // Server-proxied blob FIRST: t.me photo_url hotlinks are blocked inside some
+  // mobile webviews (loaded fine on desktop), which used to lock the avatar
+  // into the "?" fallback even after the blob arrived.
+  const avatarUrl = fetchedAvatar
+    || (!avatarBroken ? (user?.photo_url || getTelegramPhotoUrl()) : null);
 
   return (
     <>
@@ -382,7 +378,7 @@ export function ProfilePage() {
             </div>
             <div className={`profile-avatar${avatarUrl ? ' has-photo' : ''}`} id="userAvatar">
               {avatarUrl
-                ? <img src={avatarUrl} alt="" onError={(e) => { e.target.parentElement.classList.remove('has-photo'); e.target.replaceWith((user?.full_name?.[0] || '?').toUpperCase()); }} />
+                ? <img src={avatarUrl} alt="" onError={() => setAvatarBroken(true)} />
                 : (user?.full_name?.[0] || '?').toUpperCase()}
             </div>
           </div>
@@ -391,16 +387,30 @@ export function ProfilePage() {
             <div className="profile-username" id="userUsername">{user?.username ? '@' + user.username : ''}</div>
             <div className="profile-badges" id="userBadges">
               <span className={`profile-badge${categoryBadge.cls}`} id="userCategory">
-                <span className="svg-icon">
-                  <svg viewBox="0 0 24 24" fill="currentColor" width="12" height="12"><path d="M12 2l2.4 7.4H22l-6.2 4.5 2.4 7.3-6.2-4.5-6.2 4.5 2.4-7.3L2 9.4h7.6z" /></svg>
-                </span>
+                {isVip
+                  ? (
+                    <img
+                      src="/webapp/static/badges/vip.png"
+                      alt=""
+                      style={{ width: 15, height: 15, objectFit: 'contain' }}
+                      onError={(e) => { e.target.style.display = 'none'; }}
+                    />
+                  )
+                  : (
+                    <span className="svg-icon">
+                      <svg viewBox="0 0 24 24" fill="currentColor" width="12" height="12"><path d="M12 2l2.4 7.4H22l-6.2 4.5 2.4 7.3-6.2-4.5-6.2 4.5 2.4-7.3L2 9.4h7.6z" /></svg>
+                    </span>
+                  )}
                 <span id="userCategoryText">{categoryBadge.text}</span>
               </span>
               {packBadge && (
                 <span className="profile-badge" id="userPackBadge" style={{ background: 'rgba(var(--brandRgb),0.18)' }}>
-                  <span className="svg-icon">
-                    <svg viewBox="0 0 24 24" fill="currentColor" width="12" height="12"><path d="M20 7h-3.3l1.1-3.1-1.9-.7L14.6 7H9.4L8.1 3.2l-1.9.7L7.3 7H4a1 1 0 0 0-1 1v2a3 3 0 0 0 3 3h.3l.8 7.1a1 1 0 0 0 1 .9h7.8a1 1 0 0 0 1-.9l.8-7.1h.3a3 3 0 0 0 3-3V8a1 1 0 0 0-1-1z" /></svg>
-                  </span>
+                  <img
+                    src={`/webapp/static/badges/${String(packBadge).toLowerCase() === 'legend' ? 'legend' : 'champion'}.png`}
+                    alt=""
+                    style={{ width: 16, height: 16, objectFit: 'contain' }}
+                    onError={(e) => { e.target.style.display = 'none'; }}
+                  />
                   <span id="userPackBadgeText">{packBadge}</span>
                 </span>
               )}
@@ -478,7 +488,9 @@ export function ProfilePage() {
             return (
               <div key={a.key} className={`achievement-item${unlocked ? '' : ' locked'}`}>
                 <div className="achievement-icon">
-                  <svg viewBox="0 0 24 24" fill="currentColor" width="20" height="20"><path d="M12 17.27 18.18 21l-1.64-7.03L22 9.24l-7.19-.61L12 2 9.19 8.63 2 9.24l5.46 4.73L5.82 21z" /></svg>
+                  {a.img && unlocked
+                    ? <img src={a.img} alt="" style={{ width: 26, height: 26, objectFit: 'contain' }} onError={(e) => { e.target.style.display = 'none'; }} />
+                    : <svg viewBox="0 0 24 24" fill="currentColor" width="20" height="20"><path d="M12 17.27 18.18 21l-1.64-7.03L22 9.24l-7.19-.61L12 2 9.19 8.63 2 9.24l5.46 4.73L5.82 21z" /></svg>}
                 </div>
                 <div className="achievement-name">{tt(a.key)}</div>
               </div>
@@ -658,19 +670,22 @@ export function ProfilePage() {
             right={<><span className="settings-item-value" id="perfModeValue">{perfLabel()}</span><Arrow /></>}
           />
           <SettingsRow
-            onClick={openAutoClaim}
-            icon={<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" width="18" height="18"><path d="M12 2l1.8 6.2L20 10l-6.2 1.8L12 18l-1.8-6.2L4 10l6.2-1.8L12 2z" /><path d="M19 13l.9 3.1L23 17l-3.1.9L19 21l-.9-3.1L15 17l3.1-.9L19 13z" /></svg>}
-            title={tt('autoClaimer')}
-            desc={tt('autoClaimerDesc')}
-            right={<><span className="settings-item-value" id="autoClaimerValue">{autoClaim.enabled ? tt('enabled') : tt('disabled')}</span><Arrow /></>}
-          />
-          <SettingsRow
-            onClick={() => showToast('Privacy settings coming soon', 'info')}
-            icon={<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" width="18" height="18"><path d="M19 11H5a2 2 0 0 0-2 2v7a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7a2 2 0 0 0-2-2z" /><path d="M7 11V7a5 5 0 0 1 10 0v4" /></svg>}
-            title={tt('privacySecurity')}
-            desc={tt('privacyDesc')}
+            onClick={() => setFaqOpen((v) => !v)}
+            icon={<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" width="18" height="18"><circle cx="12" cy="12" r="10" /><path d="M9.1 9a3 3 0 1 1 5.8 1c0 2-3 2-3 4" /><path d="M12 18h.01" /></svg>}
+            title={tt('faqTitle')}
+            desc={tt('faqDesc')}
             right={<Arrow />}
           />
+          {faqOpen && (
+            <div className="faq-list" style={{ padding: '4px 14px 12px' }}>
+              {[1, 2, 3, 4, 5, 6, 7, 8, 9].map((n, i, arr) => (
+                <details key={n} className="faq-item" style={{ padding: '8px 0', borderBottom: i < arr.length - 1 ? '1px solid var(--line, rgba(255,255,255,0.08))' : 'none' }}>
+                  <summary style={{ cursor: 'pointer', fontWeight: 700, fontSize: 13.5, listStyle: 'none' }}>{tt('faqQ' + n)}</summary>
+                  <p style={{ margin: '8px 0 0', fontSize: 12.5, lineHeight: 1.7, color: 'var(--muted)' }}>{tt('faqA' + n)}</p>
+                </details>
+              ))}
+            </div>
+          )}
           <SettingsRow
             onClick={() => openSupportPage()}
             icon={<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" width="18" height="18"><path d="M12 18h.01" /><path d="M9.1 9a3 3 0 1 1 5.8 1c0 2-3 2-3 4" /><circle cx="12" cy="12" r="10" /></svg>}
@@ -697,99 +712,15 @@ export function ProfilePage() {
         </div>
       </section>
 
-      {/* ── Auto-claimer modal ── */}
-      {autoClaim.open && (
-        <div
-          id="autoClaimModalOverlay"
-          className="visible"
-          onClick={(e) => { if (e.target.id === 'autoClaimModalOverlay') setAutoClaim((c) => ({ ...c, open: false })); }}
-        >
-          <div id="autoClaimModal" role="dialog" aria-modal="true" aria-labelledby="autoClaimModalTitle">
-            <div id="autoClaimModalHeader">
-              <div id="autoClaimModalTitle">{tt('autoClaimer')}</div>
-              <button id="autoClaimModalClose" onClick={() => setAutoClaim((c) => ({ ...c, open: false }))}>{tt('close')}</button>
-            </div>
-            <div id="autoClaimModalBody">
-              <div className="auto-claim-row">
-                <div className="auto-claim-text">
-                  <div className="auto-claim-title">{tt('autoClaimerToggle')}</div>
-                  <div className="auto-claim-sub">{tt('autoClaimerToggleDesc')}</div>
-                </div>
-                <div className="auto-claim-actions">
-                  <div
-                    className={`toggle-switch${autoClaim.enabled ? ' active' : ''}`}
-                    id="autoClaimToggle"
-                    role="switch"
-                    aria-checked={autoClaim.enabled}
-                    tabIndex={0}
-                    onClick={() => {
-                      if (!isVip) { showToast(tt('vipRequired'), 'error'); openVipPurchase(); return; }
-                      setAutoClaim((c) => ({ ...c, enabled: !c.enabled }));
-                    }}
-                  />
-                </div>
-              </div>
-              <div className="auto-claim-row">
-                <div className="auto-claim-text">
-                  <div className="auto-claim-title">{tt('voucherAutoTarget')}</div>
-                  <div className="auto-claim-sub">{tt('voucherAutoTargetDesc')}</div>
-                </div>
-              </div>
-              <div
-                className={`auto-picker-trigger${autoClaim.pickerOpen ? ' open' : ''}`}
-                id="voucherPickerTrigger"
-                role="button"
-                tabIndex={0}
-                style={!isVip ? { opacity: 0.7 } : undefined}
-                onClick={() => {
-                  if (!isVip) { showToast(tt('vipRequired'), 'error'); openVipPurchase(); return; }
-                  setAutoClaim((c) => ({ ...c, pickerOpen: !c.pickerOpen }));
-                }}
-                onKeyDown={(e) => { if (e.key === 'Enter') setAutoClaim((c) => ({ ...c, pickerOpen: !c.pickerOpen })); }}
-              >
-                <div className="auto-picker-left">
-                  <div className="auto-picker-label">{tt('selectSubscription')}</div>
-                  <div className="auto-picker-value" id="voucherPickerValue">{autoClaimSubLabel}</div>
-                </div>
-                <svg className="auto-picker-caret" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" width="16" height="16"><path d="M6 9l6 6 6-6" /></svg>
-              </div>
-              {autoClaim.pickerOpen && (
-                <div id="voucherPickerList" style={{ marginTop: 8 }}>
-                  {autoClaim.subs.length === 0 && <div className="voucher-pick-item" style={{ cursor: 'default' }}><div className="voucher-pick-title">{tt('noActiveSubscription')}</div></div>}
-                  {autoClaim.subs.map((s) => (
-                    <div
-                      key={s.id}
-                      className={`voucher-pick-item${autoClaim.subId === String(s.id) ? ' selected' : ''}`}
-                      role="button"
-                      tabIndex={0}
-                      onClick={() => setAutoClaim((c) => ({ ...c, subId: String(s.id), pickerOpen: false }))}
-                      onKeyDown={(e) => { if (e.key === 'Enter') setAutoClaim((c) => ({ ...c, subId: String(s.id), pickerOpen: false })); }}
-                    >
-                      <div className="voucher-pick-title">{s.name || s.marzban_username || s.username || ('#' + s.id)}</div>
-                      <div className="voucher-pick-sub">{[s.plan_name, String(s.status || '').toUpperCase()].filter(Boolean).join(' · ')}</div>
-                    </div>
-                  ))}
-                </div>
-              )}
-              <div className="auto-claim-row">
-                <button className="auto-claim-btn" onClick={() => setAutoClaim((c) => ({ ...c, open: false }))}>{tt('cancel')}</button>
-                <button className="auto-claim-btn primary" onClick={saveAutoClaim}>{tt('save')}</button>
-              </div>
-              {!isVip && (
-                <div className="auto-claim-sub" id="autoClaimVipHint" style={{ display: 'block' }}>{tt('vipRequiredDesc')}</div>
-              )}
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* ── VIP modal ── */}
-      {vip && (
+      {/* ── VIP modal — portaled to <body>: page sections create stacking
+          contexts (transforms/filters) that trapped it under the app header
+          and bottom nav on phones. ── */}
+      {vip && createPortal(
         <div className="vip-modal-overlay active" id="vipModalOverlay">
           <div className="vip-modal">
             <div className="vip-modal-header">
               <div className="vip-modal-title">
-                <span className="svg-icon">
+                <span className="svg-icon vip-crown">
                   <svg viewBox="0 0 24 24" fill="currentColor" width="18" height="18"><path d="M5 16 3 5l5.5 5L12 4l3.5 6L21 5l-2 11H5zm14 3H5v-2h14v2z" /></svg>
                 </span>
                 <span id="vipModalTitle">{vt('modalTitle')}</span>
@@ -799,34 +730,73 @@ export function ProfilePage() {
             <div className="vip-modal-body">
               {vip.step === 1 && (
                 <div className="vip-step" id="vipStep1">
+                  {vip.isVip && (
+                    <div className="vip-status-card">
+                      <div className="vip-status-title">
+                        <svg viewBox="0 0 24 24" fill="currentColor" width="16" height="16"><path d="M5 16 3 5l5.5 5L12 4l3.5 6L21 5l-2 11H5zm14 3H5v-2h14v2z" /></svg>
+                        {vt('statusActive')}
+                      </div>
+                      <div className="vip-status-sub">
+                        {vip.vipUntil
+                          ? `${vt('statusUntil')} ${new Date(vip.vipUntil).toLocaleDateString(getLocale(lang), { year: 'numeric', month: 'long', day: 'numeric' })}`
+                          : vt('statusLifetime')}
+                      </div>
+                    </div>
+                  )}
+                  <div className="vip-hero">
+                    <img className="vip-hero-medal" src="/webapp/static/badges/vip.png" alt="" onError={(e) => { e.target.style.display = 'none'; }} />
+                    <div className="vip-hero-copy">
+                      <div className="vip-hero-tag">{vt('heroTag')}</div>
+                      <div className="vip-hero-line">{vt('heroLine')}</div>
+                    </div>
+                  </div>
                   <div className="vip-benefits">
-                    {['benefitDiscount', 'benefitPlans', 'benefitSupport', 'benefitBadge'].map((k) => (
+                    {[
+                      ['benefitDiscount', 'M12 8v8m-4-4h8', true],
+                      ['benefitPlans', 'M20 7H4m16 5H4m16 5H4', false],
+                      ['benefitSupport', 'M9.1 9a3 3 0 1 1 5.8 1c0 2-3 2-3 4m.1 4h.01', false],
+                      ['benefitTheme', 'M12 3a9 9 0 1 0 9 9c0-1-1-2-2-2h-2a2 2 0 0 1-2-2V6c0-1.5-1.5-3-3-3z', false],
+                    ].map(([k, path]) => (
                       <div className="vip-benefit-item" key={k}>
-                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" width="14" height="14"><path d="M20 6L9 17l-5-5" /></svg>
-                        <span className="vip-benefit-text">{vt(k)}</span>
+                        <span className="vip-benefit-icon">
+                          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" width="15" height="15" strokeLinecap="round" strokeLinejoin="round"><path d={path} /></svg>
+                        </span>
+                        <span className="vip-benefit-col">
+                          <span className="vip-benefit-text">{vt(k)}</span>
+                          <span className="vip-benefit-sub">{vt(k + 'Sub')}</span>
+                        </span>
                       </div>
                     ))}
                   </div>
-                  <div className="vip-plans-title" id="selectPlanTitle">{vt('selectPlan')}</div>
+                  <div className="vip-plans-title" id="selectPlanTitle">{vip.isVip ? vt('renew') : vt('selectPlan')}</div>
                   <div className="vip-plans-grid" id="vipPlansGrid">
                     {vip.plans === null && <div style={{ padding: 12 }}>{tt('loading')}</div>}
-                    {vip.plans !== null && vip.plans.map((p) => (
-                      <div
-                        key={p.id}
-                        className={`vip-plan-card${p.id === '3_months' ? ' popular' : ''}${vip.selectedPlanId === p.id ? ' selected' : ''}`}
-                        role="button"
-                        tabIndex={0}
-                        onClick={() => setVip((cur) => ({ ...cur, selectedPlanId: p.id }))}
-                        onKeyDown={(e) => { if (e.key === 'Enter') setVip((cur) => ({ ...cur, selectedPlanId: p.id })); }}
-                      >
-                        <div className="vip-plan-info">
-                          <div className="vip-plan-duration">{lang === 'fa' ? (p.label_fa || p.label_en) : (p.label_en || p.label_fa)}</div>
-                          <div className="vip-plan-price">{fmt(p.price)} {vt('toman')}</div>
+                    {vip.plans !== null && vip.plans.map((p) => {
+                      // Per-month + savings vs the 1-month rate, computed from data.
+                      const base = (vip.plans.find((x) => x.id === '1_month') || {}).price || 0;
+                      const months = p.days ? Math.round(p.days / 30) : 0;
+                      const perMonth = months > 1 ? Math.round(p.price / months / 1000) * 1000 : 0;
+                      const savePct = base && months > 1 ? Math.max(0, Math.round((1 - p.price / (base * months)) * 100)) : 0;
+                      return (
+                        <div
+                          key={p.id}
+                          className={`vip-plan-card${p.id === '3_months' ? ' popular' : ''}${vip.selectedPlanId === p.id ? ' selected' : ''}`}
+                          role="button"
+                          tabIndex={0}
+                          onClick={() => setVip((cur) => ({ ...cur, selectedPlanId: p.id }))}
+                          onKeyDown={(e) => { if (e.key === 'Enter') setVip((cur) => ({ ...cur, selectedPlanId: p.id })); }}
+                        >
+                          <div className="vip-plan-info">
+                            <div className="vip-plan-duration">{lang === 'fa' ? (p.label_fa || p.label_en) : (p.label_en || p.label_fa)}</div>
+                            <div className="vip-plan-price">{fmt(p.price)} {vt('toman')}</div>
+                            {perMonth > 0 && <div className="vip-plan-permonth">≈ {fmt(perMonth)} {vt('toman')}{vt('perMonth')}</div>}
+                          </div>
+                          {savePct > 4 && <div className="vip-plan-save">{vt('save')} {fmt(savePct)}٪</div>}
+                          {p.id === '3_months' && <div className="vip-plan-badge">{vt('popular')}</div>}
+                          {p.is_lifetime && <div className="vip-plan-badge">{vt('bestValue')}</div>}
                         </div>
-                        {p.id === '3_months' && <div className="vip-plan-badge">{vt('popular')}</div>}
-                        {p.is_lifetime && <div className="vip-plan-badge">{vt('bestValue')}</div>}
-                      </div>
-                    ))}
+                      );
+                    })}
                   </div>
                 </div>
               )}
@@ -851,12 +821,29 @@ export function ProfilePage() {
                     onClick={() => document.getElementById('vipReceiptInput')?.click()}
                     onKeyDown={(e) => { if (e.key === 'Enter') document.getElementById('vipReceiptInput')?.click(); }}
                   >
-                    <input id="vipReceiptInput" type="file" accept="image/jpeg,image/png,.jpg,.jpeg,.png" hidden onChange={onVipReceipt} />
+                    <input id="vipReceiptInput" type="file" accept="image/*" hidden onChange={onVipReceipt} />
                     {!vip.receiptData && <div id="vipReceiptPlaceholder">{vt('uploadReceipt')}</div>}
                     {vip.receiptData && <img id="vipReceiptPreview" className="vip-receipt-preview" src={vip.receiptData} alt="" />}
+                    {vip.receiptData && (
+                      <button
+                        type="button"
+                        className="receipt-remove-btn"
+                        aria-label="Remove"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          const inp = document.getElementById('vipReceiptInput');
+                          if (inp) inp.value = '';
+                          setVip((cur) => (cur ? { ...cur, receiptData: null, receiptName: '' } : cur));
+                        }}
+                      >
+                        <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round"><path d="M18 6 6 18M6 6l12 12" /></svg>
+                      </button>
+                    )}
                   </div>
-                  <button className="vip-submit-btn" id="vipSubmitBtn" disabled={!vip.receiptData} onClick={submitVip}>{vt('submit')}</button>
-                  <button className="vip-back-btn" id="backBtn" onClick={() => setVip((cur) => ({ ...cur, step: 1 }))}>{vt('back')}</button>
+                  <button className="vip-submit-btn" id="vipSubmitBtn" disabled={!vip.receiptData || vip.busy} onClick={submitVip}>
+                    {vip.busy ? (lang === 'fa' ? 'در حال ارسال…' : 'Sending…') : vt('submit')}
+                  </button>
+                  <button className="vip-back-btn" id="backBtn" disabled={vip.busy} onClick={() => setVip((cur) => ({ ...cur, step: 1 }))}>{vt('back')}</button>
                 </div>
               )}
               {vip.step === 3 && (
@@ -869,11 +856,12 @@ export function ProfilePage() {
             </div>
             {vip.step === 1 && (
               <div className="vip-modal-footer" id="vipModalFooter">
-                <button className="vip-purchase-btn" id="vipContinueBtn" disabled={!vip.selectedPlanId} onClick={continueVip}>{vt('continue')}</button>
+                <button className="vip-purchase-btn" id="vipContinueBtn" disabled={!vip.selectedPlanId || vip.busy} onClick={continueVip}>{vt('continue')}</button>
               </div>
             )}
           </div>
-        </div>
+        </div>,
+        document.body,
       )}
     </>
   );

@@ -114,6 +114,31 @@ async def broadcast_ticket_update(ticket_id: int, update_type: str, data: dict =
             user_connection_map.pop(dead_ws, None)
             connection_health.pop(dead_ws, None)
 
+    # Also fan new_message out to ALL admin connections (not just the ones
+    # watching this ticket) so the admin shell's support badge updates live —
+    # it used to sit on a 30s poll and looked broken.
+    if update_type == 'new_message':
+        dead_admin_connections = []
+        for ws in list(admin_connections):
+            try:
+                if id(ws) in sent_to_connections:
+                    continue
+                if ws.closed:
+                    dead_admin_connections.append(ws)
+                    continue
+                last_activity = connection_health.get(ws, 0)
+                if current_time - last_activity > CONNECTION_TIMEOUT:
+                    dead_admin_connections.append(ws)
+                    continue
+                await ws.send_json(message)
+                connection_health[ws] = current_time
+            except Exception as e:
+                logger.warning(f'Failed to send WebSocket message to admin connection: {e}')
+                dead_admin_connections.append(ws)
+        for dead_ws in dead_admin_connections:
+            admin_connections.discard(dead_ws)
+            connection_health.pop(dead_ws, None)
+
 
 async def broadcast_ticket_list_update():
     """
