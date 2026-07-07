@@ -169,7 +169,20 @@ async def approve_vip_order(callback: CallbackQuery, session: AsyncSession, bot:
     vip_order: VipOrder | None = await session.get(VipOrder, order_id)
     await session.refresh(vip_order)
 
-    activated = await activate_vip_order(session, vip_order, approved_by=callback.from_user.id, claimed=True)
+    # Any failure inside activation must release the claim, or the order
+    # wedges in 'processing' and the button looks dead forever (this is
+    # exactly what the int32 approved_by overflow did).
+    try:
+        activated = await activate_vip_order(session, vip_order, approved_by=callback.from_user.id, claimed=True)
+    except Exception:
+        logging.exception(f"[VIP] approve failed for order {order_id}")
+        try:
+            await session.rollback()
+        except Exception:
+            pass
+        await unclaim_vip_order(session, order_id)
+        await callback.answer("خطا در تایید — دوباره تلاش کنید", show_alert=True)
+        return
     if not activated:
         await unclaim_vip_order(session, order_id)
         await callback.answer("User not found", show_alert=True)

@@ -73,7 +73,9 @@ class VipOrder(Base):
     status = Column(String, default="draft")
     created_at = Column(DateTime, default=func.now())
     approved_at = Column(DateTime, nullable=True)
-    approved_by = Column(Integer, nullable=True)
+    # Telegram admin id — BigInteger: real Telegram ids exceed int32 (a 7.1e9
+    # admin id made every VIP approve roll back with asyncpg DataError)
+    approved_by = Column(BigInteger, nullable=True)
 
     user = relationship("User")
 
@@ -133,7 +135,8 @@ class CashoutRequest(Base):
     status = Column(String, default="pending")
     requested_at = Column(DateTime, default=datetime.datetime.utcnow)
     processed_at = Column(DateTime, nullable=True)
-    processed_by = Column(Integer, nullable=True)
+    # Telegram admin id (see VipOrder.approved_by) — int32 overflows
+    processed_by = Column(BigInteger, nullable=True)
     admin_note = Column(String, nullable=True)
 
     user = relationship("User")

@@ -105,7 +105,10 @@ async def approve_deletion_request(callback: CallbackQuery, session: AsyncSessio
         # Update deletion request status
         deletion_request.status = 'approved'
         deletion_request.processed_at = datetime.utcnow()
-        deletion_request.processed_by = callback.from_user.id
+        # processed_by is FK → users.id (int32): resolve the admin's DB row —
+        # a raw Telegram id overflows AND violates the FK
+        admin_row = await crud.get_user(session, callback.from_user.id)
+        deletion_request.processed_by = admin_row.id if admin_row else None
         
         # Delete subscription from local database
         await session.delete(subscription)
@@ -152,7 +155,8 @@ async def deny_deletion_request(callback: CallbackQuery, session: AsyncSession):
         # Update deletion request status
         deletion_request.status = 'denied'
         deletion_request.processed_at = datetime.utcnow()
-        deletion_request.processed_by = callback.from_user.id
+        admin_row = await crud.get_user(session, callback.from_user.id)
+        deletion_request.processed_by = admin_row.id if admin_row else None
         await session.commit()
         
         # Notify the user
