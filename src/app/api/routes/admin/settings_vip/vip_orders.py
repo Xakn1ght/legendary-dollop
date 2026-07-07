@@ -1,3 +1,6 @@
+from sqlalchemy import update as _sql_update
+
+from app.services.audit import record_audit
 from app.utils.admin_bot_helper import resolve_user_bot
 
 from ..common import *  # noqa: F403
@@ -5,6 +8,40 @@ from ..common import *  # noqa: F403
 import logging
 
 logger = logging.getLogger(__name__)
+
+
+async def _claim_vip_order(session, order_id: int) -> bool:
+    """Atomic pending → processing claim so two concurrent approve/deny taps
+    can't both proceed. Returns False when the order was already taken."""
+    res = await session.execute(
+        _sql_update(VipOrder)
+        .where(VipOrder.id == order_id, VipOrder.status == 'pending')
+        .values(status='processing')
+    )
+    await session.commit()
+    return (res.rowcount or 0) > 0
+
+
+async def _unclaim_vip_order(session, order_id: int) -> None:
+    try:
+        await session.execute(
+            _sql_update(VipOrder)
+            .where(VipOrder.id == order_id, VipOrder.status == 'processing')
+            .values(status='pending')
+        )
+        await session.commit()
+    except Exception:
+        logger.exception(f"[VIP] could not release claim on order {order_id}")
+
+
+async def _unclaim_vip_order_fresh(order_id: int) -> None:
+    """Release a claim from a NEW session — safe to call from the outer except
+    after the request's `async with` session has already closed/failed."""
+    try:
+        async with AsyncSessionLocal() as s:
+            await _unclaim_vip_order(s, order_id)
+    except Exception:
+        logger.exception(f"[VIP] could not release claim (fresh) on order {order_id}")
 
 
 async def handle_admin_approve_vip_order(request: web.Request):
@@ -16,15 +53,16 @@ async def handle_admin_approve_vip_order(request: web.Request):
     
     try:
         async with AsyncSessionLocal() as session:
-            vip_order = await session.get(VipOrder, order_id)
-            if not vip_order:
-                return web.json_response({"ok": False, "error": "not_found"}, status=404)
-            
-            if vip_order.status != 'pending':
+            if not await _claim_vip_order(session, order_id):
+                vip_order = await session.get(VipOrder, order_id)
+                if not vip_order:
+                    return web.json_response({"ok": False, "error": "not_found"}, status=404)
                 return web.json_response({"ok": True, "message": "already_processed"})
-            
+
+            vip_order = await session.get(VipOrder, order_id)
             user = await session.get(User, vip_order.user_id)
             if not user:
+                await _unclaim_vip_order(session, order_id)
                 return web.json_response({"ok": False, "error": "user_not_found"}, status=404)
             
             # Set VIP status on user
@@ -77,11 +115,20 @@ async def handle_admin_approve_vip_order(request: web.Request):
                 await broadcast_admin_event('receipts_updated', {'order_id': order_id, 'type': 'vip'})
             except Exception:
                 pass
-            
+
+            await record_audit(
+                request, "vip.approve", target_type="vip", target_id=order_id,
+                summary=f"VIP {duration_text} for user {user.chat_id} ({vip_order.price:,} toman)",
+            )
             return web.json_response({"ok": True, "message": "approved"})
-    except Exception as e:
+    except Exception:
         import traceback
         traceback.print_exc()
+        # never leave the order wedged in 'processing'
+        try:
+            await _unclaim_vip_order_fresh(int(request.match_info['order_id']))
+        except Exception:
+            pass
         return web.json_response({"ok": False, "error": "server_error"}, status=500)
 
 
@@ -94,13 +141,13 @@ async def handle_admin_deny_vip_order(request: web.Request):
     
     try:
         async with AsyncSessionLocal() as session:
-            vip_order = await session.get(VipOrder, order_id)
-            if not vip_order:
-                return web.json_response({"ok": False, "error": "not_found"}, status=404)
-            
-            if vip_order.status != 'pending':
+            if not await _claim_vip_order(session, order_id):
+                vip_order = await session.get(VipOrder, order_id)
+                if not vip_order:
+                    return web.json_response({"ok": False, "error": "not_found"}, status=404)
                 return web.json_response({"ok": False, "error": "already_processed"}, status=400)
-            
+
+            vip_order = await session.get(VipOrder, order_id)
             user = await session.get(User, vip_order.user_id)
             
             # Mark order as denied
@@ -134,9 +181,17 @@ async def handle_admin_deny_vip_order(request: web.Request):
                 await broadcast_admin_event('receipts_updated', {'order_id': order_id, 'type': 'vip'})
             except Exception:
                 pass
-            
+
+            await record_audit(
+                request, "vip.deny", target_type="vip", target_id=order_id,
+                summary=f"denied VIP order ({vip_order.price:,} toman)",
+            )
             return web.json_response({"ok": True, "message": "denied"})
-    except Exception as e:
+    except Exception:
         import traceback
         traceback.print_exc()
+        try:
+            await _unclaim_vip_order_fresh(int(request.match_info['order_id']))
+        except Exception:
+            pass
         return web.json_response({"ok": False, "error": "server_error"}, status=500)

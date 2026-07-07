@@ -1287,7 +1287,8 @@ html[dir="rtl"] .referral-code {
   max-height: 82vh;
   overflow: hidden;
 }
-#redeemPanel.visible { transform: translateY(0); }
+/* Legacy page used .visible; the React Sheet component sets .open — accept both. */
+#redeemPanel.visible, #redeemPanel.open { transform: translateY(0); }
 #redeemPanel .sheet-handle {
   width: 52px;
   height: 5px;
@@ -1753,3 +1754,22 @@ html[data-theme="light"] .season-ladder-toggle{ background: rgba(0,0,0,0.04); bo
 [data-theme="light"] .vc-credit { color:#047857; background:rgba(52,211,153,0.18); }
 [data-theme="light"] .vc-star   { color:#b45309; background:rgba(251,191,36,0.20); }
 .voucher-item .ref-btn.primary { flex-shrink: 0; font-size: 13px; padding: 8px 18px; }
+
+/* ── Ladder legibility pass (owner: labels + numbers too dim on lava) ── */
+.season-rung{
+  background: rgba(8, 14, 20, 0.45);
+  border-color: rgba(255,255,255,0.10);
+}
+.season-rung-reward{ color: #fff; }
+.season-rung-reward span{ color: rgba(255,255,255,0.85); }
+.season-rung-stars{ color: rgba(255,255,255,0.72); font-weight: 700; }
+.season-rung-node{
+  color: rgba(255,255,255,0.92);
+  background: rgba(8, 14, 20, 0.55);
+  border-color: rgba(255,255,255,0.22);
+}
+html[data-theme="light"] .season-rung{ background: rgba(255,255,255,0.75); border-color: rgba(0,0,0,0.08); }
+html[data-theme="light"] .season-rung-reward{ color: #14202c; }
+html[data-theme="light"] .season-rung-reward span{ color: rgba(20,32,44,0.8); }
+html[data-theme="light"] .season-rung-stars{ color: rgba(20,32,44,0.65); }
+html[data-theme="light"] .season-rung-node{ color: rgba(20,32,44,0.85); background: rgba(0,0,0,0.06); border-color: rgba(0,0,0,0.14); }

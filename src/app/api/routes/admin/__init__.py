@@ -49,9 +49,24 @@ from app.api.routes.admin.tickets import (
     handle_admin_ticket_photo_get,
     handle_admin_ticket_photo_upload,
     handle_admin_ticket_reply,
+    handle_admin_ticket_user_photo,
     handle_admin_tickets,
 )
 from app.api.routes.admin.arcade_flags import handle_admin_arcade_flags
+from app.api.routes.admin.ops import (
+    handle_admin_analytics_expiring,
+    handle_admin_analytics_revenue,
+    handle_admin_audit_list,
+    handle_admin_coupon_create,
+    handle_admin_coupon_revoke,
+    handle_admin_coupons_list,
+    handle_admin_expiring_remind,
+    handle_admin_export_transactions,
+    handle_admin_nodes,
+    handle_admin_sms_control_get,
+    handle_admin_sms_control_set,
+    handle_admin_system_health,
+)
 from app.api.routes.admin.users import (
     handle_admin_reset_arcade,
     handle_admin_stats,
@@ -63,9 +78,21 @@ from app.api.routes.admin.users import (
 )
 
 __all__ = [
+    "handle_admin_analytics_expiring",
+    "handle_admin_analytics_revenue",
     "handle_admin_approve_charge",
     "handle_admin_approve_receipt",
     "handle_admin_approve_vip_order",
+    "handle_admin_audit_list",
+    "handle_admin_coupon_create",
+    "handle_admin_coupon_revoke",
+    "handle_admin_coupons_list",
+    "handle_admin_expiring_remind",
+    "handle_admin_export_transactions",
+    "handle_admin_nodes",
+    "handle_admin_sms_control_get",
+    "handle_admin_sms_control_set",
+    "handle_admin_system_health",
     "handle_admin_broadcast",
     "handle_admin_deny_charge",
     "handle_admin_deny_receipt",
@@ -100,6 +127,7 @@ __all__ = [
     "handle_admin_ticket_reopen",
     "handle_admin_ticket_photo_get",
     "handle_admin_ticket_photo_upload",
+    "handle_admin_ticket_user_photo",
     "handle_admin_ticket_reply",
     "handle_admin_tickets",
     "handle_admin_toggle_user",

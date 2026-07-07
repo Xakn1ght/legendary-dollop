@@ -1,0 +1,215 @@
+{
+ "cycle_days": 30,
+ "themes": [
+  {
+   "day": 1,
+   "kind": "image",
+   "key": "day01",
+   "name": "Crimson Garden",
+   "bg": "bg_day01.png"
+  },
+  {
+   "day": 2,
+   "kind": "image",
+   "key": "day02",
+   "name": "Teal Hollow",
+   "bg": "bg_day02.png"
+  },
+  {
+   "day": 3,
+   "kind": "image",
+   "key": "day03",
+   "name": "Azure Wilds",
+   "bg": "bg_day03.png"
+  },
+  {
+   "day": 4,
+   "kind": "image",
+   "key": "day04",
+   "name": "Violet Grove",
+   "bg": "bg_day04.png"
+  },
+  {
+   "day": 5,
+   "kind": "image",
+   "key": "day05",
+   "name": "Rose Field",
+   "bg": "bg_day05.png"
+  },
+  {
+   "day": 6,
+   "kind": "image",
+   "key": "day06",
+   "name": "Jade Thicket",
+   "bg": "bg_day06.png"
+  },
+  {
+   "day": 7,
+   "kind": "image",
+   "key": "day07",
+   "name": "Azure Depths",
+   "bg": "bg_day07.png"
+  },
+  {
+   "day": 8,
+   "kind": "image",
+   "key": "day08",
+   "name": "Violet Reach",
+   "bg": "bg_day08.png"
+  },
+  {
+   "day": 9,
+   "kind": "image",
+   "key": "day09",
+   "name": "Rose Marsh",
+   "bg": "bg_day09.png"
+  },
+  {
+   "day": 10,
+   "kind": "image",
+   "key": "day10",
+   "name": "Emerald Glade",
+   "bg": "bg_day10.png"
+  },
+  {
+   "day": 11,
+   "kind": "image",
+   "key": "day11",
+   "name": "Azure Cavern",
+   "bg": "bg_day11.png"
+  },
+  {
+   "day": 12,
+   "kind": "image",
+   "key": "day12",
+   "name": "Violet Bloom",
+   "bg": "bg_day12.png"
+  },
+  {
+   "day": 13,
+   "kind": "image",
+   "key": "day13",
+   "name": "Orchid Vale",
+   "bg": "bg_day13.png"
+  },
+  {
+   "day": 14,
+   "kind": "image",
+   "key": "day14",
+   "name": "Lime Nest",
+   "bg": "bg_day14.png"
+  },
+  {
+   "day": 15,
+   "kind": "image",
+   "key": "day15",
+   "name": "Teal Ridge",
+   "bg": "bg_day15.png"
+  },
+  {
+   "day": 16,
+   "kind": "image",
+   "key": "day16",
+   "name": "Azure Haze",
+   "bg": "bg_day16.png"
+  },
+  {
+   "day": 17,
+   "kind": "image",
+   "key": "day17",
+   "name": "Violet Meadow",
+   "bg": "bg_day17.png"
+  },
+  {
+   "day": 18,
+   "kind": "image",
+   "key": "day18",
+   "name": "Crimson Basin",
+   "bg": "bg_day18.png"
+  },
+  {
+   "day": 19,
+   "kind": "image",
+   "key": "day19",
+   "name": "Teal Roots",
+   "bg": "bg_day19.png"
+  },
+  {
+   "day": 20,
+   "kind": "image",
+   "key": "day20",
+   "name": "Azure Canopy",
+   "bg": "bg_day20.png"
+  },
+  {
+   "day": 21,
+   "kind": "image",
+   "key": "day21",
+   "name": "Violet Shore",
+   "bg": "bg_day21.png"
+  },
+  {
+   "day": 22,
+   "kind": "image",
+   "key": "day22",
+   "name": "Rose Warren",
+   "bg": "bg_day22.png"
+  },
+  {
+   "day": 23,
+   "kind": "image",
+   "key": "day23",
+   "name": "Emerald Cradle",
+   "bg": "bg_day23.png"
+  },
+  {
+   "day": 24,
+   "kind": "image",
+   "key": "day24",
+   "name": "Azure Drift",
+   "bg": "bg_day24.png"
+  },
+  {
+   "day": 25,
+   "kind": "image",
+   "key": "day25",
+   "name": "Violet Tangle",
+   "bg": "bg_day25.png"
+  },
+  {
+   "day": 26,
+   "kind": "image",
+   "key": "day26",
+   "name": "Orchid Verge",
+   "bg": "bg_day26.png"
+  },
+  {
+   "day": 27,
+   "kind": "image",
+   "key": "day27",
+   "name": "Lime Burrow",
+   "bg": "bg_day27.png"
+  },
+  {
+   "day": 28,
+   "kind": "image",
+   "key": "day28",
+   "name": "Azure Expanse",
+   "bg": "bg_day28.png"
+  },
+  {
+   "day": 29,
+   "kind": "image",
+   "key": "day29",
+   "name": "Sapphire Weald",
+   "bg": "bg_day29.png"
+  },
+  {
+   "day": 30,
+   "kind": "image",
+   "key": "day30",
+   "name": "Orchid Mire",
+   "bg": "bg_day30.png"
+  }
+ ]
+}

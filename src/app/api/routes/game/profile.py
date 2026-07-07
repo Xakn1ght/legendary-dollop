@@ -7,9 +7,8 @@ from app.api.deps import _extract_user_id_from_init, _verify_webapp_auth  # noqa
 
 async def handle_arcade_status(request: web.Request):
     """Return user's arcade game status - can they play today, best score, etc."""
-    from datetime import date
-
     from app.core.settings import GAME_REWARDS
+    from app.utils.tehran_time import tehran_today
     
     # Verify authentication
     user_chat_id, _ = _verify_webapp_auth(request)
@@ -27,13 +26,18 @@ async def handle_arcade_status(request: web.Request):
         if not user:
             return web.json_response({"ok": False, "error": "not_registered"}, status=403)
         
-        # Check daily play status
-        today = date.today()
+        # Check daily play status (arcade days roll over at IRAN midnight)
+        today = tehran_today()
         existing_play = await crud.check_daily_game_play(session, user.id, today)
         
         can_play_for_rewards = not (existing_play and existing_play.rewarded)
         best_score_today = existing_play.best_score if existing_play else 0
         
+        # Arcade coin wallet + run loadout (skin/powers/lives)
+        from app.api.routes.game.shop import build_loadout
+        wallet = await crud.get_or_create_arcade_wallet(session, user.id)
+        wallet_pub = crud.arcade_wallet_public(wallet)
+
         # Get monthly star cap info
         monthly_cap = GAME_REWARDS.get("monthly_star_cap", 6)
         stars_this_month = user.arcade_stars_this_month or 0
@@ -44,6 +48,8 @@ async def handle_arcade_status(request: web.Request):
             "played_today": not can_play_for_rewards,  # Frontend expects this name
             "already_played_today": not can_play_for_rewards,
             "best_score_today": best_score_today,
+            "wallet": wallet_pub,
+            "loadout": build_loadout(wallet_pub),
             "star_pieces": user.star_pieces or 0,
             "show_on_leaderboard": user.show_on_leaderboard if hasattr(user, 'show_on_leaderboard') else True,
             "display_name": user.custom_username or user.username or user.full_name or "",

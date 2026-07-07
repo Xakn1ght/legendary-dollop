@@ -60,6 +60,7 @@
     C.SPIDERBOSS.sprite, C.BOSSBULLET.sprite,
     C.MEGABOSS.sprites[0], C.MEGABOSS.sprites[1],
     C.LASER.sprite, C.ROCKET.sprites[0], C.ROCKET.sprites[1], C.PINKBOMB.sprite,
+    C.SPLITTER.sprite, C.UFO.sprite,
     C.EXPLOSION.sheet, C.PARTICLES.sprite, C.STARS.sprite, C.BACKGROUND.tile,
     C.UI.titleSheet, C.UI.titleTable, C.UI.titlePoints, C.UI.titleDashes,
     C.UI.titleHand, C.UI.hudBar, C.UI.font, C.UI.doubleFire,
@@ -297,24 +298,30 @@
 
   // dev helper: append ?level=N to the URL to start on a later level
   var startLevel = parseInt(new URLSearchParams(location.search).get('level'), 10) || 1;
+  var isPractice = new URLSearchParams(location.search).get('practice') === '1';
 
   function newRun() {
+    // Shop loadout (window.AstroLoadout, set by bridge.js from the server):
+    // permanent unlocks applied at the start of every run.
+    var LO = window.AstroLoadout || {};
     return {
       state: ST_NEWLEVEL,
       isPlaying: false,
       score: 0,
-      lives: C.PLAYER.lives,
+      lives: C.PLAYER.lives + ((LO.extra_lives | 0) || 0),
       level: startLevel,
       fastSpeed: false,
       time: 0,
+      coins: 0,            // golden coins collected this run (banked on submit)
+      coinsSpawned: 0,     // client-side spawn cap counter
 
       player: {
         x: W / 2, y: PLAYER_Y, vx: 0,
         nextFire: 0, fireInterval: C.PLAYER.fireInterval,
         doubleFireUntil: -1, visible: true,
-        shields: 0,          // hits the ship can absorb (shield powerup)
+        shields: LO.shield_start ? 1 : 0,   // hits the ship can absorb
         invulnUntil: -1,     // i-frames after a shield absorbs a hit
-        spreadUntil: -1,     // 3-WAY weapon timer
+        spreadUntil: LO.spread_start ? (C.POWERUPS.types.spread.duration || 8) : -1,
         pierceUntil: -1,     // PIERCE weapon timer
       },
       powerups: [],      // falling tokens: {type,x,y,swayPhase}
@@ -332,6 +339,13 @@
 
       scorpion: null,    // {x,y,dir,hp}
       scorpionTimer: rnd(C.SCORPION.spawnDelayMin, C.SCORPION.spawnDelayMax),
+
+      // NEW enemies (2026-07-06): armored segments live inside `segments`
+      // (seg.armor > 0); these two get the usual spawn/update/damage triplets.
+      splitter: null,    // {x,baseX,y,swayPhase,hp,pulseT}  pink egg sac
+      splitterTimer: rnd(C.SPLITTER.spawnDelayMin, C.SPLITTER.spawnDelayMax),
+      ufo: null,         // {x,y,baseY,bobPhase,dir,hp}      rare bonus flyer
+      ufoTimer: rnd(C.UFO.spawnDelayMin, C.UFO.spawnDelayMax),
 
       spiderBoss: null,  // {x,y,baseY,swayPhase,dir,hp,fireTimer}
       spiderBossTimer: rnd(C.SPIDERBOSS.spawnDelayMin, C.SPIDERBOSS.spawnDelayMax),
@@ -393,8 +407,17 @@
   // sourceKind: 'spider' | 'flea' | 'scorpion' | 'spiderboss' | 'megaboss'
   function maybeDropPowerup(sourceKind, x, y) {
     var chance = C.POWERUPS.dropChance[sourceKind] || 0;
-    if (Math.random() >= chance) return;
-    G.powerups.push({ type: pickPowerupType(), x: x, y: y, swayPhase: 0 });
+    if (Math.random() < chance)
+      G.powerups.push({ type: pickPowerupType(), x: x, y: y, swayPhase: 0 });
+    // independent VERY-RARE coin roll (never in practice — coins only bank
+    // on the validated daily run, so practice coins would just be a lie)
+    if (!isPractice && G.coinsSpawned < (C.COINS.maxPerRun || 3)) {
+      var cChance = (C.COINS.dropChance && C.COINS.dropChance[sourceKind]) || 0;
+      if (Math.random() < cChance) {
+        G.coinsSpawned++;
+        G.powerups.push({ type: 'coin', x: x, y: y - 30, swayPhase: Math.PI });
+      }
+    }
   }
 
   function updatePowerups(dt) {
@@ -415,8 +438,16 @@
 
   // What each token does. Add a new type in config, handle it here.
   function applyPowerup(type) {
-    var def = C.POWERUPS.types[type];
     var p = G.player;
+    if (type === 'coin') {          // golden coin: banks on submit
+      G.coins++;
+      Haptics.thud();
+      Sound.play('newlevel');       // collect-gem chime
+      if (window.AstroBridge && window.AstroBridge.setCoins) window.AstroBridge.setCoins(G.coins);
+      G.popups.push({ x: p.x, y: p.y - 60, text: '+1 COIN', t: 0 });
+      return;
+    }
+    var def = C.POWERUPS.types[type];
     Haptics.tap();
     if (type === 'shield') {
       p.shields = Math.min(C.POWERUPS.maxShields, p.shields + 1);
@@ -448,6 +479,8 @@
     if (G.scorpion)   damageScorpion(null, C.POWERUPS.bombBossDamage);
     if (G.spiderBoss) damageSpiderBoss(null, C.POWERUPS.bombBossDamage);
     if (G.megaBoss)   damageMegaBoss(null, C.POWERUPS.bombBossDamage);
+    if (G.splitter)   damageSplitter(null, C.POWERUPS.bombBossDamage, true);
+    if (G.ufo)        damageUfo(null, C.POWERUPS.bombBossDamage);
     G.popups.push({ x: G.player.x, y: G.player.y - 60, text: C.POWERUPS.types.bomb.label, t: 0 });
   }
 
@@ -486,17 +519,34 @@
     var y = TOP + CELL;
     var speed = G.fastSpeed ? C.CENTIPEDE.fastSpeed : C.CENTIPEDE.speed;
     var prevUid = 0;
+    // ARMOR (new): from ARMOR.fromLevel, some body segments wear a plate
+    // that absorbs one hit. Heads never spawn armored.
+    var armorOn = G.level >= C.ARMOR.fromLevel;
     // bodies first (each remembers the uid of the previously created segment,
     // i.e. its follower), head last — exactly like the original.
     for (var i = 0; i < size - 1; i++) {
       var b = { uid: G.nextUid++, x: x, y: y, tx: x, ty: y, head: false,
-                dirX: 1, dirY: 1, speed: speed, followerUid: prevUid };
+                dirX: 1, dirY: 1, speed: speed, followerUid: prevUid,
+                armor: (armorOn && Math.random() < C.ARMOR.chance) ? 1 : 0,
+                armored: false };
+      b.armored = b.armor > 0;         // remembers it spawned armored (scoring)
       G.segments.push(b);
       prevUid = b.uid;
     }
     var h = { uid: G.nextUid++, x: x, y: y, tx: x, ty: y, head: true,
-              dirX: choose(-1, 1), dirY: 1, speed: speed, followerUid: prevUid };
+              dirX: choose(-1, 1), dirY: 1, speed: speed, followerUid: prevUid,
+              armor: 0, armored: false };
     G.segments.push(h);
+  }
+
+  // SPLITTER children: a lone fast diver head dropped at (x, y), snapped to
+  // the grid — from there it behaves exactly like an original diver segment.
+  function spawnDiverAt(x, y, dirX) {
+    var cx = clamp(Math.round(x / CELL) * CELL, LEFT_WALL, RIGHT_WALL);
+    var cy = clamp(Math.round(y / CELL) * CELL, TOP + CELL, BAND_BOTTOM);
+    G.segments.push({ uid: G.nextUid++, x: cx, y: cy, tx: cx, ty: cy, head: true,
+                      dirX: dirX, dirY: 1, speed: C.CENTIPEDE.fastSpeed,
+                      followerUid: 0, armor: 0, armored: false });
   }
 
   function createLevel(wave) {
@@ -584,6 +634,7 @@
     Sound.play('kill');
     Haptics.tap();
     if (s.head) { addScore(C.CENTIPEDE.headPoints); popup(s.x, s.y, C.CENTIPEDE.headPoints); }
+    else if (s.armored) { addScore(C.ARMOR.points); popup(s.x, s.y, C.ARMOR.points); }
     else addScore(C.CENTIPEDE.bodyPoints);
     // leave a mushroom behind — but only in the upper field
     // (the original creates it unconditionally, stacked mushrooms and all)
@@ -680,10 +731,19 @@
           continue outer;
         }
       }
-      // segments absorb the shot (PIERCE kills and keeps flying)
+      // segments absorb the shot (PIERCE kills and keeps flying).
+      // ARMOR (new): the first hit shatters the plate instead of killing.
       for (var sIdx = 0; sIdx < G.segments.length; sIdx++) {
         var seg = G.segments[sIdx];
         if (hit(b.x, b.y, bw, bh, seg.x, seg.y, C.CENTIPEDE.size, C.CENTIPEDE.size)) {
+          if (seg.armor > 0) {
+            seg.armor--;
+            Sound.play('bonus');
+            burst(seg.x, seg.y);
+            if (b.pierce) break;    // pierce strips the plate and keeps flying
+            G.bullets.splice(i, 1);
+            continue outer;
+          }
           if (b.pierce) {
             killSegment(sIdx);
             break;                  // indices shifted; next segment next frame
@@ -723,6 +783,18 @@
           hit(b.x, b.y, bw, bh, G.megaBoss.x, G.megaBoss.y, C.MEGABOSS.w * 0.8, C.MEGABOSS.h * 0.8)) {
         b.hitMegaBoss = true;
         damageMegaBoss(i);
+        if (!G.bullets[i] || G.bullets[i] !== b) continue outer;
+      }
+      if (G.splitter && !b.hitSplitter &&
+          hit(b.x, b.y, bw, bh, G.splitter.x, G.splitter.y, C.SPLITTER.w, C.SPLITTER.h)) {
+        b.hitSplitter = true;
+        damageSplitter(i);
+        if (!G.bullets[i] || G.bullets[i] !== b) continue outer;
+      }
+      if (G.ufo && !b.hitUfo &&
+          hit(b.x, b.y, bw, bh, G.ufo.x, G.ufo.y, C.UFO.w * 0.9, C.UFO.h * 0.9)) {
+        b.hitUfo = true;
+        damageUfo(i);
         if (!G.bullets[i] || G.bullets[i] !== b) continue outer;
       }
     }
@@ -899,6 +971,102 @@
     }
   }
 
+  /* ------------------------------------------- SPLITTER POD (NEW, lvl 3+) -- */
+  // A pink egg sac that drifts down the mushroom field, swaying. Killing it
+  // scores; killing it OR letting it reach the field bottom releases 2 fast
+  // diver segments (normal worm segments — normal scoring, normal threat).
+  function updateSplitter(dt) {
+    G.splitterTimer -= dt;
+    if (G.splitterTimer <= 0) {
+      G.splitterTimer = rnd(C.SPLITTER.spawnDelayMin, C.SPLITTER.spawnDelayMax);
+      if (!G.splitter && G.isPlaying && G.level >= C.SPLITTER.fromLevel) {
+        var x = Math.floor(rnd(2, HCELLS - 2)) * CELL;
+        G.splitter = { x: x, baseX: x, y: TOP + CELL / 2, swayPhase: 0,
+                       hp: C.SPLITTER.hp, pulseT: 0 };
+        Sound.play('flea');       // arrival cue (same family as the flea drop)
+      }
+    }
+    var sp = G.splitter;
+    if (!sp) return;
+    sp.pulseT += dt;
+    sp.swayPhase += (Math.PI * 2 / C.SPLITTER.swayPeriod) * dt;
+    sp.x = clamp(sp.baseX + C.SPLITTER.swayMag * Math.sin(sp.swayPhase),
+                 LEFT_WALL, RIGHT_WALL);
+    sp.y += C.SPLITTER.fallSpeed * dt;
+    if (sp.y >= FIELD_BOTTOM) {           // reached the band: hatches unpaid
+      splitterBurst(sp, false);
+      G.splitter = null;
+    }
+  }
+  function splitterBurst(sp, killed) {
+    // the actual split: 2 fast divers, one aimed each way
+    for (var i = 0; i < C.SPLITTER.childCount; i++) {
+      spawnDiverAt(sp.x + (i === 0 ? -CELL : CELL), sp.y, i === 0 ? -1 : 1);
+    }
+    explode(sp.x, sp.y);
+    burst(sp.x, sp.y);
+    Sound.play(killed ? 'bonus' : 'flea');
+  }
+  function damageSplitter(bulletIndex, dmg, noSplit) {
+    var sp = G.splitter;
+    Sound.play('bonus');
+    shake(C.SHAKE.mag);
+    explode(sp.x, sp.y);
+    sp.hp -= (dmg || 1);
+    if (sp.hp <= 0) {
+      addScore(C.SPLITTER.points);
+      popup(sp.x, sp.y, C.SPLITTER.points);
+      if (bulletIndex != null) G.bullets.splice(bulletIndex, 1);
+      Haptics.thud();
+      if (noSplit) {                      // BOMB vaporizes the eggs too
+        burst(sp.x, sp.y);
+      } else {
+        splitterBurst(sp, true);
+      }
+      G.splitter = null;
+    }
+  }
+
+  /* --------------------------------------------- UFO RAIDER (NEW, lvl 5+) -- */
+  // Rare bonus ship: crosses the very top of the screen and escapes if
+  // ignored. 3 hits for a big score. Never touches the player — pure skill
+  // shot, like the classic arcade saucer.
+  function updateUfo(dt) {
+    G.ufoTimer -= dt;
+    if (G.ufoTimer <= 0) {
+      G.ufoTimer = rnd(C.UFO.spawnDelayMin, C.UFO.spawnDelayMax);
+      if (!G.ufo && G.isPlaying && G.level >= C.UFO.fromLevel) {
+        var fromRight = Math.random() < 0.5;
+        G.ufo = { x: fromRight ? W + C.UFO.w : -C.UFO.w,
+                  baseY: C.UFO.y, y: C.UFO.y, bobPhase: 0,
+                  dir: fromRight ? -1 : 1, hp: C.UFO.hp };
+        Sound.play('flea');
+      }
+    }
+    var u = G.ufo;
+    if (!u) return;
+    u.bobPhase += (Math.PI * 2 / C.UFO.bobPeriod) * dt;
+    u.y = u.baseY + C.UFO.bobMag * Math.sin(u.bobPhase);
+    u.x += C.UFO.speed * u.dir * dt;
+    if (u.x < -C.UFO.w * 1.5 || u.x > W + C.UFO.w * 1.5) { G.ufo = null; return; }
+  }
+  function damageUfo(bulletIndex, dmg) {
+    var u = G.ufo;
+    Sound.play('bonus');
+    shake(C.SHAKE.mag);
+    explode(u.x, u.y);
+    u.hp -= (dmg || 1);
+    if (u.hp <= 0) {
+      addScore(C.UFO.points);
+      popup(u.x, u.y, C.UFO.points);
+      if (bulletIndex != null) G.bullets.splice(bulletIndex, 1);
+      burst(u.x, u.y);
+      Haptics.thud();
+      maybeDropPowerup('ufo', u.x, u.y);
+      G.ufo = null;
+    }
+  }
+
   /* --------------------------------------------------------- SPIDER BOSS -- */
   function updateSpiderBoss(dt) {
     G.spiderBossTimer -= dt;
@@ -1061,6 +1229,7 @@
     // clear every threat
     G.spider = null; G.flea = null; G.scorpion = null;
     G.spiderBoss = null; G.megaBoss = null;
+    G.splitter = null; G.ufo = null;
     G.enemyShots.length = 0;
     G.segments.length = 0;
     G.bullets.length = 0;
@@ -1136,6 +1305,8 @@
     updateSpider(dt);
     updateFlea(dt);
     updateScorpion(dt);
+    updateSplitter(dt);
+    updateUfo(dt);
     updateSpiderBoss(dt);
     updateMegaBoss(dt);
     updateEnemyShots(dt);
@@ -1200,6 +1371,32 @@
   /* =============================================================== RENDER == */
   var bgY = 0;
   var stars = [];
+
+  /* ---- daily theme background (30-day cycle, IRAN clock) ----
+   * sprites/themes30.json maps day -> full-screen 720x1280 background.
+   * Fetch fails / image missing → the original tiled background still
+   * draws, so the game never depends on the theme file. */
+  var themeBg = null;
+  var themeDim = null;
+  (function loadDailyTheme() {
+    var T = C.THEME;
+    if (!T || !T.configUrl || typeof fetch !== 'function') return;
+    var iranDay = Math.floor((Date.now() + 12600000) / 86400000); // UTC+3:30
+    fetch(T.configUrl + '?d=' + iranDay)          // re-fetch once per day, cache within it
+      .then(function (r) { return r.json(); })
+      .then(function (cfg) {
+        var list = (cfg && cfg.themes) || [];
+        if (!list.length) return;
+        var idx = ((iranDay - (T.anchorDay || 0)) % list.length + list.length) % list.length;
+        var t = list[idx];
+        if (!t || !t.bg) return;
+        var img = new Image();
+        img.onload = function () { themeBg = img; };
+        img.src = T.baseUrl + t.bg;
+        window.AstroThemeName = t.name || '';
+      })
+      .catch(function () {});
+  })();
   function seedStars() {
     stars.length = 0;
     for (var i = 0; i < C.STARS.count; i++) {
@@ -1209,6 +1406,30 @@
     }
   }
   seedStars();
+
+  /* ---- ship skin (shop): the equipped skin color from the loadout is
+   * composited onto the player sprite ONCE into an offscreen canvas
+   * (source-atop keeps the pixel-art alpha shape; per-frame ctx.filter
+   * would be slow and is broken on some WebKits). */
+  var _skinCanvas = null, _skinFor = '';
+  function tintedPlayerSprite() {
+    var LO = window.AstroLoadout || {};
+    var color = LO.skin_color;
+    if (!color) return null;                     // default skin → original art
+    if (_skinCanvas && _skinFor === color) return _skinCanvas;
+    var img = IMG[C.PLAYER.sprite];
+    if (!img || !img.complete || !img.naturalWidth) return null;
+    var cv = document.createElement('canvas');
+    cv.width = img.naturalWidth; cv.height = img.naturalHeight;
+    var c2 = cv.getContext('2d');
+    c2.drawImage(img, 0, 0);
+    c2.globalCompositeOperation = 'source-atop';
+    c2.globalAlpha = 0.55;
+    c2.fillStyle = color;
+    c2.fillRect(0, 0, cv.width, cv.height);
+    _skinCanvas = cv; _skinFor = color;
+    return cv;
+  }
 
   function drawSprite(name, x, y, w, h, angleDeg) {
     var img = IMG[name];
@@ -1257,14 +1478,27 @@
   function renderBackground() {
     ctx.fillStyle = '#000';
     ctx.fillRect(0, 0, W, H);
-    var img = IMG[C.BACKGROUND.tile];
-    if (img.complete && img.naturalWidth) {
-      ctx.globalAlpha = C.BACKGROUND.opacity;
-      var t = C.BACKGROUND.tileSize;
-      for (var y = bgY - t; y < H + t; y += t)
-        for (var x = -162; x < W; x += t)
-          ctx.drawImage(img, x, y, t, t);
-      ctx.globalAlpha = 1;
+    if (themeBg) {
+      // today's theme scene (already 720x1280 world size)
+      ctx.drawImage(themeBg, 0, 0, W, H);
+      // readability shade over the busy bottom band (player zone)
+      if (!themeDim) {
+        themeDim = ctx.createLinearGradient(0, C.THEME.dimFromY, 0, H);
+        themeDim.addColorStop(0, 'rgba(0,0,0,0)');
+        themeDim.addColorStop(1, 'rgba(0,0,0,' + C.THEME.dimAlpha + ')');
+      }
+      ctx.fillStyle = themeDim;
+      ctx.fillRect(0, C.THEME.dimFromY, W, H - C.THEME.dimFromY);
+    } else {
+      var img = IMG[C.BACKGROUND.tile];
+      if (img.complete && img.naturalWidth) {
+        ctx.globalAlpha = C.BACKGROUND.opacity;
+        var t = C.BACKGROUND.tileSize;
+        for (var y = bgY - t; y < H + t; y += t)
+          for (var x = -162; x < W; x += t)
+            ctx.drawImage(img, x, y, t, t);
+        ctx.globalAlpha = 1;
+      }
     }
     var starImg = IMG[C.STARS.sprite];
     for (var i = 0; i < stars.length; i++) {
@@ -1307,11 +1541,20 @@
       drawSprite(mu.poison ? C.MUSHROOMS.poisonSprite : C.MUSHROOMS.sprite,
                  mu.x, mu.y, C.MUSHROOMS.w, C.MUSHROOMS.h);
     }
-    // centipede
+    // centipede (armored segments wear a pulsing plate outline until hit)
     for (var s = 0; s < G.segments.length; s++) {
       var seg = G.segments[s];
       drawSprite(seg.head ? C.CENTIPEDE.headSprite : C.CENTIPEDE.bodySprite,
                  seg.x, seg.y, C.CENTIPEDE.size, C.CENTIPEDE.size);
+      if (seg.armor > 0) {
+        ctx.save();
+        ctx.strokeStyle = C.ARMOR.ringColor;
+        ctx.globalAlpha = 0.75 + 0.25 * Math.sin(G.time * 8);
+        ctx.lineWidth = 4;
+        var asz = C.CENTIPEDE.size + 6;
+        ctx.strokeRect(seg.x - asz / 2, seg.y - asz / 2, asz, asz);
+        ctx.restore();
+      }
     }
     // bugs
     if (G.scorpion) {
@@ -1329,6 +1572,31 @@
                  C.SPIDER.wobbleDeg * Math.sin(G.spider.wobblePhase));
     if (G.flea)
       drawSprite(C.FLEA.sprites[G.flea.frame], G.flea.x, G.flea.y, C.FLEA.w, C.FLEA.h);
+    // splitter pod: pulsing pink egg sac with a warning ring
+    if (G.splitter) {
+      var spl = G.splitter;
+      var pw = C.SPLITTER.w * (1 + C.SPLITTER.pulse * Math.sin(spl.pulseT * 5));
+      drawSprite(C.SPLITTER.sprite, spl.x, spl.y, pw, pw);
+      ctx.save();
+      ctx.strokeStyle = C.SPLITTER.ringColor;
+      ctx.globalAlpha = 0.45 + 0.3 * Math.sin(spl.pulseT * 5);
+      ctx.lineWidth = 3;
+      ctx.beginPath();
+      ctx.arc(spl.x, spl.y, pw / 2 + 7, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.restore();
+    }
+    // UFO raider: mirrored by travel direction, like the scorpion
+    if (G.ufo) {
+      var uf = G.ufo;
+      ctx.save();
+      ctx.translate(uf.x, uf.y);
+      if (uf.dir < 0) ctx.scale(-1, 1);
+      var ufImg = IMG[C.UFO.sprite];
+      if (ufImg && ufImg.complete && ufImg.naturalWidth)
+        ctx.drawImage(ufImg, -C.UFO.w / 2, -C.UFO.h / 2, C.UFO.w, C.UFO.h);
+      ctx.restore();
+    }
     if (G.spiderBoss) {
       drawSprite(C.SPIDERBOSS.sprite, G.spiderBoss.x, G.spiderBoss.y,
                  C.SPIDERBOSS.w, C.SPIDERBOSS.h);
@@ -1353,12 +1621,23 @@
       } else
         drawSprite(C.PINKBOMB.sprite, sh.x, sh.y, C.PINKBOMB.w, C.PINKBOMB.h);
     }
-    // powerup tokens (tinted circle + letter)
+    // powerup tokens (tinted circle + letter); coins draw the same way but
+    // smaller, gold-filled, with a faster excited pulse
     for (var pu2 = 0; pu2 < G.powerups.length; pu2++) {
       var tok = G.powerups[pu2];
-      var def = C.POWERUPS.types[tok.type];
-      var pulse = 1 + 0.08 * Math.sin(G.time * 6);
-      var ts = C.POWERUPS.size * pulse;
+      var isCoin = tok.type === 'coin';
+      var def = isCoin ? C.COINS : C.POWERUPS.types[tok.type];
+      var pulse = 1 + (isCoin ? 0.14 : 0.08) * Math.sin(G.time * (isCoin ? 9 : 6));
+      var ts = (isCoin ? C.POWERUPS.size * 0.8 : C.POWERUPS.size) * pulse;
+      if (isCoin) {
+        ctx.save();
+        ctx.fillStyle = def.color;
+        ctx.globalAlpha = 0.35;
+        ctx.beginPath();
+        ctx.arc(tok.x, tok.y, ts / 2, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.restore();
+      }
       drawSprite(C.POWERUPS.sprite, tok.x, tok.y, ts, ts);
       ctx.save();
       ctx.strokeStyle = def.color;
@@ -1367,14 +1646,21 @@
       ctx.arc(tok.x, tok.y, ts / 2 + 4, 0, Math.PI * 2);
       ctx.stroke();
       ctx.restore();
-      Font.draw(ctx, def.letter, tok.x, tok.y, C.POWERUPS.letterScale, 0, 'center', '#1e1140');
+      Font.draw(ctx, def.letter, tok.x, tok.y,
+                C.POWERUPS.letterScale * (isCoin ? 0.8 : 1), 0, 'center', '#1e1140');
     }
 
     // player (flickers during shield i-frames) + shield rings + bullets
     if (G.player.visible) {
       var invuln = G.time < G.player.invulnUntil;
-      if (!invuln || Math.floor(G.time * 12) % 2 === 0)
-        drawSprite(C.PLAYER.sprite, G.player.x, G.player.y, C.PLAYER.w, C.PLAYER.h);
+      if (!invuln || Math.floor(G.time * 12) % 2 === 0) {
+        var skinCv = tintedPlayerSprite();
+        if (skinCv)
+          ctx.drawImage(skinCv, G.player.x - C.PLAYER.w / 2, G.player.y - C.PLAYER.h / 2,
+                        C.PLAYER.w, C.PLAYER.h);
+        else
+          drawSprite(C.PLAYER.sprite, G.player.x, G.player.y, C.PLAYER.w, C.PLAYER.h);
+      }
       for (var sr = 0; sr < G.player.shields; sr++) {
         ctx.save();
         ctx.strokeStyle = C.POWERUPS.types.shield.color;
@@ -1518,11 +1804,14 @@
     setPaused: function (p) { paused = !!p; },
     setMuted: function (m) { Sound.setMuted(!!m); },
     state: function () {
-      return G ? { score: G.score, level: G.level, state: G.state,
-                   segments: G.segments.length, mushrooms: G.mushrooms.length,
-                   shields: G.player ? G.player.shields : 0,
-                   powerups: G.powerups.length }
-               : { screen: 'title' };
+      if (!G) return { screen: 'title' };
+      var armored = 0;
+      for (var i = 0; i < G.segments.length; i++) if (G.segments[i].armor > 0) armored++;
+      return { score: G.score, level: G.level, state: G.state,
+               segments: G.segments.length, mushrooms: G.mushrooms.length,
+               shields: G.player ? G.player.shields : 0,
+               powerups: G.powerups.length, coins: G.coins, lives: G.lives,
+               armored: armored, splitter: !!G.splitter, ufo: !!G.ufo };
     },
   };
 

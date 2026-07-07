@@ -44,6 +44,12 @@ class ArcadeSubmitRequest(BaseModel):
         max_length=64,
         description="Single-use token from /api/arcade/round-start (required for rewards)"
     )
+    coins: int = Field(
+        default=0,
+        ge=0,
+        le=50,
+        description="Arcade coins collected this run (server re-caps to ARCADE_COINS max_per_run)"
+    )
 
     @field_validator('display_name')
     @classmethod

@@ -139,7 +139,9 @@ export function couponLabel(c, tt, lang) {
     return lang === 'fa' ? `پلن ${faNum(n, lang)} گیگ رایگان` : `Free ${n}GB plan`;
   }
   if (c.coupon_type === 'free_autorenew') return tt('couponFreeAutorenew');
-  if (c.coupon_type === 'vip_pack') return tt('couponVipPack');
-  if (c.coupon_type === 'legend_pack') return tt('couponLegendPack');
+  if (c.coupon_type === 'vip_days') {
+    const d = Number(p.days || 30);
+    return lang === 'fa' ? `${faNum(d, lang)} روز VIP رایگان` : `${d} days of free VIP`;
+  }
   return c.coupon_type;
 }

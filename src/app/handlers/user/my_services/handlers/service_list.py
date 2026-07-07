@@ -44,7 +44,7 @@ async def _show_services_list(target, session: AsyncSession):
         text = (
             "شما هیچ سرویس فعالی ندارید. برای خرید سرویس، دکمه <b>💳 خرید سرویس</b> را از منوی اصلی انتخاب کنید."
             if lang == "fa"
-            else "You have no active services. To buy one, tap <b>Buy Service 💳</b> in the main menu."
+            else "You have no active services. To buy one, tap <b>💳 Buy Service</b> in the main menu."
         )
         if isinstance(target, CallbackQuery):
             await target.message.edit_text(text, parse_mode="HTML")

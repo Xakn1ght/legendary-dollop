@@ -158,8 +158,15 @@
   --brand-soft: rgba(251, 191, 36, 0.14);
   --brand-glow: rgba(251, 191, 36, 0.32);
 }
-/* Unlocked-only accents (Star Season vip_pack / legend_pack) — kept clearly
+/* Unlocked-only accents (Star Season 40★/50★ milestone cosmetics) — kept clearly
    distinct from amber (yellow) and violet (soft purple). */
+[data-accent="vip"] {                 /* VIP platinum — icy silver-blue */
+  --brand:      #c9d6e8;
+  --brandDark:  #93a9c4;
+  --brandRgb:   201, 214, 232;
+  --brand-soft: rgba(201, 214, 232, 0.14);
+  --brand-glow: rgba(201, 214, 232, 0.32);
+}
 [data-accent="champion"] {            /* deep metallic gold */
   --brand:      #e8a300;
   --brandDark:  #a87400;

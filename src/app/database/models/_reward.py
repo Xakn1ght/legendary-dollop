@@ -146,6 +146,30 @@ class ArcadeFlag(Base):
     user = relationship("User")
 
 
+class ArcadeWallet(Base):
+    """Arcade-only coin wallet + shop inventory (2026-07-07).
+
+    Coins are minted ONLY by the validated daily run (server-capped per run)
+    and spent on skins / permanent powers / an extra starting life / a
+    daily-run retry. They can never convert to credit, stars or traffic —
+    the arcade economy stays sealed off from money.
+    """
+    __tablename__ = "arcade_wallets"
+
+    id = Column(Integer, primary_key=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False, unique=True)
+    coins = Column(Integer, default=0, nullable=False)
+    equipped_skin = Column(String(24), default="default", nullable=False)
+    owned_skins = Column(Text, default="[]", nullable=False)    # JSON list of skin keys
+    owned_powers = Column(Text, default="[]", nullable=False)   # JSON list of power keys
+    extra_lives = Column(Integer, default=0, nullable=False)    # permanent +N starting lives
+    coins_earned_total = Column(Integer, default=0, nullable=False)  # lifetime, for analytics
+    created_at = Column(DateTime, default=datetime.datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.datetime.utcnow, onupdate=datetime.datetime.utcnow)
+
+    user = relationship("User")
+
+
 class UserAnalytics(Base):
     """Daily user behavior analytics."""
     __tablename__ = "user_analytics"

@@ -71,10 +71,11 @@ export function useReceipt({ busy, getT }) {
     const t = getT();
     const file = event.target.files[0];
     if (!file) return;
-    const allowedTypes = ['image/jpeg', 'image/png', 'image/jpg'];
-    const allowedExtensions = /\.(jpg|jpeg|png)$/i;
-    if (!allowedTypes.includes(file.type) && !allowedExtensions.test(file.name)) {
-      showToast('فقط فایل‌های JPG و PNG مجاز است');
+    // Any image is fine: canvas compression re-encodes to JPEG below, and the
+    // server re-encodes again (image_security). Only reject clear non-images.
+    const looksImage = (file.type || '').startsWith('image/') || /\.(jpg|jpeg|png|webp|heic|heif)$/i.test(file.name);
+    if (!looksImage) {
+      showToast('فقط فایل تصویر مجاز است');
       try { event.target.value = ''; } catch (_) { /* ignore */ }
       return;
     }
@@ -127,5 +128,14 @@ export function useReceipt({ busy, getT }) {
     if (objectUrlRef.current) { try { URL.revokeObjectURL(objectUrlRef.current); } catch (_) { /* ignore */ } }
   }, []);
 
-  return { receiptFile, previewSrc, handleSelect, getBase64ForSubmit, cleanup };
+  // Wrong photo picked → wipe selection so the user can retake/reselect.
+  const clear = useCallback(() => {
+    if (objectUrlRef.current) { try { URL.revokeObjectURL(objectUrlRef.current); } catch (_) { /* ignore */ } }
+    objectUrlRef.current = null;
+    base64Ref.current = null;
+    setReceiptFile(null);
+    setPreviewSrc('');
+  }, []);
+
+  return { receiptFile, previewSrc, handleSelect, getBase64ForSubmit, cleanup, clear };
 }

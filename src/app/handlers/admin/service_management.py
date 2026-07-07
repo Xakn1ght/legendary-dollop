@@ -51,7 +51,7 @@ async def service_management_menu(message: Message, session: AsyncSession):
     # Get Marzban sync status
     marzban_status = "🟢 متصل"
     try:
-        marzban_users = await marzban_api.get_users(limit=1)
+        marzban_users = await marzban_api.get_all_users(limit=1)
     except:
         marzban_status = "🔴 قطع"
 
@@ -189,7 +189,7 @@ async def service_details(callback: CallbackQuery, session: AsyncSession):
     marzban_info = ""
     if service.status == 'active' and service.marzban_username:
         try:
-            marzban_user = await marzban_api.get_user(service.marzban_username)
+            marzban_user = await marzban_api.get_user_info(service.marzban_username)
             if marzban_user:
                 used_gb = marzban_user.get('used_traffic', 0) / (1024**3)  # Convert to GB
                 total_gb = marzban_user.get('data_limit', 0) / (1024**3) if marzban_user.get('data_limit') else 0
@@ -215,8 +215,9 @@ async def service_details(callback: CallbackQuery, session: AsyncSession):
         f"💰 قیمت: `{service.price:,}` تومان\n"
         f"📦 پلن: {service.plan_name or 'نامشخص'}\n"
         f"📅 ایجاد: {created_date}\n"
-        f"🔄 وضعیت: {status_emoji} {service.status}\n"
-        f"💡 شناسه درخواست: {service.charge_request_id or 'ندارد'}"
+        f"🔄 وضعیت: {status_emoji} {service.status}"
+        # (removed `service.charge_request_id` — no such column on Subscription;
+        #  it raised AttributeError on every tap outside the try/except — audit fix)
         f"{marzban_info}"
     )
 
@@ -350,7 +351,7 @@ async def sync_marzban(callback: CallbackQuery, session: AsyncSession):
     
     try:
         # Get all users from Marzban
-        marzban_users = await marzban_api.get_users()
+        marzban_users = await marzban_api.get_all_users()
         
         # Get all active subscriptions
         active_subs = await session.execute(
@@ -451,25 +452,43 @@ async def confirm_bulk_approve(callback: CallbackQuery, session: AsyncSession):
         return
 
     await callback.answer("در حال تایید گروهی...")
-    
+
+    # CRITICAL (audit fix): the old code flipped every pending sub to 'active'
+    # with a raw UPDATE — no Marzban user, no link DM, no reward grants. Those
+    # became ghosts (active in DB, absent from the panel). Route each order
+    # through the real provisioning flow, exactly like the single-receipt
+    # approve, using the USER bot for the link DM.
     try:
-        # Update all pending to active
+        from app.services.subscription_processing import process_approved_subscription
+        from app.utils.admin_bot_helper import get_user_bot
+
         result = await session.execute(
-            update(Subscription)
-            .filter(Subscription.status == 'pending')
-            .values(status='active')
+            select(Subscription.id).filter(Subscription.status == 'pending')
         )
-        await session.commit()
-        
-        approved_count = result.rowcount
-        
-        await callback.message.edit_text(
+        pending_ids = [row[0] for row in result.all()]
+        user_bot = get_user_bot()
+
+        approved_count = 0
+        failed_count = 0
+        for sub_id in pending_ids:
+            try:
+                ok = await process_approved_subscription(sub_id, session, user_bot)
+                if ok:
+                    approved_count += 1
+                else:
+                    failed_count += 1
+            except Exception:
+                failed_count += 1
+
+        summary = (
             f"✅ **تایید گروهی کامل شد**\n\n"
-            f"تعداد سرویس‌های تایید شده: `{approved_count}`\n\n"
-            "همه سرویس‌های در انتظار به حالت فعال تغییر یافتند.",
-            parse_mode='Markdown'
+            f"تایید و فعال‌سازی شده: `{approved_count}`\n"
         )
-        
+        if failed_count:
+            summary += f"ناموفق (نیاز به بررسی دستی): `{failed_count}`\n"
+        summary += "\nهر سرویس در پنل ساخته شد و لینک برای کاربر ارسال شد."
+        await callback.message.edit_text(summary, parse_mode='Markdown')
+
     except Exception as e:
         await callback.message.edit_text(
             f"❌ خطا در تایید گروهی:\n`{str(e)}`",

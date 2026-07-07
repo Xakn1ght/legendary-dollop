@@ -12,6 +12,7 @@ from app.api.routes.admin_ws.broadcasts import (
     broadcast_admin_event,
     broadcast_ticket_list_update,
     broadcast_ticket_update,
+    broadcast_typing,
     broadcast_user_ticket_list_update,
 )
 from app.api.routes.admin_ws.presence import (
@@ -24,6 +25,7 @@ __all__ = [
     "broadcast_admin_event",
     "broadcast_ticket_list_update",
     "broadcast_ticket_update",
+    "broadcast_typing",
     "broadcast_user_ticket_list_update",
     "handle_admin_support_ws",
     "handle_user_support_ws",

@@ -45,6 +45,12 @@ async def handle_admin_approve_charge(request: web.Request):
             except Exception:
                 pass
 
+            from app.services.audit import record_audit
+
+            await record_audit(
+                request, "charge.approve", target_type="charge", target_id=charge_id,
+                summary="approved charge request",
+            )
             return web.json_response({"ok": True, "message": "approved"})
     except Exception:
         import traceback

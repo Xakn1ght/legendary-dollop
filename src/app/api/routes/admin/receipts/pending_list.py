@@ -18,6 +18,11 @@ async def handle_admin_pending_receipts(request: web.Request):
             pending_subs = result.scalars().all()
             
             for sub in pending_subs:
+                # Init before the try so the except-fallback and later code never
+                # read an unbound name or a previous iteration's stale values
+                # (audit fix: mis-attributed user/price, or a whole-list 500).
+                user = None
+                plan_info = {}
                 try:
                     # Get user info
                     user = await session.get(User, sub.user_id)

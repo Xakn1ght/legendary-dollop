@@ -1,16 +1,12 @@
 import sqlalchemy
 
+from ._audit import AdminAuditLog
 from ._base import AsyncSessionLocal, Base, engine
 from ._referral import Referral, ReferralReward
-from ._season import (
-    RewardCoupon,
-    StarMilestoneClaim,
-    StarSeason,
-    UserStarProgress,
-)
 from ._reward import (
     Achievement,
     ArcadeFlag,
+    ArcadeWallet,
     Challenge,
     DailyGamePlay,
     DailyStarCap,
@@ -27,6 +23,12 @@ from ._reward import (
     UserDiscount,
     UserGift,
     UserStarRewardClaim,
+)
+from ._season import (
+    RewardCoupon,
+    StarMilestoneClaim,
+    StarSeason,
+    UserStarProgress,
 )
 from ._subscription import (
     CashoutRequest,
@@ -45,6 +47,7 @@ __all__ = [
     "engine",
     "AsyncSessionLocal",
     "init_db",
+    "AdminAuditLog",
     "User",
     "Subscription",
     "Receipt",
@@ -62,6 +65,7 @@ __all__ = [
     "UserChallenge",
     "RewardHistory",
     "ArcadeFlag",
+    "ArcadeWallet",
     "DailyGamePlay",
     "UserAnalytics",
     "RewardEffectiveness",

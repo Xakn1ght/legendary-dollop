@@ -1,0 +1,66 @@
+"""Marzban node watchdog.
+
+Every run fetches the node list; when a node's connectivity flips (connected →
+down or back), DMs every admin via the user bot. Last-known states are kept in
+a small JSON file so restarts don't re-alert unchanged outages.
+"""
+import json
+
+from app.core.paths import data_path
+from app.services.marzban import marzban_api
+from app.shared.admin_access import ADMIN_IDS
+from app.utils.logger import bot_logger
+
+_STATE_FILE = data_path("node_watch.json")
+_OK_STATUSES = {"connected", "healthy"}
+
+
+def _load_state() -> dict:
+    try:
+        with open(_STATE_FILE, encoding="utf-8") as f:
+            return json.load(f) or {}
+    except Exception:
+        return {}
+
+
+def _save_state(state: dict) -> None:
+    try:
+        with open(_STATE_FILE, "w", encoding="utf-8") as f:
+            json.dump(state, f, ensure_ascii=False)
+    except Exception as e:
+        bot_logger.warning(f"[NODES] could not persist watch state: {e}")
+
+
+async def node_watch_job(bot) -> None:
+    nodes = await marzban_api.get_nodes()
+    if not isinstance(nodes, list) or not nodes:
+        return  # unreachable panel is alerted through its own health checks
+
+    prev = _load_state()
+    state: dict = {}
+    changes: list[str] = []
+    for n in nodes:
+        name = str(n.get("name") or f"node-{n.get('id')}")
+        status = str(n.get("status") or "unknown").lower()
+        up = status in _OK_STATUSES
+        state[name] = "up" if up else "down"
+        was = prev.get(name)
+        if was is not None and was != state[name]:
+            if up:
+                changes.append(f"✅ نود «{name}» دوباره وصل شد.")
+            else:
+                changes.append(f"🔴 نود «{name}» از دسترس خارج شد! (status: {status})")
+        elif was is None and not up:
+            changes.append(f"🔴 نود «{name}» down است (status: {status}).")
+
+    _save_state(state)
+    if not changes:
+        return
+
+    text = "🛰 <b>وضعیت نودهای Marzban</b>\n\n" + "\n".join(changes)
+    for admin_id in ADMIN_IDS:
+        try:
+            await bot.send_message(admin_id, text, parse_mode="HTML")
+        except Exception:
+            pass
+    bot_logger.info(f"[NODES] status change alert sent: {changes}")

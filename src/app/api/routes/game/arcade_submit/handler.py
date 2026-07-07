@@ -1,14 +1,13 @@
-from datetime import date, datetime
-
 from aiohttp import web
 
 from app.api.deps import _verify_webapp_auth
 from app.api.routes.game.common import logger
 from app.api.routes.game.round_start import consume_round_token
 from app.api.schemas import ArcadeSubmitRequest, validate_request
-from app.core.settings import GAME_REWARDS
+from app.core.settings import ARCADE_COINS, GAME_REWARDS
 from app.database import crud
 from app.database.models import AsyncSessionLocal
+from app.utils.tehran_time import tehran_today
 
 
 async def handle_arcade_submit(request: web.Request):
@@ -28,6 +27,7 @@ async def handle_arcade_submit(request: web.Request):
     is_practice = validated.practice
     display_name = validated.display_name or ""
     round_token = validated.round_token or ""
+    coins_reported = validated.coins or 0
 
     user_chat_id, _new_session_token = _verify_webapp_auth(request)
     if not user_chat_id:
@@ -51,7 +51,7 @@ async def handle_arcade_submit(request: web.Request):
             )
             return web.json_response({"ok": True, "practice": True, "score": score, "message": "Practice mode - no rewards"})
 
-        today = date.today()
+        today = tehran_today()  # arcade days roll over at IRAN midnight
         existing_play = await crud.check_daily_game_play(session, user.id, today)
 
         if existing_play and existing_play.rewarded:
@@ -157,7 +157,7 @@ async def handle_arcade_submit(request: web.Request):
         pieces_per_star = GAME_REWARDS.get("pieces_per_star", 10)
         monthly_cap = GAME_REWARDS.get("monthly_star_cap", 6)
 
-        current_month = datetime.utcnow().replace(day=1).date()
+        current_month = tehran_today().replace(day=1)
         if user.arcade_stars_month_reset is None or user.arcade_stars_month_reset < current_month:
             user.arcade_stars_this_month = 0
             user.arcade_stars_month_reset = current_month
@@ -183,6 +183,11 @@ async def handle_arcade_submit(request: web.Request):
                         reason="arcade_game",
                         notes=f"Converted {stars_can_award * pieces_per_star} pieces to {stars_can_award} stars",
                     )
+
+        # Arcade coins: only the validated run mints them, hard-capped per
+        # run server-side. Coins are arcade-only — never money-adjacent.
+        coins_award = min(coins_reported, int(ARCADE_COINS.get("max_per_run", 3)))
+        coin_balance = await crud.award_arcade_coins(session, user.id, coins_award)
 
         user.credit += credits
         user.experience_points += xp
@@ -233,6 +238,8 @@ async def handle_arcade_submit(request: web.Request):
                     "stars_converted": stars_awarded,
                     "total_pieces": user.star_pieces,
                     "loyalty_points": loyalty_points,
+                    "coins": coins_award,
+                    "coin_balance": coin_balance,
                 },
                 "monthly_stars": {
                     "earned": user.arcade_stars_this_month,

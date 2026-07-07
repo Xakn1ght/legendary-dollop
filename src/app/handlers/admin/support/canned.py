@@ -7,6 +7,7 @@ from app.core.settings import CANNED_RESPONSES
 from app.database import crud
 from app.database.crud import get_user_by_id
 from app.handlers.admin.common import ADMIN_IDS
+from app.utils.admin_bot_helper import get_user_bot
 from app.utils.bot_i18n import t
 
 from .common import _lang_for_tg_user, router, safe_edit_message
@@ -92,7 +93,8 @@ async def admin_canned_send(callback: CallbackQuery, session: AsyncSession):
     tkt = await crud.get_ticket_by_id(session, ticket_id)
     user = await get_user_by_id(session, tkt.user_id)
     try:
-        await callback.bot.send_message(
+        # DM the user via the USER bot (this handler runs on the admin bot)
+        await (get_user_bot() or callback.bot).send_message(
             user.chat_id, f"پاسخ ادمین به تیکت #{tkt.id}:\n{body}"
         )
     except Exception:

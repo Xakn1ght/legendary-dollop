@@ -22,7 +22,9 @@ async def handle_dashboard_referral_rewards(request: web.Request):
                 is_vip = await crud.is_user_vip(session, user.id)
             except Exception:
                 is_vip = False
-            auto_claim_enabled = bool((prefs or {}).get("auto_claim")) and is_vip
+            # Auto-claimer removed 2026-07 (owner decision) — vouchers are always
+            # redeemed manually. Plumbing kept dead-simple-off.
+            auto_claim_enabled = False
 
             auto_redeemed_ids: list[int] = []
             if auto_claim_enabled:

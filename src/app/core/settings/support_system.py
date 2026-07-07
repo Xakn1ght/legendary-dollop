@@ -65,6 +65,8 @@ JOB_SCHEDULES = {
     # Re-check pooled bank-SMS deposits vs pending orders (SMS-before-receipt case).
     # Inert unless SMS auto-approval is armed; cheap when there's nothing pooled.
     "sms_sweep_job": {"type": "interval", "seconds": 60, "max_instances": 1, "coalesce": True},
+    # Marzban node watchdog: DMs admins when a node goes down / comes back.
+    "node_watch_job": {"type": "interval", "minutes": 5, "max_instances": 1, "coalesce": True},
 }
 
 _job_schedules_path = str(CORE_DIR / "job_schedules.json")

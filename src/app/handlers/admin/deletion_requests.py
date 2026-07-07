@@ -10,6 +10,7 @@ from app.database import crud
 from app.database.models import PendingDeletionRequest, Subscription, User
 from app.handlers.admin.common import ADMIN_IDS
 from app.services.marzban import marzban_api
+from app.utils.admin_bot_helper import get_user_bot
 from app.utils.logger import bot_logger, log_error
 
 router = Router()
@@ -114,7 +115,7 @@ async def approve_deletion_request(callback: CallbackQuery, session: AsyncSessio
         user_info = await session.get(User, deletion_request.user_id)
         if user_info and user_info.chat_id:
             try:
-                await callback.bot.send_message(
+                await (get_user_bot() or callback.bot).send_message(
                     user_info.chat_id,
                     f"✅ درخواست حذف سرویس {subscription.marzban_username} تایید و حذف شد."
                 )
@@ -158,7 +159,7 @@ async def deny_deletion_request(callback: CallbackQuery, session: AsyncSession):
         user_info = await session.get(User, deletion_request.user_id)
         if user_info and user_info.chat_id:
             try:
-                await callback.bot.send_message(
+                await (get_user_bot() or callback.bot).send_message(
                     user_info.chat_id,
                     f"❌ درخواست حذف سرویس {deletion_request.subscription_username} رد شد."
                 )

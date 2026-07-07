@@ -10,6 +10,7 @@ from app.database.cached_crud import create_user_cached, get_user_with_cache
 from app.keyboards.reply import get_main_keyboard
 from app.utils.bot_i18n import guess_lang_from_telegram, normalize_lang, set_cached_lang
 from app.utils.logger import handle_errors
+from app.utils.premium_emoji import answer_premium
 
 from .common import ReferralStates, router
 
@@ -69,7 +70,7 @@ async def cmd_start(message: Message, state: FSMContext, session: AsyncSession, 
 			"🌐 Please select your language:"
 		)
 		
-		await message.answer(lang_msg, reply_markup=lang_keyboard, parse_mode=ParseMode.HTML)
+		await answer_premium(message, lang_msg, reply_markup=lang_keyboard)
 		return
 
 	else:
@@ -210,8 +211,8 @@ async def cmd_start(message: Message, state: FSMContext, session: AsyncSession, 
 	# Check if user is admin for keyboard
 	is_admin = user.is_admin if user else False
 	
-	await message.answer(
+	await answer_premium(
+		message,
 		welcome_message,
 		reply_markup=get_main_keyboard(message.chat.id, is_admin=is_admin, lang=lang),
-		parse_mode=ParseMode.HTML,
 	)

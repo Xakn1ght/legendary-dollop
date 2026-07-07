@@ -13,9 +13,16 @@ async def handle_admin_subscription_extend(request: web.Request):
         data = await request.json()
     except Exception:
         return web.json_response({"ok": False, "error": "invalid_json"}, status=400)
-    
-    days = int(data.get('days', 0))
-    traffic_gb = int(data.get('traffic_gb', 0))
+    if not isinstance(data, dict):
+        return web.json_response({"ok": False, "error": "invalid_payload"}, status=400)
+
+    # int() on unvalidated body (e.g. {"days": "abc"} or a JSON array) raised an
+    # uncaught ValueError/TypeError → raw 500 (audit fix).
+    try:
+        days = int(data.get('days', 0) or 0)
+        traffic_gb = int(data.get('traffic_gb', 0) or 0)
+    except (ValueError, TypeError):
+        return web.json_response({"ok": False, "error": "invalid_values"}, status=400)
     traffic_mode = str(data.get('traffic_mode', 'add')).lower()
     days_mode = str(data.get('days_mode', 'add')).lower()
     expire_at_raw = data.get('expire_at')  # epoch seconds or ISO string from UI
@@ -23,7 +30,7 @@ async def handle_admin_subscription_extend(request: web.Request):
     if days < 0 or traffic_gb < 0:
         return web.json_response({"ok": False, "error": "invalid_values"}, status=400)
     
-    if traffic_mode not in ('add', 'set') or days_mode not in ('add', 'set'):
+    if traffic_mode not in ('add', 'set', 'reset') or days_mode not in ('add', 'set'):
         return web.json_response({"ok": False, "error": "invalid_mode"}, status=400)
     
     try:
@@ -62,14 +69,22 @@ async def handle_admin_subscription_extend(request: web.Request):
             new_expire_dt = base_dt + timedelta(days=days)
             update_data['expire'] = int(new_expire_dt.timestamp())
         
-        # Traffic handling: add vs set (convert GB to bytes)
-        if traffic_gb > 0 or (traffic_mode == 'set' and traffic_gb >= 0):
+        # Traffic handling: add / set (convert GB to bytes) / reset (usage → 0).
+        # 'reset' zeroes used traffic via Marzban's POST /reset while keeping the
+        # current limit + expire (or the new expire computed above).
+        if traffic_mode == 'reset':
+            reset_expire = update_data.get('expire', current_expire or 0)
+            success = await marzban_api.reset_user_traffic_bytes(username, int(current_limit or 0), int(reset_expire or 0))
+            if not success:
+                return web.json_response({"ok": False, "error": "marzban_update_failed"}, status=500)
+            update_data.pop('expire', None)  # already applied inside the reset call
+        elif traffic_gb > 0 or (traffic_mode == 'set' and traffic_gb >= 0):
             if traffic_mode == 'set':
                 new_limit = traffic_gb * 1024**3
             else:
                 new_limit = current_limit + (traffic_gb * 1024**3)
             update_data['data_limit'] = new_limit
-        
+
         if update_data:
             success = await marzban_api.update_user(username, update_data)
             if not success:
@@ -117,9 +132,15 @@ async def handle_admin_subscription_extend(request: web.Request):
                             except Exception:
                                 pass
         
-        if not update_data:
+        if not update_data and traffic_mode != 'reset':
             return web.json_response({"ok": True, "message": "no_changes"})
-        
+
+        from app.services.audit import record_audit
+
+        await record_audit(
+            request, "subscription.extend", target_type="subscription", target_id=username,
+            summary=f"+{days}d +{traffic_gb}GB mode={traffic_mode}",
+        )
         return web.json_response({"ok": True, "message": "extended"})
     except Exception as e:
         import traceback

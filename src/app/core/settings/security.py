@@ -47,6 +47,48 @@ TRUST_PROXY_HEADERS = os.environ.get("TRUST_PROXY_HEADERS", "false").lower() == 
 # Admin IP whitelist storage (used by admin-only access control)
 ADMIN_IP_WHITELIST_PATH = data_path("admin_ip_whitelist.json")
 
+# ===========================================
+# ADMIN SURFACE HOST GATE
+# ===========================================
+# The whole aiohttp process serves every vhost (arcade game1.*, dashboard dash.*).
+# Without a gate, /admin and /api/admin answer on ALL of them — so a user who
+# knows the public game domain can find the admin login there. We restrict the
+# admin surface to a dedicated host; everywhere else it 404s as if it never
+# existed. Derives its default from the dashboard URL's host so a normal deploy
+# needs no extra config; override with a comma list via ADMIN_ALLOWED_HOSTS.
+def _default_admin_hosts() -> str:
+    try:
+        from urllib.parse import urlparse
+
+        from app.core.settings.web_game import DASHBOARD_PUBLIC_BASE_URL
+
+        host = urlparse(DASHBOARD_PUBLIC_BASE_URL).hostname or ""
+    except Exception:
+        host = ""
+    return host or "dash.astrobytech.com"
+
+
+_admin_hosts_raw = os.environ.get("ADMIN_ALLOWED_HOSTS", "") or _default_admin_hosts()
+# Loopback always allowed so internal health probes / local tooling keep working.
+ADMIN_ALLOWED_HOSTS = {
+    h.strip().lower()
+    for h in (_admin_hosts_raw.split(",") + ["127.0.0.1", "localhost"])
+    if h.strip()
+}
+
+
+def is_admin_host_allowed(host_header: str) -> bool:
+    """True if the request's Host may reach the admin surface. Host-only match
+    (port stripped); loopback with any port is allowed for internal access."""
+    if not ADMIN_ALLOWED_HOSTS:
+        return True  # unset → don't lock anyone out (fail-open on misconfig)
+    host = (host_header or "").split(":")[0].strip().lower()
+    if not host:
+        return False
+    if host in ADMIN_ALLOWED_HOSTS:
+        return True
+    return host in {"127.0.0.1", "localhost", "::1"}
+
 
 def is_sha256_hash(hash_string: str) -> bool:
     """Check if a hash is SHA-256 format (64 hex characters)"""

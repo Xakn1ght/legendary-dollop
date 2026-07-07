@@ -1,3 +1,5 @@
+from sqlalchemy import String, cast
+
 from ..common import *  # noqa: F403
 
 
@@ -29,9 +31,9 @@ async def handle_admin_users(request: web.Request):
             stmt = select(User)
             if search:
                 stmt = stmt.where(
-                    (User.username.ilike(f"%{search}%")) | 
+                    (User.username.ilike(f"%{search}%")) |
                     (User.full_name.ilike(f"%{search}%")) |
-                    (User.chat_id.ilike(f"%{search}%"))
+                    (cast(User.chat_id, String).ilike(f"%{search}%"))
                 )
             
             total_count = await session.scalar(select(func.count()).select_from(stmt.subquery()))

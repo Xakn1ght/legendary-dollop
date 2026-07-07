@@ -128,6 +128,12 @@ check_daily_game_play = RewardRepository.check_daily_game_play
 save_game_play = RewardRepository.save_game_play
 get_monthly_arcade_ranking = RewardRepository.get_monthly_arcade_ranking
 add_arcade_flag = RewardRepository.add_arcade_flag
+get_or_create_arcade_wallet = RewardRepository.get_or_create_arcade_wallet
+award_arcade_coins = RewardRepository.award_arcade_coins
+arcade_wallet_public = RewardRepository.wallet_public
+arcade_buy = RewardRepository.arcade_buy
+arcade_equip = RewardRepository.arcade_equip
+arcade_retry = RewardRepository.arcade_retry
 get_active_challenges = RewardRepository.get_active_challenges
 get_user_challenge_progress = RewardRepository.get_user_challenge_progress
 update_challenge_progress = RewardRepository.update_challenge_progress
@@ -181,13 +187,14 @@ get_star_reward_tier_by_threshold = _get_star_reward_tier_by_threshold
 async def _get_game_leaderboard(db, period="daily", limit=10):
     # This was specific to DailyGamePlay in original crud
     # Re-implementing briefly here or in AnalyticsRepository
-    from datetime import datetime, timedelta
+    from datetime import timedelta
 
     from sqlalchemy import select
 
     from app.database.models import DailyGamePlay, User
-    
-    now = datetime.utcnow()
+    from app.utils.tehran_time import tehran_now
+
+    now = tehran_now()  # daily/weekly boards roll over at IRAN midnight
     start_play_date = None
 
     if period == "daily":

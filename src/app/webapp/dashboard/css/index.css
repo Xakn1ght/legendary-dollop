@@ -394,13 +394,15 @@
       );
       border-radius:inherit;
     }
-    .vpn-card:hover{
-      transform:translateY(-2px);
-      box-shadow:
-        0 28px 72px rgba(0,0,0,0.78),
-        0 0 0 1px rgba(var(--brandRgb),0.32),
-        0 0 60px rgba(var(--brandRgb),0.12),
-        inset 0 1px 0 rgba(255,255,255,0.10);
+    @media (hover: hover) and (pointer: fine){
+      .vpn-card:hover{
+        transform:translateY(-2px);
+        box-shadow:
+          0 28px 72px rgba(0,0,0,0.78),
+          0 0 0 1px rgba(var(--brandRgb),0.32),
+          0 0 60px rgba(var(--brandRgb),0.12),
+          inset 0 1px 0 rgba(255,255,255,0.10);
+      }
     }
 
     /* one blur on the wrapper instead of one per blob */
@@ -2484,3 +2486,24 @@
     [data-theme="light"] .content.loading .card::after {
       background: linear-gradient(90deg, transparent, rgba(255,255,255,0.35), transparent);
     }
+
+/* ── Add to Orbit (Android-only chip under the status ring) ── */
+.orbit-add-chip {
+  display: inline-flex; align-items: center; gap: 7px;
+  margin: 10px auto 0; padding: 9px 16px;
+  border-radius: 999px; border: 1px solid rgba(var(--brandRgb), 0.4);
+  background: rgba(var(--brandRgb), 0.13);
+  color: var(--lightText, #fff); font-size: 12.5px; font-weight: 800;
+  cursor: pointer;
+}
+.orbit-add-chip:active { opacity: 0.75; }
+.orbit-add-chip:disabled { opacity: 0.55; }
+.orbit-add-chip svg { color: var(--brand); }
+.orbit-chip-spin {
+  width: 13px; height: 13px; border-radius: 50%;
+  border: 2px solid rgba(255,255,255,0.25); border-top-color: var(--brand);
+  animation: orbitSpin 0.8s linear infinite;
+}
+@keyframes orbitSpin { to { transform: rotate(360deg); } }
+.power-btn.orbit-enabled { cursor: pointer; }
+.power-btn.orbit-enabled:active { transform: scale(0.96) !important; }

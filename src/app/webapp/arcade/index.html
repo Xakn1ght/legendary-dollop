@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
@@ -8,31 +8,44 @@
   <meta http-equiv="Expires" content="0" />
   <title>AstroByte Arcade</title>
   <script src="https://telegram.org/js/telegram-web-app.js"></script>
-  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <!-- pixel font for arcade accents (latin only; fa falls back to Vazirmatn) -->
+  <!-- Self-hosted: Google Fonts CDN is unreliable from Iran (users open this pre-VPN). -->
+  <style>
+    @font-face {
+      font-family: 'Press Start 2P';
+      font-style: normal;
+      font-weight: 400;
+      font-display: swap;
+      src: url('/webapp/static/fonts/press-start-2p.woff2') format('woff2');
+    }
+  </style>
+  <!-- self-hosted Vazirmatn/Urbanist (same file the dashboard uses) -->
+  <link rel="stylesheet" href="/webapp/static/fonts/fonts.css">
   <style>
     :root {
-      --bg-deep: #0f172a;
-      --bg-star: #1e1b4b;
-      --primary: #818cf8;
-      --primary-glow: rgba(129, 140, 248, 0.5);
-      --accent: #f472b6;
-      --accent-glow: rgba(244, 114, 182, 0.5);
-      --gold: #fbbf24;
-      --text: #f8fafc;
-      --text-muted: #94a3b8;
-      --glass: rgba(30, 41, 59, 0.7);
-      --glass-border: rgba(255, 255, 255, 0.1);
-      --radius-lg: 24px;
-      --radius-md: 16px;
-      --radius-sm: 12px;
+      --bg-deep: #050110;
+      --panel: #120826;
+      --panel-2: #0d0620;
+      --line: rgba(192, 77, 255, 0.40);
+      --line-dim: rgba(192, 77, 255, 0.18);
+      --magenta: #c04dff;
+      --pink: #ff7ec2;
+      --indigo: #818cf8;
+      --gold: #ffd23f;
+      --green: #39ff88;
+      --blue: #7be0ff;
+      --text: #f3eefe;
+      --text-muted: #9d8fc4;
+      --font-body: 'Vazirmatn', 'Urbanist', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      --font-px: 'Press Start 2P', 'Vazirmatn', monospace;
     }
 
     * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
-    
+
     body {
       margin: 0;
       padding: 0;
-      font-family: 'Poppins', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      font-family: var(--font-body);
       background: var(--bg-deep);
       color: var(--text);
       overflow-x: hidden;
@@ -41,29 +54,63 @@
       flex-direction: column;
     }
 
-    /* --- Background Animation --- */
+    .px { font-family: var(--font-px); }
+
+    /* ---- deep space background: pixel stars + faint nebula ---- */
     .space-bg {
       position: fixed;
-      top: 0; left: 0; width: 100%; height: 100%;
-      background: radial-gradient(circle at 50% 0%, #2e1065 0%, #0f172a 60%);
+      inset: 0;
+      background:
+        radial-gradient(ellipse 120% 60% at 50% -10%, rgba(76, 29, 149, 0.45) 0%, transparent 60%),
+        radial-gradient(ellipse 80% 40% at 80% 110%, rgba(192, 77, 255, 0.12) 0%, transparent 60%),
+        var(--bg-deep);
       z-index: -1;
       overflow: hidden;
     }
-    
     .star {
       position: absolute;
-      background: white;
-      border-radius: 50%;
-      opacity: 0.3;
+      background: #e9d5ff;
+      opacity: 0.25;
       animation: twinkle var(--duration, 3s) infinite ease-in-out;
+      animation-delay: var(--delay, 0s);
     }
-    
+    .star.b { background: var(--blue); }
+    .star.p { background: var(--pink); }
     @keyframes twinkle {
-      0%, 100% { opacity: 0.3; transform: scale(1); }
-      50% { opacity: 1; transform: scale(1.2); }
+      0%, 100% { opacity: 0.18; }
+      50% { opacity: 0.9; }
     }
-    
-    /* --- Layout --- */
+
+    /* ---- shooting stars (transform-only, spawned by JS) ---- */
+    .shooting-star {
+      position: absolute;
+      width: 110px; height: 2px;
+      background: linear-gradient(90deg, rgba(255,255,255,0.95), rgba(123, 224, 255, 0.4) 55%, transparent);
+      border-radius: 2px;
+      opacity: 0;
+      transform: rotate(var(--angle, 32deg)) translateX(0);
+      animation: shoot var(--dur, 1.2s) linear forwards;
+      pointer-events: none;
+    }
+    @keyframes shoot {
+      0%   { opacity: 0; transform: rotate(var(--angle, 32deg)) translateX(0); }
+      6%   { opacity: 0.9; }
+      70%  { opacity: 0.7; }
+      100% { opacity: 0; transform: rotate(var(--angle, 32deg)) translateX(80vmax); }
+    }
+
+    /* ---- CRT scanlines (static, cheap) ---- */
+    body::after {
+      content: '';
+      position: fixed;
+      inset: 0;
+      background: repeating-linear-gradient(0deg, rgba(0,0,0,0.28) 0 1px, transparent 1px 3px);
+      pointer-events: none;
+      z-index: 60;
+      opacity: 0.30;
+    }
+
+    /* ---- layout ---- */
     .container {
       max-width: 480px;
       margin: 0 auto;
@@ -76,354 +123,520 @@
       gap: 16px;
       flex: 1;
     }
+    body.platform-android .container { padding-top: calc(env(safe-area-inset-top) + 80px) !important; }
+    body.platform-ios .container { padding-top: calc(env(safe-area-inset-top) + 50px) !important; }
 
-    /* Platform specific container padding */
-    body.platform-android .container {
-      padding-top: calc(env(safe-area-inset-top) + 80px) !important;
-    }
+    /* ---- header ---- */
+    .header { text-align: center; margin-bottom: 4px; position: relative; }
 
-    body.platform-ios .container {
-      padding-top: calc(env(safe-area-inset-top) + 50px) !important;
-    }
-
-    /* --- Header & Mascot --- */
-    .header {
-      text-align: center;
-      margin-bottom: 10px;
-      position: relative;
-    }
-
-    /* Top Navigation Bar */
+    .header-top { position: relative; }
     .nav-bar {
+      /* vertically centered on the logo row so it lines up on every platform padding */
       position: absolute;
-      top: 0;
-      left: 0;
-      width: 100%;
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      padding: 0 4px;
+      top: 50%;
+      transform: translateY(-50%);
+      inset-inline-start: 0;
       z-index: 10;
     }
-
     .nav-btn {
-      width: 40px;
-      height: 40px;
-      border-radius: 12px;
-      background: rgba(255, 255, 255, 0.1);
-      border: 1px solid rgba(255, 255, 255, 0.1);
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      color: white;
+      width: 46px; height: 46px;
+      border-radius: 8px;
+      background: var(--panel);
+      border: 2px solid var(--magenta);
+      display: flex; align-items: center; justify-content: center;
+      color: var(--text);
       cursor: pointer;
-      transition: all 0.2s;
+      box-shadow: 0 3px 0 rgba(0, 0, 0, 0.55), 0 0 14px rgba(192, 77, 255, 0.35);
+      transition: transform 0.15s;
     }
-    .nav-btn:active { transform: scale(0.9); background: rgba(255,255,255,0.2); }
+    .nav-btn:active { transform: scale(0.9); }
 
-    .mascot-container {
-      width: 120px;
-      height: 120px;
-      margin: 0 auto 16px;
-      position: relative;
-      animation: float 6s ease-in-out infinite;
+    /* the game's real animated ASTROBUGZ logo (8 frames of 75x14 in a 128px sheet) */
+    .logo-sprite {
+      --s: 4; /* integer pixel scale */
+      width: calc(75px * var(--s));
+      height: calc(14px * var(--s));
+      margin: 14px auto 10px;
+      background: url('/webapp/arcade/astrobugz/images/superbugztitle-sheet0.png');
+      background-size: calc(128px * var(--s)) calc(128px * var(--s));
+      background-position: calc(-1px * var(--s)) calc(-1px * var(--s));
+      image-rendering: pixelated;
+      animation: logoFrames 0.8s steps(8) infinite;
+      filter: drop-shadow(0 6px 18px rgba(192, 77, 255, 0.45));
     }
-
-    @keyframes float {
-      0%, 100% { transform: translateY(0px) rotate(0deg); }
-      50% { transform: translateY(-15px) rotate(2deg); }
+    @keyframes logoFrames {
+      from { background-position: calc(-1px * var(--s)) calc(-1px * var(--s)); }
+      to   { background-position: calc(-1px * var(--s)) calc(-1px * var(--s) - 128px * var(--s)); }
     }
-
-    /* Cute Astronaut SVG */
-    .astro-svg {
-      width: 100%;
-      height: 100%;
-      filter: drop-shadow(0 10px 20px var(--primary-glow));
-    }
-    
-    .title {
-      font-size: 28px;
-      font-weight: 800;
-      background: linear-gradient(135deg, #fff 0%, #818cf8 100%);
-      -webkit-background-clip: text;
-      background-clip: text;
-      -webkit-text-fill-color: transparent;
-      margin: 0;
-      letter-spacing: -0.5px;
-      text-shadow: 0 10px 20px rgba(0,0,0,0.2);
-    }
+    /* keep clear air between the wide logo sprite and the home button */
+    @media (max-width: 460px) { .logo-sprite { --s: 3; } }
+    @media (max-width: 359px) { .logo-sprite { --s: 2; } }
 
     .subtitle {
-      font-size: 14px;
-      color: var(--text-muted);
-      font-weight: 500;
-      margin-top: 4px;
-    }
-    
-    /* --- Cards Generic --- */
-    .card {
-      background: var(--glass);
-      backdrop-filter: blur(12px);
-      -webkit-backdrop-filter: blur(12px);
-      border: 1px solid var(--glass-border);
-      border-radius: var(--radius-lg);
-      padding: 20px;
-      box-shadow: 0 8px 32px rgba(0,0,0,0.2);
-      transition: transform 0.2s;
-    }
-
-    /* --- Pilot License (Profile) --- */
-    .pilot-card {
-      display: flex;
-      align-items: center;
-      gap: 14px;
-      padding: 14px 18px;
-    }
-
-    .pilot-avatar {
-      width: 44px;
-      height: 44px;
-      background: linear-gradient(135deg, var(--primary), var(--accent));
-      border-radius: 50%;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      font-size: 20px;
-      box-shadow: 0 4px 12px var(--primary-glow);
-    }
-
-    .pilot-info {
-      flex: 1;
-      overflow: hidden;
-    }
-    
-    .pilot-label {
-      font-size: 11px;
+      font-family: var(--font-px);
+      font-size: 9px;
+      letter-spacing: 3px;
+      color: var(--indigo);
       text-transform: uppercase;
-      letter-spacing: 1px;
-      color: var(--text-muted);
-      font-weight: 700;
-      margin-bottom: 2px;
     }
-    
+    body.lang-fa .subtitle {
+      font-family: var(--font-body);
+      font-size: 14px;
+      font-weight: 800;
+      letter-spacing: 0;
+    }
+
+    /* ---- cards: arcade cabinet panels, no glass ---- */
+    .card {
+      background: linear-gradient(180deg, var(--panel), var(--panel-2));
+      border: 2px solid var(--line);
+      border-radius: 10px;
+      padding: 18px;
+      box-shadow: 0 4px 0 rgba(0, 0, 0, 0.55), inset 0 0 28px rgba(192, 77, 255, 0.05);
+    }
+
+    .sec-head {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 12px;
+    }
+    .sec-bullet {
+      width: 8px; height: 8px;
+      background: var(--magenta);
+      box-shadow: 2px 2px 0 rgba(0,0,0,0.6);
+      flex: none;
+    }
+    .sec-title {
+      font-family: var(--font-px);
+      font-size: 10px;
+      letter-spacing: 1px;
+      color: var(--pink);
+      text-transform: uppercase;
+      flex: 1;
+    }
+    body.lang-fa .sec-title {
+      font-family: var(--font-body);
+      font-size: 15px;
+      font-weight: 800;
+      letter-spacing: 0;
+    }
+    .sec-side {
+      font-family: var(--font-px);
+      font-size: 8px;
+      color: var(--text-muted);
+    }
+    body.lang-fa .sec-side { font-family: var(--font-body); font-size: 12px; font-weight: 600; }
+
+    /* ---- pilot license ---- */
+    .pilot-card { display: flex; align-items: center; gap: 14px; padding: 14px 16px; }
+    .pilot-avatar {
+      width: 52px; height: 52px;
+      background: #1a0f35;
+      border: 2px solid var(--line);
+      border-radius: 8px;
+      display: flex; align-items: center; justify-content: center;
+      flex: none;
+    }
+    .pilot-avatar img {
+      width: 39px; height: 24px;
+      image-rendering: pixelated;
+      animation: shipFloat 3.2s ease-in-out infinite;
+    }
+    @keyframes shipFloat {
+      0%, 100% { transform: translateY(2px); }
+      50% { transform: translateY(-2px); }
+    }
+    .pilot-info { flex: 1; overflow: hidden; }
+    .pilot-label {
+      font-family: var(--font-px);
+      font-size: 8px;
+      letter-spacing: 1px;
+      color: var(--gold);
+      text-transform: uppercase;
+      margin-bottom: 4px;
+    }
+    body.lang-fa .pilot-label { font-family: var(--font-body); font-size: 12px; font-weight: 700; letter-spacing: 0; }
     .pilot-name-input {
       background: transparent;
       border: none;
-      color: white;
+      color: var(--text);
+      font-family: var(--font-body);
       font-size: 18px;
       font-weight: 700;
       width: 100%;
       padding: 0;
       outline: none;
       border-bottom: 2px solid transparent;
-      transition: all 0.3s;
+      transition: border-color 0.3s;
     }
-
-    .pilot-name-input:focus {
-      border-bottom-color: var(--primary);
-    }
-    
-    .pilot-name-input::placeholder {
-      color: rgba(255,255,255,0.3);
-      font-style: italic;
-    }
-
-    .pilot-edit-icon {
+    .pilot-name-input:focus { border-bottom-color: var(--magenta); }
+    .pilot-name-input::placeholder { color: rgba(243, 238, 254, 0.28); }
+    .pilot-edit-btn {
+      width: 44px; height: 44px;
+      flex: none;
+      border-radius: 8px;
+      background: rgba(192, 77, 255, 0.10);
+      border: 2px solid var(--line-dim);
       color: var(--text-muted);
-      opacity: 0.5;
+      display: flex; align-items: center; justify-content: center;
+      cursor: pointer;
+      padding: 0;
+      transition: transform 0.15s;
     }
+    .pilot-edit-btn:active { transform: scale(0.9); }
+    .pilot-edit-btn .ic-check { display: none; }
+    .pilot-card.editing .pilot-edit-btn {
+      background: var(--magenta);
+      border-color: var(--pink);
+      color: #fff;
+    }
+    .pilot-card.editing .pilot-edit-btn .ic-pen { display: none; }
+    .pilot-card.editing .pilot-edit-btn .ic-check { display: block; }
 
-    /* Leaderboard Toggle */
     .lb-toggle-row {
       display: flex;
       align-items: center;
       justify-content: space-between;
-      padding: 14px 18px;
-      background: rgba(255, 255, 255, 0.03);
-      border-top: 1px solid rgba(255, 255, 255, 0.08);
-      margin-top: 0;
+      padding: 12px 16px;
+      background: rgba(0, 0, 0, 0.25);
+      border-top: 2px solid var(--line-dim);
     }
-    .lb-toggle-label {
-      font-size: 13px;
-      color: var(--text-muted);
-      font-weight: 500;
-    }
+    .lb-toggle-label { font-size: 13px; color: var(--text-muted); font-weight: 500; }
     .toggle-switch {
       position: relative;
-      width: 44px;
-      height: 24px;
-      background: rgba(255, 255, 255, 0.15);
-      border-radius: 12px;
+      width: 46px; height: 24px;
+      background: #241744;
+      border: 2px solid var(--line-dim);
+      border-radius: 4px;
       cursor: pointer;
       transition: background 0.3s;
+      flex: none;
     }
-    .toggle-switch.active {
-      background: linear-gradient(135deg, var(--primary), #6366f1);
-    }
+    .toggle-switch.active { background: var(--magenta); border-color: var(--pink); }
     .toggle-switch::after {
       content: '';
       position: absolute;
-      top: 2px;
-      left: 2px;
-      width: 20px;
-      height: 20px;
-      background: white;
-      border-radius: 50%;
-      transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-      box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+      top: 2px; left: 2px;
+      width: 16px; height: 16px;
+      background: #f3eefe;
+      box-shadow: 1px 1px 0 rgba(0,0,0,0.5);
+      transition: transform 0.25s cubic-bezier(0.4, 0, 0.2, 1);
     }
-    .toggle-switch.active::after {
-      transform: translateX(20px);
-    }
+    .toggle-switch.active::after { transform: translateX(22px); }
+    [dir="rtl"] .toggle-switch::after { left: auto; right: 2px; }
+    [dir="rtl"] .toggle-switch.active::after { transform: translateX(-22px); }
 
-    /* --- Mission Control (Play) --- */
-    .mission-card {
-      text-align: center;
-      position: relative;
-      overflow: hidden;
-      border: 1px solid rgba(129, 140, 248, 0.3);
-      padding: 18px;
-    }
-
+    /* ---- mission card ---- */
+    .mission-card { text-align: center; position: relative; overflow: hidden; }
     .mission-card::before {
       content: '';
       position: absolute;
-      top: 0; left: 0; right: 0; height: 2px;
-      background: linear-gradient(90deg, transparent, var(--primary), transparent);
-      opacity: 0.5;
+      top: 0; left: 0; right: 0; height: 3px;
+      background: repeating-linear-gradient(90deg, var(--magenta) 0 10px, transparent 10px 20px);
+      opacity: 0.7;
     }
-
     .daily-badge {
       display: inline-block;
-      background: rgba(129, 140, 248, 0.15);
-      color: var(--primary);
-      border: 1px solid rgba(129, 140, 248, 0.3);
-      font-size: 11px;
-      font-weight: 700;
-      padding: 4px 12px;
-      border-radius: 20px;
-      margin-bottom: 12px;
+      font-family: var(--font-px);
+      font-size: 8px;
+      letter-spacing: 1px;
+      color: var(--gold);
+      background: rgba(255, 210, 63, 0.08);
+      border: 2px solid rgba(255, 210, 63, 0.45);
+      padding: 6px 12px;
+      border-radius: 4px;
+      margin: 4px 0 14px;
       text-transform: uppercase;
-      letter-spacing: 0.5px;
     }
+    body.lang-fa .daily-badge { font-family: var(--font-body); font-size: 12px; font-weight: 800; letter-spacing: 0; }
+    .mission-title {
+      font-family: var(--font-px);
+      font-size: 15px;
+      color: var(--text);
+      margin: 0 0 10px;
+      text-shadow: 0 0 18px rgba(192, 77, 255, 0.6), 2px 2px 0 rgba(0,0,0,0.7);
+    }
+    .mission-desc { margin: 0 0 18px; font-size: 13.5px; color: var(--text-muted); }
+
+    /* Enemy Intel roster */
+    .intel-legend {
+      display: flex; justify-content: flex-end; gap: 18px;
+      font-family: var(--font-px); font-size: 7px; letter-spacing: 1px;
+      color: var(--text-muted); margin: 2px 4px 8px;
+    }
+    body.lang-fa .intel-legend { font-family: var(--font-body); font-size: 11px; font-weight: 700; letter-spacing: 0; }
+    .intel-legend span { width: 52px; text-align: center; }
+    .intel-row {
+      display: flex; align-items: center; gap: 12px;
+      padding: 9px 4px; border-bottom: 1px dashed rgba(255,255,255,0.09);
+    }
+    .intel-row:last-child { border-bottom: none; }
+    .intel-row.boss { background: rgba(255, 79, 163, 0.05); border-radius: 8px; }
+    .intel-sprite {
+      width: 42px; height: 42px; flex-shrink: 0;
+      background-repeat: no-repeat; background-position: left center;
+      background-size: cover; image-rendering: pixelated;
+      border-radius: 8px; border: 1px solid rgba(255,255,255,0.10);
+      background-color: rgba(0,0,0,0.35);
+    }
+    .intel-name { flex: 1; min-width: 0; }
+    .intel-name b { display: block; font-size: 13px; }
+    .intel-name small { display: block; color: var(--text-muted); font-size: 11px; line-height: 1.5; }
+    .intel-hits, .intel-pts {
+      width: 52px; text-align: center; flex-shrink: 0;
+      font-family: var(--font-px); font-size: 9px;
+    }
+    body.lang-fa .intel-hits, body.lang-fa .intel-pts { font-family: var(--font-body); font-size: 13px; font-weight: 800; }
+    .intel-hits { color: var(--blue, #7be0ff); }
+    .intel-pts { color: var(--gold); }
+    .intel-row.boss .intel-pts { color: var(--pink, #ff4fa3); }
 
     .play-btn {
       width: 100%;
-      background: linear-gradient(135deg, var(--primary), #6366f1);
-      color: white;
-      border: none;
+      background: var(--magenta);
+      color: #fff;
+      border: 2px solid var(--pink);
+      border-radius: 8px;
       padding: 16px;
-      border-radius: var(--radius-md);
-      font-size: 18px;
-      font-weight: 800;
+      font-family: var(--font-px);
+      font-size: 12px;
+      letter-spacing: 1px;
       cursor: pointer;
-      box-shadow: 0 8px 24px var(--primary-glow);
-      transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+      box-shadow: 0 6px 0 #5b1187, 0 10px 22px rgba(192, 77, 255, 0.35);
+      transition: transform 0.1s, box-shadow 0.1s;
       display: flex;
       align-items: center;
       justify-content: center;
       gap: 10px;
-      position: relative;
-      overflow: hidden;
+      text-transform: uppercase;
     }
-
-    .play-btn::after {
-      content: '';
-      position: absolute;
-      inset: 0;
-      background: linear-gradient(rgba(255,255,255,0.2), transparent);
-      opacity: 0;
-      transition: opacity 0.2s;
-    }
-
-    .play-btn:active {
-      transform: scale(0.98);
-    }
-    .play-btn:active::after { opacity: 1; }
-
+    body.lang-fa .play-btn { font-family: var(--font-body); font-size: 17px; font-weight: 900; letter-spacing: 0; }
+    .play-btn:active { transform: translateY(4px); box-shadow: 0 2px 0 #5b1187; }
     .play-btn.played {
-      background: rgba(255, 255, 255, 0.05);
-      box-shadow: none;
-      border: 1px solid var(--glass-border);
+      background: #241744;
+      border-color: var(--line-dim);
       color: var(--text-muted);
+      box-shadow: 0 4px 0 rgba(0, 0, 0, 0.5);
       cursor: default;
     }
+    .play-btn .icon { display: flex; }
 
-    /* --- Monthly Race prizes --- */
-    .race-prizes { display: flex; gap: 8px; margin-bottom: 12px; }
-    .race-prize {
-      flex: 1; text-align: center; padding: 10px 4px; border-radius: 12px;
-      background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08);
-      display: flex; flex-direction: column; gap: 2px;
+    /* countdown to the next daily mission (shown only when today's run is done) */
+    .next-mission {
+      display: none;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      margin-top: 12px;
+      padding: 10px 12px;
+      border-radius: 6px;
+      background: rgba(123, 224, 255, 0.06);
+      border: 2px dashed rgba(123, 224, 255, 0.30);
+      font-size: 13px;
+      color: var(--text-muted);
     }
-    .race-prize b { font-size: 13px; color: var(--text-muted); }
-    .race-prize span { font-size: 14px; font-weight: 800; color: #e2e8f0; }
-    .race-prize.gold   { background: rgba(251,191,36,0.10); border-color: rgba(251,191,36,0.35); }
-    .race-prize.gold span { color: #fbbf24; }
-    .race-prize.silver { background: rgba(148,163,184,0.10); border-color: rgba(148,163,184,0.35); }
-    .race-prize.silver span { color: #cbd5e1; }
-    .race-prize.bronze { background: rgba(180,83,9,0.12); border-color: rgba(180,83,9,0.45); }
-    .race-prize.bronze span { color: #f59e0b; }
-    .race-me {
-      margin-bottom: 10px; padding: 10px 12px; border-radius: 12px;
-      background: rgba(129,140,248,0.10); border: 1px solid rgba(129,140,248,0.30);
-      font-size: 13px; color: #e2e8f0;
+    .next-mission.visible { display: flex; }
+    .next-mission b {
+      font-family: var(--font-px);
+      font-size: 12px;
+      color: var(--blue);
+      letter-spacing: 1px;
+      direction: ltr;
+      unicode-bidi: embed;
     }
-    .race-me b { color: #a5b4fc; }
 
-    /* --- Hall of Fame (Leaderboard) --- */
-    .lb-header {
+    /* ---- hangar (coin shop) ---- */
+    .coin-balance {
+      font-family: var(--font-px);
+      font-size: 11px;
+      color: var(--gold);
+      background: rgba(255, 210, 63, 0.08);
+      border: 2px solid rgba(255, 210, 63, 0.40);
+      border-radius: 4px;
+      padding: 5px 9px;
+      direction: ltr;
+      unicode-bidi: embed;
+    }
+    body.lang-fa .coin-balance { font-family: var(--font-body); font-size: 13px; font-weight: 800; }
+    .hangar-note {
+      margin: 0 0 12px;
+      font-size: 12.5px;
+      line-height: 1.6;
+      color: var(--text-muted);
+    }
+    .hangar-sub {
+      font-family: var(--font-px);
+      font-size: 8px;
+      letter-spacing: 1px;
+      color: var(--text-muted);
+      margin: 14px 0 8px;
+      text-transform: uppercase;
+    }
+    body.lang-fa .hangar-sub { font-family: var(--font-body); font-size: 12px; font-weight: 800; letter-spacing: 0; }
+    .skin-grid {
+      display: grid;
+      grid-template-columns: repeat(5, 1fr);
+      gap: 7px;
+    }
+    @media (max-width: 379px) { .skin-grid { grid-template-columns: repeat(3, 1fr); } }
+    .skin-cell {
+      background: #1a0f35;
+      border: 2px solid rgba(255, 255, 255, 0.10);
+      border-radius: 8px;
+      padding: 8px 4px 7px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 5px;
+      cursor: pointer;
+      -webkit-appearance: none;
+      appearance: none;
+      color: inherit;
+      font-family: inherit;
+    }
+    .skin-cell canvas { width: 39px; height: 24px; image-rendering: pixelated; }
+    .skin-cell .skin-name { font-size: 11px; font-weight: 700; }
+    .skin-cell .skin-state {
+      font-family: var(--font-px);
+      font-size: 7px;
+      color: var(--text-muted);
+      direction: ltr;
+      unicode-bidi: embed;
+    }
+    body.lang-fa .skin-cell .skin-state { font-family: var(--font-body); font-size: 10px; font-weight: 700; }
+    .skin-cell.equipped { border-color: var(--gold); background: rgba(255, 210, 63, 0.08); }
+    .skin-cell.equipped .skin-state { color: var(--gold); }
+    .skin-cell.owned .skin-state { color: var(--green); }
+    .skin-cell.locked { opacity: 0.75; }
+    .power-row {
       display: flex;
       align-items: center;
       gap: 10px;
-      margin-bottom: 16px;
-      padding: 0 4px;
+      padding: 10px 4px;
+      border-bottom: 1px dashed rgba(255,255,255,0.09);
+    }
+    .power-row:last-child { border-bottom: none; }
+    .power-ico { font-size: 20px; flex: none; width: 30px; text-align: center; }
+    .power-info { flex: 1; min-width: 0; }
+    .power-info b { display: block; font-size: 13px; }
+    .power-info small { display: block; color: var(--text-muted); font-size: 11px; line-height: 1.5; }
+    .buy-btn {
+      flex: none;
+      font-family: var(--font-px);
+      font-size: 9px;
+      padding: 9px 12px;
+      border-radius: 6px;
+      background: rgba(255, 210, 63, 0.10);
+      border: 2px solid rgba(255, 210, 63, 0.45);
+      color: var(--gold);
+      cursor: pointer;
+      direction: ltr;
+      unicode-bidi: embed;
+      min-height: 36px;
+    }
+    body.lang-fa .buy-btn { font-family: var(--font-body); font-size: 12px; font-weight: 800; }
+    .buy-btn:active { transform: translateY(2px); }
+    .buy-btn.owned {
+      background: rgba(57, 255, 136, 0.07);
+      border-color: rgba(57, 255, 136, 0.4);
+      color: var(--green);
+      cursor: default;
+    }
+    .buy-btn.poor { opacity: 0.5; }
+    .retry-btn {
+      width: 100%;
+      background: rgba(123, 224, 255, 0.08);
+      border: 2px solid rgba(123, 224, 255, 0.45);
+      color: var(--blue);
+      border-radius: 8px;
+      padding: 13px;
+      font-family: var(--font-px);
+      font-size: 10px;
+      letter-spacing: 1px;
+      cursor: pointer;
+      text-transform: uppercase;
+    }
+    body.lang-fa .retry-btn { font-family: var(--font-body); font-size: 15px; font-weight: 900; letter-spacing: 0; }
+    .retry-btn:active { transform: translateY(2px); }
+    .retry-warn { margin: 8px 0 0; font-size: 11.5px; line-height: 1.6; color: var(--text-muted); }
+    .dialog-btn.ghost {
+      background: transparent;
+      border-color: var(--line-dim);
+      color: var(--text-muted);
+      box-shadow: none;
+      margin-top: 8px;
     }
 
-    .lb-title {
-      font-size: 16px;
-      font-weight: 700;
+    /* ---- monthly race ---- */
+    .race-note {
+      display: flex;
+      gap: 8px;
+      align-items: flex-start;
+      background: rgba(255, 210, 63, 0.07);
+      border-inline-start: 3px solid var(--gold);
+      border-radius: 4px;
+      padding: 9px 11px;
+      margin-bottom: 12px;
+      font-size: 12.5px;
+      line-height: 1.55;
+      color: #efe6c8;
+    }
+    .race-prizes { display: flex; gap: 8px; margin-bottom: 12px; }
+    .race-prize {
       flex: 1;
-      color: var(--text);
-    }
-
-    .lb-icon {
-      font-size: 20px;
-    }
-
-    .lb-list {
-      list-style: none;
-      padding: 0;
-      margin: 0;
+      text-align: center;
+      padding: 9px 4px;
+      border-radius: 6px;
+      background: #1a0f35;
+      border: 2px solid rgba(255, 255, 255, 0.10);
       display: flex;
       flex-direction: column;
-      gap: 8px;
+      gap: 4px;
     }
-    
+    .race-prize b { font-family: var(--font-px); font-size: 8px; color: var(--text-muted); font-weight: 400; }
+    .race-prize span { font-size: 13px; font-weight: 800; color: #e2e8f0; }
+    .race-prize.gold   { border-color: rgba(255, 210, 63, 0.55); }
+    .race-prize.gold span { color: var(--gold); }
+    .race-prize.silver { border-color: rgba(203, 213, 225, 0.45); }
+    .race-prize.silver span { color: #cbd5e1; }
+    .race-prize.bronze { border-color: rgba(245, 158, 11, 0.45); }
+    .race-prize.bronze span { color: #f59e0b; }
+    .race-me {
+      margin-bottom: 10px;
+      padding: 10px 12px;
+      border-radius: 6px;
+      background: rgba(129, 140, 248, 0.10);
+      border: 2px solid rgba(129, 140, 248, 0.35);
+      font-size: 13px;
+      color: #e2e8f0;
+    }
+    .race-me b { color: #a5b4fc; }
+
+    /* ---- leaderboard lists ---- */
+    .lb-list { list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 7px; }
     .lb-item {
       display: flex;
       align-items: center;
-      padding: 10px 14px;
-      background: rgba(255, 255, 255, 0.03);
-      border-radius: var(--radius-sm);
-      transition: background 0.2s;
+      padding: 9px 12px;
+      background: #120a28;
+      border: 1px solid rgba(192, 77, 255, 0.12);
+      border-inline-start: 3px solid rgba(192, 77, 255, 0.25);
+      border-radius: 6px;
     }
-    
-    .lb-item:first-child { background: linear-gradient(90deg, rgba(251, 191, 36, 0.1), transparent); border-left: 2px solid var(--gold); }
-    .lb-item:nth-child(2) { border-left: 2px solid #94a3b8; }
-    .lb-item:nth-child(3) { border-left: 2px solid #b45309; }
-
+    .lb-item:nth-child(1) { border-inline-start-color: var(--gold); background: linear-gradient(90deg, rgba(255, 210, 63, 0.08), #120a28 60%); }
+    .lb-item:nth-child(2) { border-inline-start-color: #cbd5e1; }
+    .lb-item:nth-child(3) { border-inline-start-color: #f59e0b; }
+    [dir="rtl"] .lb-item:nth-child(1) { background: linear-gradient(270deg, rgba(255, 210, 63, 0.08), #120a28 60%); }
     .lb-rank {
-      width: 24px;
-      font-weight: 700;
-      font-size: 14px;
+      min-width: 26px;
+      font-family: var(--font-px);
+      font-size: 10px;
       color: var(--text-muted);
       text-align: center;
-      margin-right: 12px;
+      margin-inline-end: 10px;
     }
-    
-    .lb-item:first-child .lb-rank { color: var(--gold); font-size: 18px; }
-
+    .lb-item:nth-child(1) .lb-rank { color: var(--gold); font-size: 13px; }
     .lb-name {
       flex: 1;
       font-weight: 600;
@@ -432,28 +645,25 @@
       overflow: hidden;
       text-overflow: ellipsis;
     }
-
     .lb-score {
-      font-family: 'Courier New', monospace;
-      font-weight: 700;
-      color: var(--primary);
-      font-size: 15px;
+      font-family: var(--font-px);
+      font-size: 10px;
+      color: var(--blue);
+      margin-inline-start: 8px;
     }
-
     .lb-empty {
       text-align: center;
-      padding: 30px;
+      padding: 26px 10px;
       color: var(--text-muted);
-      font-size: 14px;
-      font-style: italic;
+      font-size: 13.5px;
+      line-height: 1.7;
     }
 
-    /* --- Dialog --- */
+    /* ---- dialog ---- */
     .dialog-backdrop {
       position: fixed;
       inset: 0;
-      background: rgba(0,0,0,0.8);
-      backdrop-filter: blur(4px);
+      background: rgba(5, 1, 16, 0.88);
       display: none;
       align-items: center;
       justify-content: center;
@@ -461,195 +671,216 @@
       opacity: 0;
       transition: opacity 0.2s;
     }
-    
     .dialog-backdrop.visible { opacity: 1; }
-
     .dialog {
-      background: #1e293b;
+      background: linear-gradient(180deg, var(--panel), var(--panel-2));
       width: 85%;
       max-width: 320px;
-      border-radius: var(--radius-lg);
+      border: 2px solid var(--line);
+      border-radius: 10px;
       padding: 24px;
       text-align: center;
-      border: 1px solid var(--glass-border);
-      transform: scale(0.9);
+      box-shadow: 0 6px 0 rgba(0, 0, 0, 0.55);
+      transform: scale(0.92);
       transition: transform 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275);
     }
-    
     .dialog-backdrop.visible .dialog { transform: scale(1); }
-
-    .dialog h3 { margin: 0 0 8px; color: white; }
-    .dialog p { color: var(--text-muted); font-size: 14px; line-height: 1.5; margin: 0 0 20px; }
-    
-    .dialog-btn {
-      background: var(--primary);
-      color: white;
-      border: none;
-      padding: 12px 24px;
-      border-radius: 99px;
-      font-weight: 600;
-      width: 100%;
-      font-size: 14px;
-      cursor: pointer;
+    .dialog h3 {
+      margin: 0 0 10px;
+      color: var(--pink);
+      font-family: var(--font-px);
+      font-size: 11px;
+      letter-spacing: 1px;
+      text-transform: uppercase;
     }
+    body.lang-fa .dialog h3 { font-family: var(--font-body); font-size: 16px; font-weight: 800; letter-spacing: 0; }
+    .dialog p { color: var(--text-muted); font-size: 14px; line-height: 1.6; margin: 0 0 20px; }
+    .dialog-btn {
+      background: var(--magenta);
+      color: white;
+      border: 2px solid var(--pink);
+      padding: 12px 24px;
+      border-radius: 8px;
+      font-family: var(--font-px);
+      font-size: 10px;
+      width: 100%;
+      cursor: pointer;
+      box-shadow: 0 4px 0 #5b1187;
+      text-transform: uppercase;
+    }
+    body.lang-fa .dialog-btn { font-family: var(--font-body); font-size: 15px; font-weight: 800; }
+    .dialog-btn:active { transform: translateY(3px); box-shadow: 0 1px 0 #5b1187; }
 
-    /* --- Secondary Button (Removed) --- */
-
-    /* --- Footer --- */
     .footer {
       text-align: center;
-      font-size: 11px;
-      color: rgba(255,255,255,0.2);
-      letter-spacing: 1px;
+      font-family: var(--font-px);
+      font-size: 7px;
+      letter-spacing: 2px;
+      color: rgba(243, 238, 254, 0.22);
       margin-top: auto;
+      text-transform: uppercase;
     }
 
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after { animation: none !important; transition: none !important; }
+    }
   </style>
 </head>
 <body>
 
-  <!-- Animated Background -->
+  <!-- pixel starfield -->
   <div class="space-bg" id="starfield"></div>
 
   <div class="container">
     <!-- Header -->
     <header class="header">
-      <div class="nav-bar">
-        <div id="backBtn" class="nav-btn">
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path><polyline points="9 22 9 12 15 12 15 22"></polyline></svg>
+      <div class="header-top">
+        <div class="nav-bar">
+          <div id="backBtn" class="nav-btn" role="button" aria-label="Back">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path><polyline points="9 22 9 12 15 12 15 22"></polyline></svg>
+          </div>
         </div>
+        <div class="logo-sprite" role="img" aria-label="ASTROBUGZ"></div>
       </div>
-
-      <div class="mascot-container">
-        <!-- Cute Astronaut SVG -->
-        <svg class="astro-svg" viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg">
-           <!-- Glow -->
-           <circle cx="100" cy="100" r="60" fill="rgba(129, 140, 248, 0.2)" />
-           <!-- Backpack -->
-           <rect x="50" y="70" width="100" height="80" rx="15" fill="#e2e8f0" />
-           <!-- Body -->
-           <circle cx="100" cy="95" r="55" fill="#f8fafc" />
-           <!-- Visor Reflection/Shadow -->
-           <path d="M100 40c-30.3 0-55 24.7-55 55s24.7 55 55 55 55-24.7 55-55-24.7-55-55-55zm0 95c-22 0-40-18-40-40s18-40 40-40 40 18 40 40-18 40-40 40z" fill="#cbd5e1" opacity="0.2"/>
-           <!-- Visor -->
-           <rect x="60" y="65" width="80" height="50" rx="25" fill="#1e1b4b" />
-           <!-- Visor Glare -->
-           <ellipse cx="115" cy="75" rx="10" ry="5" fill="rgba(255,255,255,0.8)" transform="rotate(-15 115 75)" />
-           <circle cx="75" cy="100" r="3" fill="rgba(255,255,255,0.5)" />
-           <!-- Antenna -->
-           <line x1="100" y1="40" x2="100" y2="20" stroke="#f8fafc" stroke-width="4" stroke-linecap="round"/>
-           <circle cx="100" cy="15" r="5" fill="#f472b6" />
-        </svg>
-      </div>
-      <h1 class="title">AstroByte</h1>
-      <div class="subtitle">Arcade Command Center</div>
+      <div class="subtitle" data-i18n="subtitle">ASTROBYTE ARCADE</div>
     </header>
 
-    <!-- Pilot Profile -->
+    <!-- Pilot License -->
     <div class="card" style="padding: 0; overflow: hidden;">
-      <div class="pilot-card" style="border-radius: 0;">
+      <div class="pilot-card">
         <div class="pilot-avatar">
-          <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
-            <circle cx="12" cy="8" r="5" />
-            <path d="M20 21a8 8 0 1 0-16 0" />
-            <line x1="3.1" y1="6.9" x2="7" y2="10.5" />
-            <line x1="20.9" y1="6.9" x2="17" y2="10.5" />
-          </svg>
+          <img src="/webapp/arcade/astrobugz/images/player-sheet0.png" alt="" />
         </div>
         <div class="pilot-info">
-          <div class="pilot-label">Pilot License</div>
-          <input type="text" id="pilotName" class="pilot-name-input" placeholder="Enter Name..." maxlength="20" autocomplete="off" spellcheck="false">
+          <div class="pilot-label" data-i18n="pilotLabel">PILOT LICENSE</div>
+          <input type="text" id="pilotName" class="pilot-name-input" placeholder="Enter name..." maxlength="20" autocomplete="off" spellcheck="false">
         </div>
-        <div class="pilot-edit-icon">
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg>
-        </div>
+        <button type="button" id="pilotEdit" class="pilot-edit-btn" aria-label="Edit name">
+          <svg class="ic-pen" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg>
+          <svg class="ic-check" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>
+        </button>
       </div>
       <div class="lb-toggle-row">
-        <span class="lb-toggle-label">Show on Leaderboard</span>
+        <span class="lb-toggle-label" data-i18n="lbToggle">Show on leaderboard</span>
         <div class="toggle-switch active" id="lbToggle"></div>
       </div>
     </div>
 
-    <!-- Play Action -->
+    <!-- Daily Mission -->
     <div class="card mission-card">
-      <div class="daily-badge">Daily Mission</div>
-      <h2 style="margin:0 0 8px; font-size:20px;">SuperBugz Defense</h2>
-      <p style="margin:0 0 20px; font-size:13px; color:var(--text-muted);">Defend the station from alien swarms!</p>
-      
+      <div class="daily-badge" data-i18n="dailyBadge">DAILY MISSION</div>
+      <h2 class="mission-title">ASTROBUGZ DEFENSE</h2>
+      <p class="mission-desc" data-i18n="gameDesc">Defend the station from alien swarms!</p>
+
       <button id="playBtn" class="play-btn">
         <span class="icon">
-          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
              <path d="M4.5 16.5c-1.5 1.26-2 5-2 5s3.74-.5 5-2c.71-.84.7-2.13-.09-2.91a2.18 2.18 0 0 0-2.91-.09z"/>
              <path d="M12 15l-3-3a22 22 0 0 1 2-3.95A12.88 12.88 0 0 1 22 2c0 2.72-.78 7.5-6 11a22.35 22.35 0 0 1-4 2z"/>
              <path d="M9 12H4s.55-3.03 2-4c1.62-1.08 5 0 5 0"/>
              <path d="M12 15v5s3.03-.55 4-2c1.08-1.62 0-5 0-5"/>
           </svg>
         </span>
-        <span class="text">Launch Mission</span>
+        <span class="text" data-i18n="launch">LAUNCH MISSION</span>
       </button>
+
+      <div id="nextMission" class="next-mission">
+        <span data-i18n="nextIn">Next mission in</span>
+        <b id="nextMissionTimer">--:--:--</b>
+      </div>
     </div>
 
-    <!-- Monthly Race (prizes) -->
-    <div class="card" id="raceCard">
-      <div class="lb-header">
-        <span class="lb-icon">🏆</span>
-        <span class="lb-title">Monthly Race</span>
-        <span id="raceCountdown" style="font-size:11px; color:var(--text-muted);"></span>
+    <!-- Hangar: coin shop (skins / powers / retry) -->
+    <div class="card" id="hangarCard" style="display:none;">
+      <div class="sec-head">
+        <span class="sec-bullet" style="background: var(--gold);"></span>
+        <span class="sec-title" style="color: var(--gold);" data-i18n="hangarTitle">HANGAR</span>
+        <span class="coin-balance" id="coinBalance">🪙 <b>0</b></span>
       </div>
+      <p class="hangar-note" data-i18n="hangarNote">Golden coins drop rarely during ranked missions. Spend them on your ship — they never expire.</p>
+
+      <div class="hangar-sub" data-i18n="skinsTitle">SHIP SKINS</div>
+      <div class="skin-grid" id="skinGrid"></div>
+
+      <div class="hangar-sub" data-i18n="powersTitle">UPGRADES</div>
+      <div id="powerList"></div>
+
+      <div id="retryRow" style="display:none;">
+        <div class="hangar-sub" data-i18n="retryTitle">SECOND CHANCE</div>
+        <button id="retryBtn" class="retry-btn"></button>
+        <p class="retry-warn" data-i18n="retryWarn">Today's score is wiped first — the new run replaces it, higher or lower.</p>
+      </div>
+    </div>
+
+    <!-- Enemy Intel (roster + scores; rows rendered by JS for i18n) -->
+    <div class="card" id="intelCard">
+      <div class="sec-head">
+        <span class="sec-bullet" style="background: var(--pink, #ff4fa3);"></span>
+        <span class="sec-title" style="color: var(--pink, #ff4fa3);" data-i18n="intelTitle">ENEMY INTEL</span>
+        <span class="sec-side" data-i18n="intelSide">KNOW YOUR TARGETS</span>
+      </div>
+      <div class="intel-legend">
+        <span data-i18n="intelHits">HITS</span>
+        <span data-i18n="intelPts">POINTS</span>
+      </div>
+      <div id="intelList"></div>
+    </div>
+
+    <!-- Monthly Race -->
+    <div class="card" id="raceCard">
+      <div class="sec-head">
+        <span class="sec-bullet"></span>
+        <span class="sec-title" data-i18n="raceTitle">MONTHLY RACE</span>
+        <span id="raceCountdown" class="sec-side"></span>
+      </div>
+      <!-- one-line rule: how + when winners are decided -->
+      <div class="race-note"><span aria-hidden="true">🏁</span><span data-i18n="raceNote">Every daily mission adds to your monthly total. Top 3 win 50 / 25 / 10 GB — winners are picked automatically on the 1st of next month.</span></div>
       <div class="race-prizes" id="racePrizes">
         <div class="race-prize gold"><b>#1</b><span>50GB</span></div>
         <div class="race-prize silver"><b>#2</b><span>25GB</span></div>
         <div class="race-prize bronze"><b>#3</b><span>10GB</span></div>
-        <div class="race-prize"><b>#4</b><span>10% off</span></div>
+        <div class="race-prize"><b>#4</b><span data-i18n="offP1">10% off</span></div>
       </div>
       <div id="raceMe" class="race-me" style="display:none;"></div>
       <ul id="raceList" class="lb-list">
-        <li class="lb-empty">Loading race standings...</li>
+        <li class="lb-empty" data-i18n="loading">Loading...</li>
       </ul>
     </div>
 
     <!-- Hall of Fame (last month's winners) -->
     <div class="card" id="hofCard" style="display:none;">
-      <div class="lb-header">
-        <span class="lb-icon">👑</span>
-        <span class="lb-title">Hall of Fame</span>
-        <span id="hofMonth" style="font-size:11px; color:var(--text-muted);"></span>
+      <div class="sec-head">
+        <span class="sec-bullet" style="background: var(--gold);"></span>
+        <span class="sec-title" style="color: var(--gold);" data-i18n="hofTitle">HALL OF FAME</span>
+        <span id="hofMonth" class="sec-side"></span>
       </div>
       <ul id="hofList" class="lb-list"></ul>
     </div>
 
-    <!-- Leaderboard -->
+    <!-- Daily leaderboard -->
     <div class="card">
-      <div class="lb-header">
-        <span class="lb-icon">
-           <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#fbbf24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-             <path d="M6 9H4.5a2.5 2.5 0 0 1 0-5H6"/>
-             <path d="M18 9h1.5a2.5 2.5 0 0 0 0-5H18"/>
-             <path d="M4 22h16"/>
-             <path d="M10 14.66V17c0 .55-.47.98-.97 1.21C7.85 18.75 7 20.24 7 22"/>
-             <path d="M14 14.66V17c0 .55.47.98.97 1.21C16.15 18.75 17 20.24 17 22"/>
-             <path d="M18 2H6v7a6 6 0 0 0 12 0V2z"/>
-           </svg>
-        </span>
-        <span class="lb-title">Daily Aces</span>
-        <span style="font-size:11px; color:var(--text-muted);">Top 10</span>
+      <div class="sec-head">
+        <span class="sec-bullet" style="background: var(--blue);"></span>
+        <span class="sec-title" style="color: var(--blue);" data-i18n="acesTitle">DAILY ACES</span>
+        <span class="sec-side" data-i18n="top10">TOP 10</span>
       </div>
       <ul id="leaderboardList" class="lb-list">
-        <li class="lb-empty">Loading flight data...</li>
+        <li class="lb-empty" data-i18n="loading">Loading...</li>
       </ul>
     </div>
 
     <footer class="footer">
-      ASTROBYTE SYSTEMS v2.5
+      ASTROBYTE SYSTEMS v2.6 — INSERT COIN
     </footer>
   </div>
 
-  <!-- Simple Modal for alerts -->
+  <!-- Modal -->
   <div id="dialogBackdrop" class="dialog-backdrop">
     <div class="dialog">
       <h3 id="dialogTitle">Alert</h3>
       <p id="dialogMessage">Message goes here.</p>
-      <button class="dialog-btn" onclick="closeDialog()">Understood</button>
+      <button id="dialogOk" class="dialog-btn" onclick="closeDialog()" data-i18n="ok">UNDERSTOOD</button>
+      <button id="dialogCancel" class="dialog-btn ghost" style="display:none;" data-i18n="cancel">CANCEL</button>
     </div>
   </div>
 
@@ -657,32 +888,260 @@
     // --- Logic ---
     const tg = window.Telegram && window.Telegram.WebApp ? window.Telegram.WebApp : null;
     let playedToday = false;
-    
+
+    /* ================= i18n =================
+     * Language ladder: localStorage 'lang' (set by the dashboard when it
+     * shares this origin) → Telegram initDataUnsafe language_code → 'en'. */
+    const LANG = (function () {
+      let v = '';
+      try { v = localStorage.getItem('lang') || ''; } catch (_) {}
+      if (!v && tg && tg.initDataUnsafe && tg.initDataUnsafe.user) {
+        v = tg.initDataUnsafe.user.language_code || '';
+      }
+      return String(v).toLowerCase().indexOf('fa') === 0 ? 'fa' : 'en';
+    })();
+    const RTL = LANG === 'fa';
+
+    const I18N = {
+      en: {
+        subtitle: 'ASTROBYTE ARCADE',
+        pilotLabel: 'PILOT LICENSE',
+        namePh: 'Enter name...',
+        lbToggle: 'Show on leaderboard',
+        dailyBadge: 'DAILY MISSION',
+        gameDesc: 'Defend the station from alien swarms!',
+        launch: 'LAUNCH MISSION',
+        launched: 'MISSION COMPLETE',
+        nextIn: 'Next mission in',
+        raceTitle: 'MONTHLY RACE',
+        raceNote: 'Every daily mission adds to your monthly total. Top 3 win 50 / 25 / 10 GB — winners are picked automatically on the 1st of next month.',
+        offP1: '10% off',
+        lastDay: 'Last day!',
+        daysLeft: n => n + ' days left',
+        youRank: (r, s) => `You're <b>#${r}</b> with <b>${s}</b> pts`,
+        gapTxt: (g, r) => ` — ${g} behind #${r}`,
+        crown: ' — defend your crown! 👑',
+        raceEmpty: 'No scores this month yet.<br>The 50GB is up for grabs!',
+        hofTitle: 'HALL OF FAME',
+        acesTitle: 'DAILY ACES',
+        top10: 'TOP 10',
+        acesEmpty: 'No flight records yet.<br>Be the first to launch!',
+        commsOffline: 'Comms offline (error loading data)',
+        loading: 'Loading...',
+        debriefTitle: 'Mission Debrief',
+        debriefMsg: 'You have already completed your daily ranked mission. Come back tomorrow for a new challenge!',
+        ok: 'UNDERSTOOD',
+        prizeGb: gb => gb + 'GB Free',
+        prizeOff: p => p + '% off',
+        intelTitle: 'ENEMY INTEL',
+        intelSide: 'KNOW YOUR TARGETS',
+        intelHits: 'HITS',
+        intelPts: 'POINTS',
+        hangarTitle: 'HANGAR',
+        hangarNote: 'Golden coins drop rarely during ranked missions. Spend them on your ship — they never expire.',
+        skinsTitle: 'SHIP SKINS',
+        powersTitle: 'UPGRADES',
+        retryTitle: 'SECOND CHANCE',
+        retryWarn: "Today's score is wiped first — the new run replaces it, higher or lower.",
+        retryBtn: c => `RESET TODAY'S RUN — ${c} 🪙`,
+        retryConfirmTitle: 'Reset today\'s run?',
+        retryConfirmMsg: (c, s) => `This costs ${c} coins and ERASES today's score (${s}). Your next run counts instead — even if it's lower. Fly again?`,
+        retryDone: 'Run reset! Hit LAUNCH MISSION when ready.',
+        buyConfirmTitle: 'Confirm purchase',
+        buyConfirmMsg: (n, c) => `Buy ${n} for ${c} coins?`,
+        equipped: 'EQUIPPED',
+        ownedTap: 'TAP TO EQUIP',
+        notEnough: 'Not enough coins yet — they drop during ranked missions!',
+        cancel: 'CANCEL',
+        confirm: 'CONFIRM',
+        skinNames: { default: 'Classic', crimson: 'Crimson', ice: 'Ice', void: 'Void', gold: 'Gold' },
+        powerNames: {
+          shield_start: ['Guardian Shield', 'Start every mission with 1 shield'],
+          spread_start: ['3-Way Launch', 'Start every mission with the 3-way shot'],
+          extra_life:   ['Reinforced Hull', '+1 life on every mission — permanent'],
+        },
+      },
+      fa: {
+        subtitle: 'آرکید آستروبایت',
+        pilotLabel: 'کارت خلبانی',
+        namePh: 'اسمتو بنویس...',
+        lbToggle: 'نمایش در جدول امتیازها',
+        dailyBadge: 'مأموریت روزانه',
+        gameDesc: 'از پایگاه در برابر هجوم حشره‌های فضایی دفاع کن!',
+        launch: 'شروع مأموریت',
+        launched: 'مأموریت امروز انجام شد',
+        nextIn: 'مأموریت بعدی تا',
+        raceTitle: 'مسابقه ماهانه',
+        raceNote: 'امتیاز هر مأموریت روزانه به مجموع ماهانه‌ات اضافه می‌شه. سه نفر اول ۵۰ / ۲۵ / ۱۰ گیگ جایزه می‌گیرن — برنده‌ها روز اول ماه بعد به‌صورت خودکار انتخاب می‌شن.',
+        offP1: '۱۰٪ تخفیف',
+        lastDay: 'روز آخر!',
+        daysLeft: n => n + ' روز مانده',
+        youRank: (r, s) => `رتبه‌ات <b>\u200e#${r}\u200e</b> با <b>${s}</b> امتیاز`,
+        gapTxt: (g, r) => ` — ${g} امتیاز تا رتبه ${r}`,
+        crown: ' — از تاجت دفاع کن! 👑',
+        raceEmpty: 'این ماه هنوز امتیازی ثبت نشده.<br>جایزه ۵۰ گیگی منتظر یه قهرمانه!',
+        hofTitle: 'تالار افتخار',
+        acesTitle: 'برترین‌های امروز',
+        top10: '۱۰ نفر برتر',
+        acesEmpty: 'هنوز پروازی ثبت نشده.<br>اولین خلبان باش!',
+        commsOffline: 'ارتباط قطع شد (خطا در دریافت اطلاعات)',
+        loading: 'در حال بارگیری...',
+        debriefTitle: 'گزارش مأموریت',
+        debriefMsg: 'مأموریت رتبه‌دار امروزت رو انجام دادی. فردا برای چالش جدید برگرد!',
+        ok: 'باشه',
+        prizeGb: gb => gb + ' گیگ رایگان',
+        prizeOff: p => p + '٪ تخفیف',
+        intelTitle: 'اطلاعات دشمن',
+        intelSide: 'هدف‌هات رو بشناس',
+        intelHits: 'ضربه',
+        intelPts: 'امتیاز',
+        hangarTitle: 'آشیانه',
+        hangarNote: 'سکه‌های طلایی خیلی کم توی مأموریت‌های رتبه‌دار می‌افتن. اینجا خرجشون کن — هیچ‌وقت منقضی نمی‌شن.',
+        skinsTitle: 'پوسته سفینه',
+        powersTitle: 'ارتقاها',
+        retryTitle: 'شانس دوباره',
+        retryWarn: 'اول امتیاز امروزت پاک می‌شه — دور جدید جاش می‌شینه، چه بالاتر چه پایین‌تر.',
+        retryBtn: c => `ریست دور امروز — ${c} 🪙`,
+        retryConfirmTitle: 'دور امروز ریست بشه؟',
+        retryConfirmMsg: (c, s) => `این کار ${c} سکه خرج داره و امتیاز امروزت (${s}) رو پاک می‌کنه. دور بعدی جاش حساب می‌شه — حتی اگه کمتر باشه. بریم؟`,
+        retryDone: 'دور ریست شد! هر وقت آماده بودی «شروع مأموریت» رو بزن.',
+        buyConfirmTitle: 'تأیید خرید',
+        buyConfirmMsg: (n, c) => `«${n}» رو با ${c} سکه می‌خری؟`,
+        equipped: 'انتخاب شده',
+        ownedTap: 'بزن تا انتخاب شه',
+        notEnough: 'هنوز سکه کافی نداری — سکه‌ها توی مأموریت‌های رتبه‌دار می‌افتن!',
+        cancel: 'بی‌خیال',
+        confirm: 'تأیید',
+        skinNames: { default: 'کلاسیک', crimson: 'سرخ', ice: 'یخی', void: 'شب', gold: 'طلایی' },
+        powerNames: {
+          shield_start: ['سپر نگهبان', 'هر مأموریت رو با ۱ سپر شروع کن'],
+          spread_start: ['شلیک سه‌گانه', 'هر مأموریت رو با شلیک سه‌طرفه شروع کن'],
+          extra_life:   ['بدنه تقویتی', '۱+ جان در هر مأموریت — دائمی'],
+        },
+      },
+    };
+    function T(key) {
+      const d = I18N[LANG] || I18N.en;
+      return (key in d) ? d[key] : I18N.en[key];
+    }
+    /* ============== Enemy Intel roster (numbers mirror astrobugz2/config.js) ============== */
+    const SPR = '/webapp/arcade/astrobugz/images/';
+    const INTEL = [
+      { img: 'player-sheet0.png',    boss: false, hits: '—',   pts: '—',
+        en: ['Your ship', '3 lives per mission — powerups drop from downed bugs'],
+        fa: ['سفینه شما', '۳ جان در هر مأموریت — از حشره‌های ساقط‌شده آیتم می‌افتد'] },
+      { img: 'mushroom-sheet0.png',  boss: false, hits: 3,   pts: 1,
+        en: ['Mushroom', '+2 bonus for each one alive at level end'],
+        fa: ['قارچ', 'برای هر قارچ سالم در پایان مرحله ۲+ امتیاز'] },
+      { img: 'segment-sheet1.png',   boss: false, hits: 1,   pts: 10,
+        en: ['Worm body', 'the swarm — each segment pops for points'],
+        fa: ['بدنه کرم', 'هر بند با یک شلیک می‌ترکد'] },
+      { img: 'segment-sheet1.png',   boss: false, hits: 2,   pts: 25,
+        en: ['Armored segment', 'level 4+ — first hit shatters the cyan plate'],
+        fa: ['بند زره‌دار', 'مرحله ۴ به بعد — ضربه اول زره را می‌شکند'] },
+      { img: 'segment-sheet0.png',   boss: false, hits: 1,   pts: 100,
+        en: ['Worm head', 'aim for the head — 10x a body segment'],
+        fa: ['سر کرم', 'سر را بزن — ۱۰ برابر بدنه امتیاز دارد'] },
+      { img: 'pinkbomb-sheet0.png',  boss: false, hits: 4,   pts: 150,
+        en: ['Splitter pod', 'level 3+ — bursts into 2 divers, dead or landed'],
+        fa: ['کیسه تخم', 'مرحله ۳ به بعد — در هر صورت به ۲ شیرجه‌زن تبدیل می‌شود'] },
+      { img: 'flea-sheet0.png',      boss: false, hits: 5,   pts: 200,
+        en: ['Flea', 'level 2+ — dive-bombs and plants mushrooms'],
+        fa: ['کک', 'مرحله ۲ به بعد — شیرجه می‌زند و قارچ می‌کارد'] },
+      { img: 'spider-sheet0.png',    boss: false, hits: 10,  pts: '300–900',
+        en: ['Spider', 'closer kill = bigger score'],
+        fa: ['عنکبوت', 'هرچه نزدیک‌تر بکشی، امتیاز بیشتر'] },
+      { img: 'scorpion-sheet0.png',  boss: false, hits: 10,  pts: 1000,
+        en: ['Scorpion', 'level 3+ — poisons mushrooms in its path'],
+        fa: ['عقرب', 'مرحله ۳ به بعد — قارچ‌ها را مسموم می‌کند'] },
+      { img: 'flea-sheet2.png',      boss: false, hits: 3,   pts: 2000,
+        en: ['UFO raider', 'level 5+ — rare, fast, escapes if ignored'],
+        fa: ['یوفوی مهاجم', 'مرحله ۵ به بعد — کمیاب و فراری؛ از دستش نده'] },
+      { img: 'spiderboss-sheet0.png', boss: true, hits: 50,  pts: 2500,
+        en: ['SPIDER BOSS', 'fires bombs — sprays 10 more when it dies'],
+        fa: ['غول عنکبوتی', 'بمب می‌اندازد — موقع مرگ ۱۰ بمب دیگر می‌پاشد'] },
+      { img: 'megaboss-sheet0.png',  boss: true, hits: 250, pts: 5000,
+        en: ['MEGA BOSS', 'level 6+ — volleys of bombs, the final test'],
+        fa: ['غول نهایی', 'مرحله ۶ به بعد — رگبار بمب؛ آزمون نهایی'] },
+    ];
+    function renderIntel() {
+      const list = document.getElementById('intelList');
+      if (!list) return;
+      const faN = s => LANG === 'fa' ? String(s).replace(/[0-9]/g, d => '۰۱۲۳۴۵۶۷۸۹'[d]) : String(s);
+      list.innerHTML = INTEL.map(e => {
+        const [name, note] = LANG === 'fa' ? e.fa : e.en;
+        return `<div class="intel-row${e.boss ? ' boss' : ''}">
+          <span class="intel-sprite" style="background-image:url('${SPR}${e.img}')"></span>
+          <span class="intel-name"><b>${name}</b><small>${note}</small></span>
+          <span class="intel-hits">${faN(e.hits)}</span>
+          <span class="intel-pts">${faN(e.pts)}</span>
+        </div>`;
+      }).join('');
+    }
+
+    function applyI18n() {
+      document.documentElement.lang = LANG;
+      if (RTL) {
+        document.documentElement.dir = 'rtl';
+        document.body.classList.add('lang-fa');
+      }
+      document.querySelectorAll('[data-i18n]').forEach(el => {
+        const v = T(el.getAttribute('data-i18n'));
+        if (typeof v === 'string') el.textContent = v;
+      });
+      const nameInput = document.getElementById('pilotName');
+      if (nameInput) nameInput.placeholder = T('namePh');
+    }
+
     // Initialize
     (function init(){
-      // Generate stars
+      applyI18n();
+      renderIntel();
+
+      // pixel starfield (square stars, opacity-only twinkle)
       const bg = document.getElementById('starfield');
-      for(let i=0; i<50; i++){
+      const tints = ['', '', '', 'b', 'p'];
+      for(let i=0; i<45; i++){
         const s = document.createElement('div');
-        s.className = 'star';
+        s.className = 'star ' + tints[i % tints.length];
         s.style.left = Math.random() * 100 + '%';
         s.style.top = Math.random() * 100 + '%';
-        s.style.width = Math.random() * 3 + 'px';
-        s.style.height = s.style.width;
+        const sz = (Math.random() < 0.8 ? 2 : 3);
+        s.style.width = sz + 'px';
+        s.style.height = sz + 'px';
         s.style.setProperty('--duration', (Math.random() * 3 + 2) + 's');
+        s.style.setProperty('--delay', (Math.random() * -5) + 's');
         bg.appendChild(s);
       }
 
-      // Platform Detection
+      // shooting stars: one streaks across every few seconds
+      if(!window.matchMedia('(prefers-reduced-motion: reduce)').matches){
+        function spawnShootingStar(){
+          if(!document.hidden){
+            const st = document.createElement('div');
+            st.className = 'shooting-star';
+            st.style.left = (Math.random() * 70) + '%';
+            st.style.top = (Math.random() * 45) + '%';
+            st.style.setProperty('--angle', (18 + Math.random() * 30) + 'deg');
+            const dur = 0.9 + Math.random() * 0.9;
+            st.style.setProperty('--dur', dur + 's');
+            bg.appendChild(st);
+            setTimeout(() => st.remove(), dur * 1000 + 100);
+          }
+          setTimeout(spawnShootingStar, 2500 + Math.random() * 5000);
+        }
+        setTimeout(spawnShootingStar, 1200);
+      }
+
+      // Platform detection (safe-area padding)
       let detectedPlatform = '';
-      if (window.tg && window.tg.platform) {
-        detectedPlatform = String(window.tg.platform).toLowerCase();
+      if (tg && tg.platform) {
+        detectedPlatform = String(tg.platform).toLowerCase();
       } else {
         const ua = navigator.userAgent.toLowerCase();
         if (ua.includes('android')) detectedPlatform = 'android';
         else if (ua.includes('iphone') || ua.includes('ipad') || ua.includes('ios')) detectedPlatform = 'ios';
       }
-
       if (detectedPlatform.includes('android')) {
         document.body.classList.add('platform-android');
       } else if (detectedPlatform.includes('ios')) {
@@ -692,23 +1151,26 @@
       if(tg) {
         tg.expand();
         tg.enableClosingConfirmation();
-        if(tg.setHeaderColor) tg.setHeaderColor('#0f172a');
-        if(tg.setBackgroundColor) tg.setBackgroundColor('#0f172a');
+        if(tg.setHeaderColor) tg.setHeaderColor('#050110');
+        if(tg.setBackgroundColor) tg.setBackgroundColor('#050110');
       }
-      
+
       setupNameInput();
       checkStatus();
       loadLeaderboard();
       loadRace();
       loadHallOfFame();
-      
+      loadShop();
+
       // Re-check on focus (in case user played and came back)
       window.addEventListener('focus', checkStatus);
     })();
-    
+
     function setupNameInput(){
       const input = document.getElementById('pilotName');
-      
+      const editBtn = document.getElementById('pilotEdit');
+      const card = document.querySelector('.pilot-card');
+
       // Name will be loaded from server in checkStatus()
       // Fallback to localStorage if server hasn't responded yet
       const cached = localStorage.getItem('astro_display_name');
@@ -716,22 +1178,45 @@
 
       // Auto-save on blur
       input.addEventListener('blur', () => {
+        card.classList.remove('editing');
         const val = input.value.trim();
         if(val) {
           saveNameToServer(val);
         }
       });
-      
+      input.addEventListener('focus', () => card.classList.add('editing'));
+
       // Save on enter
       input.addEventListener('keydown', (e) => {
         if(e.key === 'Enter') input.blur();
       });
+
+      // Pen button toggles edit mode: tap → keyboard opens with the caret at
+      // the end; tap again (now a checkmark) → saves + closes the keyboard.
+      editBtn.addEventListener('pointerdown', (e) => {
+        e.preventDefault();   // keep the button from stealing focus first
+        if(document.activeElement === input){
+          input.blur();
+        } else {
+          input.focus();
+          const v = input.value;
+          input.setSelectionRange(v.length, v.length);
+        }
+      });
+
+      // Tapping anywhere outside closes the keyboard too (Android back-button
+      // keyboard dismissal leaves the field focused with no way out).
+      document.addEventListener('touchstart', (e) => {
+        if(document.activeElement === input && !card.contains(e.target)){
+          input.blur();
+        }
+      }, { passive: true });
     }
 
     async function saveNameToServer(name){
       const urlParams = new URLSearchParams(window.location.search);
       const auth = urlParams.get('auth') || '';
-      
+
       try{
         const res = await fetch(`/api/arcade/save-name?auth=${encodeURIComponent(auth)}`, {
           method: 'POST',
@@ -739,17 +1224,16 @@
           body: JSON.stringify({ display_name: name })
         });
         const data = await res.json();
-        
+
         if(data.ok){
-          // Update local cache
           localStorage.setItem('astro_display_name', data.display_name);
           console.log('[ARCADE] Name saved:', data.display_name);
         }
-      } catch(e) { 
+      } catch(e) {
         console.error('[ARCADE] Failed to save name:', e);
       }
     }
-    
+
     async function checkStatus(){
       // Optimistic check
       const lastPlayed = localStorage.getItem('astro_last_played_date');
@@ -761,10 +1245,10 @@
         const urlParams = new URLSearchParams(window.location.search);
         const auth = urlParams.get('auth') || '';
         const initData = tg ? (tg.initData||'') : '';
-        
+
         const res = await fetch(`/api/arcade/status?auth=${encodeURIComponent(auth)}&init_data=${encodeURIComponent(initData)}&_t=${Date.now()}`);
         const data = await res.json();
-        
+
         if(data.ok){
           if(data.played_today){
             localStorage.setItem('astro_last_played_date', today);
@@ -776,14 +1260,18 @@
             setPlayedState(false);
           }
 
+          // remembered for the retry confirm ("erases today's score (X)")
+          if(typeof data.best_score_today !== 'undefined'){
+            try { localStorage.setItem('astro_best_today', String(data.best_score_today)); } catch(_){}
+          }
+
           // Load display name from server (synced across devices)
           const input = document.getElementById('pilotName');
           if(data.display_name && input){
             input.value = data.display_name;
-            // Update local cache
             localStorage.setItem('astro_display_name', data.display_name);
           }
-          
+
           // Update leaderboard toggle state
           const lbToggle = document.getElementById('lbToggle');
           if(lbToggle){
@@ -797,35 +1285,35 @@
         }
       } catch(e) { console.error('Status check error', e); }
     }
-    
+
     // Leaderboard toggle handler
     (function initLbToggle(){
       const toggle = document.getElementById('lbToggle');
       if(!toggle) return;
-      
+
       toggle.addEventListener('click', async function(){
         const isActive = toggle.classList.contains('active');
         const newValue = !isActive;
-        
+
         // Optimistic update
         if(newValue){
           toggle.classList.add('active');
         } else {
           toggle.classList.remove('active');
         }
-        
+
         // Send to server
         try {
           const urlParams = new URLSearchParams(window.location.search);
           const auth = urlParams.get('auth') || '';
-          
+
           const res = await fetch(`/api/arcade/toggle-leaderboard?auth=${encodeURIComponent(auth)}`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ show_on_leaderboard: newValue })
           });
           const data = await res.json();
-          
+
           if(data.ok){
             console.log('[ARCADE] Leaderboard visibility updated:', data.show_on_leaderboard);
           }
@@ -841,49 +1329,86 @@
       });
     })();
 
+    const ICON_ROCKET = `
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+         <path d="M4.5 16.5c-1.5 1.26-2 5-2 5s3.74-.5 5-2c.71-.84.7-2.13-.09-2.91a2.18 2.18 0 0 0-2.91-.09z"/>
+         <path d="M12 15l-3-3a22 22 0 0 1 2-3.95A12.88 12.88 0 0 1 22 2c0 2.72-.78 7.5-6 11a22.35 22.35 0 0 1-4 2z"/>
+         <path d="M9 12H4s.55-3.03 2-4c1.62-1.08 5 0 5 0"/>
+         <path d="M12 15v5s3.03-.55 4-2c1.08-1.62 0-5 0-5"/>
+      </svg>`;
+    const ICON_CHECK = `
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path>
+        <polyline points="22 4 12 14.01 9 11.01"></polyline>
+      </svg>`;
+
     function setPlayedState(isPlayed){
       playedToday = isPlayed;
       const btn = document.getElementById('playBtn');
       if(isPlayed){
         btn.classList.add('played');
-        btn.innerHTML = `
-          <span class="icon">
-            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-              <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path>
-              <polyline points="22 4 12 14.01 9 11.01"></polyline>
-            </svg>
-          </span>
-          <span class="text">Mission Complete</span>
-        `;
+        btn.innerHTML = `<span class="icon">${ICON_CHECK}</span><span class="text">${T('launched')}</span>`;
+        startNextMissionCountdown();
       } else {
         btn.classList.remove('played');
-        btn.innerHTML = `
-          <span class="icon">
-            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-               <path d="M4.5 16.5c-1.5 1.26-2 5-2 5s3.74-.5 5-2c.71-.84.7-2.13-.09-2.91a2.18 2.18 0 0 0-2.91-.09z"/>
-               <path d="M12 15l-3-3a22 22 0 0 1 2-3.95A12.88 12.88 0 0 1 22 2c0 2.72-.78 7.5-6 11a22.35 22.35 0 0 1-4 2z"/>
-               <path d="M9 12H4s.55-3.03 2-4c1.62-1.08 5 0 5 0"/>
-               <path d="M12 15v5s3.03-.55 4-2c1.08-1.62 0-5 0-5"/>
-            </svg>
-          </span>
-          <span class="text">Launch Mission</span>
-        `;
+        btn.innerHTML = `<span class="icon">${ICON_ROCKET}</span><span class="text">${T('launch')}</span>`;
+        stopNextMissionCountdown();
+      }
+      updateRetryRow();   // hangar's "second chance" row follows this state
+    }
+
+    /* ---- countdown to the next daily mission ----
+     * The server's daily boundary is IRAN midnight (Asia/Tehran, UTC+3:30 —
+     * no DST since 2022), so count down to that regardless of device TZ. */
+    const IRAN_OFFSET_MS = 3.5 * 3600000;
+    let nextMissionTimerId = null;
+    function startNextMissionCountdown(){
+      const box = document.getElementById('nextMission');
+      const out = document.getElementById('nextMissionTimer');
+      if(!box || !out) return;
+      box.classList.add('visible');
+      const faN = s => LANG === 'fa' ? String(s).replace(/[0-9]/g, d => '۰۱۲۳۴۵۶۷۸۹'[d]) : String(s);
+      function tick(){
+        const nowMs = Date.now();
+        const iranNow = nowMs + IRAN_OFFSET_MS;
+        const nextIranMidnight = (Math.floor(iranNow / 86400000) + 1) * 86400000 - IRAN_OFFSET_MS;
+        let ms = nextIranMidnight - nowMs;
+        if(ms <= 0){
+          stopNextMissionCountdown();
+          checkStatus();   // day rolled over — unlock the button
+          return;
+        }
+        const h = Math.floor(ms / 3600000);
+        const m = Math.floor(ms / 60000) % 60;
+        const s = Math.floor(ms / 1000) % 60;
+        const pad = n => String(n).padStart(2, '0');
+        out.textContent = faN(pad(h) + ':' + pad(m) + ':' + pad(s));
+      }
+      tick();
+      if(nextMissionTimerId === null) nextMissionTimerId = setInterval(tick, 1000);
+    }
+    function stopNextMissionCountdown(){
+      const box = document.getElementById('nextMission');
+      if(box) box.classList.remove('visible');
+      if(nextMissionTimerId !== null){
+        clearInterval(nextMissionTimerId);
+        nextMissionTimerId = null;
       }
     }
 
     // Play Button Logic
     document.getElementById('playBtn').addEventListener('click', () => {
       if(playedToday){
-        showDialog('Mission Debrief', 'You have already completed your daily ranked mission. Come back tomorrow for a new challenge!');
+        showDialog(T('debriefTitle'), T('debriefMsg'));
         return;
       }
-      
+
       // Navigate
       let url = '/webapp/arcade/astrobugz2/index.html?practice=0';
       const urlParams = new URLSearchParams(window.location.search);
       const auth = urlParams.get('auth');
       if (auth) url += '&auth=' + encodeURIComponent(auth);
-      
+
       window.location.href = url;
     });
 
@@ -899,8 +1424,18 @@
     function rankMedal(rank){
       return rank === 1 ? '🥇' : rank === 2 ? '🥈' : rank === 3 ? '🥉' : rank;
     }
-    function escapeHtml(t){
-      return String(t).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+
+    function daysLeftText(n){
+      return n === 0 ? T('lastDay') : T('daysLeft')(n);
+    }
+
+    // "Arcade Champion — 50GB Free" (server, EN) → localized short prize label
+    function prizeLabel(raw){
+      const gb = /(\d+)\s*GB/i.exec(raw || '');
+      if (gb) return T('prizeGb')(gb[1]);
+      const off = /(\d+)\s*%/.exec(raw || '');
+      if (off) return T('prizeOff')(off[1]);
+      return raw || '';
     }
 
     async function loadRace(){
@@ -916,23 +1451,23 @@
         if(!data.ok) return;
 
         const cd = document.getElementById('raceCountdown');
-        if(cd) cd.textContent = data.days_left === 0 ? 'Last day!' : data.days_left + ' days left';
+        if(cd) cd.textContent = daysLeftText(data.days_left);
 
-        // my rank banner
+        // my rank banner (current rank + gap to the player above)
         const meEl = document.getElementById('raceMe');
         if(meEl && data.me){
-          let txt = `You're <b>#${data.me.rank}</b> with <b>${data.me.score.toLocaleString()}</b> pts`;
+          let txt = T('youRank')(data.me.rank, data.me.score.toLocaleString());
           if(data.me.rank > 1 && data.me.gap_to_next > 0){
-            txt += ` — ${data.me.gap_to_next.toLocaleString()} behind #${data.me.rank - 1}`;
+            txt += T('gapTxt')(data.me.gap_to_next.toLocaleString(), data.me.rank - 1);
           } else if (data.me.rank === 1){
-            txt += ' — defend your crown! 👑';
+            txt += T('crown');
           }
           meEl.innerHTML = txt;
           meEl.style.display = 'block';
         }
 
         if(!data.top || data.top.length === 0){
-          list.innerHTML = '<li class="lb-empty">No scores this month yet.<br>The 50GB is up for grabs!</li>';
+          list.innerHTML = '<li class="lb-empty">' + T('raceEmpty') + '</li>';
           return;
         }
         list.innerHTML = data.top.map(item => `
@@ -956,7 +1491,7 @@
         document.getElementById('hofList').innerHTML = data.winners.map(w => `
           <li class="lb-item">
             <span class="lb-rank">${rankMedal(w.rank)}</span>
-            <span class="lb-name">${escapeHtml(w.name)}<br><small style="color:var(--text-muted); font-size:10px;">${escapeHtml(w.prize)}</small></span>
+            <span class="lb-name">${escapeHtml(w.name)}<br><small style="color:var(--text-muted); font-size:11px;">${escapeHtml(prizeLabel(w.prize))}</small></span>
             <span class="lb-score">${w.score.toLocaleString()}</span>
           </li>
         `).join('');
@@ -971,9 +1506,9 @@
       try {
         const res = await fetch('/api/arcade/leaderboard?period=daily&limit=10');
         const data = await res.json();
-        
+
         if(!data.leaderboard || data.leaderboard.length === 0){
-          list.innerHTML = '<li class="lb-empty">No flight records yet.<br>Be the first to launch!</li>';
+          list.innerHTML = '<li class="lb-empty">' + T('acesEmpty') + '</li>';
           return;
         }
 
@@ -985,26 +1520,229 @@
           </li>
         `).join('');
       } catch(e) {
-        list.innerHTML = '<li class="lb-empty">Comms Offline (Error loading data)</li>';
+        list.innerHTML = '<li class="lb-empty">' + T('commsOffline') + '</li>';
       }
     }
 
     function escapeHtml(text) {
       if(!text) return 'Unknown Pilot';
-      return text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#039;");
+      return String(text).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#039;");
+    }
+
+    /* ================= HANGAR (coin shop) =================
+     * Catalog + wallet come from /api/arcade/shop (server is the only truth
+     * on prices/ownership). Coins are earned in ranked runs only. */
+    // var (not let): setPlayedState → updateRetryRow can run before this
+    // line executes (optimistic lock check during init) — var hoists safely
+    var shopCatalog = null;
+    var shopWallet = null;
+    const SHIP_SPRITE_URL = '/webapp/arcade/astrobugz/images/player-sheet0.png';
+    const shipImg = new Image();
+    let shipImgReady = false;
+    shipImg.onload = () => { shipImgReady = true; renderHangar(); };
+    shipImg.src = SHIP_SPRITE_URL;
+
+    const faN = s => LANG === 'fa' ? String(s).replace(/[0-9]/g, d => '۰۱۲۳۴۵۶۷۸۹'[d]) : String(s);
+
+    function shopAuthQS(){
+      const urlParams = new URLSearchParams(window.location.search);
+      const auth = urlParams.get('auth') || '';
+      let qs = '?_t=' + Date.now();
+      if(auth) qs += '&auth=' + encodeURIComponent(auth);
+      if(tg && tg.initData) qs += '&init_data=' + encodeURIComponent(tg.initData);
+      return qs;
+    }
+
+    async function loadShop(){
+      try {
+        const res = await fetch('/api/arcade/shop' + shopAuthQS(), { credentials: 'include' });
+        const data = await res.json();
+        if(!data.ok) return;
+        shopCatalog = data.catalog;
+        shopWallet = data.wallet;          // null when not authenticated
+        if(shopWallet) renderHangar();     // card stays hidden without a wallet
+      } catch(e){ console.error('[ARCADE] shop load failed', e); }
+    }
+
+    // same tint recipe as the in-game engine (source-atop keeps pixel alpha)
+    function drawShipPreview(canvas, color){
+      if(!shipImgReady) return;
+      canvas.width = shipImg.naturalWidth;
+      canvas.height = shipImg.naturalHeight;
+      const c2 = canvas.getContext('2d');
+      c2.drawImage(shipImg, 0, 0);
+      if(color){
+        c2.globalCompositeOperation = 'source-atop';
+        c2.globalAlpha = 0.55;
+        c2.fillStyle = color;
+        c2.fillRect(0, 0, canvas.width, canvas.height);
+      }
+    }
+
+    function renderHangar(){
+      if(!shopCatalog || !shopWallet) return;
+      document.getElementById('hangarCard').style.display = 'block';
+      document.getElementById('coinBalance').innerHTML = '🪙 <b>' + faN(shopWallet.coins) + '</b>';
+
+      // ---- skins ----
+      const grid = document.getElementById('skinGrid');
+      grid.innerHTML = '';
+      shopCatalog.skins.forEach(skin => {
+        const owned = shopWallet.owned_skins.includes(skin.key);
+        const equipped = shopWallet.equipped_skin === skin.key;
+        const cell = document.createElement('button');
+        cell.type = 'button';
+        cell.className = 'skin-cell' + (equipped ? ' equipped' : owned ? ' owned' : ' locked');
+        const name = (T('skinNames') || {})[skin.key] || skin.key;
+        const state = equipped ? T('equipped')
+                    : owned ? T('ownedTap')
+                    : faN(skin.price) + ' 🪙';
+        cell.innerHTML = '<canvas></canvas>' +
+          '<span class="skin-name">' + escapeHtml(name) + '</span>' +
+          '<span class="skin-state">' + state + '</span>';
+        drawShipPreview(cell.querySelector('canvas'), skin.color);
+        cell.addEventListener('click', () => {
+          if(equipped) return;
+          if(owned) return equipSkin(skin.key);
+          if(shopWallet.coins < skin.price) return showDialog(T('hangarTitle'), T('notEnough'));
+          showConfirm(T('buyConfirmTitle'), T('buyConfirmMsg')(name, faN(skin.price)),
+                      () => buyItem('skin:' + skin.key));
+        });
+        grid.appendChild(cell);
+      });
+
+      // ---- powers + hull ----
+      const list = document.getElementById('powerList');
+      list.innerHTML = '';
+      const rows = shopCatalog.powers.map(p => ({
+        item: 'power:' + p.key, key: p.key, price: p.price,
+        owned: shopWallet.owned_powers.includes(p.key),
+        ico: p.key === 'shield_start' ? '🛡️' : '🔱',
+      }));
+      rows.push({
+        item: 'extra_life', key: 'extra_life', price: shopCatalog.extra_life.price,
+        owned: (shopWallet.extra_lives || 0) >= 1, ico: '❤️',
+      });
+      rows.forEach(r => {
+        const [name, desc] = (T('powerNames') || {})[r.key] || [r.key, ''];
+        const row = document.createElement('div');
+        row.className = 'power-row';
+        row.innerHTML =
+          '<span class="power-ico">' + r.ico + '</span>' +
+          '<span class="power-info"><b>' + escapeHtml(name) + '</b><small>' + escapeHtml(desc) + '</small></span>' +
+          '<button type="button" class="buy-btn' + (r.owned ? ' owned' : shopWallet.coins < r.price ? ' poor' : '') + '">' +
+          (r.owned ? '✓' : faN(r.price) + ' 🪙') + '</button>';
+        const btn = row.querySelector('.buy-btn');
+        if(!r.owned){
+          btn.addEventListener('click', () => {
+            if(shopWallet.coins < r.price) return showDialog(T('hangarTitle'), T('notEnough'));
+            showConfirm(T('buyConfirmTitle'), T('buyConfirmMsg')(name, faN(r.price)),
+                        () => buyItem(r.item));
+          });
+        }
+        list.appendChild(row);
+      });
+
+      updateRetryRow();
+    }
+
+    function updateRetryRow(){
+      const row = document.getElementById('retryRow');
+      if(!row || !shopCatalog || !shopWallet) return;
+      const price = shopCatalog.retry.price;
+      row.style.display = playedToday ? 'block' : 'none';
+      if(playedToday){
+        const btn = document.getElementById('retryBtn');
+        btn.textContent = T('retryBtn')(faN(price));
+        btn.onclick = () => {
+          if(shopWallet.coins < price) return showDialog(T('hangarTitle'), T('notEnough'));
+          const score = faN(localStorage.getItem('astro_best_today') || '?');
+          showConfirm(T('retryConfirmTitle'), T('retryConfirmMsg')(faN(price), score), doRetry);
+        };
+      }
+    }
+
+    async function buyItem(item){
+      try {
+        const res = await fetch('/api/arcade/shop/buy' + shopAuthQS(), {
+          method: 'POST',
+          headers: {'Content-Type': 'application/json'},
+          credentials: 'include',
+          body: JSON.stringify({ item }),
+        });
+        const data = await res.json();
+        if(data.ok){
+          shopWallet = data.wallet;
+          renderHangar();
+        } else if(data.error === 'not_enough_coins'){
+          showDialog(T('hangarTitle'), T('notEnough'));
+        }
+      } catch(e){ console.error('[ARCADE] buy failed', e); }
+    }
+
+    async function equipSkin(key){
+      try {
+        const res = await fetch('/api/arcade/shop/equip' + shopAuthQS(), {
+          method: 'POST',
+          headers: {'Content-Type': 'application/json'},
+          credentials: 'include',
+          body: JSON.stringify({ skin: key }),
+        });
+        const data = await res.json();
+        if(data.ok){ shopWallet = data.wallet; renderHangar(); }
+      } catch(e){ console.error('[ARCADE] equip failed', e); }
+    }
+
+    async function doRetry(){
+      try {
+        const res = await fetch('/api/arcade/retry' + shopAuthQS(), {
+          method: 'POST', credentials: 'include',
+        });
+        const data = await res.json();
+        if(data.ok){
+          shopWallet.coins = data.coins;
+          localStorage.removeItem('astro_last_played_date');
+          setPlayedState(false);
+          renderHangar();
+          showDialog(T('retryTitle'), T('retryDone'));
+        } else if(data.error === 'not_enough_coins'){
+          showDialog(T('hangarTitle'), T('notEnough'));
+        }
+      } catch(e){ console.error('[ARCADE] retry failed', e); }
     }
 
     // Dialog logic
     function showDialog(title, msg){
       document.getElementById('dialogTitle').innerText = title;
       document.getElementById('dialogMessage').innerText = msg;
+      const ok = document.getElementById('dialogOk');
+      ok.textContent = T('ok');
+      ok.onclick = closeDialog;
+      document.getElementById('dialogCancel').style.display = 'none';
       const bd = document.getElementById('dialogBackdrop');
       bd.style.display = 'flex';
       // Force reflow
-      bd.offsetHeight; 
+      bd.offsetHeight;
       bd.classList.add('visible');
-        }
-    
+    }
+
+    // two-button variant for spends (retry / purchases)
+    function showConfirm(title, msg, onConfirm){
+      document.getElementById('dialogTitle').innerText = title;
+      document.getElementById('dialogMessage').innerText = msg;
+      const ok = document.getElementById('dialogOk');
+      ok.textContent = T('confirm');
+      ok.onclick = () => { closeDialog(); onConfirm(); };
+      const cancel = document.getElementById('dialogCancel');
+      cancel.textContent = T('cancel');
+      cancel.style.display = 'block';
+      cancel.onclick = closeDialog;
+      const bd = document.getElementById('dialogBackdrop');
+      bd.style.display = 'flex';
+      bd.offsetHeight;
+      bd.classList.add('visible');
+    }
+
     window.closeDialog = function(){
       const bd = document.getElementById('dialogBackdrop');
       bd.classList.remove('visible');

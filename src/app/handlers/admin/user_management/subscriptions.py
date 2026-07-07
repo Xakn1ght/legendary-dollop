@@ -10,6 +10,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.settings import PLANS
 from app.database.models import Receipt, Subscription, User
 from app.services.marzban import marzban_api
+from app.utils.admin_bot_helper import get_user_bot
 from app.utils.bot_i18n import t
 from app.utils.logger import bot_logger, log_error
 
@@ -112,10 +113,14 @@ async def _build_subscription_details_view(
 
     kb = InlineKeyboardBuilder()
 
-    # Action buttons based on subscription status
+    # Action buttons based on subscription status.
+    # approve_sub_ / deny_sub_ route to the SHARED flow handlers in
+    # handlers/admin/subscription.py (real provisioning + refund/notify). The
+    # old reject_sub_ button hit a local handler that cancelled without any
+    # refund or user notice (audit fix) — point it at the good deny handler.
     if subscription.status == "pending":
         kb.button(text="✅ تایید", callback_data=f"approve_sub_{subscription.id}")
-        kb.button(text="❌ رد", callback_data=f"reject_sub_{subscription.id}")
+        kb.button(text="❌ رد", callback_data=f"deny_sub_{subscription.id}")
     elif subscription.status == "active":
         kb.button(text="⏸ غیرفعال کردن", callback_data=f"disable_sub_{subscription.id}")
         kb.button(text="🔄 تمدید", callback_data=f"renew_sub_{subscription.id}")
@@ -192,7 +197,7 @@ async def disable_subscription(callback: CallbackQuery, session: AsyncSession):
         try:
             user = await session.get(User, subscription.user_id)
             if user:
-                await callback.bot.send_message(
+                await (get_user_bot() or callback.bot).send_message(
                     user.chat_id,
                     f"⏸ اشتراک شما ({subscription.marzban_username}) توسط ادمین غیرفعال شد.",
                 )
@@ -250,7 +255,7 @@ async def enable_subscription(callback: CallbackQuery, session: AsyncSession):
         try:
             user = await session.get(User, subscription.user_id)
             if user:
-                await callback.bot.send_message(
+                await (get_user_bot() or callback.bot).send_message(
                     user.chat_id,
                     f"✅ اشتراک شما ({subscription.marzban_username}) توسط ادمین فعال شد.",
                 )
@@ -285,18 +290,21 @@ async def renew_subscription_admin(callback: CallbackQuery, session: AsyncSessio
             await callback.answer("❌ پلن اشتراک یافت نشد.", show_alert=True)
             return
 
-        # Renew user in Marzban
+        # Renew user in Marzban using the PLAN's own duration (was hardcoded to
+        # 30 days, so 35/90-day plans were under-renewed — audit fix).
         success = await marzban_api.reset_user_traffic(
             username=subscription.marzban_username,
             new_data_limit_gb=plan_details["gb"],
-            new_expire_days=30,  # Assuming a default of 30 days
+            new_expire_days=int(plan_details.get("days", 30) or 30),
         )
 
         if not success:
             await callback.answer("❌ خطا در تمدید در مرزبان.", show_alert=True)
             return
 
-        # Create a new receipt
+        # Create a new receipt. (Do NOT write receipt.id into
+        # subscription.receipt_message_id — that column holds a Telegram message
+        # id, not a receipt id; the stray write corrupted it — audit fix.)
         receipt = Receipt(
             user_id=subscription.user_id,
             plan_name=subscription.plan_name,
@@ -306,9 +314,6 @@ async def renew_subscription_admin(callback: CallbackQuery, session: AsyncSessio
             subscription_id=sub_id,
         )
         session.add(receipt)
-        await session.flush()
-
-        subscription.receipt_message_id = receipt.id
         await session.commit()
 
         await callback.answer("✅ اشتراک با موفقیت تمدید شد.", show_alert=True)
@@ -324,7 +329,7 @@ async def renew_subscription_admin(callback: CallbackQuery, session: AsyncSessio
         try:
             user = await session.get(User, subscription.user_id)
             if user:
-                await callback.bot.send_message(
+                await (get_user_bot() or callback.bot).send_message(
                     user.chat_id,
                     f"✅ اشتراک شما با موفقیت تمدید شد!\\n"
                     f"پلن: {subscription.plan_name}\\n"
@@ -405,7 +410,7 @@ async def process_traffic_amount(
                     user = await session.get(User, subscription.user_id)
                     if user:
                         user_lang = getattr(user, "language", None)
-                        await message.bot.send_message(
+                        await (get_user_bot() or message.bot).send_message(
                             user.chat_id,
                             t(user_lang, "user_traffic_updated_by_admin").format(
                                 username=subscription.marzban_username,
@@ -447,80 +452,12 @@ async def process_traffic_amount(
         await state.clear()
 
 
-@router.callback_query(F.data.startswith("approve_sub_"))
-async def approve_subscription(callback: CallbackQuery, session: AsyncSession):
-    """Approve a pending subscription"""
-    try:
-        sub_id = int(callback.data.split("_")[2])
-        await callback.answer("⏳ در حال تایید اشتراک...")
-
-        # Get subscription
-        sub_query = select(Subscription).filter(Subscription.id == sub_id)
-        sub_result = await session.execute(sub_query)
-        subscription = sub_result.scalar_one_or_none()
-
-        if not subscription:
-            await callback.answer("❌ اشتراک یافت نشد.", show_alert=True)
-            return
-
-        # Activate in Marzban
-        try:
-            if subscription.marzban_username:
-                await marzban_api.toggle_user_status(subscription.marzban_username, "active")
-        except Exception as e:
-            await callback.answer(
-                f"⚠️ خطا در فعال کردن در مرزبان: {str(e)}", show_alert=True
-            )
-            return
-
-        # Update status in database
-        subscription.status = "active"
-        await session.commit()
-
-        await callback.answer("✅ اشتراک با موفقیت تایید شد.", show_alert=True)
-
-        # Refresh the details view
-        await show_subscription_details(callback, session)
-
-    except Exception as e:
-        error_msg = f"Error in approve_subscription handler: {str(e)}"
-        bot_logger.error(error_msg)
-        await callback.answer("❌ خطای داخلی رخ داد.", show_alert=True)
-
-
-@router.callback_query(F.data.startswith("reject_sub_"))
-async def reject_subscription(callback: CallbackQuery, session: AsyncSession):
-    """Reject a pending subscription"""
-    try:
-        sub_id = int(callback.data.split("_")[2])
-        await callback.answer("⏳ در حال رد اشتراک...")
-
-        # Get subscription
-        sub_query = select(Subscription).filter(Subscription.id == sub_id)
-        sub_result = await session.execute(sub_query)
-        subscription = sub_result.scalar_one_or_none()
-
-        if not subscription:
-            await callback.answer("❌ اشتراک یافت نشد.", show_alert=True)
-            return
-
-        # Delete from Marzban
-        try:
-            if subscription.marzban_username:
-                await marzban_api.delete_user(subscription.marzban_username)
-        except Exception as e:
-            bot_logger.error(f"Error deleting user from Marzban: {str(e)}")
-
-        # Update status in database
-        subscription.status = "cancelled"
-        await session.commit()
-
-        await callback.answer("✅ اشتراک رد شد.", show_alert=True)
-
-        # Refresh the details view
-        await show_subscription_details(callback, session)
-
-    except Exception as e:
-        error_msg = f"Error in reject_subscription handler: {str(e)}"
-        bot_logger.error(error_msg)
-        await callback.answer("❌ خطای داخلی رخ داد.", show_alert=True)
+# NOTE: the former approve_subscription (approve_sub_) and reject_subscription
+# (reject_sub_) handlers lived here but were removed (audit):
+#   • approve_sub_ was a dead duplicate — the real, provisioning handler in
+#     handlers/admin/subscription.py wins router registration. Keeping a second
+#     Marzban-toggle-only copy risked a future reorder silently swapping in a
+#     broken approve.
+#   • reject_sub_ cancelled the order WITHOUT refunding credit/discounts/coupon
+#     or notifying the user. The detail keyboard now emits deny_sub_, handled by
+#     the shared deny_purchase_order flow in subscription.py.

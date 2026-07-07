@@ -65,11 +65,20 @@ async def flow_inline_tap(cb: CallbackQuery, **data):
         await cb.answer()
         return
     await cb.answer()
+    # Collapse the prompt into the picked answer (and drop the keyboard) so the
+    # chat doesn't pile up stale "choose one of the options" messages.
     try:
-        # Kill the tapped keyboard so the choice can't be double-submitted.
-        await cb.message.edit_reply_markup(reply_markup=None)
+        if cb.message.text is not None:
+            await cb.message.edit_text(f"✅ {label}")
+        elif cb.message.caption is not None:
+            await cb.message.edit_caption(caption=f"✅ {label}")
+        else:
+            await cb.message.edit_reply_markup(reply_markup=None)
     except Exception:
-        pass
+        try:
+            await cb.message.edit_reply_markup(reply_markup=None)
+        except Exception:
+            pass
     fake = cb.message.model_copy(
         update={"text": label, "from_user": cb.from_user, "entities": None, "photo": None, "caption": None}
     ).as_(cb.bot)

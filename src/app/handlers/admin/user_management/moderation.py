@@ -11,6 +11,7 @@ from app.core.chat_sessions import _message_map, admin_to_user, user_to_admin
 from app.database import crud
 from app.database.models import User
 from app.shared.admin_access import ADMIN_IDS
+from app.utils.admin_bot_helper import get_user_bot
 from app.utils.bot_i18n import t
 from app.utils.logger import bot_logger
 
@@ -44,7 +45,8 @@ async def ban_user(callback: CallbackQuery, session: AsyncSession):
         plead_kb.button(
             text="🙏 درخواست بازنگری", callback_data=f"plead_unban_{user_id}"
         )
-        await callback.bot.send_message(
+        # user-facing DM must go via the USER bot; this handler runs on the admin bot
+        await (get_user_bot() or callback.bot).send_message(
             user_id,
             "🚫 شما از ربات مسدود شده‌اید. برای درخواست بازنگری، دکمه زیر را فشار دهید.",
             reply_markup=plead_kb.as_markup(),
@@ -251,7 +253,7 @@ async def ignore_plea_handler(callback: CallbackQuery, bot: Bot):
         if user_line:
             user_id_str = user_line.split("`")[1]
             user_id = int(user_id_str)
-            await bot.send_message(
+            await (get_user_bot() or bot).send_message(
                 user_id, "🙏 درخواست بازنگری شما در حال حاضر تایید نشد."
             )
     except Exception as e:
@@ -283,9 +285,9 @@ async def unban_user(callback: CallbackQuery, session: AsyncSession):
 
     await callback.answer("✅ کاربر رفع مسدودیت شد", show_alert=True)
 
-    # Notify the user
+    # Notify the user (via USER bot — this handler runs on the admin bot)
     try:
-        await callback.bot.send_message(user_id, "✅ شما از حالت مسدودیت خارج شدید.")
+        await (get_user_bot() or callback.bot).send_message(user_id, "✅ شما از حالت مسدودیت خارج شدید.")
     except Exception as e:
         bot_logger.error(f"Failed to send unban notification to user {user_id}: {e}")
 

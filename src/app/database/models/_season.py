@@ -75,7 +75,7 @@ class RewardCoupon(Base):
     source = Column(String(40), default="star_season")  # star_season | marketing | ...
     season_id = Column(Integer, nullable=True)
     milestone_stars = Column(Integer, nullable=True)
-    # discount_percent | free_gb | free_plan | free_autorenew | vip_pack | legend_pack
+    # discount_percent | free_gb | free_plan | vip_days (free_autorenew legacy-honored)
     coupon_type = Column(String(40), nullable=False)
     # JSON string with the specifics (discount_percent, gb, plan_gb, duration_days, items…)
     payload = Column(Text, nullable=True)

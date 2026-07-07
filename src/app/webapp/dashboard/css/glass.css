@@ -862,9 +862,11 @@ html[data-theme="light"] .vpn-card::before,
   border-top-color: var(--glass-edge-bright) !important;
   box-shadow: var(--glass-sheen) !important;
 }
-.mini-btn:hover {
-  background: var(--glass-bg-mid) !important;
-  border-color: rgba(var(--brandRgb),0.35) !important;
+@media (hover: hover) and (pointer: fine) {
+  .mini-btn:hover {
+    background: var(--glass-bg-mid) !important;
+    border-color: rgba(var(--brandRgb),0.35) !important;
+  }
 }
 
 
@@ -1411,12 +1413,12 @@ button.btn-primary:hover, button.btn-primary:active,
   animation: none !important;
 }
 
-/* Replace transform feedback with calm background/opacity shifts */
-.card:active,
-.placeholder-card:active,
+/* Replace transform feedback with calm background/opacity shifts.
+   ONLY small tappable controls — big container cards (.card, .vpn-card,
+   .placeholder-card) must NOT react to a resting finger (iOS fires :active
+   on touch-hold/scroll, which read as a broken "hover" wash). */
 .action-tile:active,
-.speed-chip:active,
-.vpn-card:active {
+.speed-chip:active {
   opacity: 0.92 !important;
   transition: opacity 0.12s ease !important;
 }

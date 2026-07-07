@@ -434,8 +434,53 @@
         lb = document.createElement('div');
         lb.id = 'adminPhotoLightbox';
         lb.className = 'photo-lightbox';
-        lb.innerHTML = '<img alt="">';
-        lb.onclick = () => lb.classList.remove('active');
+        lb.innerHTML = '<img alt="">'
+          + '<button type="button" class="lightbox-save" aria-label="Save image">'
+          + '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" width="21" height="21">'
+          + '<path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="M7 10l5 5 5-5"/><path d="M12 15V3"/></svg></button>'
+          + '<button type="button" class="lightbox-close-btn" aria-label="Close">'
+          + '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" width="21" height="21">'
+          + '<line x1="6" y1="6" x2="18" y2="18"/><line x1="18" y1="6" x2="6" y2="18"/></svg></button>';
+        lb.onclick = (e) => { if (e.target === lb || e.target.tagName === 'IMG') lb.classList.remove('active'); };
+        lb.querySelector('.lightbox-close-btn').onclick = (e) => { e.stopPropagation(); lb.classList.remove('active'); };
+        // Download re-uses the cookie-authed fetch the <img> already made —
+        // no tokens in URLs, no new server surface.
+        lb.querySelector('.lightbox-save').onclick = async (e) => {
+          e.stopPropagation();
+          const src = lb.querySelector('img').src;
+          try {
+            const blob = await (await fetch(src, { credentials: 'include' })).blob();
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url; a.download = `ticket-photo-${Date.now()}.jpg`;
+            document.body.appendChild(a); a.click(); a.remove();
+            setTimeout(() => URL.revokeObjectURL(url), 30000);
+          } catch (_) { try { window.open(src, '_blank'); } catch (_2) {} }
+        };
+        // Swipe down (or up) on the photo dismisses the viewer.
+        let swipe = null;
+        lb.addEventListener('touchstart', (e) => {
+          if (e.touches.length === 1) swipe = { y: e.touches[0].clientY, dy: 0 };
+        }, { passive: true });
+        lb.addEventListener('touchmove', (e) => {
+          if (!swipe || e.touches.length !== 1) return;
+          swipe.dy = e.touches[0].clientY - swipe.y;
+          const img = lb.querySelector('img');
+          img.style.transition = 'none';
+          img.style.transform = `translateY(${swipe.dy}px)`;
+          lb.style.background = `rgba(0,0,0,${Math.max(0.35, 0.92 - Math.abs(swipe.dy) / 500)})`;
+        }, { passive: true });
+        lb.addEventListener('touchend', () => {
+          if (!swipe) return;
+          const img = lb.querySelector('img');
+          if (Math.abs(swipe.dy) > 90) {
+            lb.classList.remove('active');
+          }
+          img.style.transition = 'transform 0.2s ease';
+          img.style.transform = '';
+          lb.style.background = '';
+          swipe = null;
+        }, { passive: true });
         document.body.appendChild(lb);
       }
       lb.querySelector('img').src = src;
@@ -487,9 +532,15 @@
       group.className = `msg-group ${sender}`;
       group.setAttribute('data-day', key);
       group.setAttribute('data-sender', sender);
+      // User groups carry the customer's real Telegram avatar (cookie-authed
+      // endpoint; falls back to the initial letter when they have no photo).
+      const avatar = sender === 'user'
+        ? `<span class="msg-ava"><img src="/api/admin/tickets/${selectedId}/user-photo" alt="" loading="lazy"
+             onerror="this.parentElement.classList.add('noimg'); this.remove();"><span class="msg-ava-fallback">${escHtml(((selectedTicketSnapshot && (selectedTicketSnapshot.user_name || selectedTicketSnapshot.username)) || 'U').trim().charAt(0).toUpperCase())}</span></span>`
+        : '';
       group.innerHTML = `
         <div class="msg-group-head">
-          <span class="who">${sender === 'admin' ? 'Admin' : 'User'}</span>
+          ${avatar}<span class="who">${sender === 'admin' ? 'Admin' : 'User'}</span>
         </div>
         <div class="msg-row"></div>
       `;
@@ -1448,8 +1499,14 @@
         ws.onmessage = (event) => {
           try {
             const data = JSON.parse(event.data);
-            
+
+            if (data.type === 'typing') {
+              if (data.from === 'user') showUserTyping(data.ticket_id);
+              return;
+            }
+
             if (data.type === 'new_message') {
+              if (data.ticket_id === selectedId) hideUserTyping();
               const ticketId = data.ticket_id;
               const payload = data.data || {};
               const sender = payload.sender; // 'user' | 'admin'
@@ -1665,6 +1722,40 @@
     function autoResize(textarea) {
       textarea.style.height = 'auto';
       textarea.style.height = Math.min(textarea.scrollHeight, 100) + 'px';
+      emitTyping();
+    }
+
+    // ── Typing indicator (relay protocol: {type:'typing', ticket_id}) ──
+    let _typingEmitAt = 0;
+    function emitTyping() {
+      if (!selectedId || !ws || ws.readyState !== WebSocket.OPEN) return;
+      const now = Date.now();
+      if (now - _typingEmitAt < 1500) return; // throttle
+      _typingEmitAt = now;
+      try { ws.send(JSON.stringify({ type: 'typing', ticket_id: selectedId })); } catch (_) {}
+    }
+
+    let _typingHideTimer = null;
+    function showUserTyping(ticketId) {
+      if (ticketId !== selectedId) return;
+      const wrap = document.getElementById('chatMessages');
+      if (!wrap) return;
+      let row = document.getElementById('typingIndicatorRow');
+      if (!row) {
+        row = document.createElement('div');
+        row.id = 'typingIndicatorRow';
+        row.className = 'typing-row';
+        row.innerHTML = '<div class="typing-bubble"><span class="typing-dot"></span><span class="typing-dot"></span><span class="typing-dot"></span></div>';
+        wrap.appendChild(row);
+        try { wrap.scrollTop = wrap.scrollHeight; } catch (_) {}
+      }
+      clearTimeout(_typingHideTimer);
+      _typingHideTimer = setTimeout(hideUserTyping, 4000);
+    }
+    function hideUserTyping() {
+      clearTimeout(_typingHideTimer);
+      _typingHideTimer = null;
+      try { document.getElementById('typingIndicatorRow')?.remove(); } catch (_) {}
     }
 
     function handleKey(e) {

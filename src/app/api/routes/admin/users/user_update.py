@@ -94,6 +94,21 @@ async def handle_admin_user_update(request: web.Request):
                         pass
             
             await session.commit()
+
+            from app.services.audit import record_audit
+
+            bits = []
+            if validated.credit is not None and validated.credit != old_credit:
+                bits.append(f"credit {old_credit:,}→{validated.credit:,}")
+            if validated.banned is not None and validated.banned != old_banned:
+                bits.append("BANNED" if validated.banned else "unbanned")
+            if validated.stars is not None:
+                bits.append(f"stars={validated.stars}")
+            if bits:
+                await record_audit(
+                    request, "user.update", target_type="user", target_id=user_id,
+                    summary=", ".join(bits),
+                )
             return web.json_response({"ok": True})
     except Exception as e:
         import traceback

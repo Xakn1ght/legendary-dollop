@@ -7,7 +7,7 @@ claim_key). See core/rewards_config.py for the ladder and rules.
 import datetime
 import json
 
-from sqlalchemy import select
+from sqlalchemy import select, update
 
 from app.core.rewards_config import (
     COUPON_EXPIRY_DAYS,
@@ -107,17 +107,58 @@ class _SeasonMixin:
                 status="active",
             )
             db.add(coupon)
+            # Some milestones grant more than one coupon (e.g. 50★ = VIP days
+            # + 100GB). All minted inside the same claim guard, so the dedupe
+            # covers the whole bundle.
+            for extra in info.get("extra_coupons", []):
+                db.add(RewardCoupon(
+                    user_id=user_id,
+                    source="star_season",
+                    season_id=season_id,
+                    milestone_stars=milestone,
+                    coupon_type=extra["coupon_type"],
+                    payload=json.dumps(extra.get("payload", {})),
+                    created_at=now,
+                    expires_at=now + datetime.timedelta(days=COUPON_EXPIRY_DAYS),
+                    status="active",
+                ))
             db.add(StarMilestoneClaim(
                 user_id=user_id, season_id=season_id,
                 milestone_stars=milestone, claim_key=claim_key, created_at=now,
             ))
             await db.commit()
             await db.refresh(coupon)
+            # Cosmetics (badge/theme) are milestone-level grants, applied the
+            # moment the milestone unlocks — coupons stay pure value.
+            if info.get("badge") or info.get("theme"):
+                await _SeasonMixin._grant_milestone_cosmetics(db, user_id, info)
             unlocked.append({
                 "coupon_id": coupon.id, "milestone": milestone,
                 "name": info["name"], "coupon_type": info["coupon_type"],
             })
         return unlocked
+
+    @staticmethod
+    async def _grant_milestone_cosmetics(db, user_id: int, info: dict):
+        """Write a milestone's badge/theme into the user's dashboard prefs
+        (same storage the retired packs used, so the profile UI is unchanged)."""
+        from app.database.models import User
+
+        user = (await db.execute(select(User).filter(User.id == user_id))).scalars().first()
+        if not user:
+            return
+        try:
+            prefs = json.loads(user.dashboard_prefs or "{}")
+        except Exception:
+            prefs = {}
+        if info.get("badge"):
+            prefs["badge"] = info["badge"]
+        if info.get("theme"):
+            themes = set(prefs.get("unlocked_themes") or [])
+            themes.add(info["theme"])
+            prefs["unlocked_themes"] = sorted(themes)
+        user.dashboard_prefs = json.dumps(prefs)
+        await db.commit()
 
     @staticmethod
     async def get_season_progress(db, user_id: int):
@@ -167,15 +208,18 @@ class _SeasonMixin:
 
     @staticmethod
     async def mark_coupon_used(db, coupon_id: int) -> bool:
-        """Consume a coupon (active → used). Idempotent: a non-active coupon is left as-is
-        and returns False so callers don't double-spend."""
-        coupon = await _SeasonMixin.get_coupon_by_id(db, coupon_id)
-        if not coupon or coupon.status != "active":
+        """Consume a coupon (active → used). ATOMIC: a single conditional UPDATE
+        so two concurrent redeems (webapp + bot) can't both pass the 'active'
+        check and double-grant — the second sees 0 rows and returns False."""
+        if not coupon_id:
             return False
-        coupon.status = "used"
-        coupon.used_at = datetime.datetime.utcnow()
+        res = await db.execute(
+            update(RewardCoupon)
+            .where(RewardCoupon.id == int(coupon_id), RewardCoupon.status == "active")
+            .values(status="used", used_at=datetime.datetime.utcnow())
+        )
         await db.commit()
-        return True
+        return (res.rowcount or 0) > 0
 
     @staticmethod
     async def restore_coupon(db, coupon_id: int) -> bool:
@@ -194,9 +238,9 @@ class _SeasonMixin:
 
     @staticmethod
     async def free_gb_bonus_for_coupon(db, coupon_id: int) -> int:
-        """Bonus GB granted by a coupon at provisioning (free_gb's gb, or a legend/vip
-        pack's bonus_gb). 0 for any other type/missing. Used by both the webapp
-        auto-approve and admin-approval paths so they add the same bonus."""
+        """Bonus GB granted by a coupon at provisioning (free_gb's gb).
+        0 for any other type/missing. Used by both the webapp auto-approve and
+        admin-approval paths so they add the same bonus."""
         coupon = await _SeasonMixin.get_coupon_by_id(db, coupon_id)
         if not coupon:
             return 0
@@ -206,8 +250,6 @@ class _SeasonMixin:
             return 0
         if coupon.coupon_type == "free_gb":
             return int(payload.get("gb", 0) or 0)
-        if coupon.coupon_type in ("vip_pack", "legend_pack"):
-            return int(payload.get("bonus_gb", 0) or 0)
         return 0
 
     @staticmethod

@@ -25,6 +25,15 @@ async def handle_get_user_purchase_info(request: web.Request):
         result_ref = await session.execute(select(Referral).filter(Referral.referee_id == user.id))
         has_referrer = result_ref.scalars().first() is not None
 
+        # OG customers (pre-referral-era allowlist) never need an invite code —
+        # the webapp hides the referral field for them.
+        try:
+            from app.handlers.user.start.common import _is_og_user
+
+            is_og = _is_og_user(user_chat_id, getattr(user, "username", None))
+        except Exception:
+            is_og = False
+
         discounts = await crud.get_active_user_discounts(session, user.id)
         discount_list = []
         for d in discounts:
@@ -60,6 +69,7 @@ async def handle_get_user_purchase_info(request: web.Request):
         info = {
             "credit": user.credit,
             "has_referrer": has_referrer,
+            "is_og": is_og,
             "discounts": discount_list,
             "is_vip": is_vip,
             "auto_discounts": auto_discounts,

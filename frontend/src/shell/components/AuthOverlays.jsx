@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 
-import { getWebApp } from '../../shared/telegram.js';
+import { getWebApp, openBotChatWithStart } from '../../shared/telegram.js';
 import { showToast } from '../toast.js';
 
 // "Login problem" overlay (repeated 401/403 with initData present).
@@ -47,31 +47,31 @@ const NR_STRINGS = {
   fa: {
     title: 'ثبت‌نام لازم است',
     subtitle: 'برای ورود به داشبورد، در چت ربات ثبت‌نام کنید',
-    step1Title: 'این صفحه را ببندید',
-    step1Desc: 'به چت ربات بازگردید',
+    step1Title: 'روی «ارسال /start» بزنید',
+    step1Desc: 'چت ربات باز می‌شود و دکمه شروع آماده است',
     step2Title: 'دستور را ارسال کنید',
-    step2Desc: 'این دستور را در چت ارسال کنید',
+    step2Desc: 'در چت ربات دکمه شروع را بزنید (یا این دستور را بفرستید)',
     step3Title: 'کد دعوت را وارد کنید',
     step3Desc: 'کد ۶ رقمی دوست خود را ارسال کنید',
     hint: 'کد دعوت از دوستی که قبلاً عضو است بگیرید',
     copy: 'کپی دستور',
     copied: '✓ کپی شد',
-    close: 'بستن',
+    goStart: 'ارسال /start',
     langToggle: 'EN',
   },
   en: {
     title: 'Registration Required',
     subtitle: 'Sign up via the bot chat to access your dashboard',
-    step1Title: 'Close this page',
-    step1Desc: 'Return to the bot chat',
+    step1Title: 'Tap "Send /start" below',
+    step1Desc: 'The bot chat opens with the Start button ready',
     step2Title: 'Send the command',
-    step2Desc: 'Type this in the bot chat',
+    step2Desc: 'Hit Start in the bot chat (or type this command)',
     step3Title: 'Enter your referral code',
     step3Desc: 'Send the 6-character code from a friend',
     hint: 'Get a referral code from a friend who is already a member',
     copy: 'Copy command',
     copied: '✓ Copied',
-    close: 'Close',
+    goStart: 'Send /start',
     langToggle: 'FA',
   },
 };
@@ -181,9 +181,9 @@ export function NotRegisteredOverlay({ initialLang }) {
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" /><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" /></svg>
               <span>{copied ? T.copied : T.copy}</span>
             </button>
-            <button type="button" className="nr-btn nr-btn-primary" onClick={() => { try { getWebApp()?.close(); } catch (_) { /* ignore */ } }}>
-              <span>{T.close}</span>
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round"><path d="M5 12h14M12 5l7 7-7 7" /></svg>
+            <button type="button" className="nr-btn nr-btn-primary" onClick={() => openBotChatWithStart('register')}>
+              <span>{T.goStart}</span>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round"><path d="M22 2 11 13M22 2l-7 20-4-9-9-4 20-7z" /></svg>
             </button>
           </div>
         </div>

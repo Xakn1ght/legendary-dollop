@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<!-- 40-DAY THEME CALENDAR PREVIEW (temporary, for Pasha's review).
+     Data comes from themes40.json — the same file the game will use. -->
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AstroBugz — 40 daily themes</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: #0b0617; color: #f3eefe; font-family: monospace; padding: 18px; }
+  h1 { font-size: 14px; letter-spacing: 2px; color: #7be0ff; margin-bottom: 14px; }
+  .grid { display: grid; grid-template-columns: repeat(8, 1fr); gap: 10px; max-width: 1400px; }
+  .tframe {
+    position: relative;
+    height: 240px;
+    border: 2px solid #2a1650;
+    border-radius: 6px;
+    overflow: hidden;
+  }
+  .tframe .ground, .tframe .groundext {
+    position: absolute; left: 0; right: 0;
+    background-repeat: repeat-x;
+    background-size: auto 100%;
+    image-rendering: pixelated;
+  }
+  .tframe .ground { bottom: 0; height: 38px; }
+  .tframe .groundext { bottom: 37px; height: 96px; }
+  .tframe .tname {
+    position: absolute; top: 5px; left: 0; right: 0;
+    text-align: center; font-size: 8px;
+    color: #ffd23f; text-shadow: 1px 1px 0 #000; z-index: 5;
+  }
+  .tframe .day {
+    position: absolute; top: 16px; left: 0; right: 0;
+    text-align: center; font-size: 7px; color: rgba(243,238,254,0.5);
+    text-shadow: 1px 1px 0 #000; z-index: 5;
+  }
+  .mote { position: absolute; }
+</style>
+</head>
+<body>
+<h1>30 DAILY THEMES — day 1 to 30, then the cycle repeats</h1>
+<div class="grid" id="grid"></div>
+<script>
+fetch('themes30.json?_t=' + Date.now()).then(r => r.json()).then(data => {
+  const grid = document.getElementById('grid');
+  data.themes.forEach(t => {
+    const f = document.createElement('div');
+    f.className = 'tframe';
+    if (t.kind === 'image') {
+      // full-screen generated background (days 11-40)
+      f.style.background = 'url(' + t.bg + '?b=2) center / cover no-repeat';
+      f.innerHTML = '<div class="tname">' + t.name + '</div>' +
+                    '<div class="day">DAY ' + t.day + '</div>';
+      grid.appendChild(f);
+      return;
+    }
+    f.style.background = 'linear-gradient(180deg, ' + t.grad[0] + ' 0%, ' +
+                         t.grad[1] + ' 65%, ' + t.grad[2] + ' 100%)';
+    f.innerHTML = '<div class="tname">' + t.name + '</div>' +
+                  '<div class="day">DAY ' + t.day + '</div>' +
+                  '<div class="groundext" style="background-image:url(' + t.ext + '?g=4)"></div>' +
+                  '<div class="ground" style="background-image:url(' + t.strip + '?g=4)"></div>';
+    const n = t.family === 'night' ? 16 : 9;
+    for(let m = 0; m < n; m++){
+      const d = document.createElement('div');
+      d.className = 'mote';
+      const sz = Math.random() < 0.75 ? 2 : 3;
+      d.style.width = sz + 'px'; d.style.height = sz + 'px';
+      d.style.background = t.mote;
+      d.style.opacity = (0.25 + Math.random()*0.5).toFixed(2);
+      d.style.left = (Math.random()*94) + '%';
+      d.style.top = (10 + Math.random()*55) + '%';
+      f.appendChild(d);
+    }
+    if(t.moon){
+      const moon = document.createElement('div');
+      moon.style.cssText = 'position:absolute;right:10px;top:26px;width:16px;height:16px;' +
+        'border-radius:50%;background:' + t.mote + ';box-shadow:0 0 12px ' + t.mote + '66;opacity:0.85;';
+      f.appendChild(moon);
+    }
+    grid.appendChild(f);
+  });
+});
+</script>
+</body>
+</html>

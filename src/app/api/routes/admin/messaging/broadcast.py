@@ -35,6 +35,12 @@ async def handle_admin_broadcast(request: web.Request):
                  except Exception:
                      pass
         
+        from app.services.audit import record_audit
+
+        await record_audit(
+            request, "broadcast.send", target_type="broadcast",
+            summary=f"broadcast to {count} users: {message[:80]}",
+        )
         return web.json_response({"ok": True, "sent_count": count})
     except Exception as e:
         return web.json_response({"ok": False, "error": "server_error"}, status=500)

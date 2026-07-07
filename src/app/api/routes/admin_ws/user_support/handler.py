@@ -7,6 +7,7 @@ from weakref import WeakSet
 
 from aiohttp import WSMsgType, web
 
+from ..broadcasts.typing import broadcast_typing
 from ..state import active_connections, connection_health, logger, user_connection_map, user_connections
 
 
@@ -61,17 +62,38 @@ async def handle_user_support_ws(request: web.Request):
             if msg.type == WSMsgType.TEXT:
                 try:
                     data = json.loads(msg.data)
-                    action = data.get("action")
+                    action = data.get("action") or data.get("type")
 
-                    if action == "watch_ticket":
+                    if action == "typing":
+                        # Fire-and-forget typing hint -> admin sockets watching
+                        # this ticket. Only relayed for the ticket this socket
+                        # already watches (ownership was checked at watch time).
+                        try:
+                            ticket_id = int(data.get("ticket_id"))
+                        except (TypeError, ValueError):
+                            ticket_id = None
+                        if ticket_id and watched_ticket_id and ticket_id == int(watched_ticket_id):
+                            try:
+                                await broadcast_typing(watched_ticket_id, "user")
+                            except Exception:
+                                pass
+
+                    elif action == "watch_ticket":
                         ticket_id = data.get("ticket_id")
                         if ticket_id:
                             try:
-                                from app.database.models import AsyncSessionLocal, Ticket
+                                from sqlalchemy.future import select
+
+                                from app.database.models import AsyncSessionLocal, Ticket, User
 
                                 async with AsyncSessionLocal() as session:
                                     ticket = await session.get(Ticket, int(ticket_id))
-                                    if not ticket or int(ticket.user_id) != int(user_id):
+                                    # ticket.user_id is the DB PK; user_id here is the
+                                    # Telegram chat id — resolve before comparing.
+                                    db_user = (
+                                        await session.execute(select(User).where(User.chat_id == int(user_id)))
+                                    ).scalar_one_or_none()
+                                    if not ticket or not db_user or int(ticket.user_id) != int(db_user.id):
                                         logger.warning(
                                             "WS watch denied: user_id=%s ticket_id=%s",
                                             user_id,

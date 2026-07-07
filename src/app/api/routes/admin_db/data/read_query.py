@@ -1,7 +1,7 @@
 from aiohttp import web
 from sqlalchemy import text
 
-from app.api.routes.admin_db.common import _is_read_only_sql
+from app.api.routes.admin_db.common import _is_read_only_sql, _json_safe
 from app.database.models import AsyncSessionLocal
 
 
@@ -35,7 +35,7 @@ async def handle_admin_db_query(request: web.Request):
             cols = list(result.keys())
             if len(rows) > max_rows:
                 rows = rows[:max_rows]
-            data = [list(r) for r in rows]
+            data = [[_json_safe(v) for v in r] for r in rows]
             return web.json_response(
                 {"ok": True, "dialect": dialect, "columns": cols, "rows": data, "truncated": len(data) >= max_rows}
             )

@@ -3,6 +3,7 @@
 from app.api.routes.admin_ws import handle_user_support_ws
 from app.api.routes.dashboard import (
     handle_dashboard_challenges,
+    handle_dashboard_orbit_add_link,
     handle_dashboard_challenges_claim,
     handle_dashboard_enter_referral,
     handle_dashboard_login,
@@ -16,6 +17,7 @@ from app.api.routes.dashboard import (
     handle_dashboard_referral_rewards,
     handle_dashboard_referrals,
     handle_dashboard_rewards_summary,
+    handle_dashboard_redeem_vip_days,
     handle_dashboard_season,
     handle_dashboard_star_claim_apply,
     handle_dashboard_star_claims,

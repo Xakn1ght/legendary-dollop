@@ -20,6 +20,7 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "src"))
 
 from app.database import crud  # noqa: E402
 from app.database.models import Base, DailyGamePlay, RewardCoupon, User  # noqa: E402
+from app.utils.tehran_time import tehran_today  # noqa: E402
 from sqlalchemy import select  # noqa: E402
 from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine  # noqa: E402
 
@@ -59,19 +60,20 @@ async def test_best_score_gating():
         u = await seed_user(db, 1001, "gater")
 
         # practice-style save must not create a leaderboard score
+        # (arcade days roll over at IRAN midnight — match save_game_play)
         await crud.save_game_play(db, u.id, 99999, 60, "x", rewarded=False, count_for_leaderboard=False)
-        play = await crud.check_daily_game_play(db, u.id, datetime.date.today())
+        play = await crud.check_daily_game_play(db, u.id, tehran_today())
         check("practice run leaves best_score at 0", play.best_score == 0)
 
         # the validated rewarded run sets it
         await crud.save_game_play(db, u.id, 4321, 60, "x", rewarded=True, reward_xp=50, count_for_leaderboard=True)
-        play = await crud.check_daily_game_play(db, u.id, datetime.date.today())
+        play = await crud.check_daily_game_play(db, u.id, tehran_today())
         check("rewarded run sets best_score", play.best_score == 4321)
         check("rewarded flag set", play.rewarded is True)
 
         # a later unvalidated run cannot raise it
         await crud.save_game_play(db, u.id, 88888, 60, "x", rewarded=False, count_for_leaderboard=False)
-        play = await crud.check_daily_game_play(db, u.id, datetime.date.today())
+        play = await crud.check_daily_game_play(db, u.id, tehran_today())
         check("later practice cannot raise best_score", play.best_score == 4321)
 
 
@@ -113,7 +115,7 @@ async def test_monthly_prizes():
     maker = await make_session()
     prizes_mod.AsyncSessionLocal = maker  # point job at the test DB
 
-    today = datetime.date.today()
+    today = tehran_today()  # the job ranks by IRAN-time months
     m_start, m_end, m_key = _previous_month_bounds(today)
     check("month bounds sane", m_start.day == 1 and m_start <= m_end < today)
 
@@ -178,7 +180,7 @@ async def test_ranking_and_flags():
     async with maker() as db:
         u1 = await seed_user(db, 4001, "alpha")
         u2 = await seed_user(db, 4002, "beta")
-        today = datetime.date.today()
+        today = tehran_today()
         start = today.replace(day=1)
         db.add(DailyGamePlay(user_id=u1.id, play_date=start, best_score=500,
                              rewarded=True, duration_seconds=60))
@@ -189,6 +191,16 @@ async def test_ranking_and_flags():
         rows = await crud.get_monthly_arcade_ranking(db, start, today)
         check("ranking ordered by score", [r.user_id for r in rows] == [u2.id, u1.id])
         check("ranking carries display names", rows[0].display_name == "beta")
+
+        # monthly score ACCUMULATES across days (sum, not max) — a second
+        # validated day lifts alpha (500+600=1100) over beta's single 900
+        if (today - start).days >= 1:
+            db.add(DailyGamePlay(user_id=u1.id, play_date=start + datetime.timedelta(days=1),
+                                 best_score=600, rewarded=True, duration_seconds=60))
+            await db.commit()
+            rows = await crud.get_monthly_arcade_ranking(db, start, today)
+            check("daily scores add up across the month",
+                  rows[0].user_id == u1.id and int(rows[0].top_score) == 1100)
 
         await crud.add_arcade_flag(db, u1.id, 999999, 600, None, "no_token")
         await crud.add_arcade_flag(db, u1.id, 777777, 30, 25, "implausible_score")

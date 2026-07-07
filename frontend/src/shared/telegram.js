@@ -1,7 +1,24 @@
 // Thin accessors over the Telegram WebApp object injected by telegram-web-app.js.
 
+// The user bot's public username (single source for client-side deep links —
+// unregistered users have no API access to fetch it).
+export const BOT_USERNAME = 'khgfakgfbabot';
+
 export function getWebApp() {
   return window.Telegram?.WebApp || null;
+}
+
+// Open the bot chat with the START button armed, then close the Mini App.
+// Telegram can't literally auto-send /start, but ?start= shows the one-tap
+// Start button — the closest thing that exists.
+export function openBotChatWithStart(param = 'webapp') {
+  const url = `https://t.me/${BOT_USERNAME}?start=${encodeURIComponent(param)}`;
+  const tg = getWebApp();
+  try {
+    if (tg?.openTelegramLink) tg.openTelegramLink(url);
+    else window.open(url, '_blank');
+  } catch (_) { try { window.open(url, '_blank'); } catch (_2) { /* ignore */ } }
+  setTimeout(() => { try { tg?.close(); } catch (_) { /* ignore */ } }, 300);
 }
 
 // Telegram profile photo of the current WebApp user (may be undefined).

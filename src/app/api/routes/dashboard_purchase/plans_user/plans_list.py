@@ -12,7 +12,9 @@ async def handle_get_plans(request: web.Request):
 
     plans_list = []
     for name, info in PLANS.items():
-        plans_list.append({"name": name, "price": info["price"], "gb": info["gb"]})
+        plans_list.append(
+            {"name": name, "name_en": info.get("name_en"), "price": info["price"], "gb": info["gb"]}
+        )
 
     plans_list.sort(key=lambda x: x["price"])
 

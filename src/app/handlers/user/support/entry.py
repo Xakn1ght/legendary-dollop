@@ -12,7 +12,7 @@ from app.database import crud
 from .common import SupportStates, router, safe_edit_message
 
 
-@router.message(F.text.in_(["پشتیبانی💬", "📞 پشتیبانی"]))
+@router.message(F.text.in_(["💬 پشتیبانی", "💬 Support", "پشتیبانی💬", "📞 پشتیبانی"]))
 async def enter_support(message: Message, state: FSMContext, session: AsyncSession):
     await state.clear()
     

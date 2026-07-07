@@ -80,33 +80,49 @@ export function PaymentSection({
 
         {shownCoupons.length > 0 && (
           <div id="couponInfo" style={{ marginBottom: 20 }}>
-            <label className="form-label">{t('rewardCoupon')}</label>
-            <div id="couponList" style={{ marginTop: 10 }}>
-              <label className={`coupon-option${selectedCouponId === null ? ' selected' : ''}`}>
-                <input
-                  type="radio"
-                  name="couponPick"
-                  value=""
-                  checked={selectedCouponId === null}
-                  onChange={() => onSelectCoupon(null)}
-                />
-                <span className="coupon-radio" />
-                <span className="coupon-text">{t('couponNone')}</span>
-              </label>
-              {shownCoupons.map((c) => (
-                <label key={c.id} className={`coupon-option${selectedCouponId === c.id ? ' selected' : ''}`}>
+            <label className="form-label" htmlFor={shownCoupons.length > 2 ? 'couponSelect' : undefined}>{t('rewardCoupon')}</label>
+            {shownCoupons.length > 2 ? (
+              /* Many coupons → native dropdown keeps the step compact (owner request). */
+              <select
+                id="couponSelect"
+                className="form-input coupon-select"
+                style={{ marginTop: 10 }}
+                value={selectedCouponId == null ? '' : String(selectedCouponId)}
+                onChange={(e) => onSelectCoupon(e.target.value === '' ? null : Number(e.target.value))}
+              >
+                <option value="">{t('couponNone')}</option>
+                {shownCoupons.map((c) => (
+                  <option key={c.id} value={String(c.id)}>{couponLabel(c, lang)}</option>
+                ))}
+              </select>
+            ) : (
+              <div id="couponList" style={{ marginTop: 10 }}>
+                <label className={`coupon-option${selectedCouponId === null ? ' selected' : ''}`}>
                   <input
                     type="radio"
                     name="couponPick"
-                    value={c.id}
-                    checked={selectedCouponId === c.id}
-                    onChange={() => onSelectCoupon(c.id)}
+                    value=""
+                    checked={selectedCouponId === null}
+                    onChange={() => onSelectCoupon(null)}
                   />
                   <span className="coupon-radio" />
-                  <span className="coupon-text">{couponLabel(c, lang)}</span>
+                  <span className="coupon-text">{t('couponNone')}</span>
                 </label>
-              ))}
-            </div>
+                {shownCoupons.map((c) => (
+                  <label key={c.id} className={`coupon-option${selectedCouponId === c.id ? ' selected' : ''}`}>
+                    <input
+                      type="radio"
+                      name="couponPick"
+                      value={c.id}
+                      checked={selectedCouponId === c.id}
+                      onChange={() => onSelectCoupon(c.id)}
+                    />
+                    <span className="coupon-radio" />
+                    <span className="coupon-text">{couponLabel(c, lang)}</span>
+                  </label>
+                ))}
+              </div>
+            )}
           </div>
         )}
 

@@ -76,7 +76,7 @@ function goFullscreen(opts = {}) {
   }
 }
 
-const ACCENT_ALLOWED = ['red', 'cyan', 'emerald', 'violet', 'amber', 'champion', 'legend'];
+const ACCENT_ALLOWED = ['red', 'cyan', 'emerald', 'violet', 'amber', 'vip', 'champion', 'legend'];
 
 export function ShellApp() {
   const [lang, setLang] = useState(() => detectLanguage());
@@ -413,7 +413,11 @@ export function ShellApp() {
         try { localStorage.setItem('hasSeenWelcome', 'true'); } catch (_) { /* ignore */ }
         schedulePrefsSave({ welcome_shown: true });
       };
-      const doStart = () => { try { window.AstroTour.start(TOUR_STEPS, { onComplete }); } catch (_) { /* ignore */ } };
+      // Android variants (descAndroid) win on Android — e.g. the Orbit pitch.
+      let isAndroid = false;
+      try { isAndroid = String(getWebApp()?.platform || '').toLowerCase() === 'android'; } catch (_) { /* ignore */ }
+      const steps = TOUR_STEPS.map((s) => (isAndroid && s.descAndroid ? { ...s, desc: s.descAndroid } : s));
+      const doStart = () => { try { window.AstroTour.start(steps, { onComplete }); } catch (_) { /* ignore */ } };
       if (pageRef.current !== 'home') {
         navigateRef.current('home');
         setTimeout(doStart, 400);

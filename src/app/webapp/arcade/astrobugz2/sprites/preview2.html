@@ -1,0 +1,196 @@
+<!DOCTYPE html>
+<!-- EXPANSION PREVIEW v2 (temporary, for Pasha's review):
+     - all 10 daily themes: detailed reference strip pinned at the BOTTOM,
+       rest of the screen is a simple generated backdrop (gradient + sparse
+       pixel motes in the theme palette)
+     - per-creature attacks: every creature gets its own related projectile -->
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AstroBugz — themes + attacks preview</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: #0b0617; color: #f3eefe; font-family: monospace; padding: 20px; }
+  img { image-rendering: pixelated; }
+  h2 { font-size: 14px; letter-spacing: 2px; color: #7be0ff; margin: 6px 0 14px; }
+  .themes { display: grid; grid-template-columns: repeat(5, 1fr); gap: 14px; max-width: 1140px; }
+  .tframe {
+    position: relative;
+    height: 330px;
+    border: 3px solid #2a1650;
+    border-radius: 8px;
+    overflow: hidden;
+  }
+  .tframe .ground {
+    position: absolute; left: 0; right: 0; bottom: 0;
+    height: 56px;
+    background-repeat: repeat-x;
+    background-size: auto 100%;
+    image-rendering: pixelated;
+  }
+  /* the ground's own art continues upward and dissolves into the sky */
+  .tframe .groundext {
+    position: absolute; left: 0; right: 0; bottom: 55px;
+    height: 158px;
+    background-repeat: repeat-x;
+    background-size: auto 100%;
+    image-rendering: pixelated;
+    pointer-events: none;
+  }
+  .tframe .tname {
+    position: absolute; top: 8px; left: 0; right: 0;
+    text-align: center; font-size: 10px; letter-spacing: 1px;
+    color: #ffd23f; text-shadow: 1px 1px 0 #000; z-index: 5;
+  }
+  .tframe .day {
+    position: absolute; top: 22px; left: 0; right: 0;
+    text-align: center; font-size: 8px; color: rgba(243,238,254,0.45);
+    text-shadow: 1px 1px 0 #000; z-index: 5;
+  }
+  .mote { position: absolute; }
+  .spr { position: absolute; image-rendering: pixelated; }
+
+  /* simple generated backdrops — gradient per theme, motes added by JS */
+  .bg-garden { background: linear-gradient(180deg, #060f08 0%, #0a1c0d 70%, #0e2a12 100%); }
+  .bg-bloom  { background: linear-gradient(180deg, #120812 0%, #171020 65%, #14240f 100%); }
+  .bg-crawl  { background: linear-gradient(180deg, #08060f 0%, #0e0a18 70%, #150e24 100%); }
+  .bg-poison { background: linear-gradient(180deg, #081004 0%, #0c1a06 70%, #12260a 100%); }
+  .bg-nest   { background: linear-gradient(180deg, #0c0716 0%, #140c26 70%, #1d1238 100%); }
+  .bg-night  { background: linear-gradient(180deg, #05070f 0%, #0a1024 70%, #101a3a 100%); }
+  .bg-swamp  { background: linear-gradient(180deg, #051009 0%, #0a1c12 70%, #0f281a 100%); }
+  .bg-tunnel { background: linear-gradient(180deg, #0f0a05 0%, #1a1108 70%, #26180c 100%); }
+  .bg-wasp   { background: linear-gradient(180deg, #170d03 0%, #241405 70%, #351d08 100%); }
+  .bg-glitch { background: linear-gradient(180deg, #030309 0%, #080814 70%, #0d0d26 100%); }
+
+  /* attacks section */
+  .attacks {
+    margin-top: 26px;
+    display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px;
+    max-width: 1140px;
+  }
+  .atk {
+    background: #120826;
+    border: 2px solid rgba(192,77,255,0.3);
+    border-radius: 8px;
+    padding: 12px;
+    display: flex; align-items: center; gap: 12px;
+  }
+  .atk .who { width: 64px; text-align: center; flex: none; }
+  .atk .arrow { color: #9d8fc4; font-size: 16px; flex: none; }
+  .atk .what { width: 52px; text-align: center; flex: none; }
+  .atk .info b { display: block; font-size: 11px; color: #ff7ec2; letter-spacing: 1px; margin-bottom: 4px; }
+  .atk .info small { font-size: 10px; color: #9d8fc4; line-height: 1.5; display: block; }
+</style>
+</head>
+<body>
+
+<h2>DAILY THEMES — detailed ground at the bottom, simple generated sky above (theme changes every day)</h2>
+<div class="themes" id="themes"></div>
+
+<h2 style="margin-top:28px;">CREATURE ATTACKS — every creature has its own related shot</h2>
+<div class="attacks">
+  <div class="atk"><span class="who"><img src="beetle_tank.png" width="52"></span><span class="arrow">➤</span>
+    <span class="what"><img src="proj_beetle.png" width="30"></span>
+    <span class="info"><b>BEETLE TANK</b><small>lobs a heavy seed mortar in a slow arc — big, easy to see, hurts a lot</small></span></div>
+  <div class="atk"><span class="who"><img src="snail_cannon.png" width="56"></span><span class="arrow">➤</span>
+    <span class="what"><img src="proj_snail.png" width="30"></span>
+    <span class="info"><b>SNAIL CANNON</b><small>fires spiral shell cannonballs SIDEWAYS across the field</small></span></div>
+  <div class="atk"><span class="who"><img src="wasp.png" width="52"></span><span class="arrow">➤</span>
+    <span class="what"><img src="proj_wasp.png" width="18"></span>
+    <span class="info"><b>WASP</b><small>flicks fast stinger darts at each zigzag turn</small></span></div>
+  <div class="atk"><span class="who"><img src="crystal_bug.png" width="46"></span><span class="arrow">➤</span>
+    <span class="what"><img src="proj_crystal.png" width="24"></span>
+    <span class="info"><b>CRYSTAL BUG</b><small>sometimes REFLECTS your bullet back as a crystal shard</small></span></div>
+  <div class="atk"><span class="who"><img src="worm.png" width="54"></span><span class="arrow">➤</span>
+    <span class="what"><img src="proj_worm.png" width="38"></span>
+    <span class="info"><b>WORM</b><small>burps a short-lived poison puff on the ground where it crawls</small></span></div>
+  <div class="atk"><span class="who"><img src="firefly.png" width="40"></span><span class="arrow">➤</span>
+    <span class="what"><img src="proj_firefly.png" width="30"></span>
+    <span class="info"><b>FIREFLY</b><small>blinks invisible — releases a ring of glow orbs when it re-appears</small></span></div>
+  <div class="atk"><span class="who"><img src="mosquito.png" width="48"></span><span class="arrow">➤</span>
+    <span class="what"><img src="proj_mosquito.png" width="34"></span>
+    <span class="info"><b>MOSQUITO</b><small>no bullet — telegraphs with red streaks, then DIVES diagonally at you</small></span></div>
+  <div class="atk"><span class="who"><img src="queen_spider.png" width="50"></span><span class="arrow">➤</span>
+    <span class="what"><img src="proj_egg.png" width="26"></span>
+    <span class="info"><b>QUEEN SPIDER</b><small>drops egg sacs — shoot them fast or a baby spider hatches</small></span></div>
+  <div class="atk"><span class="who"><img src="gold_flea.png" width="44"></span><span class="arrow">➤</span>
+    <span class="what"><img src="proj_gold.png" width="26"></span>
+    <span class="info"><b>GOLD FLEA</b><small>harmless — leaks bonus gold nuggets as it flees (points / rare coin)</small></span></div>
+</div>
+
+<script>
+  const THEMES = [
+    { key:'garden', name:'1 · PIXEL GARDEN',  mote:'#7fd88a', n:14 },
+    { key:'bloom',  name:'2 · FLEA BLOOM',    mote:'#ff9ec2', n:14 },
+    { key:'crawl',  name:'3 · SPIDER CRAWL',  mote:'#b9a8de', n:10 },
+    { key:'poison', name:'4 · POISON ROOTS',  mote:'#9dff3f', n:12 },
+    { key:'nest',   name:'5 · PURPLE NEST',   mote:'#c04dff', n:12 },
+    { key:'night',  name:'6 · NEON NIGHT',    mote:'#ffffff', n:22 },
+    { key:'swamp',  name:'7 · BUG SWAMP',     mote:'#6fe0c0', n:12 },
+    { key:'tunnel', name:'8 · BEETLE TUNNEL', mote:'#ffb347', n:10 },
+    { key:'wasp',   name:'9 · WASP STORM',    mote:'#ffcf7a', n:14 },
+    { key:'glitch', name:'10 · THE GLITCH HIVE', mote:'#54f0ff', n:16, glitch:true },
+  ];
+  // sample creatures shown per theme (level pairing)
+  const CAST = {
+    garden: [['golden_mushroom.png', 26, 48, 62]],
+    bloom:  [['gold_flea.png', 34, 40, 45]],
+    crawl:  [['baby_spider.png', 24, 30, 40], ['queen_spider.png', 42, 62, 52]],
+    poison: [['worm.png', 40, 45, 68]],
+    nest:   [['queen_spider.png', 46, 55, 48]],
+    night:  [['firefly.png', 30, 35, 42], ['mosquito.png', 40, 60, 58]],
+    swamp:  [['worm.png', 40, 30, 72], ['mosquito.png', 38, 65, 40]],
+    tunnel: [['beetle_tank.png', 46, 45, 52]],
+    wasp:   [['wasp.png', 46, 45, 50]],
+    glitch: [['crystal_bug.png', 42, 45, 55]],
+  };
+  const wrap = document.getElementById('themes');
+  THEMES.forEach((t, i) => {
+    const f = document.createElement('div');
+    f.className = 'tframe bg-' + t.key;
+    f.innerHTML = '<div class="tname">' + t.name + '</div>' +
+                  '<div class="day">DAY ' + (i+1) + ' OF THE CYCLE</div>' +
+                  '<div class="groundext" style="background-image:url(ext_' + t.key + '.png?g=2)"></div>' +
+                  '<div class="ground" style="background-image:url(strip_' + t.key + '.png)"></div>';
+    // sparse pixel motes in the theme color (simple, calm — no detail)
+    for(let m = 0; m < t.n; m++){
+      const d = document.createElement('div');
+      d.className = 'mote';
+      const glitchDash = t.glitch && m % 3 === 0;
+      const sz = glitchDash ? 1 : (Math.random() < 0.75 ? 2 : 3);
+      d.style.width = glitchDash ? (6 + Math.random()*10) + 'px' : sz + 'px';
+      d.style.height = sz + 'px';
+      d.style.background = (t.glitch && m % 4 === 1) ? '#ff54c8' : t.mote;
+      d.style.opacity = (0.25 + Math.random()*0.5).toFixed(2);
+      d.style.left = (Math.random()*96) + '%';
+      d.style.top = (12 + Math.random()*68) + '%';
+      f.appendChild(d);
+    }
+    // moon for night theme (simple circle, upper backdrop stays calm)
+    if(t.key === 'night'){
+      const moon = document.createElement('div');
+      moon.style.cssText = 'position:absolute;right:16px;top:44px;width:26px;height:26px;' +
+        'border-radius:50%;background:#e8ecff;box-shadow:0 0 18px rgba(220,230,255,0.5);' +
+        'opacity:0.9;';
+      const crater = document.createElement('div');
+      crater.style.cssText = 'position:absolute;left:6px;top:9px;width:7px;height:7px;' +
+        'border-radius:50%;background:#c3cbe8;';
+      moon.appendChild(crater);
+      f.appendChild(moon);
+    }
+    // creatures
+    (CAST[t.key] || []).forEach(c => {
+      const img = document.createElement('img');
+      img.className = 'spr';
+      img.src = c[0];
+      img.style.width = c[1] + 'px';
+      img.style.left = c[2] + '%';
+      img.style.top = c[3] + '%';
+      f.appendChild(img);
+    });
+    wrap.appendChild(f);
+  });
+</script>
+</body>
+</html>

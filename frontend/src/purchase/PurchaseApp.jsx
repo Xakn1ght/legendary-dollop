@@ -485,7 +485,7 @@ export function PurchaseApp() {
             t={t} fmt={fmt} lang={lang}
             plans={plans}
             autoDiscounts={userInfo?.auto_discounts}
-            showReferral={!!userInfo && !userInfo.has_referrer}
+            showReferral={!!userInfo && !userInfo.has_referrer && !userInfo.is_og}
             autoRenewal={autoRenewal}
             onAutoRenewalChange={onAutoRenewalChange}
             selectedRenewalPlan={selectedRenewalPlan}
@@ -525,6 +525,7 @@ export function PurchaseApp() {
             hasFile={!!receipt.receiptFile}
             onCopyCard={copyCardNumber}
             onFileSelect={receipt.handleSelect}
+            onClearFile={receipt.clear}
             onCancel={cancelOrder}
             onSubmit={submitReceipt}
             uploadPct={uploadPct}

@@ -11,7 +11,6 @@ GET /api/arcade/hall-of-fame
 
 import calendar
 import re
-from datetime import date
 
 from aiohttp import web
 from sqlalchemy import select
@@ -21,6 +20,7 @@ from app.core.settings import ARCADE_MONTHLY_PRIZES, BOT_TOKEN
 from app.database import crud
 from app.database.models import AsyncSessionLocal, RewardHistory, User
 from app.jobs.arcade_prizes import GUARD_SOURCE, _previous_month_bounds
+from app.utils.tehran_time import tehran_today
 from app.utils.webapp_verify import verify_init_data
 
 # "2026-07 rank 3 (score 4210) → Arcade 3rd Place — 10GB Free"
@@ -45,7 +45,7 @@ def _prize_ladder():
 
 
 async def handle_arcade_race(request: web.Request):
-    today = date.today()
+    today = tehran_today()  # race month flips at IRAN midnight
     month_start = today.replace(day=1)
     month_end = today.replace(day=calendar.monthrange(today.year, today.month)[1])
     days_left = (month_end - today).days
@@ -81,7 +81,7 @@ async def handle_arcade_race(request: web.Request):
 
 
 async def handle_arcade_hall_of_fame(request: web.Request):
-    today = date.today()
+    today = tehran_today()
     _, _, prev_key = _previous_month_bounds(today)
 
     async with AsyncSessionLocal() as session:

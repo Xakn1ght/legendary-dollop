@@ -58,7 +58,14 @@ async def handle_admin_update_plans(request: web.Request):
         plans_path = str(CORE_DIR / "plans.json")
         with open(plans_path, 'w', encoding='utf-8') as f:
             json.dump(plans_dict, f, ensure_ascii=False, indent=2)
-        
+
+        # Mutate the in-memory catalog in place so checkout/pricing use the new
+        # prices immediately — the file alone doesn't take effect until restart,
+        # so GET showed new prices while purchases still charged the old ones.
+        from app.core.settings import PLANS
+        PLANS.clear()
+        PLANS.update(plans_dict)
+
         return web.json_response({"ok": True, "message": "Plans updated successfully"})
     except Exception as e:
         import traceback
@@ -116,7 +123,13 @@ async def handle_admin_update_charge_packages(request: web.Request):
         packages_path = str(CORE_DIR / "charge_packages.json")
         with open(packages_path, 'w', encoding='utf-8') as f:
             json.dump(packages_dict, f, ensure_ascii=False, indent=2)
-        
+
+        # In-memory update so the charge flow prices new top-ups correctly
+        # without a restart (same staleness bug as plans).
+        from app.core.settings import CHARGE_PRESET_PACKAGES
+        CHARGE_PRESET_PACKAGES.clear()
+        CHARGE_PRESET_PACKAGES.update(packages_dict)
+
         return web.json_response({"ok": True, "message": "Charge packages updated successfully"})
     except Exception as e:
         import traceback

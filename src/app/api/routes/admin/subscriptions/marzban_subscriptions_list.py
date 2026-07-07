@@ -10,11 +10,10 @@ async def handle_admin_subscriptions(request: web.Request):
         sort_by = request.query.get('sort', 'created')  # created, expire, used, username
         sort_order = request.query.get('order', 'desc')  # asc, desc
         
-        # Fetch all users from Marzban (use high limit to get all users)
+        # Fetch ALL users from Marzban (paged walk — no silent truncation at 2000)
         offset = (page - 1) * limit
-        marzban_data = await marzban_api.get_all_users(offset=0, limit=2000, search=search if search else None)
-        marzban_users = marzban_data.get('users', [])
-        total_count = marzban_data.get('total', len(marzban_users))
+        marzban_users = await marzban_api.get_all_users_paged(search=search if search else None)
+        total_count = len(marzban_users)
         
         # Transform Marzban user data
         subs_data = []

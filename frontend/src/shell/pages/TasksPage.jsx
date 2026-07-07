@@ -231,6 +231,32 @@ export function TasksPage() {
     }
   };
 
+  // 50★ Legend prize: activate VIP straight from the wallet (never at checkout).
+  const activateVipCoupon = async (c) => {
+    const days = Number(c.payload?.days || 30);
+    const ok = await astroConfirm({
+      title: lang === 'fa' ? 'فعال‌سازی VIP' : 'Activate VIP',
+      message: lang === 'fa'
+        ? `${faNum(days, lang)} روز عضویت VIP همین حالا فعال شود؟`
+        : `Activate ${days} days of VIP membership now?`,
+      okText: lang === 'fa' ? 'فعال کن' : 'Activate',
+      cancelText: lang === 'fa' ? 'بعداً' : 'Later',
+    });
+    if (!ok) return;
+    try {
+      const r = await api(`/api/dashboard/coupons/${c.id}/redeem-vip`, { method: 'POST' });
+      if (r && r.ok) {
+        showToast(lang === 'fa' ? '🎖 VIP فعال شد!' : '🎖 VIP activated!', 'success', 2600);
+        hapticNotify('success');
+        fetchSeason();
+      } else {
+        showToast(String(r?.error || tt('failedToLoad')), 'error', 2600);
+      }
+    } catch (e) {
+      showToast(String(e?.message || tt('failedToLoad')), 'error', 2600);
+    }
+  };
+
   const confirmRedeem = async () => {
     if (!redeem) return;
     if (redeem.options.length > 1 && !redeem.selectedType) {
@@ -347,9 +373,19 @@ export function TasksPage() {
               const isNext = season.nextStars != null && Number(m.stars) === season.nextStars;
               return (
                 <div key={m.stars} className={`season-rung${m.reached ? ' reached' : ''}${isNext ? ' next' : ''}`}>
-                  <div className="season-rung-node">{m.reached ? <StarIcon size={12} /> : faNum(m.stars, lang)}</div>
+                  <div className="season-rung-node">
+                    {m.badge
+                      ? <img src={`/webapp/static/badges/${String(m.theme || m.badge).toLowerCase()}.png`} alt={m.badge} style={{ width: 22, height: 22, objectFit: 'contain' }} />
+                      : m.reached ? <StarIcon size={12} /> : faNum(m.stars, lang)}
+                  </div>
                   <div className="season-rung-body">
-                    <div className="season-rung-reward">{couponLabel(m, tt, lang)}</div>
+                    <div className="season-rung-reward">
+                      {couponLabel(m, tt, lang)}
+                      {(m.extra_coupons || []).map((ex, xi) => (
+                        <span key={xi}>{' + '}{couponLabel(ex, tt, lang)}</span>
+                      ))}
+                      {m.badge && <span style={{ opacity: 0.8 }}>{lang === 'fa' ? ` + نشان ${m.badge === 'Champion' ? 'قهرمان' : 'افسانه'}` : ` + ${m.badge} badge`}</span>}
+                    </div>
                     <div className="season-rung-stars">{faNum(m.stars, lang)} <StarIcon size={10} /></div>
                   </div>
                   <div className="season-rung-state">
@@ -437,6 +473,16 @@ export function TasksPage() {
                     </div>
                   )}
                 </div>
+                {c.coupon_type === 'vip_days' && (
+                  <button
+                    className="ref-btn primary"
+                    type="button"
+                    style={{ alignSelf: 'center', flexShrink: 0 }}
+                    onClick={() => activateVipCoupon(c)}
+                  >
+                    {lang === 'fa' ? 'فعال‌سازی' : 'Activate'}
+                  </button>
+                )}
               </div>
             );
           })}

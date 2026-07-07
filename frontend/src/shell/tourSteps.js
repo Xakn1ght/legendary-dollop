@@ -21,10 +21,16 @@ export const TOUR_STEPS = [
   },
   {
     target: '#powerBtn',
-    title: { en: 'Connect in one tap', fa: 'اتصال با یک لمس' },
+    title: { en: 'Your connection at a glance', fa: 'وضعیت اتصال در یک نگاه' },
+    // Android additionally gets the one-tap "Add to Orbit" pitch (the big
+    // button + chip mint an add link for the owner's Orbit app there).
     desc: {
-      en: 'Tap to copy your connection link, then paste it into your VPN app.\nThat\u2019s the whole thing.',
-      fa: 'بزنید تا لینک اتصال کپی شود، سپس آن را در برنامه VPN خود پیست کنید.\nهمین!',
+      en: 'The ring fills as you use data and the badge shows the percentage.\nUse the … menu on the card above to copy your connection link.',
+      fa: 'حلقه با مصرف حجم پر می\u200cشود و نشانگر درصد را نشان می\u200cدهد.\nبرای کپی لینک اتصال از منوی بالای کارت استفاده کنید.',
+    },
+    descAndroid: {
+      en: 'The ring shows your usage — and on Android, tapping it adds your subscription straight into the Orbit app.\nNo Orbit yet? The link also lets you download it.',
+      fa: 'حلقه مصرف شما را نشان می\u200cدهد — و در اندروید با یک لمس، اشتراکتان مستقیم به اپ اربیت اضافه می\u200cشود.\nاربیت ندارید؟ همان لینک دانلودش را هم می\u200cدهد.',
     },
     placement: 'top',
   },

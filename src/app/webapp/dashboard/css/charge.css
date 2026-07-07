@@ -859,3 +859,16 @@ body[data-charge-step="1"] .bottom-actions .btn {
   text-align: center;
   font-variant-numeric: tabular-nums;
 }
+
+/* Remove-selected-photo button (owner request: fix wrong uploads in place) */
+.receipt-upload { position: relative; }
+.receipt-remove-btn {
+  position: absolute; top: 8px; inset-inline-end: 8px;
+  width: 30px; height: 30px; border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  background: rgba(0,0,0,0.55); color: #fff;
+  border: 1px solid rgba(255,255,255,0.25);
+  backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px);
+  cursor: pointer; z-index: 3;
+}
+.receipt-remove-btn:active { opacity: 0.7; }

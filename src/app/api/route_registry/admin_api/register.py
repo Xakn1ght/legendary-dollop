@@ -4,10 +4,22 @@ from aiohttp import web
 
 from .constants import ADMIN_API_BASE
 from .handlers import (
+    handle_admin_analytics_expiring,
+    handle_admin_analytics_revenue,
     handle_admin_approve_charge,
     handle_admin_approve_receipt,
     handle_admin_approve_vip_order,
+    handle_admin_audit_list,
     handle_admin_broadcast,
+    handle_admin_coupon_create,
+    handle_admin_coupon_revoke,
+    handle_admin_coupons_list,
+    handle_admin_expiring_remind,
+    handle_admin_export_transactions,
+    handle_admin_nodes,
+    handle_admin_sms_control_get,
+    handle_admin_sms_control_set,
+    handle_admin_system_health,
     handle_admin_db_capabilities,
     handle_admin_db_exec,
     handle_admin_db_query,
@@ -54,6 +66,7 @@ from .handlers import (
     handle_admin_ticket_photo_get,
     handle_admin_ticket_photo_upload,
     handle_admin_ticket_reply,
+    handle_admin_ticket_user_photo,
     handle_admin_tickets,
     handle_admin_toggle_user,
     handle_admin_ui_get_settings,
@@ -96,6 +109,7 @@ def register_admin_api_routes(app: web.Application) -> None:
     app.router.add_post(ADMIN_API_BASE + "/tickets/{ticket_id}/reply", handle_admin_ticket_reply)
     app.router.add_post(ADMIN_API_BASE + "/tickets/{ticket_id}/photo", handle_admin_ticket_photo_upload)
     app.router.add_get(ADMIN_API_BASE + "/tickets/{ticket_id}/photo/{file_name}", handle_admin_ticket_photo_get)
+    app.router.add_get(ADMIN_API_BASE + "/tickets/{ticket_id}/user-photo", handle_admin_ticket_user_photo)
     app.router.add_post(ADMIN_API_BASE + "/tickets/{ticket_id}/close", handle_admin_ticket_close)
     app.router.add_post(ADMIN_API_BASE + "/tickets/{ticket_id}/archive", handle_admin_ticket_archive)
     app.router.add_post(ADMIN_API_BASE + "/tickets/{ticket_id}/reopen", handle_admin_ticket_reopen)
@@ -131,6 +145,20 @@ def register_admin_api_routes(app: web.Application) -> None:
 
     app.router.add_post(ADMIN_API_BASE + "/charges/{charge_id}/approve", handle_admin_approve_charge)
     app.router.add_post(ADMIN_API_BASE + "/charges/{charge_id}/deny", handle_admin_deny_charge)
+
+    # Ops: analytics / audit / health / nodes / export / coupons / SMS control
+    app.router.add_get(ADMIN_API_BASE + "/analytics/revenue", handle_admin_analytics_revenue)
+    app.router.add_get(ADMIN_API_BASE + "/analytics/expiring", handle_admin_analytics_expiring)
+    app.router.add_post(ADMIN_API_BASE + "/analytics/expiring/remind", handle_admin_expiring_remind)
+    app.router.add_get(ADMIN_API_BASE + "/audit", handle_admin_audit_list)
+    app.router.add_get(ADMIN_API_BASE + "/system-health", handle_admin_system_health)
+    app.router.add_get(ADMIN_API_BASE + "/nodes", handle_admin_nodes)
+    app.router.add_get(ADMIN_API_BASE + "/export/transactions", handle_admin_export_transactions)
+    app.router.add_get(ADMIN_API_BASE + "/coupons", handle_admin_coupons_list)
+    app.router.add_post(ADMIN_API_BASE + "/coupons", handle_admin_coupon_create)
+    app.router.add_post(ADMIN_API_BASE + "/coupons/revoke", handle_admin_coupon_revoke)
+    app.router.add_get(ADMIN_API_BASE + "/sms-control", handle_admin_sms_control_get)
+    app.router.add_post(ADMIN_API_BASE + "/sms-control", handle_admin_sms_control_set)
 
     app.router.add_post(ADMIN_API_BASE + "/login", handle_admin_login)
     app.router.add_post(ADMIN_API_BASE + "/verify-2fa", handle_admin_verify_2fa)

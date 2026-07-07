@@ -47,6 +47,7 @@ export function SupportApp() {
   const [modalInitialSub, setModalInitialSub] = useState('');
   const [toast, setToast] = useState(null); // { msg, type }
   const [overlayText, setOverlayText] = useState(null);
+  const [adminTyping, setAdminTyping] = useState(false);
 
   const t = useMemo(() => makeT(lang), [lang]);
 
@@ -57,9 +58,22 @@ export function SupportApp() {
   const toastTimerRef = useRef(null);
   // Optimistic echo dedupe: 'ticketId|text' -> { key, expiresAt }
   const pendingMapRef = useRef(new Map());
+  // Failed photo uploads keep their File around for tap-to-retry: key -> File
+  const photoFilesRef = useRef(new Map());
+  // Sync bookkeeping for the WS-echo vs POST-response race (state updaters run
+  // async, so dedupe decisions must be made from refs, not inside setMessages).
+  const photoUploadsInFlightRef = useRef(0);
+  const sentPhotoNamesRef = useRef(new Set());
+  const typingHideTimerRef = useRef(null);
+  const typingLastSentRef = useRef(0);
   langRef.current = lang;
   selectedTicketRef.current = selectedTicket;
   chatActiveRef.current = chatActive;
+
+  const hideAdminTyping = useCallback(() => {
+    clearTimeout(typingHideTimerRef.current);
+    setAdminTyping(false);
+  }, []);
 
   const showToast = useCallback((msg, type = 'success') => {
     clearTimeout(toastTimerRef.current);
@@ -140,17 +154,25 @@ export function SupportApp() {
       });
 
       if (viewing) {
+        if (sender === 'admin') hideAdminTyping();
         let handled = false;
         if (sender === 'user' && isPhotoMsg) {
-          // Echo of our own upload: adopt the optimistic bubble.
-          setMessages((cur) => {
-            const i = cur.findIndex((m) => m.uploadPending);
-            if (i < 0) return cur;
+          const fname = payload.file_name || '';
+          if (fname && sentPhotoNamesRef.current.has(fname)) {
+            // POST response landed first and already adopted the bubble.
             handled = true;
-            const next = [...cur];
-            next[i] = { ...next[i], uploadPending: false, file_name: payload.file_name || next[i].file_name };
-            return next;
-          });
+          } else if (photoUploadsInFlightRef.current > 0) {
+            // Echo raced ahead of the POST response: adopt the oldest
+            // still-pending optimistic bubble.
+            handled = true;
+            setMessages((cur) => {
+              const i = cur.findIndex((m) => m.uploadPending);
+              if (i < 0) return cur;
+              const next = [...cur];
+              next[i] = { ...next[i], uploadPending: false, uploadFailed: false, file_name: fname || next[i].file_name };
+              return next;
+            });
+          }
         } else if (sender === 'user') {
           const key = String(ticketId) + '|' + String(text || '');
           const pending = pendingMapRef.current.get(key);
@@ -190,12 +212,21 @@ export function SupportApp() {
       if (selectedTicketRef.current && ticketId === selectedTicketRef.current.id) {
         setSelectedTicket((cur) => (cur ? { ...cur, status: payload.status || cur.status } : cur));
       }
+    } else if (data.type === 'typing') {
+      // Admin is typing in the ticket we're viewing: show dots, auto-hide
+      // after 4s unless another hint arrives.
+      if (data.from === 'admin' && selectedTicketRef.current && data.ticket_id === selectedTicketRef.current.id) {
+        clearTimeout(typingHideTimerRef.current);
+        setAdminTyping(true);
+        typingHideTimerRef.current = setTimeout(() => setAdminTyping(false), 4000);
+      }
     }
-  }, [loadTickets]);
+  }, [loadTickets, hideAdminTyping]);
 
   const openTicket = useCallback(async (id) => {
     setChatActive(true);
     setMessagesLoading(true);
+    hideAdminTyping();
     const data = await api(`/api/dashboard/tickets/${id}`);
     if (data.ok) {
       setSelectedTicket(data.ticket);
@@ -210,7 +241,7 @@ export function SupportApp() {
       setMessagesLoading(false);
       showToast(makeT(langRef.current)('failedToLoad'), 'error');
     }
-  }, [showToast]);
+  }, [showToast, hideAdminTyping]);
 
   const closeChat = useCallback(() => {
     setChatActive(false);
@@ -218,7 +249,9 @@ export function SupportApp() {
     setSelectedTicket(null);
     selectedTicketRef.current = null;
     setMessages([]);
-  }, []);
+    hideAdminTyping();
+    photoFilesRef.current.clear();
+  }, [hideAdminTyping]);
 
   const sendReply = useCallback(async (msg) => {
     const tt = makeT(langRef.current);
@@ -252,34 +285,80 @@ export function SupportApp() {
     }
   }, [showToast]);
 
-  const sendPhoto = useCallback(async (file) => {
+  // Shared photo upload path for first attempt and tap-to-retry.
+  const uploadPhotoFor = useCallback(async (key, ticketId, file) => {
     const tt = makeT(langRef.current);
-    const ticket = selectedTicketRef.current;
-    if (!ticket || !file) return;
-    if (file.size > 8 * 1024 * 1024) { showToast(tt('photoTooLarge'), 'error'); return; }
-    const localUrl = URL.createObjectURL(file);
-    const key = nextKey();
-    setMessages((cur) => [...cur, {
-      key, from_admin: false, message: '', created_at: new Date().toISOString(),
-      content_type: 'photo', local_url: localUrl, uploadPending: true,
-    }]);
+    photoUploadsInFlightRef.current += 1;
     try {
       const fd = new FormData();
       fd.append('photo', file, file.name || 'photo.jpg');
-      const res = await fetch(withUrlAuth(`/api/dashboard/tickets/${ticket.id}/photo`), {
+      const res = await fetch(withUrlAuth(`/api/dashboard/tickets/${ticketId}/photo`), {
         method: 'POST', credentials: 'include', headers: await getRawAuthHeaders(), body: fd,
       });
       const data = await res.json().catch(() => ({}));
       if (!data.ok) throw new Error(data.error || 'upload_failed');
-      setMessages((cur) => cur.map((m) => (m.key === key ? { ...m, uploadPending: false, file_name: data.file_name || '' } : m)));
-      setTickets((cur) => cur.map((tk) => (tk.id === ticket.id
+      if (data.file_name) {
+        sentPhotoNamesRef.current.add(data.file_name);
+        if (sentPhotoNamesRef.current.size > 50) {
+          sentPhotoNamesRef.current.delete(sentPhotoNamesRef.current.values().next().value);
+        }
+      }
+      photoFilesRef.current.delete(key);
+      setMessages((cur) => cur.map((m) => (m.key === key
+        ? { ...m, uploadPending: false, uploadFailed: false, file_name: m.file_name || data.file_name || '' }
+        : m)));
+      setTickets((cur) => cur.map((tk) => (tk.id === ticketId
         ? { ...tk, last_message: tt('photoLabel'), updated_at: data.created_at || tk.updated_at }
         : tk)));
     } catch (_) {
       showToast(tt('photoSendFailed'), 'error');
-      setMessages((cur) => cur.filter((m) => m.key !== key));
+      // If the WS echo already adopted this bubble the upload actually landed;
+      // only a still-pending bubble flips to the visible failed state.
+      setMessages((cur) => cur.map((m) => (m.key === key && m.uploadPending
+        ? { ...m, uploadPending: false, uploadFailed: true }
+        : m)));
+      hapticNotify('error');
+    } finally {
+      photoUploadsInFlightRef.current -= 1;
     }
   }, [showToast]);
+
+  const sendPhoto = useCallback(async (file) => {
+    const tt = makeT(langRef.current);
+    const ticket = selectedTicketRef.current;
+    if (!ticket || !file) return;
+    if (ticket.status === 'closed' || ticket.status === 'archived') {
+      showToast(langRef.current === 'fa' ? 'این تیکت بسته شده است' : 'This ticket is closed', 'error');
+      return;
+    }
+    if (file.size > 8 * 1024 * 1024) { showToast(tt('photoTooLarge'), 'error'); return; }
+    const localUrl = URL.createObjectURL(file);
+    const key = nextKey();
+    photoFilesRef.current.set(key, file);
+    setMessages((cur) => [...cur, {
+      key, from_admin: false, message: '', created_at: new Date().toISOString(),
+      content_type: 'photo', local_url: localUrl, uploadPending: true,
+    }]);
+    await uploadPhotoFor(key, ticket.id, file);
+  }, [showToast, uploadPhotoFor]);
+
+  const retryPhoto = useCallback((key) => {
+    const ticket = selectedTicketRef.current;
+    const file = photoFilesRef.current.get(key);
+    if (!ticket || !file) return;
+    setMessages((cur) => cur.map((m) => (m.key === key ? { ...m, uploadPending: true, uploadFailed: false } : m)));
+    uploadPhotoFor(key, ticket.id, file);
+  }, [uploadPhotoFor]);
+
+  // Throttled typing hint towards the admin side (server rate-limits again).
+  const onTyping = useCallback(() => {
+    const ticket = selectedTicketRef.current;
+    if (!ticket || !chatActiveRef.current) return;
+    const now = Date.now();
+    if (now - typingLastSentRef.current < 1500) return;
+    typingLastSentRef.current = now;
+    realtimeRef.current?.sendTyping(ticket.id);
+  }, []);
 
   const createTicket = useCallback(async ({ category, subId, message }) => {
     const tt = makeT(langRef.current);
@@ -373,6 +452,8 @@ export function SupportApp() {
     });
     realtimeRef.current = realtime;
     realtime.connect();
+    // Debug/headless-test hook: inject a synthetic realtime event.
+    try { window.__astroSupportRt = { inject: (d) => onRealtimeEvent(d) }; } catch (_) { /* ignore */ }
 
     const urlParams = new URLSearchParams(window.location.search);
     const preSelectedSubId = urlParams.get('sub_id');
@@ -415,6 +496,7 @@ export function SupportApp() {
       destroySwipe();
       realtime.destroy();
       clearTimeout(toastTimerRef.current);
+      clearTimeout(typingHideTimerRef.current);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps -- mount-only boot sequence
   }, []);
@@ -445,10 +527,21 @@ export function SupportApp() {
               </div>
             ))}
           </div>
-          <TicketsList t={t} lang={lang} tickets={tickets} filter={filter} loading={ticketsLoading} onOpen={openTicket} />
-          <button className="fab" onClick={() => { setModalInitialSub(''); setModalActive(true); }} aria-label={t('newTicket')}>
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><line x1="12" y1="5" x2="12" y2="19" strokeLinecap="round" /><line x1="5" y1="12" x2="19" y2="12" strokeLinecap="round" /></svg>
-          </button>
+          <TicketsList
+            t={t}
+            lang={lang}
+            tickets={tickets}
+            filter={filter}
+            loading={ticketsLoading}
+            onOpen={openTicket}
+            onCreate={() => { setModalInitialSub(''); setModalActive(true); }}
+          />
+          {/* FAB only when there are tickets; the empty state carries its own big CTA. */}
+          {(ticketsLoading || tickets.length > 0) && (
+            <button className="fab" onClick={() => { setModalInitialSub(''); setModalActive(true); }} aria-label={t('newTicket')}>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><line x1="12" y1="5" x2="12" y2="19" strokeLinecap="round" /><line x1="5" y1="12" x2="19" y2="12" strokeLinecap="round" /></svg>
+            </button>
+          )}
         </div>
 
         <ChatView
@@ -458,10 +551,13 @@ export function SupportApp() {
           ticket={selectedTicket}
           messages={messages}
           messagesLoading={messagesLoading}
+          adminTyping={adminTyping}
           onClose={closeChat}
           onDelete={deleteTicket}
           onSend={sendReply}
           onSendPhoto={sendPhoto}
+          onRetryPhoto={retryPhoto}
+          onTyping={onTyping}
         />
       </div>
 

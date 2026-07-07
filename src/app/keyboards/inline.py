@@ -14,15 +14,15 @@ def get_renewal_keyboard(username):
 def get_low_resource_keyboard(username: str):
     """Inline actions for low traffic/time: quick charge and add 10 days."""
     builder = InlineKeyboardBuilder()
-    builder.button(text="شارژ سرویس⚡️", callback_data=f"charge_{username}")
-    builder.button(text="خرید روز بیشتر 📅", callback_data=f"buydays_{username}")
+    builder.button(text="⚡️ شارژ سرویس", callback_data=f"charge_{username}")
+    builder.button(text="📅 خرید روز بیشتر", callback_data=f"buydays_{username}")
     builder.adjust(2)
     return builder.as_markup()
 
 def get_low_traffic_keyboard(username: str):
     """Inline action for low traffic only: quick charge button."""
     builder = InlineKeyboardBuilder()
-    builder.button(text="شارژ سرویس⚡️", callback_data=f"charge_{username}")
+    builder.button(text="⚡️ شارژ سرویس", callback_data=f"charge_{username}")
     builder.adjust(1)
     return builder.as_markup()
 

@@ -8,9 +8,40 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.database import crud
 from app.handlers.admin.common import ADMIN_IDS, _send_pending_requests
 from app.services.marzban import marzban_api
+from app.utils.admin_bot_helper import get_user_bot
 from app.utils.bot_i18n import get_cached_lang, guess_lang_from_telegram, t
 
 router = Router()
+
+
+async def _dm_user(chat_id, text):
+    """DM a user from an admin-bot handler. The injected ``bot`` here is the
+    ADMIN bot, which users never started — sends must go through the USER bot
+    (audit fix). Best-effort: a delivery failure must not abort the handler."""
+    ub = get_user_bot()
+    if not ub or not chat_id:
+        return
+    try:
+        await ub.send_message(chat_id, text)
+    except Exception as e:
+        logging.warning(f"user DM failed (chat {chat_id}): {e}")
+
+
+async def _edit_user_detail(sub, user_chat_id, user_msg_id):
+    """Refresh the user's own subscription-detail message via the USER bot."""
+    if not (user_chat_id and user_msg_id):
+        return
+    ub = get_user_bot()
+    if not ub:
+        return
+    try:
+        user_info = await marzban_api.get_user_info(sub.marzban_username)
+        if user_info:
+            from app.handlers.user.my_services import build_subscription_detail
+            text, kb = build_subscription_detail(sub, user_info)
+            await ub.edit_message_text(text=text, chat_id=user_chat_id, message_id=user_msg_id, parse_mode="HTML", reply_markup=kb.as_markup())
+    except Exception as e:
+        logging.error(f"Failed to edit user detail message: {e}")
 
 # --------------------------
 #  Show toggle request
@@ -94,17 +125,8 @@ async def approve_disable(callback: CallbackQuery, session: AsyncSession, bot: B
     sub.status = 'disabled'
     await session.commit()
 
-    await bot.send_message(sub.user.chat_id, "⛔ سرویس شما توسط ادمین غیرفعال شد.")
-
-    if user_chat_id and user_msg_id:
-        try:
-            user_info = await marzban_api.get_user_info(sub.marzban_username)
-            if user_info:
-                from app.handlers.user.my_services import build_subscription_detail
-                text, kb = build_subscription_detail(sub, user_info)
-                await bot.edit_message_text(text=text, chat_id=user_chat_id, message_id=user_msg_id, parse_mode="HTML", reply_markup=kb.as_markup())
-        except Exception as e:
-            logging.error(f"Failed to edit old detail message after disable: {e}")
+    await _dm_user(sub.user.chat_id, "⛔ سرویس شما توسط ادمین غیرفعال شد.")
+    await _edit_user_detail(sub, user_chat_id, user_msg_id)
 
     await callback.answer(t(lang, "admin_toggle_disabled"))
     await _send_pending_requests(bot, session, callback.from_user.id, callback.message.message_id)
@@ -126,9 +148,13 @@ async def deny_disable(callback: CallbackQuery, session: AsyncSession, bot: Bot)
 
     await session.refresh(sub, attribute_names=["user"])
 
-    await bot.send_message(sub.user.chat_id, "درخواست شما برای غیرفعال‌سازی سرویس توسط ادمین رد شد.")
+    # Commit the status restore FIRST — the old order sent the DM before the
+    # commit, so a (guaranteed, wrong-bot) send failure meant the denial never
+    # persisted (audit fix). Persist, then best-effort DM.
+    user_chat_id = sub.user.chat_id
     sub.status = 'active'
     await session.commit()
+    await _dm_user(user_chat_id, "درخواست شما برای غیرفعال‌سازی سرویس توسط ادمین رد شد.")
 
     await callback.answer(t(lang, "admin_toggle_request_denied"))
     await _send_pending_requests(bot, session, callback.from_user.id, callback.message.message_id)
@@ -169,17 +195,8 @@ async def approve_enable(callback: CallbackQuery, session: AsyncSession, bot: Bo
     sub.status = 'active'
     await session.commit()
 
-    await bot.send_message(sub.user.chat_id, "✅ سرویس شما دوباره فعال شد.")
-
-    if user_chat_id and user_msg_id:
-        try:
-            user_info = await marzban_api.get_user_info(sub.marzban_username)
-            if user_info:
-                from app.handlers.user.my_services import build_subscription_detail
-                text, kb = build_subscription_detail(sub, user_info)
-                await bot.edit_message_text(text=text, chat_id=user_chat_id, message_id=user_msg_id, parse_mode="HTML", reply_markup=kb.as_markup())
-        except Exception as e:
-            logging.error(f"Failed to edit old detail message after enable: {e}")
+    await _dm_user(sub.user.chat_id, "✅ سرویس شما دوباره فعال شد.")
+    await _edit_user_detail(sub, user_chat_id, user_msg_id)
 
     await callback.answer(t(lang, "admin_toggle_enabled"))
     await _send_pending_requests(bot, session, callback.from_user.id, callback.message.message_id)
@@ -201,9 +218,11 @@ async def deny_enable(callback: CallbackQuery, session: AsyncSession, bot: Bot):
 
     await session.refresh(sub, attribute_names=["user"])
 
-    await bot.send_message(sub.user.chat_id, "درخواست شما برای فعال‌سازی سرویس توسط ادمین رد شد.")
+    # Persist first, DM after (same ordering fix as deny_disable).
+    user_chat_id = sub.user.chat_id
     sub.status = 'disabled'
     await session.commit()
+    await _dm_user(user_chat_id, "درخواست شما برای فعال‌سازی سرویس توسط ادمین رد شد.")
 
     await callback.answer(t(lang, "admin_toggle_request_denied"))
     await _send_pending_requests(bot, session, callback.from_user.id, callback.message.message_id) 

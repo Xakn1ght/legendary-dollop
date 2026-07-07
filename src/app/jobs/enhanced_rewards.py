@@ -12,18 +12,14 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.database.crud import (
     check_and_award_achievements,
     get_active_challenges,
-    get_leaderboard,
     get_referees_by_referrer,
-    get_user,
     get_user_analytics,
     get_user_subscriptions,
     update_challenge_progress,
     update_leaderboard,
-    update_user_analytics,
 )
 from app.database.models import AsyncSessionLocal
 from app.services.marzban import marzban_api
-from app.utils.text_format import to_persian_digits
 
 logger = logging.getLogger(__name__)
 
@@ -264,7 +260,7 @@ async def reminder_unclaimed_star_rewards_job(bot: Bot):
                         message = (
                             f"⭐ سلام {user.full_name or user.username or 'کاربر عزیز'}!\n\n"
                             f"شما {len(unclaimed)} جایزه ستاره‌ای قابل دریافت دارید که هنوز برداشت نکردید.\n\n"
-                            f"برای دریافت جوایز خود به بخش 🎁 سیستم پاداش پیشرفته بروید."
+                            f"برای دریافت جوایز خود به بخش «🎁 پاداش‌ها» بروید."
                         )
 
                         try:
@@ -290,7 +286,6 @@ async def get_all_users(session: AsyncSession):
     """Get all users from database."""
     from sqlalchemy import select
 
-    from app.database.crud import get_user
     from app.database.models import User
     
     result = await session.execute(select(User))

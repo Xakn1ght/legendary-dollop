@@ -5,7 +5,9 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.settings import DASHBOARD_PUBLIC_BASE_URL
 from app.database import crud
+from app.handlers.user.start.common import _create_share_button
 from app.utils.bot_i18n import normalize_lang, set_cached_lang, t, text_matches
+from app.utils.premium_emoji import answer_premium
 
 router = Router()
 
@@ -69,8 +71,9 @@ async def referral_handler(message: Message, session: AsyncSession):
     
     kb = InlineKeyboardBuilder()
     try:
+        kb.row(_create_share_button(message.bot, user.referral_code, lang))
         kb.button(text=("⭐ Rewards (WebApp)" if lang != "fa" else "⭐ پاداش‌ها (وب‌اپ)"), web_app=WebAppInfo(url=_build_rewards_webapp_url(message.chat.id)))
         kb.adjust(1)
-        await message.answer(referral_message, parse_mode='HTML', reply_markup=kb.as_markup())
+        await answer_premium(message, referral_message, reply_markup=kb.as_markup())
     except Exception:
-        await message.answer(referral_message, parse_mode='HTML')
+        await answer_premium(message, referral_message)

@@ -41,7 +41,7 @@ async def broadcast_management_menu(message: Message, session: AsyncSession):
     users_with_subs = await session.scalar(
         select(func.count(User.id.distinct()))
         .select_from(User)
-        .join(Subscription, User.chat_id == Subscription.user_id)
+        .join(Subscription, User.id == Subscription.user_id)
         .filter(and_(User.banned == False, Subscription.status == 'active'))
     ) or 0
 
@@ -135,7 +135,7 @@ async def set_target_audience(callback: CallbackQuery, state: FSMContext, sessio
         count = await session.scalar(
             select(func.count(User.id.distinct()))
             .select_from(User)
-            .join(Subscription, User.chat_id == Subscription.user_id)
+            .join(Subscription, User.id == Subscription.user_id)
             .filter(and_(User.banned == False, Subscription.status == 'active'))
         ) or 0
         description = "کاربران با سرویس فعال"
@@ -285,7 +285,7 @@ async def confirm_and_send_broadcast(callback: CallbackQuery, state: FSMContext,
     elif target_type == 'active_users':
         users_query = users_query.filter(User.banned == False)
     elif target_type == 'active_subscribers':
-        users_query = users_query.join(Subscription, User.chat_id == Subscription.user_id).filter(
+        users_query = users_query.join(Subscription, User.id == Subscription.user_id).filter(
             and_(User.banned == False, Subscription.status == 'active')
         ).distinct()
     elif target_type == 'vip_users':
@@ -391,7 +391,7 @@ async def broadcast_statistics(callback: CallbackQuery, session: AsyncSession):
     active_subscribers = await session.scalar(
         select(func.count(User.id.distinct()))
         .select_from(User)
-        .join(Subscription, User.chat_id == Subscription.user_id)
+        .join(Subscription, User.id == Subscription.user_id)
         .filter(and_(User.banned == False, Subscription.status == 'active'))
     ) or 0
     

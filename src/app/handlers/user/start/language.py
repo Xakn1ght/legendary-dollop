@@ -1,3 +1,5 @@
+from html import escape
+
 from aiogram import F
 from aiogram.enums import ParseMode
 from aiogram.fsm.context import FSMContext
@@ -7,8 +9,9 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.database import crud
 from app.database.cached_crud import create_user_cached, get_user_by_referral_code_cached, get_user_with_cache
 from app.keyboards.reply import get_main_keyboard
-from app.utils.bot_i18n import normalize_lang, set_cached_lang
+from app.utils.bot_i18n import normalize_lang, set_cached_lang, t
 from app.utils.logger import handle_errors
+from app.utils.premium_emoji import edit_premium, send_premium
 
 from .common import ReferralStates, _create_share_button, _is_og_user, router
 
@@ -42,9 +45,7 @@ async def process_language_selection(callback: CallbackQuery, state: FSMContext,
 		# Get account stats
 		stats_line = ""
 		try:
-			import time
 
-			from app.services.marzban import marzban_api
 			subs = await crud.get_user_subscriptions(session, user.id)
 			active_subs = [s for s in subs if (getattr(s, 'status', None) or '').lower() == 'active']
 			active_count = len(active_subs)
@@ -78,7 +79,7 @@ async def process_language_selection(callback: CallbackQuery, state: FSMContext,
 			"Use the menu below."
 		)
 		
-		await callback.message.edit_text(welcome_msg, parse_mode=ParseMode.HTML)
+		await edit_premium(callback.message, welcome_msg)
 		await callback.message.answer(
 			("از منوی زیر استفاده کنید:" if selected_lang == "fa" else "Use the menu below:"),
 			reply_markup=get_main_keyboard(chat_id, is_admin=user.is_admin, lang=selected_lang),
@@ -128,7 +129,7 @@ async def process_language_selection(callback: CallbackQuery, state: FSMContext,
 			]
 		)
 		
-		await callback.message.edit_text(welcome_msg, reply_markup=keyboard, parse_mode=ParseMode.HTML)
+		await edit_premium(callback.message, welcome_msg, reply_markup=keyboard)
 		await state.clear()
 		await callback.answer()
 		return
@@ -166,21 +167,12 @@ async def process_language_selection(callback: CallbackQuery, state: FSMContext,
 
 			try:
 				referrer_lang = normalize_lang(getattr(referrer, "language", None))
-				await callback.message.bot.send_message(
+				await send_premium(
+					callback.message.bot,
 					referrer.chat_id,
-					(
-						(
-							"🎉 یک کاربر جدید با کد دعوت شما عضو شد!\n\n"
-							f"👤 نام کاربر: {full_name or username or chat_id}\n"
-							"🎁 اگر این کاربر خرید انجام دهد، بن پاداش برای شما فعال می‌شود."
-							if referrer_lang == "fa"
-							else
-							"🎉 A new user joined with your invite code!\n\n"
-							f"👤 User: {full_name or username or chat_id}\n"
-							"🎁 If they make a purchase, you’ll get a reward voucher."
-						)
+					t(referrer_lang, "referral_new_user_dm").format(
+						name=escape(str(full_name or username or chat_id))
 					),
-					parse_mode=ParseMode.HTML,
 				)
 			except Exception:
 				pass
@@ -216,7 +208,7 @@ async def process_language_selection(callback: CallbackQuery, state: FSMContext,
 				]
 			)
 
-			await callback.message.edit_text(welcome_message, reply_markup=share_keyboard, parse_mode=ParseMode.HTML)
+			await edit_premium(callback.message, welcome_message, reply_markup=share_keyboard)
 			await callback.message.answer(
 				("از منوی زیر استفاده کنید:" if selected_lang == "fa" else "Use the menu below:"),
 				reply_markup=get_main_keyboard(chat_id, is_admin=user.is_admin, lang=selected_lang),

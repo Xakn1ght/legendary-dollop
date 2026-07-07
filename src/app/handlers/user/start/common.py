@@ -114,14 +114,17 @@ def _create_referral_link(bot, referral_code: str) -> str:
 def _create_share_button(bot, referral_code: str, lang: str) -> InlineKeyboardButton:
 	"""Create share referral link button"""
 	referral_link = _create_referral_link(bot, referral_code)
-	# Telegram renders the url separately below the text — never repeat the link
-	# inside the text or the shared message shows it twice.
+	# Telegram renders the url separately, on its own line — never repeat the
+	# link inside the text or the shared message shows it twice.
+	# Layout: hook / one-line benefit / reward pitch, then the clickable link.
 	share_text = (
-		"🚀 اینترنت آزاد، پرسرعت و بدون قطعی با AstroByte!\n"
-		"🎁 با لینک دعوت من عضو شو — هر دو پاداش می‌گیریم:"
+		"🛰 اینترنت بدون مرز با AstroByte\n\n"
+		"⚡️ آزاد، پرسرعت و پایدار — بدون قطعی و افت سرعت.\n"
+		"🎁 با لینک دعوت من عضو شو؛ با اولین خریدت، هر دو پاداش می‌گیریم:"
 		if lang == "fa"
-		else "🚀 Fast, reliable internet with AstroByte!\n"
-		"🎁 Join with my invite link — we both get rewards:"
+		else "🛰 Internet without borders — AstroByte\n\n"
+		"⚡️ Fast, stable and always on. No drops.\n"
+		"🎁 Join with my invite link — on your first purchase, we both get a reward:"
 	)
 	share_url = f"https://t.me/share/url?url={quote(referral_link)}&text={quote(share_text)}"
 	return InlineKeyboardButton(

@@ -15,13 +15,23 @@ from app.api.routes.game.profile import (
 )
 from app.api.routes.game.race import handle_arcade_hall_of_fame, handle_arcade_race
 from app.api.routes.game.round_start import handle_arcade_round_start
+from app.api.routes.game.shop import (
+    handle_arcade_buy,
+    handle_arcade_equip,
+    handle_arcade_retry,
+    handle_arcade_shop,
+)
 
 __all__ = [
+    "handle_arcade_buy",
+    "handle_arcade_equip",
     "handle_arcade_game2_index",
     "handle_arcade_game_index",
     "handle_arcade_hall_of_fame",
     "handle_arcade_race",
+    "handle_arcade_retry",
     "handle_arcade_round_start",
+    "handle_arcade_shop",
     "handle_arcade_status",
     "handle_arcade_submit",
     "handle_index",

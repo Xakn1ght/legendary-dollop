@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import json
 import logging
 import re
 from datetime import datetime, timedelta
@@ -9,43 +8,19 @@ from aiogram import Bot
 from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.settings import ADMIN_ID, PLANS
+from app.core.settings import ADMIN_ID
 from app.database import crud
 
 
-async def apply_coupon_pack_grants(session: AsyncSession, user, coupon_id) -> None:
-    """Apply a vip_pack/legend_pack's non-money grants at provision: extend the VIP
-    window (which also gives high-priority support tickets) and unlock the badge + theme
-    in dashboard_prefs. No-op for other coupon types. Applied at provision (not order
-    create) so a denied/cancelled receipt never strands a VIP grant."""
-    if not coupon_id or not user:
+async def extend_vip_window(session: AsyncSession, user, days: int) -> None:
+    """Extend the user's VIP window by ``days`` (activating VIP if needed).
+    Shared by admin VIP approval side-paths and the vip_days coupon redemption."""
+    if not user or days <= 0:
         return
-    coupon = await crud.get_coupon_by_id(session, coupon_id)
-    if not coupon or coupon.coupon_type not in ("vip_pack", "legend_pack"):
-        return
-    try:
-        payload = json.loads(coupon.payload or "{}")
-    except Exception:
-        return
-
-    days = int(payload.get("priority_support_days") or 0)
-    if days > 0:
-        now = datetime.utcnow()
-        base = user.vip_until if (user.vip_until and user.vip_until > now) else now
-        user.is_vip = True
-        user.vip_until = base + timedelta(days=days)  # extend, don't overwrite
-
-    try:
-        prefs = json.loads(user.dashboard_prefs or "{}")
-    except Exception:
-        prefs = {}
-    if payload.get("badge"):
-        prefs["badge"] = payload["badge"]
-    if payload.get("theme"):
-        themes = set(prefs.get("unlocked_themes") or [])
-        themes.add(payload["theme"])
-        prefs["unlocked_themes"] = sorted(themes)
-    user.dashboard_prefs = json.dumps(prefs)
+    now = datetime.utcnow()
+    base = user.vip_until if (user.vip_until and user.vip_until > now) else now
+    user.is_vip = True
+    user.vip_until = base + timedelta(days=days)  # extend, don't overwrite
     await session.commit()
 
 
@@ -100,21 +75,31 @@ async def process_approved_subscription(sub_id: int, session: AsyncSession, bot:
         await _cleanup_admin_messages(subscription)
         return True
 
-    if subscription.status == "pending":
-        try:
-            res = await session.execute(
-                update(Subscription)
-                .where(Subscription.id == sub_id, Subscription.status == "pending")
-                .values(status="active")
-            )
-            await session.commit()
-            if getattr(res, "rowcount", 0) == 0:
-                subscription = await session.get(Subscription, sub_id)
-                if subscription and subscription.status == "active" and getattr(subscription, "user_link_sent", False):
-                    await _cleanup_admin_messages(subscription)
-                    return True
-        except Exception:
-            pass
+    # Only a row we ATOMICALLY move pending→active here may be provisioned. This
+    # guard closes the approve-vs-deny race: if a concurrent deny already claimed
+    # the row (status 'processing'/'denied' or the row is gone), we must NOT fall
+    # through to Marzban provisioning — otherwise we'd build a service for an
+    # order that deny is simultaneously refunding and deleting.
+    if subscription.status != "pending":
+        logging.warning(f"Sub {sub_id} not pending (status={subscription.status}); refusing to provision.")
+        return False
+    try:
+        res = await session.execute(
+            update(Subscription)
+            .where(Subscription.id == sub_id, Subscription.status == "pending")
+            .values(status="active")
+        )
+        await session.commit()
+        if getattr(res, "rowcount", 0) == 0:
+            # lost the claim — only a no-op success if it's already fully provisioned
+            subscription = await session.get(Subscription, sub_id)
+            if subscription and subscription.status == "active" and getattr(subscription, "user_link_sent", False):
+                await _cleanup_admin_messages(subscription)
+                return True
+            return False
+    except Exception:
+        logging.exception(f"Sub {sub_id}: failed to claim pending→active")
+        return False
 
     result = await session.execute(select(_User).filter(_User.id == subscription.user_id))
     user = result.scalar_one_or_none()
@@ -163,15 +148,9 @@ async def process_approved_subscription(sub_id: int, session: AsyncSession, bot:
             logging.error(f"Failed to notify user {user.chat_id} about URL failure: {notify_error}")
         return False
 
-    # Service is provisioned — now apply any vip/legend pack grants (VIP window →
-    # priority support, badge, theme). After the success guard so a failed provision
-    # never strands a VIP grant.
-    try:
-        await apply_coupon_pack_grants(session, user, getattr(subscription, "applied_coupon_id", None))
-    except Exception as e:
-        logging.error(f"Failed to apply pack grants for sub {sub_id}: {e}")
-
     # Rewards policy: no XP / loyalty / purchase cashback from this flow (see handlers policy).
+    # (Pack grants retired 2026-07: badge/theme now unlock at the star milestone,
+    # VIP time comes from the wallet-redeemed vip_days coupon.)
 
     try:
         pending_claim = await crud.get_pending_extradays_claim(session, user.id)

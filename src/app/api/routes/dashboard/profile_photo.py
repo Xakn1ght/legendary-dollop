@@ -39,6 +39,28 @@ async def _fetch_from_telegram(bot, chat_id: int) -> bytes | None:
     return buf.read() if buf else None
 
 
+async def get_cached_profile_photo(bot, chat_id: int) -> bytes | None:
+    """Disk-cached Telegram avatar bytes (24h positive / 6h negative).
+
+    Shared by the dashboard self-photo endpoint and the admin ticket view.
+    """
+    jpg = _CACHE_DIR / f"{chat_id}.jpg"
+    miss = _CACHE_DIR / f"{chat_id}.none"
+    if _fresh(jpg, _TTL_HIT):
+        return jpg.read_bytes()
+    if _fresh(miss, _TTL_MISS):
+        return None
+    data = await _fetch_from_telegram(bot, int(chat_id))
+    _CACHE_DIR.mkdir(parents=True, exist_ok=True)
+    if not data:
+        miss.touch()
+        return None
+    jpg.write_bytes(data)
+    if miss.exists():
+        miss.unlink()
+    return data
+
+
 async def handle_profile_photo(request: web.Request):
     user_chat_id, _new_token = _verify_webapp_auth(request)
     if not user_chat_id:

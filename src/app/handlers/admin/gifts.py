@@ -7,6 +7,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.database import crud
 from app.database.models import Subscription, User, UserGift
 from app.handlers.admin.common import ADMIN_IDS
+from app.utils.admin_bot_helper import get_user_bot
 from app.utils.bot_i18n import get_cached_lang, guess_lang_from_telegram, t
 
 router = Router()
@@ -86,14 +87,17 @@ async def approve_gift(callback: CallbackQuery, session: AsyncSession, bot: Bot)
         return
     gift.payment_status = 'approved'
     await session.commit()
-    # Notify sender and receiver that gift is now payable/available
+    # Notify sender and receiver via the USER bot. Admin bot can't DM users, and
+    # the gift_accept: button's handler lives in the user bot — so a user-bot
+    # send is required for the tap to work at all (audit fix).
+    user_bot = get_user_bot() or bot
     try:
         if gift.sender and gift.sender.chat_id:
-            await bot.send_message(gift.sender.chat_id, f"✅ پرداخت هدیه #{gid} تایید شد. گیرنده می‌تواند آن را بپذیرد.")
+            await user_bot.send_message(gift.sender.chat_id, f"✅ پرداخت هدیه #{gid} تایید شد. گیرنده می‌تواند آن را بپذیرد.")
         if gift.receiver and gift.receiver.chat_id:
             from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup
             kb = InlineKeyboardMarkup(inline_keyboard=[[InlineKeyboardButton(text='✅ پذیرش هدیه', callback_data=f'gift_accept:{gift.id}')]])
-            await bot.send_message(gift.receiver.chat_id, f"🎁 یک هدیه جدید برای شما آماده است. برای افزودن به حساب، دکمه را لمس کنید.", reply_markup=kb)
+            await user_bot.send_message(gift.receiver.chat_id, f"🎁 یک هدیه جدید برای شما آماده است. برای افزودن به حساب، دکمه را لمس کنید.", reply_markup=kb)
     except Exception:
         pass
     await callback.answer(t(lang, "admin_gift_approved"))
@@ -112,9 +116,10 @@ async def deny_gift(callback: CallbackQuery, session: AsyncSession, bot: Bot):
         return
     gift.payment_status = 'denied'
     await session.commit()
+    user_bot = get_user_bot() or bot
     try:
         if gift.sender and gift.sender.chat_id:
-            await bot.send_message(gift.sender.chat_id, f"❌ پرداخت هدیه #{gid} رد شد. لطفاً دوباره تلاش کنید.")
+            await user_bot.send_message(gift.sender.chat_id, f"❌ پرداخت هدیه #{gid} رد شد. لطفاً دوباره تلاش کنید.")
     except Exception:
         pass
     await callback.answer(t(lang, "admin_gift_denied"))

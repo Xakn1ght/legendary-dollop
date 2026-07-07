@@ -526,7 +526,7 @@
     scoreEl.textContent = String(state.score);
     if (showStart) {
       ctx.fillStyle = '#fff'; ctx.textAlign = 'center'; ctx.font = 'bold 28px monospace';
-      ctx.fillText('SUPERBUGZ', state.w / 2, state.h * 0.33);
+      ctx.fillText('ASTROBUGZ', state.w / 2, state.h * 0.33);
       ctx.font = '18px monospace';
       ctx.fillText('Tap & Hold anywhere to play', state.w / 2, state.h * 0.45);
       ctx.fillText('Desktop: Hold Left-Click and move cursor', state.w / 2, state.h * 0.52);

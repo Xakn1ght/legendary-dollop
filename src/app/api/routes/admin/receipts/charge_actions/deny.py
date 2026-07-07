@@ -61,6 +61,12 @@ async def handle_admin_deny_charge(request: web.Request):
             except Exception:
                 pass
 
+            from app.services.audit import record_audit
+
+            await record_audit(
+                request, "charge.deny", target_type="charge", target_id=charge_id,
+                summary=f"denied charge (refund {result.credit_refunded:,} toman credit)",
+            )
             return web.json_response({"ok": True, "message": "denied"})
     except Exception:
         import traceback

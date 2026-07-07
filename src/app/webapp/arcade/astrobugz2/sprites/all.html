@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<!-- FULL ASSET GALLERY — every extracted/generated expansion asset.
+     Tap any sprite to open the raw PNG (long-press to save on phone),
+     or grab the whole pack with the ZIP button. -->
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AstroBugz — expansion asset pack</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: #0b0617; color: #f3eefe; font-family: monospace; padding: 20px; }
+  h1 { font-size: 16px; letter-spacing: 2px; color: #ffd23f; margin-bottom: 4px; }
+  .sub { font-size: 11px; color: #9d8fc4; margin-bottom: 16px; }
+  .dl {
+    display: inline-block; margin-bottom: 22px; padding: 12px 20px;
+    background: #c04dff; color: #fff; border: 2px solid #ff7ec2; border-radius: 8px;
+    font-family: inherit; font-size: 12px; letter-spacing: 1px; text-decoration: none;
+  }
+  h2 { font-size: 12px; letter-spacing: 2px; color: #7be0ff; margin: 20px 0 10px; }
+  .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); gap: 10px; max-width: 1200px; }
+  .cell {
+    background: #120826; border: 1px solid rgba(192,77,255,0.3); border-radius: 8px;
+    padding: 10px 6px; text-align: center; text-decoration: none; color: inherit;
+    display: flex; flex-direction: column; align-items: center; gap: 8px;
+  }
+  .cell .box {
+    width: 96px; height: 76px; display: flex; align-items: center; justify-content: center;
+    background:
+      repeating-conic-gradient(#1c1533 0% 25%, #241b41 0% 50%) 0 0 / 16px 16px;
+    border-radius: 4px;
+  }
+  .cell img { image-rendering: pixelated; max-width: 88px; max-height: 68px; }
+  .cell b { font-size: 9px; color: #ff7ec2; letter-spacing: 0.5px; word-break: break-all; }
+  .strips .cell .box { width: 100%; height: 52px; }
+  .strips .cell img { max-width: 100%; max-height: 48px; }
+  .strips.grid { grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); }
+</style>
+</head>
+<body>
+  <h1>ASTROBUGZ EXPANSION PACK</h1>
+  <div class="sub">Tap a sprite to open the PNG (long-press to save) · all transparent · pixel-perfect from the reference sheet</div>
+  <a class="dl" href="astrobugz_expansion_pack.zip" download>⬇ DOWNLOAD ALL (ZIP)</a>
+  <div id="root"></div>
+
+<script>
+(async function(){
+  const GROUPS = {
+    'FLOWER SEGMENTS': ['seg_pink','seg_blue','seg_armored','seg_split','seg_poison'],
+    'FLEAS': ['flea_normal','flea_fast','gold_flea','flea_bomb'],
+    'SPIDERS': ['baby_spider','spider_normal','spider_wall','spider_phantom','queen_spider'],
+    'SCORPIONS': ['scorpion_normal','scorpion_red','scorpion_poison','scorpion_shield'],
+    'SPIDER BOSSES': ['boss_purple','boss_horned','boss_egg','boss_crystal'],
+    'MEGABOSSES': ['mega_mini','mega_true','mega_glitch'],
+    'NEW ENEMIES': ['beetle_tank','mosquito','worm','firefly','snail_cannon','wasp','larva_egg','crystal_bug'],
+    'MUSHROOMS': ['mushroom_normal','mushroom_poison','golden_mushroom','mushroom_shield'],
+    'ROCKETS': ['rocket_normal','rocket_triple','rocket_piercing','rocket_bomb'],
+    'CREATURE PROJECTILES': ['proj_beetle','proj_snail','proj_wasp','proj_crystal','proj_worm','proj_firefly','proj_mosquito','proj_egg','proj_gold'],
+  };
+  // daily background days come from the canonical config
+  let DAYS = [];
+  try {
+    const cfg = await (await fetch('themes30.json?_t=' + Date.now())).json();
+    DAYS = cfg.themes;
+  } catch (_) {}
+
+  const root = document.getElementById('root');
+  for (const [title, keys] of Object.entries(GROUPS)) {
+    const h = document.createElement('h2'); h.textContent = title; root.appendChild(h);
+    const g = document.createElement('div'); g.className = 'grid';
+    keys.forEach(k => {
+      const a = document.createElement('a');
+      a.className = 'cell'; a.href = k + '.png'; a.target = '_blank';
+      a.innerHTML = '<span class="box"><img src="' + k + '.png"></span><b>' + k + '</b>';
+      g.appendChild(a);
+    });
+    root.appendChild(g);
+  }
+  const h2 = document.createElement('h2');
+  h2.textContent = 'DAILY BACKGROUNDS (30-day cycle)';
+  root.appendChild(h2);
+  const gs = document.createElement('div'); gs.className = 'grid strips';
+  DAYS.forEach(t => {
+    const a = document.createElement('a');
+    a.className = 'cell'; a.href = t.bg; a.target = '_blank';
+    a.innerHTML = '<span class="box"><img src="' + t.bg + '"></span><b>day ' + t.day + ' · ' + t.name + '</b>';
+    gs.appendChild(a);
+  });
+  root.appendChild(gs);
+})();
+</script>
+</body>
+</html>

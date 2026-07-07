@@ -98,6 +98,15 @@ async def admin_auth_middleware(request: web.Request, handler):
     """
     path = request.path
     if path.startswith("/api/admin") or path.startswith("/admin"):
+        # Host gate FIRST: the admin surface only exists on the dedicated admin
+        # host. On the public game/arcade domain (or any other vhost this one
+        # process answers) /admin* and /api/admin* 404 as if they were never a
+        # route — so knowing the obvious game URL reveals nothing.
+        from app.core.settings import is_admin_host_allowed
+
+        if not is_admin_host_allowed(request.headers.get("Host", "")):
+            raise web.HTTPNotFound()
+
         ip = get_client_ip(request)
         if not is_ip_allowed(ip):
             if path.startswith("/api/admin"):

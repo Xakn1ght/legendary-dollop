@@ -1,3 +1,5 @@
+from app.services.audit import record_audit
+
 from ..common import *  # noqa: F403
 
 
@@ -55,7 +57,11 @@ async def handle_admin_approve_receipt(request: web.Request):
                     await broadcast_admin_event('receipts_updated', {'order_id': sub_id})
                 except Exception:
                     pass
-                
+
+                await record_audit(
+                    request, "receipt.approve", target_type="subscription", target_id=sub_id,
+                    summary=f"approved {plan_name or '?'} for user #{user_id} ({service_name or '-'})",
+                )
                 return web.json_response({"ok": True, "message": "approved"})
             else:
                 return web.json_response({"ok": False, "error": "activation_failed"}, status=500)
@@ -145,7 +151,11 @@ async def handle_admin_deny_receipt(request: web.Request):
                 await broadcast_admin_event('receipts_updated', {'order_id': sub_id})
             except Exception:
                 pass
-            
+
+            await record_audit(
+                request, "receipt.deny", target_type="subscription", target_id=sub_id,
+                summary=f"denied order (refund {credit_refunded:,} toman credit)",
+            )
             return web.json_response({"ok": True, "message": "denied"})
     except Exception as e:
         import traceback

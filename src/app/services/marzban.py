@@ -549,6 +549,21 @@ class MarzbanAPI:
             print(f"Error fetching users: {e}")
             return {"users": [], "total": 0}
 
+    async def get_all_users_paged(self, search: str = None, page_size: int = 500, max_users: int = 50000):
+        """Fetch EVERY user by walking the paginated endpoint — replaces the old
+        'limit=2000 and hope' pattern that silently truncated large panels."""
+        users: list = []
+        offset = 0
+        while offset < max_users:
+            data = await self.get_all_users(offset=offset, limit=page_size, search=search)
+            batch = data.get("users", []) or []
+            users.extend(batch)
+            total = int(data.get("total") or 0)
+            offset += page_size
+            if len(batch) < page_size or (total and len(users) >= total):
+                break
+        return users
+
     async def update_user(self, username: str, update_data: dict) -> bool:
         """Update a user in Marzban"""
         session = await self._get_session()

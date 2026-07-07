@@ -86,18 +86,15 @@ async def handle_dashboard_submit_referral(request: web.Request):
         try:
             bot = resolve_user_bot(request.app.get('bot'))
             if bot:
+                from html import escape as _esc
+
+                from app.utils.bot_i18n import t as _t
+                from app.utils.premium_emoji import send_premium
+
                 referrer_lang = getattr(referrer, 'language', 'fa') or 'fa'
                 new_user_name = user.full_name or user.username or str(user.chat_id)
-                notify_msg = (
-                    "🎉 یک کاربر جدید با کد دعوت شما عضو شد!\n\n"
-                    f"👤 نام کاربر: {new_user_name}\n"
-                    "🎁 اگر این کاربر خرید انجام دهد، بن پاداش برای شما فعال می‌شود."
-                    if referrer_lang == "fa" else
-                    "🎉 A new user joined with your referral code!\n\n"
-                    f"👤 User: {new_user_name}\n"
-                    "🎁 If they make a purchase, you’ll get a reward voucher."
-                )
-                await bot.send_message(referrer.chat_id, notify_msg, parse_mode="HTML")
+                notify_msg = _t(referrer_lang, "referral_new_user_dm").format(name=_esc(str(new_user_name)))
+                await send_premium(bot, referrer.chat_id, notify_msg)
         except Exception as e:
             logger.warning(f"Could not notify referrer {referrer.id} about new referral: {e}")
         

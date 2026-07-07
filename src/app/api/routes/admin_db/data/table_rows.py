@@ -1,7 +1,7 @@
 from aiohttp import web
 from sqlalchemy import text
 
-from app.api.routes.admin_db.common import _validate_table_name
+from app.api.routes.admin_db.common import _json_safe, _validate_table_name
 from app.database.models import AsyncSessionLocal
 
 
@@ -35,7 +35,7 @@ async def handle_admin_db_table_rows(request: web.Request):
         result = await session.execute(stmt, {"limit": limit, "offset": offset})
         rows = result.fetchall()
         cols = list(result.keys())
-        data = [list(r) for r in rows]
+        data = [[_json_safe(v) for v in r] for r in rows]
         return web.json_response(
             {"ok": True, "dialect": dialect, "columns": cols, "rows": data, "limit": limit, "offset": offset}
         )

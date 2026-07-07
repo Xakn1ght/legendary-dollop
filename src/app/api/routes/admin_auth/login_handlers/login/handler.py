@@ -137,6 +137,13 @@ async def handle_admin_login(request: web.Request):
 
         session = st._create_session(chat_id, ip, ua)
         logger.info(f"[ADMIN AUTH] Successful login from IP {ip}")
+        try:
+            from app.services.audit import record_audit
+
+            await record_audit(request, "auth.login", target_type="session",
+                               summary=f"login from {ip}")
+        except Exception:
+            pass
 
         response = web.json_response(
             {

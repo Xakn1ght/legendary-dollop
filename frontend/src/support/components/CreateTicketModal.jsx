@@ -101,7 +101,12 @@ export function CreateTicketModal({ t, active, subs, initialSubId, onSubmit, onC
 
   const submit = async (e) => {
     e.preventDefault();
-    if (!category || !message.trim() || submitting) return;
+    if (submitting) return;
+    // The designed (Telegram-mobile) category field is a custom picker with no
+    // native validation — a silent return here read as "button does nothing".
+    // Guide the user straight into the picker instead.
+    if (!category) { setPicker('category'); return; }
+    if (!message.trim()) return; // textarea has native `required` feedback
     setSubmitting(true);
     try {
       const ok = await onSubmit({ category, subId, message: message.trim() });

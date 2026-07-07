@@ -31,10 +31,10 @@ def get_main_keyboard(user_id: int, is_admin: bool = False, lang: str | None = N
 # Legacy static keyboard for backward compatibility (no dashboard button)
 KEYBOARD_MARKUP_MAIN = ReplyKeyboardMarkup(
     keyboard=[
-        [KeyboardButton(text='خرید سرویس💳'), KeyboardButton(text='سرویس های من🛍')],
-        [KeyboardButton(text='شارژ سرویس⚡️'), KeyboardButton(text='پشتیبانی💬')],
-        [KeyboardButton(text='🎁 سیستم پاداش پیشرفته'), KeyboardButton(text='کد دعوت💌')],
-        [KeyboardButton(text='افزودن سرویس➕'), KeyboardButton(text='راهنمای اتصال📚')],
+        [KeyboardButton(text='💳 خرید سرویس'), KeyboardButton(text='🛍 سرویس‌های من')],
+        [KeyboardButton(text='⚡️ شارژ سرویس'), KeyboardButton(text='💬 پشتیبانی')],
+        [KeyboardButton(text='🎁 پاداش‌ها'), KeyboardButton(text='💌 کد دعوت')],
+        [KeyboardButton(text='➕ افزودن سرویس'), KeyboardButton(text='📚 راهنمای اتصال')],
     ],
     resize_keyboard=True
 )

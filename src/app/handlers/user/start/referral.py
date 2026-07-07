@@ -1,4 +1,5 @@
-from aiogram import F
+from html import escape
+
 from aiogram.enums import ParseMode
 from aiogram.fsm.context import FSMContext
 from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup, Message
@@ -7,8 +8,9 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.database import crud
 from app.database.cached_crud import get_user_by_referral_code_cached, get_user_with_cache
 from app.keyboards.reply import get_main_keyboard
-from app.utils.bot_i18n import guess_lang_from_telegram, normalize_lang
+from app.utils.bot_i18n import guess_lang_from_telegram, normalize_lang, t
 from app.utils.logger import handle_errors
+from app.utils.premium_emoji import answer_premium, send_premium
 
 from .common import ReferralStates, _create_share_button, router
 
@@ -79,16 +81,10 @@ async def process_invitation_code(message: Message, state: FSMContext, session: 
 	# Notify referrer FIRST to ensure correct message order
 	referrer_lang = normalize_lang(getattr(referrer, "language", None))
 	try:
-		notify_msg = (
-			"🎉 یک کاربر جدید با کد دعوت شما عضو شد!\n\n"
-			f"👤 نام کاربر: {full_name or username or chat_id}\n"
-			"🎁 اگر این کاربر خرید انجام دهد، بن پاداش برای شما فعال می‌شود."
-			if referrer_lang == "fa" else
-			"🎉 A new user joined with your referral code!\n\n"
-			f"👤 User: {full_name or username or chat_id}\n"
-			"🎁 If they make a purchase, you’ll get a reward voucher."
+		notify_msg = t(referrer_lang, "referral_new_user_dm").format(
+			name=escape(str(full_name or username or chat_id))
 		)
-		await message.bot.send_message(referrer.chat_id, notify_msg, parse_mode=ParseMode.HTML)
+		await send_premium(message.bot, referrer.chat_id, notify_msg)
 	except Exception:
 		pass
 
@@ -142,4 +138,4 @@ async def process_invitation_code(message: Message, state: FSMContext, session: 
 			[_create_share_button(message.bot, user.referral_code, lang)]
 		]
 	)
-	await message.answer(welcome_text, reply_markup=keyboard, parse_mode=ParseMode.HTML) 
+	await answer_premium(message, welcome_text, reply_markup=keyboard)

@@ -30,14 +30,30 @@ async def _run():
         assert total == 5 and [u["milestone"] for u in unlocked] == [5]
 
         total, unlocked = await RR.add_season_stars(db, 1, 45)  # → 50
-        assert total == 50 and [u["milestone"] for u in unlocked] == [10, 15, 20, 25, 30, 40, 50]
+        assert total == 50 and [u["milestone"] for u in unlocked] == [10, 15, 20, 25, 40, 50]
 
         # dedup: crossing into no new milestone unlocks nothing
         total, unlocked = await RR.add_season_stars(db, 1, 1)  # → 51
         assert unlocked == []
 
         coupons = await RR.get_active_coupons(db, 1)
-        assert sorted(c.milestone_stars for c in coupons) == [1, 3, 5, 10, 15, 20, 25, 30, 40, 50]
+        # 50★ mints TWO coupons (vip_days + the extra 100GB) — one claim row.
+        assert sorted(c.milestone_stars for c in coupons) == [1, 3, 5, 10, 15, 20, 25, 40, 50, 50]
+
+        # 2026-07 simplification: 40★ = plain free 60GB plan, 50★ = vip_days
+        # + 100GB, and milestone cosmetics landed in prefs at unlock time.
+        import json as _json
+        by_type = {c.coupon_type: c for c in coupons if c.milestone_stars == 40}
+        assert by_type["free_plan"] and _json.loads(by_type["free_plan"].payload)["plan_gb"] == 60
+        legend = {c.coupon_type: c for c in coupons if c.milestone_stars == 50}
+        assert _json.loads(legend["vip_days"].payload)["days"] == 30
+        assert _json.loads(legend["free_gb"].payload)["gb"] == 100
+
+        from sqlalchemy import select as _select
+        u = (await db.execute(_select(User).filter(User.id == 1))).scalars().first()
+        prefs = _json.loads(u.dashboard_prefs or "{}")
+        assert prefs.get("badge") == "Legend"  # 50★ overwrote Champion
+        assert set(prefs.get("unlocked_themes") or []) == {"champion", "legend"}
 
         # season reset → fresh season starts at 0
         await RR.end_active_season(db)

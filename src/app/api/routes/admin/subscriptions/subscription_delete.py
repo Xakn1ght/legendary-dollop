@@ -44,6 +44,12 @@ async def handle_admin_subscription_delete(request: web.Request):
                     except Exception:
                         pass
             
+            from app.services.audit import record_audit
+
+            await record_audit(
+                request, "subscription.delete", target_type="subscription", target_id=username,
+                summary=f"deleted marzban user {username}",
+            )
             return web.json_response({"ok": True, "message": "deleted"})
         else:
             return web.json_response({"ok": False, "error": "delete_failed"}, status=500)

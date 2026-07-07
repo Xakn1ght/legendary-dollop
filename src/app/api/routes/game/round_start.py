@@ -84,9 +84,25 @@ async def consume_round_token(token: str, user_id: int) -> int | None:
 
 
 async def handle_arcade_round_start(request: web.Request):
-    """Issue a round token for the authenticated user."""
+    """Issue a round token for the authenticated user. Also returns the
+    player's shop loadout (skin/powers/extra lives) so the run can apply
+    it even when the page skipped the status call."""
     user_chat_id, _ = _verify_webapp_auth(request)
     if not user_chat_id:
         return web.json_response({"ok": False, "error": "unauthorized"}, status=403)
     token = await issue_round_token(user_chat_id)
-    return web.json_response({"ok": True, "round_token": token})
+
+    loadout = None
+    try:
+        from app.api.routes.game.shop import build_loadout
+        from app.database import crud
+        from app.database.models import AsyncSessionLocal
+        async with AsyncSessionLocal() as session:
+            user = await crud.get_user(session, user_chat_id)
+            if user:
+                wallet = await crud.get_or_create_arcade_wallet(session, user.id)
+                loadout = build_loadout(crud.arcade_wallet_public(wallet))
+    except Exception as e:
+        logger.warning(f"[ARCADE] loadout fetch failed on round-start: {e}")
+
+    return web.json_response({"ok": True, "round_token": token, "loadout": loadout})

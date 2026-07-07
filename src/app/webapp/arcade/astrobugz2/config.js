@@ -179,6 +179,51 @@ window.ASTRO_CONFIG = {
             frames: 4, animFps: 15, speed: 350 },
   PINKBOMB: { w: 36, h: 36, sprite: 'pinkbomb-sheet0.png', speed: 500 },
 
+  /* ------------------------------------- ARMORED SEGMENTS (NEW, level 4+) */
+  // Some worm BODY segments spawn wearing a cyan armor plate: the first hit
+  // shatters the plate (segment survives, visual ring disappears), the second
+  // kills it. Heads are never armored. Worth more than a normal body.
+  ARMOR: {
+    fromLevel: 4,               // levels 1-3 play exactly like the original
+    chance: 0.35,               // chance for each body segment to be armored
+    points: 25,                 // kill score (normal body = 10)
+    ringColor: '#7be0ff',
+  },
+
+  /* ----------------------------------------- SPLITTER POD (NEW, level 3+) */
+  // A pink egg sac that drifts down the mushroom field. Shoot it (4 hits)
+  // for points — or let it reach the bottom of the field and it bursts into
+  // 2 fast diver segments on its own. Either way it splits on death.
+  SPLITTER: {
+    w: 44, h: 44,
+    sprite: 'pinkbomb-sheet0.png',   // the original's pink bomb art, reused
+    hp: 4,
+    points: 150,
+    fromLevel: 3,
+    spawnDelayMin: 12, spawnDelayMax: 22,
+    fallSpeed: 70,              // px/s slow drift down
+    swayMag: 60, swayPeriod: 3, // horizontal sine sway
+    childCount: 2,              // fast divers released on death/landing
+    pulse: 0.10,                // size pulse amplitude (visual)
+    ringColor: '#ff4fa3',
+  },
+
+  /* ------------------------------------------- UFO RAIDER (NEW, level 5+) */
+  // Rare bonus ship: crosses the top of the field horizontally, escapes if
+  // ignored. 3 hits for a big score — the classic arcade skill shot.
+  UFO: {
+    w: 72, h: 78,
+    sprite: 'flea-sheet2.png',  // the export's unused blue bug variant
+    hp: 3,
+    points: 2000,
+    fromLevel: 5,
+    spawnDelayMin: 25, spawnDelayMax: 45,
+    speed: 260,                 // px/s straight across
+    y: 72,                      // flight line (above the mushroom rows)
+    bobMag: 14, bobPeriod: 0.9, // slight vertical shimmy
+    ringColor: '#7be0ff',
+  },
+
   /* -------------------------------------------------------------- POWERUPS */
   // NEW (not in the original): floating tokens dropped by dying bugs.
   // Uses the original's unused circleletter sprite + shield1a sound.
@@ -192,7 +237,7 @@ window.ASTRO_CONFIG = {
     shieldInvuln: 1.2,         // i-frames after a shield absorbs a hit
     // chance to drop a token when each bug dies (0..1)
     dropChance: { spider: 0.25, flea: 0.3, scorpion: 0.5,
-                  spiderboss: 1.0, megaboss: 1.0 },
+                  spiderboss: 1.0, megaboss: 1.0, ufo: 0.5 },
     // the token types — add your own and handle it in applyPowerup()
     types: {
       shield: { letter: 'S', color: '#39ff88', weight: 3, label: 'SHIELD' },
@@ -204,6 +249,19 @@ window.ASTRO_CONFIG = {
     bombBossDamage: 10,        // bomb damage dealt to each big bug on screen
   },
 
+  /* ------------------------------------------------------------- COINS -- */
+  // NEW (2026-07-07): very rare golden coins dropped by big bugs. Collected
+  // coins bank server-side ONLY on the validated daily run (the server caps
+  // them per run) and are spent in the lobby HANGAR shop (skins / powers /
+  // extra life / daily retry). Practice runs never spawn them.
+  COINS: {
+    color: '#ffd23f',
+    letter: '$',
+    maxPerRun: 3,              // client stops spawning at this (server caps too)
+    dropChance: { spider: 0.04, flea: 0.04, scorpion: 0.06,
+                  ufo: 0.15, spiderboss: 0.25, megaboss: 0.35 },
+  },
+
   /* -------------------------------------------------------------- BOSS BAR */
   BOSSBAR: {
     h: 10,
@@ -213,6 +271,21 @@ window.ASTRO_CONFIG = {
 
   /* --------------------------------------------------------------- HAPTICS */
   HAPTICS: { enabled: true, minGapMs: 60 },
+
+  /* ---------------------------------------------------- DAILY THEME (NEW) */
+  // Full-screen background that changes every day on the IRAN clock
+  // (same boundary as the daily mission). sprites/themes30.json maps the
+  // 30-day cycle; anchorDay = the Iran epoch-day that counts as "day 1"
+  // (2026-07-07). Rotation: themes[(iranDay - anchorDay) % 30].
+  THEME: {
+    configUrl: 'sprites/themes30.json',
+    baseUrl: 'sprites/',
+    anchorDay: 20641,
+    // readability shade over the busy bottom band (player zone): the bg
+    // dims from `dimFromY` down to `dimAlpha` black at the bottom edge.
+    dimFromY: 760,
+    dimAlpha: 0.45,
+  },
 
   /* --------------------------------------------------------------- EFFECTS */
   EXPLOSION: { size: 140, sheet: 'explosion-sheet0.png', frames: 7, fps: 20,

@@ -102,9 +102,11 @@ def plan_display_name(plan_name: str, lang: str = "fa") -> str:
 # Coupon types spendable at checkout. Other types must be rejected, never silently
 # consumed. free_plan/free_autorenew are valued via the pricing curve and applied as a
 # money discount (free_plan zeroes the plan up to its granted value; free_autorenew
-# zeroes the selected renewal plan up to its granted value).
+# zeroes the selected renewal plan up to its granted value — no longer minted, but
+# wallet coupons stay honored until expiry). vip_days is wallet-redeemed, never
+# checkout-spent. vip_pack/legend_pack are retired.
 SUPPORTED_COUPON_TYPES = (
-    "discount_percent", "free_gb", "free_plan", "free_autorenew", "vip_pack", "legend_pack",
+    "discount_percent", "free_gb", "free_plan", "free_autorenew",
 )
 
 
@@ -280,20 +282,4 @@ async def _validate_coupon(
         if discount <= 0:
             raise QuoteError("invalid_coupon", "Coupon not available")
         return CouponEffect(id=coupon.id, coupon_type=coupon.coupon_type, discount_amount=discount)
-    if coupon.coupon_type in ("vip_pack", "legend_pack"):
-        # Bundle: money part = free renewal (if a renewal is selected) + bonus GB
-        # (legend). The non-money grants (VIP window → priority support, badge, theme)
-        # apply at provision via apply_coupon_pack_grants. Unlike free_autorenew the pack
-        # still has value without a renewal, so it's never rejected for lacking one.
-        ar = payload.get("free_autorenew") or {}
-        discount = 0
-        if int(renewal_price or 0) > 0 and ar:
-            value = _plan_value(ar.get("max_plan_gb") or 0, ar.get("duration_days") or 0)
-            discount = min(value, int(renewal_price or 0))
-        return CouponEffect(
-            id=coupon.id,
-            coupon_type=coupon.coupon_type,
-            discount_amount=discount,
-            free_gb=int(payload.get("bonus_gb") or 0),
-        )
-    raise QuoteError("coupon_not_supported_yet", "This coupon type is not yet redeemable at checkout.")
+    raise QuoteError("coupon_not_supported_yet", "This coupon type is not redeemable at checkout.")

@@ -14,10 +14,66 @@
   var tg = (window.Telegram && window.Telegram.WebApp) ? window.Telegram.WebApp : null;
   var startMs = (performance && performance.now) ? performance.now() : Date.now();
   var latestScore = 0;
+  var latestCoins = 0;
   var submitted = false;
   var muted = false;
   var paused = false;
   var isPractice = new URLSearchParams(location.search).get('practice') === '1';
+
+  /* ---- language (same ladder as the lobby): localStorage 'lang' →
+   * Telegram initDataUnsafe language_code → 'en'. Persian gets RTL cards. */
+  var LANG = (function () {
+    var v = '';
+    try { v = localStorage.getItem('lang') || ''; } catch (_) {}
+    if (!v && tg && tg.initDataUnsafe && tg.initDataUnsafe.user) {
+      v = tg.initDataUnsafe.user.language_code || '';
+    }
+    return String(v).toLowerCase().indexOf('fa') === 0 ? 'fa' : 'en';
+  })();
+  var STR = LANG === 'fa' ? {
+    score: 'امتیاز',
+    paused: 'توقف',
+    resume: 'ادامه',
+    gameOver: 'پایان بازی',
+    playAgain: 'بازی دوباره',
+    backToArcade: 'بازگشت به آرکید',
+    practiceMsg: 'دور تمرینی — بدون رتبه.',
+    submittedMsg: 'امتیازت ثبت شد!',
+    dailyLimitMsg: 'سهمیه امروزت استفاده شده — فردا دوباره بازی کن!',
+    earnedXp: function (xp) { return xp + ' XP گرفتی!'; },
+    seeYouTomorrow: 'تا فردا!',
+    lockedMsg: 'دور امتیازیِ امروزت رو انجام دادی.<br>فردا یه دور جدید باز می‌شه!',
+    credits: 'اعتبار', stars: 'ستاره', xp: 'XP', coins: 'سکه',
+    pieces: function (a, b) { return a + '/' + b + ' تکه ستاره'; },
+    raceRank: function (rank) { return 'مسابقه ماهانه: <b>\u200e#' + rank + '\u200e</b>'; },
+    raceGap: function (gap, rank) { return ' · ' + gap + ' امتیاز تا رتبه ' + rank; },
+    raceLastDay: 'روز آخر!',
+    raceDaysLeft: function (n) { return n + ' روز مانده'; },
+    racePrizes: 'سه نفر اول ماه ۵۰ / ۲۵ / ۱۰ گیگ جایزه می‌گیرن',
+    raceAuto: 'برنده‌ها روز اول ماه بعد خودکار انتخاب می‌شن',
+  } : {
+    score: 'Score',
+    paused: 'PAUSED',
+    resume: 'Resume',
+    gameOver: 'GAME OVER',
+    playAgain: 'Play Again',
+    backToArcade: 'Back to Arcade',
+    practiceMsg: 'Practice run — not ranked.',
+    submittedMsg: 'Score submitted!',
+    dailyLimitMsg: 'Daily run already used — play again tomorrow!',
+    earnedXp: function (xp) { return 'Earned ' + xp + ' XP!'; },
+    seeYouTomorrow: 'SEE YOU TOMORROW',
+    lockedMsg: 'You already played today\u2019s run.<br>A new rewarded run unlocks tomorrow!',
+    credits: 'Credits', stars: 'Stars', xp: 'XP', coins: 'Coins',
+    pieces: function (a, b) { return a + '/' + b + ' star pieces'; },
+    raceRank: function (rank) { return 'Monthly race: <b>#' + rank + '</b>'; },
+    raceGap: function (gap, rank) { return ' · ' + gap + ' pts behind #' + rank; },
+    raceLastDay: 'Last day!',
+    raceDaysLeft: function (n) { return n + ' days left'; },
+    racePrizes: 'Top 3 this month win 50 / 25 / 10 GB',
+    raceAuto: 'Winners picked automatically on the 1st of next month',
+  };
+  var IS_RTL = LANG === 'fa';
 
   /* ---- Telegram fullscreen / chrome ---- */
   (function fullscreen() {
@@ -52,7 +108,8 @@
     var h = document.createElement('div');
     h.id = 'astro-header';
     h.innerHTML =
-      '<div class="ah-score"><div class="ah-label">Score</div><div id="ah-score-val">0</div></div>' +
+      '<div class="ah-score"><div class="ah-label">' + STR.score + '</div><div id="ah-score-val">0</div></div>' +
+      '<div id="ah-coin">🪙 <span id="ah-coin-val">0</span></div>' +
       '<div class="ah-ctrls">' +
       '<button id="ah-mute" class="ah-btn" title="Mute">' + ICON.sound + '</button>' +
       '<button id="ah-pause" class="ah-btn" title="Pause">' + ICON.pause + '</button>' +
@@ -77,7 +134,7 @@
     if (on) {
       if (v) return;
       v = document.createElement('div'); v.id = 'ah-veil';
-      v.innerHTML = '<div>PAUSED</div><button id="ah-resume">Resume</button>';
+      v.innerHTML = '<div>' + STR.paused + '</div><button id="ah-resume">' + STR.resume + '</button>';
       document.body.appendChild(v);
       document.getElementById('ah-resume').addEventListener('click', function () {
         paused = false;
@@ -106,11 +163,11 @@
     var v = document.createElement('div');
     v.id = 'ah-locked';
     v.innerHTML =
-      '<div class="ah-card">' +
-      '<div class="ah-go">SEE YOU TOMORROW</div>' +
+      '<div class="ah-card"' + (IS_RTL ? ' dir="rtl"' : '') + '>' +
+      '<div class="ah-go">' + STR.seeYouTomorrow + '</div>' +
       '<div style="font-size:46px;line-height:1">🌙</div>' +
-      '<div class="ah-msg">You already played today\u2019s run.<br>A new rewarded run unlocks tomorrow!</div>' +
-      '<button id="ah-locked-back">Back to Arcade</button>' +
+      '<div class="ah-msg">' + STR.lockedMsg + '</div>' +
+      '<button id="ah-locked-back">' + STR.backToArcade + '</button>' +
       '</div>';
     document.body.appendChild(v);
     document.getElementById('ah-locked-back').addEventListener('click', function () {
@@ -123,10 +180,13 @@
     if (v) v.remove();
   }
   (function dailyLock() {
-    if (isPractice) return;
-    try {
-      if (localStorage.getItem('astro_last_played_date') === new Date().toDateString()) showLocked();
-    } catch (_) {}
+    if (!isPractice) {
+      try {
+        if (localStorage.getItem('astro_last_played_date') === new Date().toDateString()) showLocked();
+      } catch (_) {}
+    }
+    // fetched even in practice: the response carries the shop loadout
+    // (skin/powers/extra lives) that the engine applies at run start
     var url = '/api/arcade/status?_t=' + Date.now();
     var auth = new URLSearchParams(location.search).get('auth');
     if (auth) url += '&auth=' + encodeURIComponent(auth);
@@ -135,6 +195,8 @@
       .then(function (r) { return r.json(); })
       .then(function (d) {
         if (!d || !d.ok) return;                 // can't verify → keep optimistic state
+        if (d.loadout) window.AstroLoadout = d.loadout;
+        if (isPractice) return;                  // practice is never locked
         if (d.played_today) {
           try { localStorage.setItem('astro_last_played_date', new Date().toDateString()); } catch (_) {}
           if (!submitted) showLocked();          // don't stack over a fresh result card
@@ -160,7 +222,10 @@
     if (tg && tg.initData) headers['X-Telegram-Init'] = tg.initData;
     fetch(url, { method: 'POST', headers: headers, credentials: 'include' })
       .then(function (r) { return r.json(); })
-      .then(function (d) { if (d && d.ok) roundToken = d.round_token || ''; })
+      .then(function (d) {
+        if (d && d.ok) roundToken = d.round_token || '';
+        if (d && d.loadout) window.AstroLoadout = d.loadout;
+      })
       .catch(function () {});
     startMs = (performance && performance.now) ? performance.now() : Date.now();
   }
@@ -175,6 +240,7 @@
       duration: Math.floor((nowMs - startMs) / 1000),
       practice: !!isPractice,
       round_token: roundToken,
+      coins: (latestCoins | 0),
       display_name: (function () { try { return (localStorage.getItem('astro_display_name') || '').trim().slice(0, 40); } catch (_) { return ''; } })(),
     };
     var headers = { 'Content-Type': 'application/json' };
@@ -204,15 +270,30 @@
     var credits = rewards.credits | 0;
     var xp = rewards.xp | 0;
     var stars = (rewards.stars_converted != null ? rewards.stars_converted : rewards.stars) | 0;
-    if (credits) chips.push('<div class="ah-chip credits"><b>+' + credits.toLocaleString() + '</b><span>Credits</span></div>');
-    if (stars) chips.push('<div class="ah-chip stars"><b>+' + stars + '</b><span>Stars</span></div>');
-    if (xp) chips.push('<div class="ah-chip xp"><b>+' + xp + '</b><span>XP</span></div>');
+    if (credits) chips.push('<div class="ah-chip credits"><b>+' + credits.toLocaleString() + '</b><span>' + STR.credits + '</span></div>');
+    if (stars) chips.push('<div class="ah-chip stars"><b>+' + stars + '</b><span>' + STR.stars + '</span></div>');
+    if (xp) chips.push('<div class="ah-chip xp"><b>+' + xp + '</b><span>' + STR.xp + '</span></div>');
+    var coins = rewards.coins | 0;
+    if (coins) chips.push('<div class="ah-chip coins"><b>+' + coins + '</b><span>🪙 ' + STR.coins + '</span></div>');
     var html = chips.length ? '<div class="ah-rewards">' + chips.join('') + '</div>' : '';
     var per = (rewards.pieces_per_star != null) ? rewards.pieces_per_star : 10;
     var prog = (rewards.pieces_progress != null) ? rewards.pieces_progress
              : (rewards.total_pieces || rewards.star_pieces || 0);
-    if (prog) html += '<div class="ah-pieces">' + prog + '/' + per + ' star pieces</div>';
+    if (prog) html += '<div class="ah-pieces">' + STR.pieces(prog, per) + '</div>';
     return html;
+  }
+
+  // The server speaks English; map the known result messages to the UI
+  // language locally (fall back to the raw server text for anything else).
+  function localizedMsg(data) {
+    if (!data || !data.message) return isPractice ? STR.practiceMsg : STR.submittedMsg;
+    if (LANG === 'en') return data.message;
+    var m = String(data.message);
+    if (data.practice || /practice/i.test(m)) return STR.practiceMsg;
+    if (/daily limit/i.test(m)) return STR.dailyLimitMsg;
+    var xp = /Earned\s+(\d+)\s*XP/i.exec(m);
+    if (xp) return STR.earnedXp(xp[1]);
+    return m;
   }
 
   function showResult(score, data) {
@@ -222,18 +303,18 @@
     }
     var v = document.createElement('div');
     v.id = 'ah-result';
-    var msg = (data && data.message) ? data.message : (isPractice ? 'Practice run — not ranked.' : 'Score submitted!');
+    var msg = localizedMsg(data);
     var rewards = rewardHtml(data && data.rewards);
     // The game is once per day — no replays of any kind after the run.
     // (Practice mode still works if the page is opened with ?practice=1,
     // e.g. for testing, and only then offers Play Again.)
     v.innerHTML =
-      '<div class="ah-card">' +
-      '<div class="ah-go">GAME OVER</div>' +
+      '<div class="ah-card"' + (IS_RTL ? ' dir="rtl"' : '') + '>' +
+      '<div class="ah-go">' + STR.gameOver + '</div>' +
       '<div class="ah-final">' + score + '</div>' +
       '<div class="ah-msg">' + escapeHtml(msg) + '</div>' + rewards +
-      (isPractice ? '<button id="ah-again">Play Again</button>' : '') +
-      '<button id="ah-back"' + (isPractice ? ' class="ghost"' : '') + '>Back to Arcade</button>' +
+      (isPractice ? '<button id="ah-again">' + STR.playAgain + '</button>' : '') +
+      '<button id="ah-back"' + (isPractice ? ' class="ghost"' : '') + '>' + STR.backToArcade + '</button>' +
       '</div>';
     document.body.appendChild(v);
     var againEl = document.getElementById('ah-again');
@@ -246,7 +327,9 @@
     if (!isPractice) showRaceRank();
   }
 
-  // "Monthly race: #N" line on the result card (prizes: 50/25/10GB + 10%)
+  // Monthly race card on the result screen: current rank (+ gap), days left,
+  // the 50/25/10 GB prize line, and the "picked automatically on the 1st"
+  // rule — so the when/how of winning is self-evident right where you finish.
   function showRaceRank() {
     var url = '/api/arcade/race?_t=' + Date.now();
     var auth = new URLSearchParams(location.search).get('auth');
@@ -261,12 +344,14 @@
         var el = document.createElement('div');
         el.className = 'ah-race';
         var medal = d.me.rank === 1 ? '🥇' : d.me.rank === 2 ? '🥈' : d.me.rank === 3 ? '🥉' : '🏁';
-        var txt = medal + ' Monthly race: <b>#' + d.me.rank + '</b>';
+        var txt = medal + ' ' + STR.raceRank(d.me.rank);
         if (d.me.rank > 1 && d.me.gap_to_next > 0) {
-          txt += ' · ' + d.me.gap_to_next.toLocaleString() + ' pts behind #' + (d.me.rank - 1);
+          txt += STR.raceGap(d.me.gap_to_next.toLocaleString(), d.me.rank - 1);
         }
-        txt += '<br><small>' + (d.days_left === 0 ? 'Last day' : d.days_left + ' days left') +
-               ' — top 3 win 50 / 25 / 10 GB!</small>';
+        txt += '<br><small>' +
+               (d.days_left === 0 ? STR.raceLastDay : STR.raceDaysLeft(d.days_left)) +
+               ' — ' + STR.racePrizes + '</small>' +
+               '<br><small>🤖 ' + STR.raceAuto + '</small>';
         el.innerHTML = txt;
         var msg = card.querySelector('.ah-msg');
         card.insertBefore(el, msg ? msg.nextSibling : card.children[2]);
@@ -282,6 +367,17 @@
       latestScore = n | 0;
       var el = document.getElementById('ah-score-val');
       if (el) el.textContent = latestScore;
+    },
+    setCoins: function (n) {
+      latestCoins = n | 0;
+      var box = document.getElementById('ah-coin');
+      var val = document.getElementById('ah-coin-val');
+      if (val) val.textContent = latestCoins;
+      if (box) {
+        box.classList.remove('on');
+        void box.offsetWidth;          // restart the pop animation
+        box.classList.add('on');
+      }
     },
     roundStart: roundStart,
     gameOver: function () { submit(); },

@@ -25,6 +25,7 @@ from .handlers import (
     handle_dashboard_ping,
     handle_dashboard_preferences_get,
     handle_dashboard_preferences_patch,
+    handle_dashboard_orbit_add_link,
     handle_profile_photo,
     handle_dashboard_redeem_referral_reward,
     handle_dashboard_referral_rewards,
@@ -32,6 +33,7 @@ from .handlers import (
     handle_dashboard_remove_local,
     handle_dashboard_revoke,
     handle_dashboard_rewards_summary,
+    handle_dashboard_redeem_vip_days,
     handle_dashboard_season,
     handle_dashboard_speed_dl,
     handle_dashboard_speed_ul,
@@ -77,6 +79,7 @@ def register_dashboard_api_routes(app: web.Application) -> None:
     app.router.add_delete(DASHBOARD_API_BASE_PATH + "/subscriptions/{sub_id}", handle_dashboard_remove_local)
     app.router.add_get(DASHBOARD_API_BASE_PATH + "/overview", handle_dashboard_overview)
     app.router.add_get(DASHBOARD_API_BASE_PATH + "/profile-photo", handle_profile_photo)
+    app.router.add_post(DASHBOARD_API_BASE_PATH + "/orbit/add-link", handle_dashboard_orbit_add_link)
 
     app.router.add_get(DASHBOARD_API_BASE_PATH + "/ping", handle_dashboard_ping)
     app.router.add_get(DASHBOARD_API_BASE_PATH + "/speed-dl", handle_dashboard_speed_dl)
@@ -115,6 +118,7 @@ def register_dashboard_api_routes(app: web.Application) -> None:
     app.router.add_post(DASHBOARD_API_BASE_PATH + "/wallet/convert-loyalty", handle_dashboard_wallet_convert_loyalty)
     app.router.add_post(DASHBOARD_API_BASE_PATH + "/wallet/cashout", handle_dashboard_wallet_cashout)
     app.router.add_get(DASHBOARD_API_BASE_PATH + "/season", handle_dashboard_season)
+    app.router.add_post(DASHBOARD_API_BASE_PATH + "/coupons/{coupon_id}/redeem-vip", handle_dashboard_redeem_vip_days)
     app.router.add_get(DASHBOARD_API_BASE_PATH + "/star-tiers", handle_dashboard_star_tiers)
     app.router.add_get(DASHBOARD_API_BASE_PATH + "/star-claims", handle_dashboard_star_claims)
     app.router.add_post(

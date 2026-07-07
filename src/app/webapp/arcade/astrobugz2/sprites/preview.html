@@ -1,0 +1,173 @@
+<!DOCTYPE html>
+<!-- SPRITE EXPANSION PREVIEW (temporary page for Pasha's review).
+     Shows the new characters extracted from the reference sheet, placed in
+     mock game frames with two level themes. Not linked from anywhere. -->
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AstroBugz — expansion preview</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    background: #0b0617;
+    color: #f3eefe;
+    font-family: monospace;
+    display: flex;
+    gap: 26px;
+    padding: 24px;
+    align-items: flex-start;
+  }
+  img, .strip { image-rendering: pixelated; }
+  h2 { font-size: 13px; letter-spacing: 2px; color: #7be0ff; margin-bottom: 10px; }
+
+  /* ---- mock game frames (720x1280 world at 0.5x = 360x640) ---- */
+  .frame {
+    position: relative;
+    width: 360px; height: 640px;
+    background: #000;
+    border: 3px solid #2a1650;
+    border-radius: 8px;
+    overflow: hidden;
+    flex: none;
+  }
+  .frame .bgtile {
+    position: absolute; inset: 0;
+    background: url('../../astrobugz/images/tiledbackground.png');
+    background-size: 320px;
+    opacity: 0.22;
+  }
+  .frame.night .bgtile { opacity: 0.12; }
+  .frame .strip {
+    position: absolute; left: 0; right: 0; bottom: 96px;
+    height: 64px;
+    background-repeat: repeat-x;
+    background-size: auto 100%;
+  }
+  .frame .strip.top {
+    bottom: auto; top: 0; height: 56px;
+    transform: scaleY(-1);
+    opacity: 0.85;
+  }
+  .spr { position: absolute; }
+  .label {
+    position: absolute;
+    font-size: 9px;
+    color: rgba(243,238,254,0.75);
+    text-shadow: 1px 1px 0 #000;
+    white-space: nowrap;
+  }
+  .frame-title {
+    position: absolute; top: 8px; left: 0; right: 0;
+    text-align: center;
+    font-size: 11px; letter-spacing: 2px;
+    color: #ffd23f;
+    text-shadow: 1px 1px 0 #000;
+    z-index: 5;
+  }
+
+  /* ---- roster card ---- */
+  .roster {
+    width: 330px;
+    background: #120826;
+    border: 3px solid #2a1650;
+    border-radius: 8px;
+    padding: 16px;
+  }
+  .roster-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .roster-cell {
+    background: #0a0515;
+    border: 1px solid rgba(192,77,255,0.25);
+    border-radius: 6px;
+    padding: 10px 6px 8px;
+    display: flex; flex-direction: column; align-items: center; gap: 6px;
+    min-height: 108px;
+    justify-content: center;
+  }
+  .roster-cell b { font-size: 10px; color: #ff7ec2; letter-spacing: 1px; }
+  .roster-cell small { font-size: 9px; color: #9d8fc4; }
+</style>
+</head>
+<body>
+
+  <!-- FRAME 1: Pixel Garden day theme -->
+  <div class="frame">
+    <div class="bgtile"></div>
+    <div class="frame-title">LEVEL 1 — PIXEL GARDEN</div>
+    <div class="strip" style="background-image:url('theme_pixel_garden.png'); bottom: 92px;"></div>
+
+    <!-- existing field mushrooms for context -->
+    <img class="spr" src="../../astrobugz/images/mushroom-sheet0.png" style="left:40px; top:150px; width:24px;">
+    <img class="spr" src="../../astrobugz/images/mushroom-sheet0.png" style="left:210px; top:210px; width:24px;">
+    <img class="spr" src="../../astrobugz/images/mushroom-sheet0.png" style="left:120px; top:320px; width:24px;">
+    <img class="spr" src="golden_mushroom.png" style="left:270px; top:280px; width:26px;">
+    <span class="label" style="left:250px; top:312px;">GOLDEN MUSHROOM</span>
+
+    <!-- new enemies at game scale -->
+    <img class="spr" src="beetle_tank.png" style="left:130px; top:60px; width:58px;">
+    <span class="label" style="left:132px; top:118px;">BEETLE TANK</span>
+
+    <img class="spr" src="snail_cannon.png" style="left:30px; top:420px; width:56px;">
+    <span class="label" style="left:22px; top:456px;">SNAIL CANNON</span>
+
+    <img class="spr" src="worm.png" style="left:220px; top:470px; width:52px;">
+    <span class="label" style="left:230px; top:496px;">WORM</span>
+
+    <img class="spr" src="gold_flea.png" style="left:250px; top:120px; width:44px;">
+    <span class="label" style="left:246px; top:166px;">GOLD FLEA</span>
+
+    <img class="spr" src="queen_spider.png" style="left:60px; top:230px; width:56px;">
+    <img class="spr" src="baby_spider.png" style="left:126px; top:252px; width:28px;">
+    <img class="spr" src="baby_spider.png" style="left:36px; top:268px; width:28px;">
+    <span class="label" style="left:52px; top:290px;">QUEEN + BABY SPIDERS</span>
+
+    <!-- player ship -->
+    <img class="spr" src="../../astrobugz/images/player-sheet0.png" style="left:160px; bottom:30px; width:40px;">
+  </div>
+
+  <!-- FRAME 2: Neon Night theme -->
+  <div class="frame night">
+    <div class="bgtile"></div>
+    <div class="frame-title">LEVEL 6 — NEON NIGHT</div>
+    <div class="strip top" style="background-image:url('theme_neon_night.png');"></div>
+    <div class="strip" style="background-image:url('theme_neon_night.png'); bottom: 92px;"></div>
+
+    <img class="spr" src="../../astrobugz/images/mushroom-sheet1.png" style="left:60px; top:200px; width:24px;">
+    <img class="spr" src="../../astrobugz/images/mushroom-sheet1.png" style="left:250px; top:300px; width:24px;">
+
+    <img class="spr" src="firefly.png" style="left:90px; top:110px; width:40px;">
+    <img class="spr" src="firefly.png" style="left:150px; top:140px; width:40px; opacity:0.35;">
+    <span class="label" style="left:86px; top:172px;">FIREFLY (blinking)</span>
+
+    <img class="spr" src="mosquito.png" style="left:230px; top:100px; width:52px;">
+    <span class="label" style="left:230px; top:150px;">MOSQUITO</span>
+
+    <img class="spr" src="wasp.png" style="left:180px; top:250px; width:62px;">
+    <span class="label" style="left:192px; top:310px;">WASP</span>
+
+    <img class="spr" src="crystal_bug.png" style="left:50px; top:330px; width:56px;">
+    <span class="label" style="left:44px; top:392px;">CRYSTAL BUG</span>
+
+    <img class="spr" src="../../astrobugz/images/player-sheet0.png" style="left:160px; bottom:30px; width:40px;">
+  </div>
+
+  <!-- roster card -->
+  <div class="roster">
+    <h2>EXTRACTED TEST BATCH (11)</h2>
+    <div class="roster-grid">
+      <div class="roster-cell"><img src="beetle_tank.png" width="48"><b>BEETLE TANK</b><small>600 pts · slow, tanky</small></div>
+      <div class="roster-cell"><img src="mosquito.png" width="44"><b>MOSQUITO</b><small>400 pts · diagonal dives</small></div>
+      <div class="roster-cell"><img src="worm.png" width="50"><b>WORM</b><small>150 pts · bottom blocker</small></div>
+      <div class="roster-cell"><img src="firefly.png" width="36"><b>FIREFLY</b><small>300 pts · blinks in/out</small></div>
+      <div class="roster-cell"><img src="snail_cannon.png" width="50"><b>SNAIL CANNON</b><small>700 pts · shoots sideways</small></div>
+      <div class="roster-cell"><img src="wasp.png" width="48"><b>WASP</b><small>800 pts · sharp zigzags</small></div>
+      <div class="roster-cell"><img src="crystal_bug.png" width="44"><b>CRYSTAL BUG</b><small>1000 pts · reflects shots</small></div>
+      <div class="roster-cell"><img src="gold_flea.png" width="40"><b>GOLD FLEA</b><small>500 pts · rare, bonus drop</small></div>
+      <div class="roster-cell"><img src="baby_spider.png" width="30"><b>BABY SPIDER</b><small>200 pts · small + fast</small></div>
+      <div class="roster-cell"><img src="queen_spider.png" width="46"><b>QUEEN SPIDER</b><small>900 pts · spawns babies</small></div>
+      <div class="roster-cell"><img src="golden_mushroom.png" width="34"><b>GOLDEN MUSHROOM</b><small>bonus on destroy</small></div>
+    </div>
+  </div>
+
+</body>
+</html>

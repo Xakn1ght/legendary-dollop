@@ -37,21 +37,24 @@ def get_cached_lang(chat_id: int) -> str:
 
 
 STRINGS: dict[str, dict[str, str]] = {
-    # Main menu buttons
-    "btn_buy": {"fa": "خرید سرویس💳", "en": "Buy Service 💳"},
-    "btn_my_services": {"fa": "سرویس های من🛍", "en": "My Services 🛍"},
-    "btn_recharge": {"fa": "شارژ سرویس⚡️", "en": "Recharge ⚡️"},
-    "btn_support": {"fa": "پشتیبانی💬", "en": "Support 💬"},
-    "btn_rewards": {"fa": "🎁 سیستم پاداش پیشرفته", "en": "🎁 Rewards"},
-    "btn_invite": {"fa": "کد دعوت💌", "en": "Invite Code 💌"},
-    "btn_add_service": {"fa": "افزودن سرویس➕", "en": "Add Service ➕"},
-    "btn_guide": {"fa": "راهنمای اتصال📚", "en": "Connection Guide 📚"},
-    "btn_dashboard": {"fa": "مدیریت اشتراک 🌐", "en": "Dashboard 🌐"},
-    "btn_language": {"fa": "زبان🌐", "en": "Language 🌐"},
+    # Main menu buttons — emoji first, tight labels.
+    # RENAMING? Old labels live on users' persisted reply keyboards until the
+    # bot re-sends the markup; add the previous text to LEGACY_BUTTON_TEXTS
+    # below or stale keyboards dead-end.
+    "btn_buy": {"fa": "💳 خرید سرویس", "en": "💳 Buy Service"},
+    "btn_my_services": {"fa": "🛍 سرویس‌های من", "en": "🛍 My Services"},
+    "btn_recharge": {"fa": "⚡️ شارژ سرویس", "en": "⚡️ Recharge"},
+    "btn_support": {"fa": "💬 پشتیبانی", "en": "💬 Support"},
+    "btn_rewards": {"fa": "🎁 پاداش‌ها", "en": "🎁 Rewards"},
+    "btn_invite": {"fa": "💌 کد دعوت", "en": "💌 Invite Code"},
+    "btn_add_service": {"fa": "➕ افزودن سرویس", "en": "➕ Add Service"},
+    "btn_guide": {"fa": "📚 راهنمای اتصال", "en": "📚 Connection Guide"},
+    "btn_dashboard": {"fa": "🌐 مدیریت اشتراک", "en": "🌐 Dashboard"},
+    "btn_language": {"fa": "🌍 زبان", "en": "🌍 Language"},
     "btn_back": {"fa": "بازگشت🔙", "en": "Back 🔙"},
-    "btn_android": {"fa": "اندروید📱", "en": "Android 📱"},
-    "btn_ios": {"fa": "آیفون📱", "en": "iPhone 📱"},
-    "btn_windows": {"fa": "ویندوز💻", "en": "Windows 💻"},
+    "btn_android": {"fa": "📱 اندروید", "en": "📱 Android"},
+    "btn_ios": {"fa": "📱 آیفون", "en": "📱 iPhone"},
+    "btn_windows": {"fa": "💻 ویندوز", "en": "💻 Windows"},
 
     # Common texts
     "support_webapp_only": {
@@ -67,8 +70,24 @@ STRINGS: dict[str, dict[str, str]] = {
     "tutorial_send_error": {"fa": "خطا در ارسال آموزش. لطفا با پشتیبانی تماس بگیرید.", "en": "Failed to send the tutorial. Please contact support."},
     "tutorial_invalid": {"fa": "لطفا یکی از گزینه‌های موجود را انتخاب کنید.", "en": "Please choose one of the available options."},
 
+    # Referral
+    "referral_new_user_dm": {
+        "fa": (
+            "🎉 دعوت شما نتیجه داد\n"
+            "👤 <b>{name}</b> همین حالا با کد شما عضو AstroByte شد.\n\n"
+            "به‌محض اولین خریدش، انتخاب با شماست — یکی از این چهار پاداش:\n"
+            "💰 اعتبار نقدی · 📶 حجم هدیه · 📅 روز هدیه · ⭐ ستاره فصل"
+        ),
+        "en": (
+            "🎉 Your invite paid off\n"
+            "👤 <b>{name}</b> just joined AstroByte with your code.\n\n"
+            "The moment they make their first purchase, the choice is yours — one of four rewards:\n"
+            "💰 cash credit · 📶 bonus data · 📅 extra days · ⭐ a season star"
+        ),
+    },
+
     # Rewards
-    "rewards_title": {"fa": "🎁 <b>سیستم پاداش پیشرفته و کیف پول</b>", "en": "🎁 <b>Rewards & Wallet</b>"},
+    "rewards_title": {"fa": "🎁 <b>پاداش‌ها و کیف پول</b>", "en": "🎁 <b>Rewards & Wallet</b>"},
     "rewards_completed": {"fa": "🎉 چالش تکمیل شد: {title}! پاداش شما اضافه شد.", "en": "🎉 Challenge completed: {title}! Your reward has been added."},
     "rewards_close": {"fa": "❌ بستن", "en": "❌ Close"},
     "rewards_profile": {"fa": "👤 پروفایل", "en": "👤 Profile"},
@@ -467,6 +486,26 @@ STRINGS: dict[str, dict[str, str]] = {
 }
 
 
+# Old button labels that may still sit on users' persisted reply keyboards
+# (Telegram keeps the last markup until the bot replaces it). variants() —
+# and therefore every text_matches() filter — accepts these alongside the
+# current labels, so taps from stale keyboards never dead-end.
+LEGACY_BUTTON_TEXTS: dict[str, set[str]] = {
+    "btn_buy": {"خرید سرویس💳", "Buy Service 💳"},
+    "btn_my_services": {"سرویس های من🛍", "My Services 🛍"},
+    "btn_recharge": {"شارژ سرویس⚡️", "شارژ سرویس⚡", "Recharge ⚡️"},
+    "btn_support": {"پشتیبانی💬", "Support 💬"},
+    "btn_rewards": {"🎁 سیستم پاداش پیشرفته"},
+    "btn_invite": {"کد دعوت💌", "Invite Code 💌"},
+    "btn_add_service": {"افزودن سرویس➕", "Add Service ➕"},
+    "btn_guide": {"راهنمای اتصال📚", "Connection Guide 📚"},
+    "btn_language": {"زبان🌐", "Language 🌐"},
+    "btn_android": {"اندروید📱", "Android 📱"},
+    "btn_ios": {"آیفون📱", "iPhone 📱"},
+    "btn_windows": {"ویندوز💻", "Windows 💻"},
+}
+
+
 def t(lang: str, key: str) -> str:
     lang = normalize_lang(lang)
     table = STRINGS.get(key) or {}
@@ -475,7 +514,7 @@ def t(lang: str, key: str) -> str:
 
 def variants(key: str) -> set[str]:
     table = STRINGS.get(key) or {}
-    return {v for v in table.values() if v}
+    return {v for v in table.values() if v} | LEGACY_BUTTON_TEXTS.get(key, set())
 
 
 def text_matches(key: str) -> Callable:

@@ -49,16 +49,15 @@ async def handle_dashboard_enter_referral(request: web.Request):
             try:
                 bot = resolve_user_bot(request.app.get('bot'))
                 if bot:
+                    from html import escape as _esc
+
+                    from app.utils.bot_i18n import t as _t
+                    from app.utils.premium_emoji import send_premium
+
                     lang = getattr(referrer, 'language', 'fa') or 'fa'
                     name = user.full_name or user.username or str(user.chat_id)
-                    msg = (
-                        f"🎉 <b>{name}</b> با کد دعوت شما به AstroByte پیوست!\n"
-                        "🎁 اگر خرید انجام دهند، پاداش دریافت می‌کنید."
-                        if lang == 'fa' else
-                        f"🎉 <b>{name}</b> joined AstroByte using your referral code!\n"
-                        "🎁 You'll earn a reward when they make a purchase."
-                    )
-                    await bot.send_message(referrer.chat_id, msg, parse_mode="HTML")
+                    msg = _t(lang, "referral_new_user_dm").format(name=_esc(str(name)))
+                    await send_premium(bot, referrer.chat_id, msg)
             except Exception:
                 pass
 

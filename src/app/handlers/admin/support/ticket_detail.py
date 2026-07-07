@@ -8,9 +8,22 @@ from app.database import crud
 from app.database.crud import get_user_by_id
 from app.database.models import Subscription, Ticket
 from app.handlers.admin.common import ADMIN_IDS
+from app.utils.admin_bot_helper import get_user_bot
 from app.utils.bot_i18n import t
 
 from .common import _lang_for_tg_user, router, safe_edit_message
+
+
+async def _dm_user(chat_id, text, reply_markup=None):
+    """DM a user from an admin-bot handler via the USER bot (admin bot can't
+    reach users who never started it — audit fix). Best-effort."""
+    ub = get_user_bot()
+    if not ub or not chat_id:
+        return
+    try:
+        await ub.send_message(chat_id, text, reply_markup=reply_markup)
+    except Exception:
+        pass
 
 
 def _ticket_actions_kb(t: Ticket) -> InlineKeyboardBuilder:
@@ -224,12 +237,7 @@ async def admin_claim(callback: CallbackQuery, session: AsyncSession):
     await render_ticket_view(callback, session, ticket_id)
     tkt = await crud.get_ticket_by_id(session, ticket_id)
     user = await get_user_by_id(session, tkt.user_id)
-    try:
-        await callback.bot.send_message(
-            user.chat_id, f"تیکت #{tkt.id} شما در حال بررسی است."
-        )
-    except Exception:
-        pass
+    await _dm_user(user.chat_id, f"تیکت #{tkt.id} شما در حال بررسی است.")
     await callback.answer("اختصاص یافت.")
 
 
@@ -264,11 +272,7 @@ async def admin_close(callback: CallbackQuery, session: AsyncSession):
         kb.button(text="👍 بله", callback_data=f"support_fb_yes_{tkt.id}")
         kb.button(text="👎 خیر", callback_data=f"support_fb_no_{tkt.id}")
         kb.adjust(2)
-        await callback.bot.send_message(
-            user.chat_id,
-            f"تیکت #{tkt.id} بسته شد. آیا مشکل شما حل شد؟",
-            reply_markup=kb.as_markup(),
-        )
+        await _dm_user(user.chat_id, f"تیکت #{tkt.id} بسته شد. آیا مشکل شما حل شد؟", reply_markup=kb.as_markup())
     except Exception:
         pass
     await render_ticket_view(callback, session, ticket_id)
@@ -301,12 +305,7 @@ async def admin_request_more(callback: CallbackQuery, session: AsyncSession):
     await crud.set_ticket_allow_more(session, ticket_id, True)
     tkt = await crud.get_ticket_by_id(session, ticket_id)
     user = await get_user_by_id(session, tkt.user_id)
-    try:
-        await callback.bot.send_message(
-            user.chat_id, f"برای تیکت #{tkt.id} لطفاً اطلاعات بیشتری ارسال کنید."
-        )
-    except Exception:
-        pass
+    await _dm_user(user.chat_id, f"برای تیکت #{tkt.id} لطفاً اطلاعات بیشتری ارسال کنید.")
     await render_ticket_view(callback, session, ticket_id)
     await callback.answer("درخواست شد.")
 

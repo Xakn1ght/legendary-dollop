@@ -32,6 +32,7 @@ from app.jobs.arcade_prizes import arcade_monthly_prizes_job
 from app.jobs.cleanup_draft_orders import cleanup_draft_orders_job
 from app.jobs.enhanced_rewards import reminder_unclaimed_star_rewards_job, update_user_analytics_job
 from app.jobs.expire_claims import expire_star_reward_claims_job
+from app.jobs.node_watch import node_watch_job
 from app.jobs.notifications import check_low_data_job
 from app.jobs.renewal import renewal_job
 from app.jobs.season_reset import season_reset_job
@@ -309,6 +310,7 @@ async def main():
         (season_reset_job, 'season_reset_job'),
         (arcade_monthly_prizes_job, 'arcade_monthly_prizes_job'),
         (sms_sweep_job, 'sms_sweep_job'),
+        (node_watch_job, 'node_watch_job'),
     ]
     
     # Add jobs with error handling
@@ -321,11 +323,14 @@ async def main():
             # Wrap job with error handling
             async def wrapped_job(bot, original_job=job_func, name=job_name):
                 import time
+
+                from app.services.job_status import record_job_run
                 start_time = time.time()
                 try:
                     await original_job(bot)
                     duration = time.time() - start_time
                     log_job_execution(name, True, duration)
+                    record_job_run(name, True, duration)
                 except asyncio.CancelledError:
                     bot_logger.info(f"Job '{name}' was cancelled gracefully during shutdown.")
                     # No need to log job execution as failure, it's an expected cancellation
@@ -333,6 +338,7 @@ async def main():
                     duration = time.time() - start_time
                     log_error(e, {"job_name": name, "duration": duration})
                     log_job_execution(name, False, duration)
+                    record_job_run(name, False, duration)
             
             scheduler.add_job(wrapped_job, job_type, **job_args, args=[bot])
             

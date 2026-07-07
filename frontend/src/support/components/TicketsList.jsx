@@ -14,7 +14,7 @@ const CATEGORY_ICONS = {
   ),
 };
 
-export function TicketsList({ t, lang, tickets, filter, loading, onOpen }) {
+export function TicketsList({ t, lang, tickets, filter, loading, onOpen, onCreate }) {
   const locale = lang === 'fa' ? 'fa-IR' : 'en-US';
   const filtered = filter === 'all' ? tickets : tickets.filter((tk) => tk.status === filter);
 
@@ -41,14 +41,23 @@ export function TicketsList({ t, lang, tickets, filter, loading, onOpen }) {
   }
 
   if (filtered.length === 0) {
+    // Zero tickets overall: the empty state carries the big create CTA (no FAB).
+    // Filter just came up empty: keep the plain notice, FAB stays available.
+    const showCta = tickets.length === 0;
     return (
-      <div className="tickets-list" id="ticketsList">
+      <div className="tickets-list is-empty" id="ticketsList">
         <div className="empty-state">
           <div className="empty-icon">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" strokeWidth="2" /></svg>
           </div>
           <div style={{ fontSize: 16, fontWeight: 600, marginBottom: 6 }}>{t('noTickets')}</div>
           <div style={{ fontSize: 13 }}>{t('createTicketPrompt')}</div>
+          {showCta && (
+            <button className="empty-cta" type="button" onClick={onCreate}>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><line x1="12" y1="5" x2="12" y2="19" strokeLinecap="round" /><line x1="5" y1="12" x2="19" y2="12" strokeLinecap="round" /></svg>
+              {t('newTicket')}
+            </button>
+          )}
         </div>
       </div>
     );

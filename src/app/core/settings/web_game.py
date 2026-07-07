@@ -90,3 +90,39 @@ ARCADE_MONTHLY_PRIZES = [
      "payload": {"discount_percent": 10}, "name": "Arcade 4th Place — 10% Off"},
 ]
 ARCADE_PRIZE_COUPON_EXPIRY_DAYS = 45   # same shelf life as season coupons
+
+# ===========================================
+# ARCADE COINS + SHOP (2026-07-07)
+# ===========================================
+# Coins are an ARCADE-ONLY currency: minted exclusively by the single
+# validated daily run (server-capped per run, so ≤ max_per_run per day) and
+# spent on in-game cosmetics/upgrades or a daily-run retry. They can NEVER
+# convert to credit, stars, GB, days or anything money-adjacent — that keeps
+# the "arcade mints nothing" economy invariant intact.
+ARCADE_COINS = {
+    "max_per_run": 3,          # server cap on coins credited per validated run
+}
+
+# The catalog is server truth: prices, item keys and skin tints live here.
+# skins: permanent, one equipped at a time ("default" is free and always owned).
+#   color = overlay tint composited onto the ship sprite (the client renders
+#   with a source-atop fill, which works on every WebKit — canvas hue-rotate
+#   doesn't; kept here so lobby preview and in-game tint can never drift).
+# powers: permanent unlocks applied at the start of every run.
+# extra_life: permanent +1 starting life (single purchase).
+# retry: consumable — resets today's ranked run so it can be played again.
+ARCADE_SHOP = {
+    "skins": {
+        "default": {"price": 0,  "color": None},
+        "crimson": {"price": 18, "color": "#ff4d4d"},
+        "ice":     {"price": 18, "color": "#7be0ff"},
+        "void":    {"price": 24, "color": "#c04dff"},
+        "gold":    {"price": 30, "color": "#ffd23f"},
+    },
+    "powers": {
+        "shield_start": {"price": 40},   # start every run with 1 shield
+        "spread_start": {"price": 35},   # start every run with the 3-WAY timer
+    },
+    "extra_life": {"price": 60},
+    "retry": {"price": 12},
+}

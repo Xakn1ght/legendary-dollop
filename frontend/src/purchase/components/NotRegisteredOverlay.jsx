@@ -1,12 +1,13 @@
 import React from 'react';
 
 import { BulbIcon, LockIcon } from '../../shared/icons.jsx';
+import { openBotChatWithStart } from '../../shared/telegram.js';
 
 // Shown when /api/dashboard/login answers not_registered (bot requires a referral code).
 export function NotRegisteredOverlay({ lang, onClose }) {
   const fa = lang === 'fa';
-  const close = () => {
-    try { window.Telegram?.WebApp?.close(); } catch (_) { /* ignore */ }
+  const goStart = () => {
+    openBotChatWithStart('register');
     onClose();
   };
   return (
@@ -33,8 +34,8 @@ export function NotRegisteredOverlay({ lang, onClose }) {
           <BulbIcon size={14} />
           {fa ? 'کد دعوت را از دوستان خود بگیرید.' : 'Get a referral code from your friends.'}
         </div>
-        <button onClick={close} className="btn btn-primary" style={{ minWidth: 140, background: 'var(--brand)', borderColor: 'var(--brand)', color: '#fff' }}>
-          {fa ? 'بستن' : 'Close'}
+        <button onClick={goStart} className="btn btn-primary" style={{ minWidth: 140, background: 'var(--brand)', borderColor: 'var(--brand)', color: '#fff' }}>
+          {fa ? 'ارسال /start' : 'Send /start'}
         </button>
       </div>
     </div>

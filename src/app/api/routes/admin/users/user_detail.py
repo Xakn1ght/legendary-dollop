@@ -13,11 +13,15 @@ async def handle_admin_user_detail(request: web.Request):
                 return web.json_response({"ok": False, "error": "not_found"}, status=404)
             
             subs = await crud.get_user_subscriptions(session, user.id)
+            # NB: expiry lives in Marzban, not the DB — the old `s.expire_date`
+            # attribute never existed and 500'd this endpoint for any user
+            # that owned a subscription.
             subs_data = [{
                 "id": s.id,
                 "username": s.marzban_username,
                 "status": s.status,
-                "expire_date": s.expire_date.isoformat() if s.expire_date else None
+                "plan_name": s.plan_name,
+                "created_at": s.created_at.isoformat() if s.created_at else None,
             } for s in subs]
             
             return web.json_response({
@@ -30,6 +34,8 @@ async def handle_admin_user_detail(request: web.Request):
                     "credit": user.credit,
                     "stars": user.stars,
                     "banned": user.banned,
+                    "is_vip": bool(getattr(user, "is_vip", False)),
+                    "vip_until": user.vip_until.isoformat() if getattr(user, "vip_until", None) else None,
                     "created_at": user.created_at.isoformat() if user.created_at else None,
                     "subscriptions": subs_data
                 }

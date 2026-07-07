@@ -505,6 +505,7 @@ export function ChargeApp() {
             hasFile={!!receipt.receiptFile}
             onCopyCard={copyCardNumber}
             onFileSelect={receipt.handleSelect}
+            onClearFile={receipt.clear}
             onCancel={cancelOrder}
             onSubmit={submitReceipt}
             uploadPct={uploadPct}

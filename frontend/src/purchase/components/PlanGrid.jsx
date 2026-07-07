@@ -34,22 +34,62 @@ function CustomPlanCard({ t, fmt, selected, onSelect, autoOpen }) {
   const numRef = useRef(null);
   const gbRef = useRef(gb);
   gbRef.current = gb;
+  // Server price table (index 0 = 1GB) fetched once on first open → every
+  // slider tick prices instantly with the EXACT server curve, no round-trips.
+  const tableRef = useRef(null);
+  const tableLoadRef = useRef(null);
+
+  const loadTable = () => {
+    if (tableRef.current || tableLoadRef.current) return tableLoadRef.current;
+    tableLoadRef.current = api('/api/dashboard/purchase/custom-quote?gb=all')
+      .then((d) => {
+        if (d && d.ok && Array.isArray(d.prices)) tableRef.current = { min: d.min || 1, prices: d.prices };
+        return tableRef.current;
+      })
+      .catch(() => null)
+      .finally(() => { tableLoadRef.current = null; });
+    return tableLoadRef.current;
+  };
+
+  const applyPrice = (value, price) => {
+    setPriceLabel(price);
+    onSelect({ name: `custom:${value}`, gb: value, price, custom: true });
+  };
 
   const quote = (value) => {
     clearTimeout(timerRef.current);
     if (!value || value < 1 || value > 300) { setPriceLabel(null); return; }
+    const tab = tableRef.current;
+    if (tab) {
+      const price = tab.prices[value - tab.min];
+      if (typeof price === 'number') { applyPrice(value, price); return; }
+    }
+    // Table not ready yet — load it, then price this value (fallback: single quote).
     setPriceLabel('loading');
-    timerRef.current = setTimeout(async () => {
-      try {
-        const data = await api(`/api/dashboard/purchase/custom-quote?gb=${value}`);
-        if (!(data && data.ok)) { setPriceLabel(null); return; }
-        if (gbRef.current !== data.gb) return; // stale response
-        setPriceLabel(data.price);
-        onSelect({ name: data.plan_name, gb: data.gb, price: data.price, custom: true });
-        hapticSelection();
-      } catch (_) { setPriceLabel(null); }
-    }, 300);
+    loadTable().then((loaded) => {
+      if (gbRef.current !== value) return; // user moved on
+      if (loaded) {
+        const price = loaded.prices[value - loaded.min];
+        if (typeof price === 'number') { applyPrice(value, price); hapticSelection(); return; }
+      }
+      timerRef.current = setTimeout(async () => {
+        try {
+          const data = await api(`/api/dashboard/purchase/custom-quote?gb=${value}`);
+          if (!(data && data.ok)) { setPriceLabel(null); return; }
+          if (gbRef.current !== data.gb) return; // stale response
+          applyPrice(data.gb, data.price);
+          hapticSelection();
+        } catch (_) { setPriceLabel(null); }
+      }, 150);
+    });
   };
+
+  // A fixed plan was picked while the builder was open → close the slider
+  // (owner bug report: "I have 40 selected and it still shows the bar").
+  useEffect(() => {
+    if (selected && !selected.custom && open) { setOpen(false); setPriceLabel(null); }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selected]);
 
   // autoOpen arrives async (after plans + URL params load), so react to the
   // prop instead of only reading it at mount: open the builder, fetch a

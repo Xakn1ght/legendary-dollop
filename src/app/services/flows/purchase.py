@@ -186,13 +186,6 @@ async def _auto_approve(session: AsyncSession, sub: Subscription, bot) -> None:
                     await session.commit()
                 except Exception:
                     pass
-                # Mirror process_approved_subscription: apply vip/legend pack grants.
-                try:
-                    from app.services.subscription_processing import apply_coupon_pack_grants
-                    grant_user = await crud.get_user_by_id(session, sub.user_id)
-                    await apply_coupon_pack_grants(session, grant_user, getattr(sub, "applied_coupon_id", None))
-                except Exception as e:
-                    logger.error(f"Failed to apply pack grants (botless) for order {sub.id}: {e}")
                 ok = True
         except Exception as e:
             logger.error(f"Auto-approve (botless) failed for order {sub.id}: {e}")
@@ -251,12 +244,25 @@ async def submit_purchase_receipt(
 
 async def deny_purchase_order(session: AsyncSession, sub_id: int) -> DenyResult:
     """Admin denial of a pending order: refund credit, restore discounts AND the
-    consumed coupon, then delete the order row. Idempotent via the status guard."""
+    consumed coupon, then delete the order row. Idempotent via the status guard.
+
+    The atomic pending → processing claim closes the double-deny race (two taps
+    both passing the status check, refunding the credit twice)."""
+    from sqlalchemy import update as _sql_update
+
+    res = await session.execute(
+        _sql_update(Subscription)
+        .where(Subscription.id == sub_id, Subscription.status == "pending")
+        .values(status="processing")
+    )
+    await session.commit()
+    if (res.rowcount or 0) == 0:
+        sub = await session.get(Subscription, sub_id)
+        raise FlowError("not_found" if not sub else "already_processed")
+
     sub = await session.get(Subscription, sub_id)
     if not sub:
         raise FlowError("not_found")
-    if sub.status != "pending":
-        raise FlowError("already_processed")
 
     result = DenyResult(
         user_id=sub.user_id,
@@ -266,7 +272,23 @@ async def deny_purchase_order(session: AsyncSession, sub_id: int) -> DenyResult:
         service_name=sub.marzban_username,
         plan_name=sub.plan_name,
     )
-    await _rollback_order(session, sub)
+    try:
+        await _rollback_order(session, sub)
+    except Exception:
+        # Release the claim so a transient failure mid-rollback doesn't wedge the
+        # order in 'processing' (invisible to every pending queue, un-actionable,
+        # user's money held). Back to 'pending' → admin can retry.
+        try:
+            await session.rollback()
+            await session.execute(
+                _sql_update(Subscription)
+                .where(Subscription.id == sub_id, Subscription.status == "processing")
+                .values(status="pending")
+            )
+            await session.commit()
+        except Exception:
+            logger.exception("purchase %s: could not release deny claim", sub_id)
+        raise
     return result
 
 

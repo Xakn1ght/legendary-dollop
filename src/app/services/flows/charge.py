@@ -36,6 +36,37 @@ TRAFFIC_GATE_GB = 5
 _REFUNDABLE_STATUSES = ("draft", "pending")
 
 
+async def _claim_pending(session: AsyncSession, charge_id: int) -> None:
+    """Atomically flip pending → processing so two concurrent approve/deny taps
+    can't both proceed (the second sees 0 rows and gets not_found_or_handled).
+    Callers must reset to 'pending' if their flow fails before a final status."""
+    from sqlalchemy import update
+
+    res = await session.execute(
+        update(ChargeRequest)
+        .where(ChargeRequest.id == charge_id, ChargeRequest.status == "pending")
+        .values(status="processing")
+    )
+    await session.commit()
+    if (res.rowcount or 0) == 0:
+        raise FlowError("not_found_or_handled")
+
+
+async def _unclaim(session: AsyncSession, charge_id: int) -> None:
+    """Best-effort rollback of a claim after a mid-flow failure."""
+    try:
+        from sqlalchemy import update
+
+        await session.execute(
+            update(ChargeRequest)
+            .where(ChargeRequest.id == charge_id, ChargeRequest.status == "processing")
+            .values(status="pending")
+        )
+        await session.commit()
+    except Exception:
+        logger.exception("charge %s: could not release claim", charge_id)
+
+
 @dataclass
 class ChargeOrderResult:
     charge_request: ChargeRequest
@@ -326,23 +357,34 @@ async def submit_charge_receipt(
 
 
 async def deny_charge(session: AsyncSession, charge_id: int) -> DenyChargeResult:
-    """Admin denial: refund reserved credit and mark the request denied."""
-    charge_req = await crud.get_charge_request(session, charge_id)
-    if not charge_req or charge_req.status != "pending":
-        raise FlowError("not_found_or_handled")
+    """Admin denial: refund reserved credit and mark the request denied.
 
-    sub = await session.get(Subscription, charge_req.subscription_id)
-    service_name = sub.marzban_username if sub else None
-    user_id = charge_req.user_id
-    refunded = int(charge_req.credit_used or 0)
-    if refunded > 0:
-        await crud.add_credit(session, user_id, refunded)
-    await crud.update_charge_request_status(session, charge_id, "denied")
-    return DenyChargeResult(
-        user_id=user_id,
-        credit_refunded=refunded,
-        service_name=service_name,
-    )
+    Claims the row first (pending → processing) so a double-tap / concurrent
+    admin can't refund twice."""
+    await _claim_pending(session, charge_id)
+    try:
+        charge_req = await crud.get_charge_request(session, charge_id)
+        if not charge_req:
+            raise FlowError("not_found_or_handled")
+
+        sub = await session.get(Subscription, charge_req.subscription_id)
+        service_name = sub.marzban_username if sub else None
+        user_id = charge_req.user_id
+        refunded = int(charge_req.credit_used or 0)
+        if refunded > 0:
+            await crud.add_credit(session, user_id, refunded)
+        await crud.update_charge_request_status(session, charge_id, "denied")
+        return DenyChargeResult(
+            user_id=user_id,
+            credit_refunded=refunded,
+            service_name=service_name,
+        )
+    except FlowError:
+        await _unclaim(session, charge_id)
+        raise
+    except Exception:
+        await _unclaim(session, charge_id)
+        raise
 
 
 async def approve_charge(session: AsyncSession, charge_id: int, *, user_bot) -> ApproveChargeResult:
@@ -352,9 +394,26 @@ async def approve_charge(session: AsyncSession, charge_id: int, *, user_bot) -> 
 
     This is the single implementation of the carry-over rules previously duplicated
     between the admin bot handler and the admin panel route.
+
+    The row is claimed (pending → processing) up front so concurrent approvals
+    (double-tap, panel + bot, panel + SMS auto-approve) can't both run; any
+    failure before a final status releases the claim back to pending.
     """
+    await _claim_pending(session, charge_id)
+    try:
+        return await _approve_charge_claimed(session, charge_id, user_bot=user_bot)
+    except FlowError as e:
+        if e.code != "not_found_or_handled":
+            await _unclaim(session, charge_id)
+        raise
+    except Exception:
+        await _unclaim(session, charge_id)
+        raise
+
+
+async def _approve_charge_claimed(session: AsyncSession, charge_id: int, *, user_bot) -> ApproveChargeResult:
     charge_req = await crud.get_charge_request(session, charge_id)
-    if not charge_req or charge_req.status != "pending":
+    if not charge_req:
         raise FlowError("not_found_or_handled")
 
     await session.refresh(charge_req, attribute_names=["subscription", "user"])

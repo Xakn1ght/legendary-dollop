@@ -5,9 +5,10 @@ coupons (config: ARCADE_MONTHLY_PRIZES in settings/web_game.py — 50GB / 10GB /
 5GB free-traffic for ranks 1-3, 10% discount for ranks 4-10).
 
 Fairness guarantees (matching the hardened submit path):
-- Ranking uses DailyGamePlay.best_score, which is ONLY ever written by the
-  single round-token-validated rewarded run per day. Practice, replayed and
-  rejected runs can never enter this ranking.
+- Ranking is the SUM of DailyGamePlay.best_score over the month — and
+  best_score is ONLY ever written by the single round-token-validated
+  rewarded run per day. Practice, replayed and rejected runs can never
+  enter this ranking. Daily play accumulates toward the month total.
 - Only users with show_on_leaderboard=True are ranked — the prize board is
   exactly the board everyone can see.
 - Ties break in favor of whoever reached the score on an earlier day.
@@ -30,6 +31,7 @@ from app.database.models import (
     User,
 )
 from app.utils.logger import bot_logger
+from app.utils.tehran_time import tehran_today
 
 GUARD_SOURCE = "arcade_prize"
 
@@ -98,7 +100,7 @@ async def award_monthly_arcade_prizes(session, month_start, month_end, month_key
                         chat_id=user.chat_id,
                         text=(
                             f"🏆 <b>AstroBugz {month_key} — Rank #{rank}!</b>\n\n"
-                            f"Your best score of <b>{top_score}</b> earned you:\n"
+                            f"Your month total of <b>{top_score}</b> points earned you:\n"
                             f"🎁 <b>{prize['name']}</b>\n\n"
                             "The coupon is in your rewards wallet — use it on your next purchase. "
                             f"It expires in {ARCADE_PRIZE_COUPON_EXPIRY_DAYS} days."
@@ -114,8 +116,9 @@ async def award_monthly_arcade_prizes(session, month_start, month_end, month_key
 
 
 async def arcade_monthly_prizes_job(bot=None):
-    """Interval job: on/after the 1st of each month, award last month once."""
-    today = datetime.date.today()
+    """Interval job: on/after the 1st of each month (IRAN time), award last
+    month once."""
+    today = tehran_today()
     month_start, month_end, month_key = _previous_month_bounds(today)
 
     async with AsyncSessionLocal() as session:

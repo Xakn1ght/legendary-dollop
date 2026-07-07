@@ -23,7 +23,12 @@ COUPONS_CAN_STACK = False
 DISCOUNT_COUPON_MAX_PLAN_GB = 100         # cap discount value on very large custom plans
 
 # ── Star milestone ladder (auto-unlocks a coupon once per season) ───────────
-# coupon_type ∈ discount_percent | free_gb | free_plan | free_autorenew | vip_pack | legend_pack
+# coupon_type ∈ discount_percent | free_gb | free_plan | vip_days
+# (free_autorenew coupons are no longer minted but stay honored until expiry;
+#  vip_pack/legend_pack are retired — see specs/2026-07-06-star-ladder-simplification-design.md)
+# Optional milestone keys "badge"/"theme" grant profile cosmetics at unlock time.
+# Economics @175k toman/$: every prize is VPN value (~70 toman/GB real cost) or
+# VIP time (zero infra cost). The ladder never mints cash/credit.
 STAR_SEASON_MILESTONES = {
     1:  {"name": "First Spark",       "coupon_type": "discount_percent", "payload": {"discount_percent": 5}},
     3:  {"name": "Starter Discount",  "coupon_type": "discount_percent", "payload": {"discount_percent": 10}},
@@ -32,15 +37,14 @@ STAR_SEASON_MILESTONES = {
     15: {"name": "Half Price",        "coupon_type": "discount_percent", "payload": {"discount_percent": 50}},
     20: {"name": "Free 20GB Plan",    "coupon_type": "free_plan",        "payload": {"plan_gb": 20, "duration_days": 35}},
     25: {"name": "Free 40GB Plan",    "coupon_type": "free_plan",        "payload": {"plan_gb": 40, "duration_days": 35}},
-    # Free-renewal value capped at the 60GB plan (250k) — the single biggest giveaway;
-    # 100GB (400k) was ~60% more exposure for no extra motivational pull.
-    30: {"name": "Free Auto-Renewal", "coupon_type": "free_autorenew",   "payload": {"max_plan_gb": 60, "duration_days": 35}},
-    40: {"name": "Season Champion",   "coupon_type": "vip_pack",         "payload": {
-        "free_autorenew": {"max_plan_gb": 60, "duration_days": 35},
-        "priority_support_days": 30, "badge": "Champion", "theme": "champion"}},
-    50: {"name": "Season Legend",     "coupon_type": "legend_pack",      "payload": {
-        "free_autorenew": {"max_plan_gb": 60, "duration_days": 35},
-        "bonus_gb": 100, "priority_support_days": 60, "badge": "Legend", "theme": "legend"}},
+    40: {"name": "Season Champion",   "coupon_type": "free_plan",
+         "payload": {"plan_gb": 60, "duration_days": 35},
+         "badge": "Champion", "theme": "champion"},
+    50: {"name": "Season Legend",     "coupon_type": "vip_days",
+         "payload": {"days": 30},
+         # Legend also gets 100GB as a normal checkout coupon (~7k toman real cost).
+         "extra_coupons": [{"coupon_type": "free_gb", "payload": {"gb": 100}}],
+         "badge": "Legend", "theme": "legend"},
 }
 
 # ── VIP Promoter cashout (Phase D) ──────────────────────────────────────────

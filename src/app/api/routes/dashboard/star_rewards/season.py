@@ -46,15 +46,21 @@ async def handle_dashboard_season(request: web.Request):
             ladder = []
             for stars in sorted(STAR_SEASON_MILESTONES):
                 info = STAR_SEASON_MILESTONES[stars]
-                ladder.append(
-                    {
-                        "stars": stars,
-                        "name": info.get("name", ""),
-                        "coupon_type": info.get("coupon_type", ""),
-                        "payload": info.get("payload", {}),
-                        "reached": season_stars >= stars,
-                    }
-                )
+                item = {
+                    "stars": stars,
+                    "name": info.get("name", ""),
+                    "coupon_type": info.get("coupon_type", ""),
+                    "payload": info.get("payload", {}),
+                    "reached": season_stars >= stars,
+                }
+                # Milestone cosmetics (40★/50★): lets the webapp show badge art.
+                if info.get("badge"):
+                    item["badge"] = info["badge"]
+                if info.get("theme"):
+                    item["theme"] = info["theme"]
+                if info.get("extra_coupons"):
+                    item["extra_coupons"] = info["extra_coupons"]
+                ladder.append(item)
 
             next_ms = next((m for m in sorted(STAR_SEASON_MILESTONES) if m > season_stars), None)
             next_milestone = (

@@ -7,6 +7,7 @@ from weakref import WeakSet
 
 from aiohttp import WSMsgType, web
 
+from ..broadcasts.typing import broadcast_typing
 from ..state import active_connections, admin_connections, connection_health, logger
 
 
@@ -21,6 +22,28 @@ async def handle_admin_support_ws(request: web.Request):
 
     Authentication: Uses HttpOnly admin_session cookie (automatically sent with WS upgrade)
     """
+
+    # Reject cross-site WS upgrades before doing anything else. The admin session
+    # cookie is SameSite=None (needed for the Telegram embed), so a page an admin
+    # visits could otherwise open this socket with their ambient cookie and stream
+    # live support events (CSWSH). Browsers always send Origin on WS; a mismatched
+    # Origin is refused. A missing Origin (native/non-browser client) still has to
+    # pass token auth below, so it carries no ambient-cookie risk.
+    origin = request.headers.get("Origin", "")
+    if origin:
+        try:
+            from urllib.parse import urlparse
+
+            from app.core.settings import is_admin_host_allowed
+
+            oh = urlparse(origin).hostname or ""
+            tg_ok = oh.endswith(".telegram.org") or oh in ("telegram.org", "web.telegram.org")
+            if not (tg_ok or is_admin_host_allowed(oh)):
+                raise web.HTTPForbidden(text="bad origin")
+        except web.HTTPException:
+            raise
+        except Exception:
+            raise web.HTTPForbidden(text="bad origin")
 
     ws = web.WebSocketResponse(heartbeat=30)
     await ws.prepare(request)
@@ -59,9 +82,22 @@ async def handle_admin_support_ws(request: web.Request):
             if msg.type == WSMsgType.TEXT:
                 try:
                     data = json.loads(msg.data)
-                    action = data.get("action")
+                    action = data.get("action") or data.get("type")
 
-                    if action == "watch_ticket":
+                    if action == "typing":
+                        # Fire-and-forget typing hint -> user sockets watching
+                        # this ticket (relayed only for the watched ticket).
+                        try:
+                            ticket_id = int(data.get("ticket_id"))
+                        except (TypeError, ValueError):
+                            ticket_id = None
+                        if ticket_id and watched_ticket_id and ticket_id == int(watched_ticket_id):
+                            try:
+                                await broadcast_typing(watched_ticket_id, "admin")
+                            except Exception:
+                                pass
+
+                    elif action == "watch_ticket":
                         ticket_id = data.get("ticket_id")
                         if ticket_id:
                             if watched_ticket_id and watched_ticket_id in active_connections:

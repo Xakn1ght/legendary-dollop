@@ -108,6 +108,12 @@ export function createSupportRealtime({ onEvent, pollTickets, pollMessages }) {
   return {
     connect,
     get connected() { return wsConnected; },
+    // Fire-and-forget typing hint for the watched ticket (server relays to admins).
+    sendTyping(ticketId) {
+      if (ws && ws.readyState === WebSocket.OPEN) {
+        try { ws.send(JSON.stringify({ type: 'typing', ticket_id: ticketId })); } catch (_) { /* ignore */ }
+      }
+    },
     watchTicket(ticketId) {
       watchedTicketId = ticketId;
       if (ws && ws.readyState === WebSocket.OPEN) {

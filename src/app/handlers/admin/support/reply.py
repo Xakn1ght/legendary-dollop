@@ -7,6 +7,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.database import crud
 from app.database.crud import get_user_by_id
 from app.handlers.admin.common import ADMIN_IDS
+from app.utils.admin_bot_helper import get_user_bot
 from app.utils.bot_i18n import t
 
 from .common import AdminSupportStates, _lang_for_tg_user, router
@@ -74,16 +75,17 @@ async def admin_reply_text(message: Message, state: FSMContext, session: AsyncSe
     outbound = t(user_lang, "support_admin_reply").format(
         ticket_id=tkt.id, text=message.text
     )
+    # Reply must go through the USER bot — message.bot here is the ADMIN bot,
+    # which the user never started, so replies were silently never delivered
+    # (audit fix).
+    user_bot = get_user_bot() or message.bot
     try:
-        await message.bot.send_message(user.chat_id, outbound)
-    except Exception:
-        try:
-            await message.bot.send_message(user.chat_id, outbound)
-        except Exception as e:
-            lang = _lang_for_tg_user(message.from_user)
-            await message.answer(
-                t(lang, "admin_support_send_user_failed").format(err=str(e)[:100])
-            )
+        await user_bot.send_message(user.chat_id, outbound)
+    except Exception as e:
+        lang = _lang_for_tg_user(message.from_user)
+        await message.answer(
+            t(lang, "admin_support_send_user_failed").format(err=str(e)[:100])
+        )
 
     await state.clear()
     lang = _lang_for_tg_user(message.from_user)

@@ -45,8 +45,8 @@ async def _run():
     assert data["next_milestone"]["stars"] == 10
 
     ladder = {m["stars"]: m for m in data["ladder"]}
-    # full ladder present
-    assert sorted(ladder) == [1, 3, 5, 10, 15, 20, 25, 30, 40, 50]
+    # full ladder present (2026-07 simplification: no 30★, packs retired)
+    assert sorted(ladder) == [1, 3, 5, 10, 15, 20, 25, 40, 50]
     # reached flags reflect 7 stars
     assert ladder[1]["reached"] is True
     assert ladder[3]["reached"] is True
@@ -55,6 +55,11 @@ async def _run():
     # ladder carries renderable coupon metadata
     assert ladder[3]["coupon_type"] == "discount_percent"
     assert ladder[3]["payload"]["discount_percent"] == 10
+    # top milestones: plain value + cosmetics metadata for badge art
+    assert ladder[40]["coupon_type"] == "free_plan" and ladder[40]["payload"]["plan_gb"] == 60
+    assert ladder[40]["badge"] == "Champion" and ladder[40]["theme"] == "champion"
+    assert ladder[50]["coupon_type"] == "vip_days" and ladder[50]["payload"]["days"] == 30
+    assert ladder[50]["badge"] == "Legend" and ladder[50]["theme"] == "legend"
 
     # coupon wallet has exactly the unlocked coupons (1★, 3★, 5★ at 7 stars)
     coup = sorted(data["coupons"], key=lambda c: c["milestone_stars"])

@@ -32,7 +32,18 @@ async def handle_dashboard_tickets_delete(request: web.Request):
 
             ticket.hidden_from_user = True
             ticket.hidden_at = datetime.utcnow()
+            # The user walked away — don't leave the ticket looking actionable
+            # in the admin panel's pending queue.
+            if ticket.status not in ("closed", "archived"):
+                ticket.status = "closed"
             await session.commit()
+
+            try:
+                from app.api.routes.admin_ws import broadcast_ticket_list_update
+
+                await broadcast_ticket_list_update()
+            except Exception:
+                pass
 
             resp = web.json_response({"ok": True})
             if new_session_token:
