@@ -2,6 +2,7 @@ import asyncio
 import logging
 
 from aiogram import Bot, Dispatcher
+from aiogram.client.default import DefaultBotProperties
 from aiogram.enums import ParseMode
 from aiogram.fsm.storage.memory import MemoryStorage
 from aiogram.types import BotCommand
@@ -179,7 +180,10 @@ async def main():
         log_error(e, {"operation": "redis_init"})
         bot_logger.warning("Failed to initialize Redis cache, continuing without caching")
 
-    bot = Bot(token=BOT_TOKEN, default_parse_mode=ParseMode.HTML)
+    # aiogram 3.7+ silently swallows the old `default_parse_mode` kwarg — the
+    # user bot ran with NO default parse mode (raw <b> tags in any message
+    # that didn't pass parse_mode explicitly). Same fix as admin_main.py.
+    bot = Bot(token=BOT_TOKEN, default=DefaultBotProperties(parse_mode=ParseMode.HTML))
     try:
         await bot.set_my_commands([
             BotCommand(command="start", description="شروع"),

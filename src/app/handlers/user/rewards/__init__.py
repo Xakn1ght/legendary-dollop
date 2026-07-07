@@ -2,7 +2,6 @@
 from aiogram import Router
 
 from .achievements import router as achievements_router
-from .analytics import router as analytics_router
 from .leaderboard import router as leaderboard_router
 from .loyalty_shop import router as loyalty_shop_router
 
@@ -15,6 +14,10 @@ from .redemption import router as redemption_router
 from .wallet import router as wallet_router
 
 # 2. Aggregate all sub-routers into a single main router for the package.
+# NOTE: analytics_router (star_analytics/star_distribution/… callbacks) is
+# deliberately NOT included: it was admin-only surface living inside the USER
+# bot (no user-facing button ever emitted those callbacks). Admin analytics
+# belong to the admin panel/bot only.
 router = Router()
 router.include_routers(
     menu_router,
@@ -23,7 +26,6 @@ router.include_routers(
     redemption_router,
     achievements_router,
     leaderboard_router,
-    analytics_router,
     loyalty_shop_router,
 )
 

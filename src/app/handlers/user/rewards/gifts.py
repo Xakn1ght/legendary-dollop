@@ -352,15 +352,24 @@ async def process_gift_payment_receipt(message: Message, state: FSMContext, sess
         await state.clear()
         return
     await set_gift_payment_status(session, gift_id, 'pending', receipt_message_id=message.message_id)
-    # Notify admin
+    # Notify admin — on the ADMIN bot (admin traffic never flows through the
+    # user bot). The photo can't be copy_message'd by a bot that isn't in the
+    # user's chat, so it's relayed download→re-upload with the caption inline.
     from app.handlers.admin.common import ADMIN_IDS
+    from app.utils.admin_bot_helper import get_admin_bot, relay_user_receipt_photo_to_admin
     try:
-        for admin_id in ADMIN_IDS:
-            try:
-                await message.bot.copy_message(chat_id=admin_id, from_chat_id=message.chat.id, message_id=message.message_id)
-                await message.bot.send_message(admin_id, f"🧾 رسید پرداخت برای هدیه #{gift_id} ارسال شد. برای تایید/رد از منوی مدیریت هدایه استفاده کنید.")
-            except Exception:
-                pass
+        admin_bot = get_admin_bot()
+        if admin_bot:
+            caption = f"🧾 رسید پرداخت برای هدیه #{gift_id} ارسال شد. برای تایید/رد از منوی مدیریت هدایا استفاده کنید."
+            for admin_id in ADMIN_IDS:
+                try:
+                    sent = await relay_user_receipt_photo_to_admin(
+                        message.bot, admin_bot, admin_id, message, caption=caption
+                    )
+                    if not sent:
+                        await admin_bot.send_message(admin_id, caption)
+                except Exception:
+                    pass
     except Exception:
         pass
     await message.answer("✅ رسید دریافت شد. پس از تایید ادمین، هدیه برای گیرنده فعال/قابل پذیرش می‌شود.")

@@ -72,25 +72,5 @@ KEYBOARD_MARKUP_CONFIRM_PURCHASE = ReplyKeyboardMarkup(
     resize_keyboard=True
 )
 
-# -------- Admin keyboard ----------
-
-def get_admin_keyboard(user_id: int) -> ReplyKeyboardMarkup:
-    """Generate admin keyboard (WebApp-only admin)."""
-    # Admin is WebApp-only; keep only a single WebApp entry point.
-    admin_panel_url = f"{DASHBOARD_PUBLIC_BASE_URL}/admin/"
-    
-    return ReplyKeyboardMarkup(
-        keyboard=[
-            [KeyboardButton(text='👑 Admin Panel', web_app=WebAppInfo(url=admin_panel_url))],
-            [KeyboardButton(text='Close menu 🔙')]
-        ],
-        resize_keyboard=True
-    )
-
-# Legacy static admin keyboard (without WebApp)
-KEYBOARD_MARKUP_ADMIN = ReplyKeyboardMarkup(
-    keyboard=[
-        [KeyboardButton(text='تنظیمات⚙️'), KeyboardButton(text='🔙 بستن منو')]
-    ],
-    resize_keyboard=True
-) 
+# Admin keyboards used to live here — removed: the USER bot carries no admin
+# surface at all. Admin UI = the admin bot (@Bewrekhobot) + the admin panel.

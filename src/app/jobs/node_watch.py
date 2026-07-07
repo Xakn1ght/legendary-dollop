@@ -1,14 +1,18 @@
-"""Marzban node watchdog.
+"""Panel node watchdog.
 
 Every run fetches the node list; when a node's connectivity flips (connected →
-down or back), DMs every admin via the user bot. Last-known states are kept in
+down or back), DMs every admin via the ADMIN bot. Last-known states are kept in
 a small JSON file so restarts don't re-alert unchanged outages.
+
+The job runs inside the user-bot process (its scheduler), but admin traffic
+must NEVER flow through the user bot — alerts go out on the admin bot client.
 """
 import json
 
 from app.core.paths import data_path
 from app.services.marzban import marzban_api
 from app.shared.admin_access import ADMIN_IDS
+from app.utils.admin_bot_helper import get_admin_bot
 from app.utils.logger import bot_logger
 
 _STATE_FILE = data_path("node_watch.json")
@@ -42,6 +46,10 @@ async def node_watch_job(bot) -> None:
     for n in nodes:
         name = str(n.get("name") or f"node-{n.get('id')}")
         status = str(n.get("status") or "unknown").lower()
+        # "disabled" is an admin's choice (PasarGuard keeps such nodes listed),
+        # not an outage — don't alert on it, and forget its previous state.
+        if status == "disabled":
+            continue
         up = status in _OK_STATUSES
         state[name] = "up" if up else "down"
         was = prev.get(name)
@@ -57,10 +65,17 @@ async def node_watch_job(bot) -> None:
     if not changes:
         return
 
-    text = "🛰 <b>وضعیت نودهای Marzban</b>\n\n" + "\n".join(changes)
+    # `bot` (the scheduler's user bot) is deliberately unused for sending:
+    # node status is admin-only and must arrive from the admin bot.
+    admin_bot = get_admin_bot()
+    if not admin_bot:
+        bot_logger.warning("[NODES] ADMIN_BOT_TOKEN not set — node alert skipped (never sent via user bot)")
+        return
+
+    text = "🛰 <b>وضعیت نودها</b>\n\n" + "\n".join(changes)
     for admin_id in ADMIN_IDS:
         try:
-            await bot.send_message(admin_id, text, parse_mode="HTML")
+            await admin_bot.send_message(admin_id, text, parse_mode="HTML")
         except Exception:
             pass
     bot_logger.info(f"[NODES] status change alert sent: {changes}")

@@ -243,10 +243,19 @@ def _epoch(dt) -> int:
 
 # ── admin notify ────────────────────────────────────────────────────────────
 async def _notify_admin(bot, text: str) -> None:
-    if not (bot and ADMIN_ID):
+    """Admin hints/alerts go out on the ADMIN bot — never the user bot, even
+    though this code runs inside the user-bot process (`bot` is kept only for
+    call-compat and as documentation of the calling context)."""
+    if not ADMIN_ID:
         return
     try:
-        await bot.send_message(ADMIN_ID, text)
+        from app.utils.admin_bot_helper import get_admin_bot
+
+        admin_bot = get_admin_bot()
+        if not admin_bot:
+            bot_logger.warning("[SMS] ADMIN_BOT_TOKEN not set — admin hint skipped (never sent via user bot)")
+            return
+        await admin_bot.send_message(ADMIN_ID, text)
     except Exception:
         pass
 
