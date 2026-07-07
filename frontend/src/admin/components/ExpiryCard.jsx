@@ -63,6 +63,12 @@ export function ExpiryCard() {
             </div>
             <div className="expiry-meta">
               {r.renewal_paid && <span className="expiry-paid" title="Renewal already paid">renewal paid</span>}
+              {/* churn radar: expiring AND silent for days = probably already gone */}
+              {r.likely_churned && (
+                <span className="expiry-churn" title={`Client last connected ${r.inactive_days}d ago`}>
+                  silent {Math.round(r.inactive_days)}d
+                </span>
+              )}
               <span className={'expiry-days' + (r.days_left < 0 ? ' neg' : r.days_left <= 2 ? ' hot' : '')}>
                 {r.days_left < 0 ? `${Math.abs(r.days_left).toFixed(0)}d ago` : `${r.days_left.toFixed(1)}d`}
               </span>

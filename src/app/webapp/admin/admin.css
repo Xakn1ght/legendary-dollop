@@ -4946,6 +4946,8 @@ body.admin-panel .expiry-days { font-size: 12px; font-weight: 700; font-variant-
 body.admin-panel .expiry-days.hot { color: var(--warning); }
 body.admin-panel .expiry-days.neg { color: var(--danger); }
 body.admin-panel .expiry-paid { font-size: 10px; font-weight: 700; color: var(--success); border: 1px solid color-mix(in srgb, var(--success) 40%, transparent); padding: 2px 7px; border-radius: 999px; }
+/* churn radar: expiring user whose client has been silent for days */
+body.admin-panel .expiry-churn { font-size: 10px; font-weight: 700; color: var(--muted); border: 1px dashed color-mix(in srgb, var(--muted) 55%, transparent); padding: 2px 7px; border-radius: 999px; }
 body.admin-panel .expiry-remind { margin-top: 12px; justify-content: center; gap: 8px; }
 
 /* ---- coupons ---- */

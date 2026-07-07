@@ -92,17 +92,33 @@ export function ExportModal({ t, open, link, showQRFirst, onClose }) {
     return () => { cancelled = true; };
   }, [qrVisible, link, t]);
 
-  const addToApp = () => {
+  // One-tap import per client. PasarGuard serves format-specific configs at
+  // {link}/{client_type} (verified live: clash_meta/sing_box/links_base64),
+  // so every app gets its native format instead of one generic link.
+  const APPS = [
+    { key: 'v2rayng', label: 'v2rayNG', os: 'android', url: (l) => 'v2rayng://install-config?url=' + encodeURIComponent(l) },
+    { key: 'hiddify', label: 'Hiddify', os: 'any', url: (l) => 'hiddify://import/' + l },
+    { key: 'streisand', label: 'Streisand', os: 'ios', url: (l) => 'streisand://import/' + l },
+    { key: 'v2box', label: 'V2Box', os: 'ios', url: (l) => 'v2box://install-sub?url=' + encodeURIComponent(l) + '&name=AstroByte' },
+    { key: 'clashmeta', label: 'Clash Meta', os: 'android', url: (l) => 'clash://install-config?url=' + encodeURIComponent(l + '/clash_meta') + '&name=AstroByte' },
+    { key: 'karing', label: 'Karing', os: 'any', url: (l) => 'sing-box://import-remote-profile?url=' + encodeURIComponent(l + '/sing_box') + '#AstroByte' },
+  ];
+  const [appsVisible, setAppsVisible] = useState(false);
+  useEffect(() => { if (!open) setAppsVisible(false); }, [open]);
+
+  const platform = /android/i.test(navigator.userAgent || '') ? 'android'
+    : /iphone|ipad|ipod/i.test(navigator.userAgent || '') ? 'ios' : 'any';
+  // Platform-native apps first, cross-platform after, other-OS apps last.
+  const appsSorted = [...APPS].sort((a, b) => {
+    const rank = (x) => (x.os === platform ? 0 : x.os === 'any' ? 1 : 2);
+    return rank(a) - rank(b);
+  });
+
+  const openApp = (app) => {
     if (!link) { showToast(t('noSubOpen'), 'error'); return; }
-    const tg = getWebApp();
-    const ua = navigator.userAgent || '';
-    if (/android/i.test(ua)) {
-      window.location.href = 'v2rayng://install-config?url=' + encodeURIComponent(link);
-      showToast(t('addToApp'), 'success');
-    } else {
-      const tutorialUrl = '/webapp/dashboard/tutorial.html';
-      if (tg?.openLink) tg.openLink(tutorialUrl); else window.location.href = tutorialUrl;
-    }
+    // Custom URI schemes must go through location.href — Telegram's openLink
+    // only accepts http(s) and would reject these.
+    window.location.href = app.url(link);
   };
 
   return (
@@ -125,8 +141,29 @@ export function ExportModal({ t, open, link, showQRFirst, onClose }) {
           />
         </div>
       )}
+      {appsVisible && (
+        <div id="exportAppGrid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginTop: 14 }}>
+          {appsSorted.map((app) => (
+            <button
+              key={app.key}
+              className="btn"
+              style={{ justifyContent: 'center', fontWeight: 700 }}
+              onClick={() => openApp(app)}
+            >
+              {app.label}
+            </button>
+          ))}
+          <a
+            className="btn"
+            style={{ gridColumn: '1 / -1', justifyContent: 'center', fontSize: 12.5, color: 'var(--muted, inherit)' }}
+            href="/webapp/dashboard/tutorial.html"
+          >
+            {t('appGridHelp')}
+          </a>
+        </div>
+      )}
       <div className="sheet-actions" style={{ marginTop: 16, justifyContent: 'center' }}>
-        <button id="exportAddBtn" className="btn btn-primary" onClick={addToApp}>{t('addToApp')}</button>
+        <button id="exportAddBtn" className="btn btn-primary" onClick={() => setAppsVisible((v) => !v)}>{t('addToApp')}</button>
         <button id="exportQRBtn" className="btn" onClick={() => setQrVisible(!qrVisible)}>{t('showQR')}</button>
         <button id="exportModalClose" className="btn" onClick={onClose}>{t('close')}</button>
       </div>

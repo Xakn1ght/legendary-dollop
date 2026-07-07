@@ -160,6 +160,17 @@ async def handle_admin_analytics_expiring(request: web.Request):
                     sub, user = by_name.get(name, (None, None))
                     used = mu.get("used_traffic") or 0
                     limit_b = mu.get("data_limit") or 0
+                    # Churn radar: how long since this client last connected.
+                    # A sub that expires soon AND hasn't connected for days is
+                    # a likely-churned user — remind them first (or don't).
+                    inactive_days = None
+                    online_at = mu.get("online_at")
+                    if online_at:
+                        try:
+                            dt = datetime.datetime.fromisoformat(str(online_at).replace("Z", "+00:00"))
+                            inactive_days = round(max(0.0, (now - dt.timestamp()) / 86400), 1)
+                        except Exception:
+                            inactive_days = None
                     item = {
                         "username": name,
                         "days_left": round(days_left, 1),
@@ -171,6 +182,8 @@ async def handle_admin_analytics_expiring(request: web.Request):
                         "user_id": user.id if user else None,
                         "chat_id": user.chat_id if user else None,
                         "user_name": (user.first_name or user.username) if user else None,
+                        "inactive_days": inactive_days,
+                        "likely_churned": bool(inactive_days is not None and inactive_days >= 5),
                     }
                     (expiring if days_left >= 0 else expired).append(item)
 
