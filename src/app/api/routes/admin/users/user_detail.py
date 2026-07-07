@@ -16,13 +16,30 @@ async def handle_admin_user_detail(request: web.Request):
             # NB: expiry lives in Marzban, not the DB — the old `s.expire_date`
             # attribute never existed and 500'd this endpoint for any user
             # that owned a subscription.
-            subs_data = [{
-                "id": s.id,
-                "username": s.marzban_username,
-                "status": s.status,
-                "plan_name": s.plan_name,
-                "created_at": s.created_at.isoformat() if s.created_at else None,
-            } for s in subs]
+            subs_data = []
+            for s in subs:
+                row = {
+                    "id": s.id,
+                    "username": s.marzban_username,
+                    "status": s.status,
+                    "plan_name": s.plan_name,
+                    "created_at": s.created_at.isoformat() if s.created_at else None,
+                    "is_online": False,
+                    "online_at": None,
+                }
+                # Live "online now" flag (panel online_at within 3 min). Served
+                # from the 90s panel cache — cheap even with several services.
+                try:
+                    info = await marzban_api.get_fast_user_info(s.marzban_username, getattr(s, "sub_token", None))
+                    online_at = (info or {}).get("online_at")
+                    if online_at:
+                        row["online_at"] = online_at
+                        dt = datetime.fromisoformat(str(online_at).replace("Z", "+00:00"))
+                        age = (datetime.now(dt.tzinfo) - dt).total_seconds()
+                        row["is_online"] = 0 <= age <= 180
+                except Exception:
+                    pass
+                subs_data.append(row)
             
             return web.json_response({
                 "ok": True,

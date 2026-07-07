@@ -7,7 +7,7 @@ import aiohttp
 
 from app.core.paths import core_path
 from app.core.redis_config import cache
-from app.core.settings import MARZBAN_BASE_URL, MARZBAN_PASSWORD, MARZBAN_USERNAME
+from app.core.settings import MARZBAN_BASE_URL, MARZBAN_PASSWORD, MARZBAN_USERNAME, PASARGUARD_GROUP_IDS
 from app.utils.logger import log_api_call, log_error
 
 # Panel-load shield. Every read surface (dashboard list/overview, bot menus, the
@@ -18,6 +18,38 @@ from app.utils.logger import log_api_call, log_error
 # to the panel exactly as before.
 USER_INFO_CACHE_TTL = 90       # seconds; live usage % may lag at most this much
 USAGE_CHART_CACHE_TTL = 600    # 7-day usage chart changes slowly
+
+# ---- PasarGuard (2026-07 panel migration) compatibility layer -------------
+# The panel is now PasarGuard, a Marzban fork with a few breaking API changes.
+# Everything below normalizes responses back to the classic Marzban shapes the
+# rest of the codebase (and its tests) were written against:
+#   * expire:      ISO-8601 string  -> epoch int (classic)
+#   * create user: group_ids based  -> replaces per-user inbounds/proxies
+#   * /api/nodes:  {"nodes": [...]} -> bare list
+#   * /api/system: renamed counters -> classic total_user/users_active aliases
+#   * usage:       {"stats": {...}} -> classic [{node_name, used_traffic}] list
+#   * 201/204 now legitimate success codes on create/delete
+
+
+def _expire_to_epoch(value):
+    """PasarGuard returns expire as ISO-8601 ('2026-07-08T13:22:26Z'); the whole
+    codebase does epoch-seconds math on it. None/0 (never expires) pass through."""
+    if value is None or isinstance(value, (int, float)):
+        return value
+    try:
+        s = str(value).strip()
+        if s.isdigit():
+            return int(s)
+        return int(datetime.fromisoformat(s.replace("Z", "+00:00")).timestamp())
+    except Exception:
+        return None
+
+
+def _norm_user_payload(data):
+    """Normalize a PasarGuard user/sub-info dict to classic Marzban keys in place."""
+    if isinstance(data, dict) and "expire" in data:
+        data["expire"] = _expire_to_epoch(data.get("expire"))
+    return data
 
 
 def _info_key(username: str) -> str:
@@ -135,8 +167,6 @@ class MarzbanAPI:
         start_time = time.time()
         await self.invalidate_user_info(username)
         try:
-            inbounds_config = await self._inbounds_for_new_user()
-
             session = await self._get_session()
             url = f"{self.base_url}/api/user"
             headers = await self._get_headers()
@@ -146,14 +176,14 @@ class MarzbanAPI:
             # Convert days to timestamp
             expire_timestamp = int((datetime.now() + timedelta(days=expire_days)).timestamp()) if expire_days > 0 else 0
 
+            # PasarGuard: inbounds come from group membership. The classic
+            # inbounds/proxies payload is still ACCEPTED but creates a user in
+            # no group => empty subscription (zero configs) — a silent dud.
             user_data = {
                 "data_limit": data_limit_bytes,
                 "expire": expire_timestamp,
-                "inbounds": inbounds_config,
+                "group_ids": list(PASARGUARD_GROUP_IDS),
                 "note": "",
-                "proxies": {
-                    "vless": {}
-                },
                 "status": "active",
                 "username": username
             }
@@ -162,8 +192,8 @@ class MarzbanAPI:
                 async with session.post(url, headers=headers, json=user_data) as response:
                     duration = time.time() - start_time
                     
-                    if response.status == 200:
-                        result = await response.json()
+                    if response.status in (200, 201):
+                        result = _norm_user_payload(await response.json())
                         log_api_call("marzban", "add_user", True, duration, username=username)
                         return result
                     else:
@@ -185,8 +215,8 @@ class MarzbanAPI:
                             headers = await self._get_headers()
                             async with session.post(url, headers=headers, json=user_data) as retry_response:
                                 retry_duration = time.time() - start_time
-                                if retry_response.status == 200:
-                                    result = await retry_response.json()
+                                if retry_response.status in (200, 201):
+                                    result = _norm_user_payload(await retry_response.json())
                                     log_api_call("marzban", "add_user", True, retry_duration, username=username, retry=True)
                                     return result
                         
@@ -204,8 +234,8 @@ class MarzbanAPI:
                     headers = await self._get_headers()
                     async with session.post(url, headers=headers, json=user_data) as response:
                         duration = time.time() - start_time
-                        if response.status == 200:
-                            result = await response.json()
+                        if response.status in (200, 201):
+                            result = _norm_user_payload(await response.json())
                             log_api_call("marzban", "add_user", True, duration, username=username, recovered=True)
                             return result
                         # If it still fails, fall through to generic error handling below
@@ -228,13 +258,13 @@ class MarzbanAPI:
             headers = await self._get_headers()
             async with session.get(url, headers=headers) as response:
                 if response.status == 200:
-                    return await response.json()
+                    return _norm_user_payload(await response.json())
                 if response.status == 401:
                     await self._login()
                     headers = await self._get_headers()
                     async with session.get(url, headers=headers) as retry_response:
                         if retry_response.status == 200:
-                            return await retry_response.json()
+                            return _norm_user_payload(await retry_response.json())
                 return None
         except (aiohttp.ClientConnectionError, RuntimeError) as e:
             if "connector is closed" in str(e).lower() or "session is closed" in str(e).lower():
@@ -244,7 +274,7 @@ class MarzbanAPI:
                     headers = await self._get_headers()
                     async with session.get(url, headers=headers) as response:
                         if response.status == 200:
-                            return await response.json()
+                            return _norm_user_payload(await response.json())
                         return None
                 except Exception:
                     return None
@@ -262,15 +292,16 @@ class MarzbanAPI:
         url = f"{self.base_url}/api/user/{username}"
         headers = await self._get_headers()
         
+        # PasarGuard answers 204 No Content; classic Marzban answered 200.
         async with session.delete(url, headers=headers) as response:
-            if response.status == 200:
+            if response.status in (200, 204):
                 return True
             else:
                 if response.status == 401:
                     await self._login()
                     headers = await self._get_headers()
                     async with session.delete(url, headers=headers) as retry_response:
-                        if retry_response.status == 200:
+                        if retry_response.status in (200, 204):
                             return True
                 return False
 
@@ -283,7 +314,7 @@ class MarzbanAPI:
             session = await self._get_session()
             async with session.get(url) as response:
                 if response.status == 200:
-                    return await response.json()
+                    return _norm_user_payload(await response.json())
                 return None
         except asyncio.CancelledError:
             # Scheduler/job shutdown or timeout cancellation – treat as transient and return None
@@ -295,7 +326,7 @@ class MarzbanAPI:
                     session = await self._get_session()
                     async with session.get(url) as response:
                         if response.status == 200:
-                            return await response.json()
+                            return _norm_user_payload(await response.json())
                         return None
                 except Exception:
                     return None
@@ -303,6 +334,21 @@ class MarzbanAPI:
         except Exception as e:
             log_error(e, {"operation": "marzban_get_subscription_info", "url": url})
             return None
+
+    async def get_subscription_links(self, token: str) -> list:
+        """PasarGuard: per-config links moved off the user object to
+        /sub/{token}/links (newline-separated). Classic Marzban embedded them
+        as user_info['links']."""
+        url = f"{self.base_url}/sub/{token}/links"
+        try:
+            session = await self._get_session()
+            async with session.get(url) as response:
+                if response.status != 200:
+                    return []
+                text = await response.text()
+                return [ln.strip() for ln in text.splitlines() if ln.strip()]
+        except Exception:
+            return []
 
     async def get_subscription_info_from_url(self, sub_url: str):
         """Extract token from a full subscription URL and fetch /sub/{token}/info."""
@@ -345,16 +391,20 @@ class MarzbanAPI:
             try:
                 data = await self.get_subscription_info(sub_token)
                 if data:
-                    # Normalize to admin API-like keys
+                    # Normalize to admin API-like keys. PasarGuard's sub-info
+                    # carries neither links nor subscription_url — links come
+                    # from /sub/{token}/links, the url we can rebuild locally.
                     from app.utils.logger import bot_logger
                     bot_logger.debug("[USER_INFO] source=share_link", username=username)
+                    links = data.get('links') or await self.get_subscription_links(sub_token)
                     result = {
                         'used_traffic': data.get('used_traffic'),
                         'data_limit': data.get('data_limit'),
                         'expire': data.get('expire'),
                         'status': data.get('status'),
-                        'links': data.get('links'),
-                        'subscription_url': data.get('subscription_url'),
+                        'links': links,
+                        'subscription_url': data.get('subscription_url') or f"/sub/{sub_token}",
+                        'online_at': data.get('online_at'),
                     }
             except asyncio.CancelledError:
                 return None
@@ -363,6 +413,18 @@ class MarzbanAPI:
             from app.utils.logger import bot_logger
             bot_logger.debug("[USER_INFO] source=admin", username=username)
             result = await self.get_user_info(username)
+            # Admin user object also lost embedded links on PasarGuard.
+            if isinstance(result, dict) and not result.get('links'):
+                tok = None
+                try:
+                    sub_url = result.get('subscription_url') or ''
+                    parts = [p for p in sub_url.split('/') if p]
+                    if 'sub' in parts:
+                        tok = parts[parts.index('sub') + 1]
+                except Exception:
+                    tok = None
+                if tok:
+                    result['links'] = await self.get_subscription_links(tok)
 
         if isinstance(result, dict) and result:
             try:
@@ -371,8 +433,48 @@ class MarzbanAPI:
                 pass
         return result
 
+    async def _node_name_map(self) -> dict:
+        """id -> name for PasarGuard usage stats (keyed by node id there)."""
+        try:
+            cached = await cache.get("mz:nodenames")
+            if isinstance(cached, dict) and cached:
+                return cached
+        except Exception:
+            pass
+        out: dict = {}
+        try:
+            for n in await self.get_nodes():
+                if isinstance(n, dict) and n.get("id") is not None:
+                    out[str(n["id"])] = str(n.get("name") or f"node-{n['id']}")
+        except Exception:
+            return out
+        try:
+            await cache.set("mz:nodenames", out, ttl=USAGE_CHART_CACHE_TTL)
+        except Exception:
+            pass
+        return out
+
+    def _flatten_pg_usage(self, data: dict, node_names: dict) -> list:
+        """PasarGuard usage: {"stats": {node_id: [{total_traffic, period_start}...]}}
+        → classic [{node_id, node_name, used_traffic}] (window totals per node)."""
+        usages = []
+        for node_id, points in (data.get("stats") or {}).items():
+            total = 0
+            for p in points or []:
+                try:
+                    total += int(p.get("total_traffic") or 0)
+                except Exception:
+                    continue
+            name = node_names.get(str(node_id)) or ("Master" if str(node_id) == "-1" else f"node-{node_id}")
+            usages.append({"node_id": node_id, "node_name": name, "used_traffic": total})
+        return usages
+
     async def get_user_usage(self, username: str, days: int = 7):
-        """Return usage stats for last `days` days list of dicts with date & used_traffic."""
+        """Return usage stats for the last `days` days as a list of dicts with
+        node_name & used_traffic (classic Marzban `usages` shape).
+
+        NOTE: this class used to define get_user_usage TWICE — the later
+        uncached definition silently shadowed this one. Merged here."""
         try:
             cached = await cache.get(_usage_key(username, days))
             if isinstance(cached, list):
@@ -392,7 +494,10 @@ class MarzbanAPI:
         async with session.get(url, headers=headers, params=params) as resp:
             if resp.status == 200:
                 data = await resp.json()
-                usages = data.get("usages", [])
+                if isinstance(data, dict) and "stats" in data:  # PasarGuard
+                    usages = self._flatten_pg_usage(data, await self._node_name_map())
+                else:  # classic Marzban
+                    usages = data.get("usages", [])
                 try:
                     await cache.set(_usage_key(username, days), usages, ttl=USAGE_CHART_CACHE_TTL)
                 except Exception:
@@ -498,29 +603,55 @@ class MarzbanAPI:
                     return retry_resp.status in (200, 204)
             return False
 
+    async def get_nodes_realtime_stats(self) -> dict:
+        """PasarGuard live per-node stats keyed by node id (as str):
+        cpu_usage, cpu_cores, mem_used/total, incoming/outgoing_bandwidth_speed,
+        uptime. Only connected nodes appear. Empty dict on any failure."""
+        session = await self._get_session()
+        url = f"{self.base_url}/api/nodes/realtime_stats"
+        headers = await self._get_headers()
+        try:
+            async with session.get(url, headers=headers) as resp:
+                if resp.status == 200:
+                    data = await resp.json()
+                    return data if isinstance(data, dict) else {}
+                return {}
+        except Exception:
+            return {}
+
     async def get_nodes(self):
-        """Get all nodes/servers from Marzban"""
+        """Get all nodes/servers from the panel as a bare list.
+        PasarGuard wraps them: {"nodes": [...], "total": N}."""
         session = await self._get_session()
         url = f"{self.base_url}/api/nodes"
         headers = await self._get_headers()
         try:
             async with session.get(url, headers=headers) as resp:
                 if resp.status == 200:
-                    return await resp.json()
+                    data = await resp.json()
+                    if isinstance(data, dict):
+                        return data.get("nodes", []) or []
+                    return data if isinstance(data, list) else []
                 return []
         except Exception as e:
             print(f"Error fetching nodes: {e}")
             return []
     
     async def get_system_stats(self):
-        """Get system stats from Marzban"""
+        """Get system stats. PasarGuard renamed the user counters — alias the
+        classic keys the health/ops surfaces read (total_user, users_active)."""
         session = await self._get_session()
         url = f"{self.base_url}/api/system"
         headers = await self._get_headers()
         try:
             async with session.get(url, headers=headers) as resp:
                 if resp.status == 200:
-                    return await resp.json()
+                    stats = await resp.json()
+                    if isinstance(stats, dict) and "total_user" not in stats and "active_users" in stats:
+                        parts = ("active_users", "disabled_users", "expired_users", "limited_users", "on_hold_users")
+                        stats["total_user"] = sum(int(stats.get(k) or 0) for k in parts)
+                        stats["users_active"] = stats.get("active_users")
+                    return stats
                 return None
         except Exception as e:
             print(f"Error fetching system stats: {e}")
@@ -542,8 +673,10 @@ class MarzbanAPI:
         try:
             async with session.get(url, headers=headers, params=params) as resp:
                 if resp.status == 200:
-                    data = await resp.json()
-                    return data  # Returns {"users": [...], "total": N}
+                    data = await resp.json()  # {"users": [...], "total": N}
+                    for u in (data.get("users") or []):
+                        _norm_user_payload(u)
+                    return data
                 return {"users": [], "total": 0}
         except Exception as e:
             print(f"Error fetching users: {e}")
@@ -580,38 +713,6 @@ class MarzbanAPI:
         except Exception as e:
             print(f"Error updating user {username}: {e}")
             return False
-
-    async def delete_user(self, username: str) -> bool:
-        """Delete a user from Marzban"""
-        session = await self._get_session()
-        url = f"{self.base_url}/api/user/{username}"
-        headers = await self._get_headers()
-        
-        try:
-            async with session.delete(url, headers=headers) as resp:
-                if resp.status == 200:
-                    return True
-                print(f"Error deleting user {username}: status {resp.status}")
-                return False
-        except Exception as e:
-            print(f"Error deleting user {username}: {e}")
-            return False
-
-    async def get_user_usage(self, username: str) -> list:
-        """Get usage stats for a user from Marzban"""
-        session = await self._get_session()
-        url = f"{self.base_url}/api/user/{username}/usage"
-        headers = await self._get_headers()
-        
-        try:
-            async with session.get(url, headers=headers) as resp:
-                if resp.status == 200:
-                    data = await resp.json()
-                    return data.get('usages', [])
-                return []
-        except Exception as e:
-            print(f"Error fetching usage for {username}: {e}")
-            return []
 
     async def close(self):
         # Ensure we fully reset state so next call can recreate cleanly

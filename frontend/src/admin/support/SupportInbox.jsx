@@ -574,7 +574,11 @@ export function SupportInbox() {
                 {(ctxUser.subscriptions || []).length === 0 && <div className="sup-empty">No services</div>}
                 {(ctxUser.subscriptions || []).map((s) => (
                   <div className="sup-ctx-sub-row" key={s.id}>
-                    <span className="sup-ctx-svc">{s.username || `#${s.id}`}</span>
+                    <span className="sup-ctx-svc">
+                      {s.username || `#${s.id}`}
+                      {/* live from the panel: user connected within the last 3 min */}
+                      {s.is_online && <span className="sup-online-dot" title="Online now" />}
+                    </span>
                     <span className="sup-ctx-plan">{s.plan_name || ''}</span>
                     <span className="sup-row-status" style={{ background: s.status === 'active' ? 'var(--success)' : s.status === 'pending' ? 'var(--warning)' : 'var(--muted)' }} />
                   </div>

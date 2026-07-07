@@ -159,7 +159,8 @@ async def process_approved_subscription(sub_id: int, session: AsyncSession, bot:
             from app.handlers.user.rewards.redemption import _patch_marzban_user
 
             user_info = await crud.marzban_api.get_user_info(subscription.marzban_username)
-            current_expire_ts = (user_info or {}).get("expire", 0)
+            # `or 0`: PasarGuard returns expire=null for never-expires users
+            current_expire_ts = (user_info or {}).get("expire", 0) or 0
             new_expire_ts = current_expire_ts + (days_to_add * 24 * 60 * 60)
             patch_success = await _patch_marzban_user(subscription.marzban_username, {"expire": new_expire_ts})
             if patch_success:

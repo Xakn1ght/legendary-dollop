@@ -5092,6 +5092,22 @@ body.admin-panel .sup-ctx-sub-row {
   background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.06);
 }
 body.admin-panel .sup-ctx-svc { font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* live "online now" pulse next to a service name (panel online_at ≤3 min) */
+body.admin-panel .sup-online-dot {
+  display: inline-block; width: 7px; height: 7px; border-radius: 50%;
+  margin-inline-start: 6px; vertical-align: 1px;
+  background: var(--success);
+  box-shadow: 0 0 0 0 rgba(52, 211, 153, 0.55);
+  animation: supOnlinePulse 2.2s ease-out infinite;
+}
+@keyframes supOnlinePulse {
+  0% { box-shadow: 0 0 0 0 rgba(52, 211, 153, 0.55); }
+  70% { box-shadow: 0 0 0 6px rgba(52, 211, 153, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(52, 211, 153, 0); }
+}
+@media (prefers-reduced-motion: reduce) {
+  body.admin-panel .sup-online-dot { animation: none; }
+}
 body.admin-panel .sup-ctx-plan { color: var(--text-muted); margin-left: auto; white-space: nowrap; }
 body.admin-panel .sup-ctx-toggle { display: none; }
 @media (max-width: 1180px) {

@@ -6,7 +6,22 @@ import os
 # IMPORTANT: Set these in your .env file for security.
 MARZBAN_USERNAME = os.environ.get("MARZBAN_USERNAME", "mykp")
 MARZBAN_PASSWORD = os.environ.get("MARZBAN_PASSWORD", "")
-MARZBAN_BASE_URL = os.environ.get("MARZBAN_BASE_URL", "https://home.afffb.com:8888")
+MARZBAN_BASE_URL = os.environ.get("MARZBAN_BASE_URL", "https://home.afffb.com:9443")
+
+# PasarGuard groups: users get their inbounds via group membership (the old
+# per-user inbounds dict is gone). New users are created in these groups —
+# must match where the migrated users live (group 1 as of the 2026-07 move).
+PASARGUARD_GROUP_IDS = [
+    int(g) for g in os.environ.get("PASARGUARD_GROUP_IDS", "1").split(",") if g.strip().isdigit()
+] or [1]
+
+# Shared secret the PasarGuard panel sends with webhook events (x-webhook-secret
+# header). Empty → the webhook receiver rejects everything (fail closed).
+PASARGUARD_WEBHOOK_SECRET = os.environ.get("PASARGUARD_WEBHOOK_SECRET", "")
+
+# Shared secret for the PasarGuard → app webhook receiver
+# (POST /api/webhook/pasarguard). Empty = receiver disabled (403s everything).
+PASARGUARD_WEBHOOK_SECRET = os.environ.get("PASARGUARD_WEBHOOK_SECRET", "").strip()
 
 # Subscription link details
 SUBLINK = os.environ.get("SUBLINK", "astrobyte.org/sub")

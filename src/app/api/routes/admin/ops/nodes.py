@@ -11,10 +11,13 @@ async def handle_admin_nodes(request: web.Request):
         nodes = await marzban_api.get_nodes()
         if not isinstance(nodes, list):
             nodes = []
+        # Live per-node cpu/mem/bandwidth (PasarGuard; keyed by node id as str).
+        realtime = await marzban_api.get_nodes_realtime_stats()
 
         out = []
         for n in nodes:
             status = str(n.get("status") or "unknown").lower()
+            rt = realtime.get(str(n.get("id"))) or {}
             out.append({
                 "id": n.get("id"),
                 "name": n.get("name"),
@@ -25,6 +28,12 @@ async def handle_admin_nodes(request: web.Request):
                 "xray_version": n.get("xray_version"),
                 "usage_coefficient": n.get("usage_coefficient"),
                 "message": n.get("message"),
+                "cpu_usage": rt.get("cpu_usage"),
+                "mem_used": rt.get("mem_used"),
+                "mem_total": rt.get("mem_total"),
+                "down_speed": rt.get("incoming_bandwidth_speed"),
+                "up_speed": rt.get("outgoing_bandwidth_speed"),
+                "uptime": rt.get("uptime"),
             })
 
         system = None
