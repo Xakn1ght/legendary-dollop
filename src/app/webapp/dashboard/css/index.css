@@ -2505,5 +2505,10 @@
   animation: orbitSpin 0.8s linear infinite;
 }
 @keyframes orbitSpin { to { transform: rotate(360deg); } }
-.power-btn.orbit-enabled { cursor: pointer; }
+.power-btn.orbit-enabled { cursor: pointer; -webkit-tap-highlight-color: transparent; touch-action: manipulation; }
 .power-btn.orbit-enabled:active { transform: scale(0.96) !important; }
+/* Touch: no hover state may linger after a tap (sticky-hover eats the next tap) */
+@media (hover: none), (pointer: coarse) {
+  .power-btn:hover { transform: none; }
+  .power-btn:focus { outline: none; }
+}

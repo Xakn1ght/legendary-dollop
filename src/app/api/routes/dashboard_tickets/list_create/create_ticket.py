@@ -46,7 +46,9 @@ async def handle_dashboard_tickets_create(request: web.Request):
                 user_id=user.id,
                 category=category,
                 status="pending",
-                priority="normal",
+                # VIP customers jump the queue — the admin inbox pins and
+                # badges high-priority tickets.
+                priority="high" if bool(getattr(user, "is_vip", False)) else "normal",
                 subscription_id=subscription_id,
                 user_ticket_number=next_ticket_number,
                 created_at=datetime.utcnow(),

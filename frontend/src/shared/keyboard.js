@@ -147,12 +147,12 @@ export function initKeyboardWatcher() {
   } catch (_) { /* ignore */ }
 
   // Action layer: act on focus immediately — no detection required.
-  // Samsung keyboards with number row + suggestions measure ~49% of the
-  // webview (42-45% left the composer clipped), so Android estimates half.
+  // Samsung keyboards with number row + suggestions measure ~47% of the
+  // webview; 50% left a visible gap between composer and keyboard.
   document.addEventListener('focusin', (e) => {
     if (!isEditable(e.target) || !isTouchLike()) return;
-    const frac = isAndroidLike() ? 0.5 : 0.45;
-    const cap = isAndroidLike() ? 480 : 420;
+    const frac = isAndroidLike() ? 0.47 : 0.45;
+    const cap = isAndroidLike() ? 440 : 420;
     estKb = Math.round(Math.min(cap, (window.innerHeight || 800) * frac));
     schedule();
     startPinning(e.target);
@@ -163,6 +163,24 @@ export function initKeyboardWatcher() {
     pinTimers = [];
     setTimeout(schedule, 60);
   });
+
+  // Android gives NO signal when the keyboard is dismissed with the BACK
+  // button — focus stays in the field, so the estimated lift got stuck and
+  // left a dead strip where the keyboard was. Recovery: tapping anything
+  // that isn't the field or another control blurs the field, dropping the
+  // lift (and closing the keyboard if it was still up). Buttons/links are
+  // exempt so tapping Send doesn't collapse the composer mid-action.
+  document.addEventListener('touchstart', (ev) => {
+    const el = document.activeElement;
+    if (!isEditable(el)) return;
+    if (!document.documentElement.classList.contains('kb-open')) return;
+    const t = ev.target;
+    if (t === el) return;
+    try {
+      if (t && t.closest && t.closest('input, textarea, select, [contenteditable="true"], button, a, label')) return;
+    } catch (_) { /* ignore */ }
+    try { el.blur(); } catch (_) { /* ignore */ }
+  }, { capture: true, passive: true });
 
   // interactive-widget=resizes-content path: the window itself shrinks when
   // the keyboard opens — keep the focused field pinned in the smaller view.

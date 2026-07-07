@@ -28,7 +28,10 @@ function loadCanned() {
 }
 
 function sortTickets(list) {
-  return [...list].sort((a, b) => (parseTs(b.updated_at || b.created_at)?.getTime() || 0) - (parseTs(a.updated_at || a.created_at)?.getTime() || 0));
+  // VIP (priority=high) OPEN tickets pin to the top; within each band, newest first.
+  const rank = (t) => (t.priority === 'high' && t.status !== 'closed' && t.status !== 'archived' ? 0 : 1);
+  return [...list].sort((a, b) => (rank(a) - rank(b))
+    || (parseTs(b.updated_at || b.created_at)?.getTime() || 0) - (parseTs(a.updated_at || a.created_at)?.getTime() || 0));
 }
 
 const tShort = (v) => {
@@ -382,7 +385,10 @@ export function SupportInbox() {
               <div className="sup-row-avatar">{(t.user_name || 'U').charAt(0).toUpperCase()}</div>
               <div className="sup-row-main">
                 <div className="sup-row-top">
-                  <span className="sup-row-name">{t.user_name || 'User'}</span>
+                  <span className="sup-row-name">
+                    {t.user_name || 'User'}
+                    {t.priority === 'high' && <span className="sup-vip-chip" title="VIP customer"><Icons.crown width={11} height={11} /> VIP</span>}
+                  </span>
                   <span className="sup-row-time">{timeAgo(t.updated_at || t.created_at)}</span>
                 </div>
                 <div className="sup-row-bottom">
@@ -411,7 +417,11 @@ export function SupportInbox() {
               </button>
               <div className="sup-row-avatar sup-chat-avatar">{(selected.user_name || 'U').charAt(0).toUpperCase()}</div>
               <div className="sup-chat-id">
-                <div className="sup-chat-title">{selected.user_name || 'User'} <span className="sup-chat-num">#{selected.user_ticket_number || selected.id}</span></div>
+                <div className="sup-chat-title">
+                  {selected.user_name || 'User'}
+                  {selected.priority === 'high' && <span className="sup-vip-chip" title="VIP customer"><Icons.crown width={11} height={11} /> VIP</span>}
+                  {' '}<span className="sup-chat-num">#{selected.user_ticket_number || selected.id}</span>
+                </div>
                 <div className="sup-chat-meta">
                   <span className="sup-chat-status" style={{ color: STATUS[selected.status] }}>{(selected.status || 'open').toUpperCase()}</span>
                   {selected.category && <span> · {selected.category}</span>}

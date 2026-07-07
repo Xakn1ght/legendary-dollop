@@ -558,9 +558,10 @@
 
     // If element doesn't exist, skip this step
     if (step.target && !targetEl) {
-      if (index < steps.length - 1) { showStep(index + 1); return; }
-      if (index > 0) { showStep(index - 1); return; }
-      stop(); return;
+      // Target not on screen (page still rendering, or tour replayed from a
+      // different tab): show the step CENTERED instead of skipping ahead —
+      // skipping chained past several steps and made one tap jump 1 → 5.
+      targetEl = null;
     }
 
     // Hide tip during transition

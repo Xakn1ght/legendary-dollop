@@ -9,7 +9,7 @@ import { AuthHelpOverlay, NotRegisteredOverlay } from './components/AuthOverlays
 import { BottomNav } from './components/BottomNav.jsx';
 import { Header } from './components/Header.jsx';
 import { NotificationsPanel } from './components/NotificationsPanel.jsx';
-import { AddSubSheet, ConfirmRemoveSheet, ExportModal } from './components/ShellSheets.jsx';
+import { AddSubSheet, AppLaunchSheet, ConfirmRemoveSheet, ExportModal } from './components/ShellSheets.jsx';
 import { fmtNum } from './format.js';
 import { HomePage } from './home/HomePage.jsx';
 import { ShellContext } from './ShellContext.js';
@@ -539,6 +539,16 @@ export function ShellApp() {
     setExportState({ link, showQRFirst });
   }, []);
 
+  // "Connect" sheet from the big ring button: Orbit + per-platform VPN apps.
+  const [appLauncher, setAppLauncher] = useState(null);
+  const openAppLauncher = useCallback(() => {
+    const tt = makeT(langRef.current);
+    const ov = overviewCacheRef.current.get(String(currentSubIdRef.current || '')) || null;
+    const link = ov && ov.subscription_url ? ov.subscription_url : '';
+    if (!link) { showToast(tt('noSubOpen'), 'error'); return; }
+    setAppLauncher({ link });
+  }, []);
+
   // ── Update detection ──────────────────────────────────────────────
   // Deploys change the hashed bundle name inside the (no-store) shell HTML.
   // Compare it against the script this session is running; offer a reload
@@ -855,6 +865,7 @@ export function ShellApp() {
   useBackClose(addSheetOpen, () => setAddSheetOpen(false));
   useBackClose(!!removeTarget, () => setRemoveTarget(null));
   useBackClose(!!exportState, () => setExportState(null));
+  useBackClose(!!appLauncher, () => setAppLauncher(null));
 
   const ctx = useMemo(() => ({
     t, lang, setLanguage, page, navigate,
@@ -864,10 +875,11 @@ export function ShellApp() {
     localizeCountry: (label, code) => localizeCountryDisplay(label, code, lang),
     openAddSheet: () => setAddSheetOpen(true),
     openExportModal,
+    openAppLauncher,
     openRemoveConfirm: (label, id) => setRemoveTarget({ label, id }),
     openPurchasePage, openChargePage, openSupportPage, openTutorial,
     setAccent,
-  }), [t, lang, setLanguage, page, navigate, currentSubId, cachedSubs, subsLoaded, selectSub, setDefaultSub, loadSubscriptions, overview, overviewUpdatedAt, fetchOverview, fetchOverviewById, dataLoading, geo, openExportModal, openPurchasePage, openChargePage, openSupportPage, openTutorial, setAccent]);
+  }), [t, lang, setLanguage, page, navigate, currentSubId, cachedSubs, subsLoaded, selectSub, setDefaultSub, loadSubscriptions, overview, overviewUpdatedAt, fetchOverview, fetchOverviewById, dataLoading, geo, openExportModal, openAppLauncher, openPurchasePage, openChargePage, openSupportPage, openTutorial, setAccent]);
 
   // Terminal auth failure: render ONLY the error screen (no header, content,
   // nav, sheets — nothing else). Toasts stay so the Copy button gives feedback.
@@ -943,6 +955,13 @@ export function ShellApp() {
         link={exportState?.link}
         showQRFirst={exportState?.showQRFirst}
         onClose={() => setExportState(null)}
+      />
+      <AppLaunchSheet
+        t={t}
+        open={!!appLauncher}
+        link={appLauncher?.link}
+        currentSubId={currentSubId}
+        onClose={() => setAppLauncher(null)}
       />
       <NotificationsPanel
         t={t}

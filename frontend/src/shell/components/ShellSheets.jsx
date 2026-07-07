@@ -1,9 +1,101 @@
 import React, { useEffect, useRef, useState } from 'react';
 
 import { getWebApp } from '../../shared/telegram.js';
+import { api } from '../api.js';
 import { showToast } from '../toast.js';
 
 import { Sheet } from './Sheet.jsx';
+
+// ---- one-tap app import -----------------------------------------------
+// Launching a custom scheme via window.location navigates the Telegram
+// webview to net::ERR_UNKNOWN_URL_SCHEME and KILLS the SPA (the mini app
+// stays dead until Telegram is force-closed). A throwaway iframe fires the
+// scheme without ever navigating the top frame: app installed → OS opens
+// it; not installed → silent no-op and the dashboard stays alive.
+function launchScheme(url) {
+  try {
+    const f = document.createElement('iframe');
+    f.style.display = 'none';
+    f.src = url;
+    document.body.appendChild(f);
+    setTimeout(() => { try { f.remove(); } catch (_) { /* ignore */ } }, 2500);
+  } catch (_) { /* ignore */ }
+}
+
+const PLATFORM = /android/i.test(navigator.userAgent || '') ? 'android'
+  : /iphone|ipad|ipod/i.test(navigator.userAgent || '') ? 'ios' : 'any';
+
+// Per-client formats come from PasarGuard: {link}/{client_type}.
+// Only apps that exist on the viewer's platform are shown (v2rayNG has no
+// iOS build, Streisand/V2Box have no Android build).
+const ALL_APPS = [
+  { key: 'v2rayng', label: 'v2rayNG', os: ['android'], url: (l) => 'v2rayng://install-config?url=' + encodeURIComponent(l) },
+  { key: 'karing', label: 'Karing', os: ['android', 'ios', 'any'], url: (l) => 'sing-box://import-remote-profile?url=' + encodeURIComponent(l + '/sing_box') + '#AstroByte' },
+  { key: 'hiddify', label: 'Hiddify', os: ['android', 'ios', 'any'], url: (l) => 'hiddify://import/' + l },
+  { key: 'streisand', label: 'Streisand', os: ['ios'], url: (l) => 'streisand://import/' + l },
+  { key: 'v2box', label: 'V2Box', os: ['ios'], url: (l) => 'v2box://install-sub?url=' + encodeURIComponent(l) + '&name=AstroByte' },
+  { key: 'clashmeta', label: 'Clash Meta', os: ['android'], url: (l) => 'clash://install-config?url=' + encodeURIComponent(l + '/clash_meta') + '&name=AstroByte' },
+];
+const appsForPlatform = () => ALL_APPS.filter((a) => PLATFORM === 'any' || a.os.includes(PLATFORM) || a.os.includes('any'));
+
+// Choose-your-app sheet, opened from the big ring button on Home. Orbit
+// (the house app) sits on top as the hero choice; its add-link is an https
+// URL minted server-side, so it opens through Telegram's own openLink.
+export function AppLaunchSheet({ t, open, link, currentSubId, onClose }) {
+  const [orbitBusy, setOrbitBusy] = useState(false);
+
+  const openOrbit = async () => {
+    if (orbitBusy) return;
+    setOrbitBusy(true);
+    try {
+      const body = currentSubId ? { subscription_id: Number(currentSubId) } : {};
+      const r = await api('/api/dashboard/orbit/add-link', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body),
+      });
+      if (r && r.ok && r.add_url) {
+        const tg = getWebApp();
+        if (tg?.openLink) tg.openLink(r.add_url); else window.open(r.add_url, '_blank');
+      } else {
+        showToast(r?.error === 'no_subscription' ? t('noSubOpen') : t('orbitFailed'), 'error');
+      }
+    } catch (_) { showToast(t('orbitFailed'), 'error'); } finally { setOrbitBusy(false); }
+  };
+
+  const openApp = (app) => {
+    if (!link) { showToast(t('noSubOpen'), 'error'); return; }
+    launchScheme(app.url(link));
+    showToast(t('appLaunchHint'), 'success');
+  };
+
+  return (
+    <Sheet open={open} onClose={onClose} panelId="appLaunchSheet" backdropId="appLaunchBackdrop" labelledBy="appLaunchTitle">
+      <h2 id="appLaunchTitle">{t('appLaunchTitle')}</h2>
+      <p className="sheet-subtitle">{t('appLaunchSub')}</p>
+      <button
+        type="button"
+        className="btn btn-primary"
+        style={{ width: '100%', justifyContent: 'center', marginTop: 12, fontWeight: 800, fontSize: 15, padding: '13px 16px' }}
+        disabled={orbitBusy}
+        onClick={openOrbit}
+      >
+        {orbitBusy ? '…' : 'Orbit ' + t('appOrbitTag')}
+      </button>
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginTop: 10 }}>
+        {appsForPlatform().map((app) => (
+          <button key={app.key} type="button" className="btn" style={{ justifyContent: 'center', fontWeight: 700 }} onClick={() => openApp(app)}>
+            {app.label}
+          </button>
+        ))}
+      </div>
+      <a className="btn" style={{ width: '100%', justifyContent: 'center', marginTop: 8, fontSize: 12.5 }} href="/webapp/dashboard/tutorial.html">
+        {t('appGridHelp')}
+      </a>
+      <div className="sheet-actions" style={{ marginTop: 12, justifyContent: 'center' }}>
+        <button className="btn" onClick={onClose}>{t('close')}</button>
+      </div>
+    </Sheet>
+  );
+}
 
 export function AddSubSheet({ t, open, onClose, onSubmit }) {
   const [value, setValue] = useState('');
@@ -92,33 +184,14 @@ export function ExportModal({ t, open, link, showQRFirst, onClose }) {
     return () => { cancelled = true; };
   }, [qrVisible, link, t]);
 
-  // One-tap import per client. PasarGuard serves format-specific configs at
-  // {link}/{client_type} (verified live: clash_meta/sing_box/links_base64),
-  // so every app gets its native format instead of one generic link.
-  const APPS = [
-    { key: 'v2rayng', label: 'v2rayNG', os: 'android', url: (l) => 'v2rayng://install-config?url=' + encodeURIComponent(l) },
-    { key: 'hiddify', label: 'Hiddify', os: 'any', url: (l) => 'hiddify://import/' + l },
-    { key: 'streisand', label: 'Streisand', os: 'ios', url: (l) => 'streisand://import/' + l },
-    { key: 'v2box', label: 'V2Box', os: 'ios', url: (l) => 'v2box://install-sub?url=' + encodeURIComponent(l) + '&name=AstroByte' },
-    { key: 'clashmeta', label: 'Clash Meta', os: 'android', url: (l) => 'clash://install-config?url=' + encodeURIComponent(l + '/clash_meta') + '&name=AstroByte' },
-    { key: 'karing', label: 'Karing', os: 'any', url: (l) => 'sing-box://import-remote-profile?url=' + encodeURIComponent(l + '/sing_box') + '#AstroByte' },
-  ];
   const [appsVisible, setAppsVisible] = useState(false);
   useEffect(() => { if (!open) setAppsVisible(false); }, [open]);
 
-  const platform = /android/i.test(navigator.userAgent || '') ? 'android'
-    : /iphone|ipad|ipod/i.test(navigator.userAgent || '') ? 'ios' : 'any';
-  // Platform-native apps first, cross-platform after, other-OS apps last.
-  const appsSorted = [...APPS].sort((a, b) => {
-    const rank = (x) => (x.os === platform ? 0 : x.os === 'any' ? 1 : 2);
-    return rank(a) - rank(b);
-  });
-
   const openApp = (app) => {
     if (!link) { showToast(t('noSubOpen'), 'error'); return; }
-    // Custom URI schemes must go through location.href — Telegram's openLink
-    // only accepts http(s) and would reject these.
-    window.location.href = app.url(link);
+    // iframe launch — never navigates the webview (see launchScheme above)
+    launchScheme(app.url(link));
+    showToast(t('appLaunchHint'), 'success');
   };
 
   return (
@@ -143,7 +216,7 @@ export function ExportModal({ t, open, link, showQRFirst, onClose }) {
       )}
       {appsVisible && (
         <div id="exportAppGrid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginTop: 14 }}>
-          {appsSorted.map((app) => (
+          {appsForPlatform().map((app) => (
             <button
               key={app.key}
               className="btn"

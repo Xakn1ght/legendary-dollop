@@ -492,17 +492,14 @@ export function HomePage() {
                 strokeDashoffset={limit > 0 ? circumference * (1 - usedRatio) : circumference}
               />
             </svg>
-            {/* On Android the core doubles as "Add to Orbit" (owner's v2rayNG
-                build): mints a single-use token server-side and opens the add
-                link. Everywhere else it stays a decorative status display. */}
+            {/* The big ring button = "connect me": opens the app chooser
+                (Orbit first, then the per-platform VPN apps) on every OS. */}
             <button
               id="powerBtn"
-              className={`power-btn${cfg.btnActive ? '' : ' inactive'}${IS_ANDROID ? ' orbit-enabled' : ''}`}
-              style={{ background: cfg.btnGradient, boxShadow: cfg.btnShadow, ...(IS_ANDROID ? {} : { pointerEvents: 'none' }) }}
-              tabIndex={IS_ANDROID ? 0 : -1}
-              aria-hidden={IS_ANDROID ? undefined : 'true'}
-              aria-label={IS_ANDROID ? t('addToOrbit') : undefined}
-              onClick={IS_ANDROID ? addToOrbit : undefined}
+              className={`power-btn${cfg.btnActive ? '' : ' inactive'} orbit-enabled`}
+              style={{ background: cfg.btnGradient, boxShadow: cfg.btnShadow }}
+              aria-label={t('appLaunchTitle')}
+              onClick={() => { hapticImpact('light'); shell.openAppLauncher(); }}
             >
               <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" aria-hidden="true" style={{ fill: cfg.iconColor }}>
                 <path d="M18,8.5A2.5,2.5,0,1,1,15.5,6,2.5,2.5,0,0,1,18,8.5Zm-1.341,9.213a11.038,11.038,0,0,1-.828,2.222A7.634,7.634,0,0,1,9,24H8V19.143A3.214,3.214,0,0,0,4.857,16H0V15A7.634,7.634,0,0,1,4.065,8.169a11.038,11.038,0,0,1,2.222-.828C9.96,2.38,14.221.178,20.458,0H20.5A3.489,3.489,0,0,1,24,3.551C23.82,9.877,21.686,14,16.659,17.713ZM21,3.508A.5.5,0,0,0,20.515,3c-5.461.162-8.839,1.966-12.038,6.431a28.441,28.441,0,0,0-2.206,3.737,6.287,6.287,0,0,1,4.561,4.561,28.376,28.376,0,0,0,3.737-2.206C19.042,12.317,20.846,8.949,21,3.508ZM1.631,18.728C.857,19.5.38,21.831.211,22.8L0,24l1.2-.212c.961-.17,3.278-.649,4.052-1.425a2.58,2.58,0,0,0,0-3.635A2.613,2.613,0,0,0,1.631,18.728Z" />

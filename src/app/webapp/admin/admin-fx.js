@@ -240,6 +240,16 @@
     if (finePointer && !reduceMotion) attachTilt();
   }
 
+  // Telegram's back gesture can restore the page from the back/forward cache:
+  // the app resumes with dead websockets and stale React state (symptom:
+  // support inbox rows stop responding until a manual reload). A bfcache
+  // restore is detectable — reload into a fresh session instead.
+  window.addEventListener("pageshow", (e) => {
+    if (e.persisted) {
+      try { window.location.reload(); } catch (_) {}
+    }
+  });
+
   if (document.readyState === "loading") {
     document.addEventListener("DOMContentLoaded", boot, { once: true });
   } else {
