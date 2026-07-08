@@ -56,19 +56,35 @@ const PLATFORM = /android/i.test(navigator.userAgent || '') ? 'android'
 // Only apps that exist on the viewer's platform are shown (v2rayNG has no
 // iOS build, Streisand/V2Box have no Android build).
 //
-// SCHEME RULE (2026-07-08, Pasha: Karing opened Happ, Clash Meta opened
-// Exclave): generic schemes (sing-box://, clash://) are registered by every
-// client built on that core, and Android hands the intent to WHICHEVER app
-// grabbed it. Always use the app's OWN scheme so the right app answers.
+// SCHEME RULE (2026-07-08, round 2 — Pasha: Clash Meta opened Hiddify):
+// generic scheme names (clash://, clashmeta://, sing-box://) are registered
+// by EVERY same-core client, so a plain scheme lets whichever app grabbed it
+// answer — Hiddify squats clashmeta:// (their own devs acknowledge this).
+// The only deterministic Android fix is an intent:// URL pinned to the app's
+// package via `apkg`; the plain `url` stays for iOS + as the fallback.
 const ALL_APPS = [
-  { key: 'v2rayng', label: 'v2rayNG', os: ['android'], url: (l) => 'v2rayng://install-config?url=' + encodeURIComponent(l) },
-  { key: 'karing', label: 'Karing', os: ['android', 'ios', 'any'], url: (l) => 'karing://install-config?url=' + encodeURIComponent(l + '/sing_box') + '&name=AstroByte' },
-  { key: 'hiddify', label: 'Hiddify', os: ['android', 'ios', 'any'], url: (l) => 'hiddify://install-config?url=' + encodeURIComponent(l) },
+  { key: 'v2rayng', label: 'v2rayNG', os: ['android'], apkg: 'com.v2ray.ang', url: (l) => 'v2rayng://install-config?url=' + encodeURIComponent(l) },
+  { key: 'karing', label: 'Karing', os: ['android', 'ios', 'any'], apkg: 'com.nebula.karing', url: (l) => 'karing://install-config?url=' + encodeURIComponent(l + '/sing_box') + '&name=AstroByte' },
+  { key: 'hiddify', label: 'Hiddify', os: ['android', 'ios', 'any'], apkg: 'app.hiddify.com', url: (l) => 'hiddify://install-config?url=' + encodeURIComponent(l) },
   { key: 'streisand', label: 'Streisand', os: ['ios'], url: (l) => 'streisand://import/' + l },
   { key: 'v2box', label: 'V2Box', os: ['ios'], url: (l) => 'v2box://install-sub?url=' + encodeURIComponent(l) + '&name=AstroByte' },
-  { key: 'clashmeta', label: 'Clash Meta', os: ['android'], url: (l) => 'clashmeta://install-config?url=' + encodeURIComponent(l + '/clash_meta') + '&name=AstroByte' },
+  { key: 'clashmeta', label: 'Clash Meta', os: ['android'], apkg: 'com.github.metacubex.clash.meta', url: (l) => 'clashmeta://install-config?url=' + encodeURIComponent(l + '/clash_meta') + '&name=AstroByte' },
 ];
 const appsForPlatform = () => ALL_APPS.filter((a) => PLATFORM === 'any' || a.os.includes(PLATFORM) || a.os.includes('any'));
+
+// Android: wrap the plain scheme in a package-locked intent:// URL so ONLY
+// the intended app answers (no chooser, no scheme-squatter hijack). Android
+// reconstructs "<scheme>://<rest>" from the fragment. If that app isn't
+// installed the intent throws → nothing opens (matches "install it first").
+// iOS/desktop can't parse intent:// — they keep the plain scheme.
+function launchUrlForApp(app, link) {
+  const raw = app.url(link);
+  if (PLATFORM === 'android' && app.apkg) {
+    const m = /^([a-z0-9+.-]+):\/\/(.*)$/i.exec(raw);
+    if (m) return 'intent://' + m[2] + '#Intent;scheme=' + m[1] + ';package=' + app.apkg + ';end';
+  }
+  return raw;
+}
 
 // Choose-your-app sheet, opened from the big ring button on Home. Orbit
 // (the house app) sits on top as the hero choice; its add-link is an https
@@ -95,7 +111,7 @@ export function AppLaunchSheet({ t, open, link, currentSubId, onClose }) {
 
   const openApp = (app) => {
     if (!link) { showToast(t('noSubOpen'), 'error'); return; }
-    launchScheme(app.url(link));
+    launchScheme(launchUrlForApp(app, link));
     // \u2068…\u2069 isolates the Latin app name inside the RTL sentence.
     showToast(t('appLaunchHint').replace('{app}', '\u2068' + app.label + '\u2069'), 'success');
   };
@@ -225,7 +241,7 @@ export function ExportModal({ t, open, link, showQRFirst, onClose }) {
   const openApp = (app) => {
     if (!link) { showToast(t('noSubOpen'), 'error'); return; }
     // window.open launch — never navigates the webview (see launchScheme above)
-    launchScheme(app.url(link));
+    launchScheme(launchUrlForApp(app, link));
     showToast(t('appLaunchHint').replace('{app}', '\u2068' + app.label + '\u2069'), 'success');
   };
 
