@@ -96,7 +96,8 @@ export function AppLaunchSheet({ t, open, link, currentSubId, onClose }) {
   const openApp = (app) => {
     if (!link) { showToast(t('noSubOpen'), 'error'); return; }
     launchScheme(app.url(link));
-    showToast(t('appLaunchHint'), 'success');
+    // \u2068…\u2069 isolates the Latin app name inside the RTL sentence.
+    showToast(t('appLaunchHint').replace('{app}', '\u2068' + app.label + '\u2069'), 'success');
   };
 
   return (
@@ -223,9 +224,9 @@ export function ExportModal({ t, open, link, showQRFirst, onClose }) {
 
   const openApp = (app) => {
     if (!link) { showToast(t('noSubOpen'), 'error'); return; }
-    // iframe launch — never navigates the webview (see launchScheme above)
+    // window.open launch — never navigates the webview (see launchScheme above)
     launchScheme(app.url(link));
-    showToast(t('appLaunchHint'), 'success');
+    showToast(t('appLaunchHint').replace('{app}', '\u2068' + app.label + '\u2069'), 'success');
   };
 
   const copyLink = async () => {
