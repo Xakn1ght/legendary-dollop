@@ -278,7 +278,7 @@ export function TasksPage() {
       const r = await api('/api/dashboard/wallet/cashout', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ amount: earnings.credit_toman }),
+        body: JSON.stringify({ amount: earnings.cash_balance_toman }),
       });
       if (r && r.ok) {
         showToast(tt('withdrawSuccess'), 'success');
@@ -370,11 +370,16 @@ export function TasksPage() {
         body: JSON.stringify(payload),
       });
       if (r && r.ok) {
-        showToast(tt('redeemed'), 'success', 2200);
+        const bucket = r?.applied?.credit_bucket;
+        showToast(tt(bucket === 'cash' ? 'redeemedToCash' : 'redeemed'), 'success', 2600);
         hapticNotify('success');
         setRedeem(null);
         fetchVouchers();
         fetchSeason();
+        fetchEarnings();
+      } else if (r?.error === 'credit_cap_reached') {
+        showToast(tt('creditCapReachedToast'), 'error', 3600);
+        hapticNotify('error');
       } else {
         showToast(String(r?.error || tt('failedToLoad')), 'error', 2600);
       }
@@ -607,9 +612,15 @@ export function TasksPage() {
                 </div>
               </div>
               <div className="rw-earn-stat">
-                <span className="rw-earn-stat-label">{tt('earnedSoFar')}</span>
-                <span className="rw-earn-stat-num">{fmt(earnings.earned_total_toman)} {tt('toman')}</span>
+                <span className="rw-earn-stat-label">{tt('creditEarnedOfCap')}</span>
+                <span className="rw-earn-stat-num">
+                  {fmt(earnings.credit_earned_toman)}
+                  <span className="rw-earn-cap"> / {fmt(earnings.credit_cap_toman)} {tt('toman')}</span>
+                </span>
               </div>
+              {earnings.credit_earned_toman >= earnings.credit_cap_toman && (
+                <div className="rw-earn-hint warn">{tt('creditCapReachedHint')}</div>
+              )}
               <div className="rw-earn-hint">{tt('earningsGoalHint')}</div>
             </>
           )}
@@ -618,15 +629,19 @@ export function TasksPage() {
             <>
               <div className="rw-earn-balance">
                 <div className="rw-earn-balance-label">{tt('withdrawableBalance')}</div>
-                <div className="rw-earn-balance-num">{fmt(earnings.credit_toman)} <span>{tt('toman')}</span></div>
+                <div className="rw-earn-balance-num">{fmt(earnings.cash_balance_toman)} <span>{tt('toman')}</span></div>
+              </div>
+              <div className="rw-earn-stat">
+                <span className="rw-earn-stat-label">{tt('storeCreditLabel')}</span>
+                <span className="rw-earn-stat-num">{fmt(earnings.credit_toman)} {tt('toman')}</span>
               </div>
               <button
                 className={`rw-btn primary rw-earn-withdraw${withdrawBusy ? ' loading' : ''}`}
                 type="button"
-                disabled={withdrawBusy || earnings.credit_toman < earnings.min_cashout_toman}
+                disabled={withdrawBusy || earnings.cash_balance_toman < earnings.min_cashout_toman}
                 onClick={requestWithdraw}
               >
-                {earnings.credit_toman >= earnings.min_cashout_toman
+                {earnings.cash_balance_toman >= earnings.min_cashout_toman
                   ? tt('withdraw')
                   : tt('minCashoutHint').replace('{amount}', fmt(earnings.min_cashout_toman))}
               </button>

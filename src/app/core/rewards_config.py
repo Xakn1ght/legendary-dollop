@@ -52,3 +52,9 @@ CASHOUT_MIN_ACTIVE_REFERRALS = 20
 CASHOUT_MIN_AMOUNT_TOMAN = 200_000   # below this, credit stays spendable in-app
 # Cash-out is 1:1 by decision — credit is referral-only, so no haircut. (Was 5%.)
 PROMOTER_REFERRAL_CUT = {0: 0.10, 20: 0.12, 50: 0.15}  # store-credit % by active-referral tier
+# Two-stage earnings (Pasha, 2026-07-08): BEFORE the 20-active gate the cut
+# pays STORE CREDIT, capped at this lifetime total; crossing the gate flips
+# the account permanently (promoter_unlocked_at) and from then on the cut
+# pays the withdrawable cashback balance instead. Pre-gate credit never
+# converts to cash.
+REFERRAL_STORE_CREDIT_CAP_TOMAN = 1_000_000

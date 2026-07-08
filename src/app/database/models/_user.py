@@ -23,6 +23,10 @@ class User(Base):
     # Saved cash-out destination (digits only, 16 chars) — masked everywhere in
     # the user UI; admins see it in full on the payout request they approve.
     payout_card = Column(String(20), nullable=True)
+    # Two-stage referral earnings: withdrawable cash (post-gate cuts only) and
+    # the permanent unlock timestamp. Store credit stays in `credit`.
+    cashback_balance = Column(Integer, default=0, nullable=False)
+    promoter_unlocked_at = Column(DateTime, nullable=True)
     banned = Column(Boolean, default=False, nullable=False)
     is_admin = Column(Boolean, default=False, nullable=False)
     category = Column(String(32), nullable=False, default="normal")

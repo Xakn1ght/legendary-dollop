@@ -45,11 +45,13 @@ class CashoutRepository:
             return None
 
         amount = int(amount)
-        if user.credit < amount:
+        # Two-stage earnings: withdrawals draw on the cashback balance only —
+        # store credit stays spendable in-app and is never transferable.
+        if int(user.cashback_balance or 0) < amount:
             return None
 
         # Reserve funds by deducting immediately.
-        user.credit -= amount
+        user.cashback_balance = int(user.cashback_balance or 0) - amount
 
         req = CashoutRequest(
             user_id=user_id,
@@ -92,7 +94,8 @@ class CashoutRepository:
 
         user = (await db.execute(select(User).where(User.id == req.user_id))).scalars().first()
         if user:
-            user.credit += int(req.amount or 0)
+            # Refund lands back in the bucket it was reserved from.
+            user.cashback_balance = int(user.cashback_balance or 0) + int(req.amount or 0)
 
         req.status = "denied"
         req.processed_at = datetime.utcnow()

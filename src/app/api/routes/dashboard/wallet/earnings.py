@@ -10,14 +10,15 @@ import re
 import traceback
 
 from aiohttp import web
-from sqlalchemy import desc, func
+from sqlalchemy import desc
 from sqlalchemy.future import select
 
 from app.api.deps import _verify_webapp_auth, set_tma_session_cookie
-from app.core.rewards_config import CASHOUT_MIN_AMOUNT_TOMAN
+from app.core.rewards_config import CASHOUT_MIN_AMOUNT_TOMAN, REFERRAL_STORE_CREDIT_CAP_TOMAN
 from app.database import crud
-from app.database.models import AsyncSessionLocal, CashoutRequest, ReferralReward
+from app.database.models import AsyncSessionLocal, CashoutRequest
 from app.services.flows.cashout import CASHOUT_MIN_ACTIVE_REFERRALS, count_active_referrals
+from app.services.flows.earnings import ensure_promoter_unlock, referral_store_credit_earned
 
 logger = logging.getLogger(__name__)
 
@@ -42,10 +43,11 @@ async def handle_dashboard_earnings(request: web.Request):
             if not user:
                 return web.json_response({"ok": False, "error": "user_not_found"}, status=404)
 
+            # Stamps promoter_unlocked_at the first time the gate is met —
+            # opening the earnings card is enough to flip cash-back mode on.
+            unlocked = await ensure_promoter_unlock(session, user)
             active = await count_active_referrals(session, user.id)
-            earned_total = await session.scalar(
-                select(func.sum(ReferralReward.credit_amount)).where(ReferralReward.referrer_id == user.id)
-            ) or 0
+            credit_earned = await referral_store_credit_earned(session, user.id)
             payouts = (
                 await session.execute(
                     select(CashoutRequest)
@@ -60,9 +62,12 @@ async def handle_dashboard_earnings(request: web.Request):
                     "ok": True,
                     "active_referrals": active,
                     "gate": CASHOUT_MIN_ACTIVE_REFERRALS,
-                    "unlocked": active >= CASHOUT_MIN_ACTIVE_REFERRALS,
-                    "earned_total_toman": int(earned_total),
+                    "unlocked": unlocked,
+                    # Two-stage model: store credit (in-app, capped) vs cash.
+                    "credit_earned_toman": credit_earned,
+                    "credit_cap_toman": REFERRAL_STORE_CREDIT_CAP_TOMAN,
                     "credit_toman": int(getattr(user, "credit", 0) or 0),
+                    "cash_balance_toman": int(getattr(user, "cashback_balance", 0) or 0),
                     "min_cashout_toman": CASHOUT_MIN_AMOUNT_TOMAN,
                     "card_masked": mask_card(getattr(user, "payout_card", None)),
                     "recent_payouts": [

@@ -574,6 +574,8 @@ html[dir="rtl"] .rw-progress-fill { background: linear-gradient(-90deg, var(--br
   line-height: 1.7;
   color: var(--rw-text-soft);
 }
+.rw-earn-hint.warn { color: var(--warning, #f59e0b); }
+.rw-earn-cap { font-size: 11px; font-weight: 700; color: var(--rw-text-dim); }
 .rw-earn-balance { margin-top: 6px; }
 .rw-earn-balance-label { font-size: 12px; font-weight: 700; color: var(--rw-text-dim); }
 .rw-earn-balance-num {

@@ -80,23 +80,39 @@ async def _redeem_days(
 async def _redeem_credit(
     callback: CallbackQuery, session: AsyncSession, bot: Bot, reward: ReferralReward
 ):
+    from app.services.flows.earnings import credit_referral_payout
+    from app.services.flows.errors import FlowError
+
     user = await crud.get_user(session, callback.from_user.id)
     if reward.credit_amount is None:
         await callback.answer("مقدار اعتبار نامعتبر است.", show_alert=True)
         return
-    await crud.add_credit(session, user.id, reward.credit_amount)
-    await crud.spend_reward(session, reward.id)
-    await callback.answer("✅ اعتبار به کیف پول شما افزوده شد!", show_alert=True)
     try:
-        await callback.message.edit_text(
-            f"🎁 بن استفاده شد: {to_persian_digits(f'{reward.credit_amount:,}')} تومان به کیف پول افزوده شد."
-        )
+        # Two-stage earnings: pre-gate → store credit (capped), post-gate →
+        # withdrawable cashback. On a cap bust the voucher stays unspent.
+        bucket = await credit_referral_payout(session, user, reward.credit_amount, source_id=reward.id)
+    except FlowError as e:
+        if e.code == "credit_cap_reached":
+            await callback.answer(
+                "سقف اعتبار فروشگاهی پر شده — به ۲۰ دعوت فعال برسی، دریافتی‌ها نقدی می‌شوند. فعلاً گزینه دیگر بن را انتخاب کن.",
+                show_alert=True,
+            )
+            return
+        await callback.answer("خطا در افزودن اعتبار.", show_alert=True)
+        return
+    await crud.spend_reward(session, reward.id)
+    amount_fa = to_persian_digits(f"{reward.credit_amount:,}")
+    if bucket == "cash":
+        await callback.answer("✅ به موجودی نقدی شما افزوده شد!", show_alert=True)
+        note = f"💵 {amount_fa} تومان به موجودی نقدی (قابل برداشت) شما افزوده شد."
+    else:
+        await callback.answer("✅ اعتبار به کیف پول شما افزوده شد!", show_alert=True)
+        note = f"💰 {amount_fa} تومان به کیف پول شما افزوده شد."
+    try:
+        await callback.message.edit_text(f"🎁 بن استفاده شد: {note}")
     except Exception:
         pass
-    await bot.send_message(
-        user.chat_id,
-        f"💰 {to_persian_digits(f'{reward.credit_amount:,}')} تومان به کیف پول شما افزوده شد.",
-    )
+    await bot.send_message(user.chat_id, note)
 
 
 async def _redeem_star(

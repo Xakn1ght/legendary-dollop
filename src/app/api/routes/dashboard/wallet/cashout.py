@@ -65,6 +65,7 @@ async def handle_dashboard_wallet_cashout(request: web.Request):
                     "request_id": req.id,
                     "amount": req.amount,
                     "destination": req.destination,
+                    "cash_remaining": int(getattr(user, "cashback_balance", 0) or 0),
                     "credit_remaining": int(getattr(user, "credit", 0) or 0),
                 }
             )

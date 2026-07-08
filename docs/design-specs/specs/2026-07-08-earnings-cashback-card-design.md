@@ -13,14 +13,39 @@ Completes the page's funnel: invite → earn → get paid.
 
 - Gate unchanged: **20 active referrals AND ≥200,000 toman** to withdraw.
 - Payouts stay **manual** (admin approves, transfers to card; deny → refund).
-  The existing cash-out flow service is reused untouched.
 - Lives **inside the Tasks/rewards page** as its own card between
   دعوت دوستان and the voucher/redeem card — Approach A (dedicated card).
 - **Card number saved once** on the user, masked in UI, editable any time.
-- **One credit pool** — no separate "earnings wallet"; withdrawable balance
-  IS the existing credit balance.
 - Economy seal intact: money still only enters via purchases; referral cuts
-  remain the only minting path. This feature adds *visibility*, not money.
+  remain the only minting path.
+
+## REVISED 2026-07-08 PM (Pasha): two-stage earnings
+
+The single credit pool is replaced by **two buckets**:
+
+1. **Pre-gate**: the 10–15% referral cut pays **store credit**
+   (`User.credit`, in-app only), capped at
+   `REFERRAL_STORE_CREDIT_CAP_TOMAN = 1,000,000` lifetime (ledger:
+   RewardHistory source='referral_voucher', type='credit'). A cap-busting
+   voucher redemption is rejected whole (`credit_cap_reached`) — the
+   voucher survives so the user can pick traffic/days/stars instead.
+2. **Unlock**: first sighting of ≥20 active referrals stamps
+   `User.promoter_unlocked_at` — **permanent**, survives referees lapsing.
+   Checked/stamped on the earnings GET, on voucher redemption, and in the
+   cash-out flow.
+3. **Post-gate**: cuts pay `User.cashback_balance` (withdrawable cash).
+   Pre-gate store credit **never converts** and stays in-app spendable.
+   Withdrawals (`create_cashout`) reserve from and refund to
+   `cashback_balance` only; min 200k + paid-sub checks unchanged.
+
+Routing lives in `services/flows/earnings.py::credit_referral_payout` —
+every credit-landing surface (dashboard redeem route, bot redeem helper)
+must go through it, never `crud.add_credit` directly.
+
+UI: pre-gate face shows «اعتبار فروشگاهی دریافتی X / ۱٬۰۰۰٬۰۰۰» + warn line
+when capped; post-gate face: cash balance big (starts at 0), store credit
+as a secondary line «فقط داخل اپ», برداشت draws cash only. Bot redeem
+answers say نقدی vs کیف پول depending on the bucket.
 
 ## UX
 

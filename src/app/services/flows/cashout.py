@@ -54,7 +54,8 @@ async def create_cashout(
     amount: int,
     destination: str | None = None,
 ) -> CashoutRequest:
-    """Create a withdrawal request, reserving the amount from the user's credit.
+    """Create a withdrawal request, reserving the amount from the user's
+    CASHBACK balance (two-stage model: store credit is never withdrawable).
 
     Raises FlowError with codes: invalid_amount, invalid_destination,
     requires_vip_promoter (with ``.active_referrals``),
@@ -71,12 +72,17 @@ async def create_cashout(
     if destination and len(destination) < 8:
         raise FlowError("invalid_destination")
 
-    active_referrals = await count_active_referrals(session, user.id)
-    if active_referrals < CASHOUT_MIN_ACTIVE_REFERRALS:
-        err = FlowError("requires_vip_promoter")
-        err.active_referrals = active_referrals
-        err.min_active_referrals = CASHOUT_MIN_ACTIVE_REFERRALS
-        raise err
+    # Permanent unlock: once crossed, the gate never re-closes (a referee's
+    # sub expiring later must not strand already-earned cash).
+    if not getattr(user, "promoter_unlocked_at", None):
+        from app.services.flows.earnings import ensure_promoter_unlock
+
+        if not await ensure_promoter_unlock(session, user):
+            active_referrals = await count_active_referrals(session, user.id)
+            err = FlowError("requires_vip_promoter")
+            err.active_referrals = active_referrals
+            err.min_active_referrals = CASHOUT_MIN_ACTIVE_REFERRALS
+            raise err
 
     req = await crud.create_cashout_request(session, user.id, int(amount), destination)
     if req:
@@ -89,6 +95,6 @@ async def create_cashout(
         has_paid = False
     if not has_paid:
         raise FlowError("requires_active_paid_subscription")
-    if int(getattr(user, "credit", 0) or 0) < int(amount):
+    if int(getattr(user, "cashback_balance", 0) or 0) < int(amount):
         raise FlowError("insufficient_credit")
     raise FlowError("cannot_create")

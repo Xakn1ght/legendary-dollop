@@ -102,9 +102,29 @@ async def handle_dashboard_redeem_referral_reward(request: web.Request):
                     if not ok:
                         return web.json_response({"ok": False, "error": "marzban_update_failed"}, status=502)
 
+            landed_bucket = None
             if chosen_credit > 0:
-                await crud.add_credit(session, user.id, chosen_credit)
-                await crud.add_reward_history(session, user.id, "credit", chosen_credit, "referral_voucher", reward.id)
+                # Two-stage earnings: pre-gate → store credit (1M cap),
+                # post-gate → withdrawable cashback. Cap bust = voucher kept.
+                from app.services.flows.earnings import credit_referral_payout
+                from app.services.flows.errors import FlowError
+
+                try:
+                    landed_bucket = await credit_referral_payout(
+                        session, user, chosen_credit, source_id=reward.id
+                    )
+                except FlowError as e:
+                    if e.code == "credit_cap_reached":
+                        return web.json_response(
+                            {
+                                "ok": False,
+                                "error": "credit_cap_reached",
+                                "cap": getattr(e, "cap", None),
+                                "earned": getattr(e, "earned", None),
+                            },
+                            status=400,
+                        )
+                    raise
 
             season_total = 0
             season_unlocked = []
@@ -130,6 +150,7 @@ async def handle_dashboard_redeem_referral_reward(request: web.Request):
                         "traffic_bytes": chosen_traffic,
                         "extra_days": chosen_days,
                         "credit_amount": chosen_credit,
+                        "credit_bucket": landed_bucket,
                         "stars": chosen_stars,
                         "season_stars_total": season_total,
                         "unlocked_coupons": season_unlocked,

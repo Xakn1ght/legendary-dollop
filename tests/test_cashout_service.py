@@ -30,7 +30,9 @@ async def _setup(active_referrals: int):
     Session = async_sessionmaker(eng, expire_on_commit=False)
 
     async with Session() as db:
-        db.add(User(id=1, chat_id=CHAT, referral_code="me", credit=500000))
+        # Two-stage model: withdrawals draw on cashback_balance (store credit
+        # is deliberately non-withdrawable — seeded here to prove that).
+        db.add(User(id=1, chat_id=CHAT, referral_code="me", credit=123000, cashback_balance=500000))
         db.add(Subscription(id=1, user_id=1, marzban_username="own", status="active", price=90000))
         for i in range(active_referrals):
             uid = 100 + i
@@ -82,13 +84,15 @@ async def test_reserve_and_rejections():
         req = await create_cashout(db, user, amount=CASHOUT_MIN_AMOUNT_TOMAN, destination="IR12345678901234")
         assert req.status == "pending" and req.amount == CASHOUT_MIN_AMOUNT_TOMAN
         await db.refresh(user)
-        assert user.credit == 500000 - CASHOUT_MIN_AMOUNT_TOMAN  # reserved immediately
+        assert user.cashback_balance == 500000 - CASHOUT_MIN_AMOUNT_TOMAN  # reserved immediately
+        assert user.credit == 123000, "store credit must NEVER be touched by a withdrawal"
 
         # Denial returns the funds (repo behavior the admin panel relies on).
         back = await crud.deny_cashout_request(db, req.id)
         assert back is not None and back.status == "denied"
         await db.refresh(user)
-        assert user.credit == 500000
+        assert user.cashback_balance == 500000
+        assert user.credit == 123000
     print("PASS test_reserve_and_rejections")
 
 
