@@ -201,7 +201,12 @@ export function TasksPage() {
   const shareRefLink = () => {
     const tg = getWebApp();
     if (tg?.openTelegramLink && referralData?.referral_link) {
-      tg.openTelegramLink('https://t.me/share/url?url=' + encodeURIComponent(referralData.referral_link));
+      // Telegram share sheet shows `text` under the link — a real invitation
+      // instead of a bare URL.
+      tg.openTelegramLink(
+        'https://t.me/share/url?url=' + encodeURIComponent(referralData.referral_link)
+        + '&text=' + encodeURIComponent(tt('shareInviteText')),
+      );
     } else copyRefLink();
   };
 
