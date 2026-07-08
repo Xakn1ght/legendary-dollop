@@ -77,32 +77,43 @@ const ALL_APPS = [
 ];
 const appsForPlatform = () => ALL_APPS.filter((a) => PLATFORM === 'any' || a.os.includes(PLATFORM) || a.os.includes('any'));
 
-// Android: wrap the plain scheme in a package-locked intent:// URL so ONLY
-// the intended app answers (no chooser, no scheme-squatter hijack). Android
-// reconstructs "<scheme>://<rest>" from the fragment. If that app isn't
-// installed the intent throws → nothing opens (the fallback below catches
-// that). iOS/desktop can't parse intent:// — they keep the plain scheme.
-function launchUrlForApp(app, link) {
-  const raw = app.url(link);
-  if (PLATFORM === 'android' && app.apkg) {
-    const m = /^([a-z0-9+.-]+):\/\/(.*)$/i.exec(raw);
-    if (m) return 'intent://' + m[2] + '#Intent;scheme=' + m[1] + ';package=' + app.apkg + ';end';
-  }
-  return raw;
-}
-
-// Not-installed fallback: a webview CANNOT query installed apps, but when a
-// scheme actually opens one, this page ALWAYS gets backgrounded
-// (visibilitychange/pagehide) within a beat. If we're still visible after
-// the grace window, the launch went nowhere → offer the official download
-// page (GitHub releases / App Store per ALL_APPS.dl). Prompt, never
-// auto-navigate: on desktop the webview may stay visible even on success,
-// so the user keeps the final word.
-let _fallbackTimer = null;
-function armNotInstalledFallback(app, t) {
+async function promptOfficialDownload(app, t) {
   const dl = app.dl && (app.dl[PLATFORM] || app.dl.any);
   if (!dl) return;
-  if (_fallbackTimer) { clearTimeout(_fallbackTimer); _fallbackTimer = null; }
+  const name = '\u2068' + app.label + '\u2069';
+  const yes = await astroConfirm({
+    title: app.label,
+    message: t('appNotInstalled').replace('{app}', name),
+    okText: t('getAppDownload'),
+    cancelText: t('close'),
+  });
+  if (!yes) return;
+  const tg = getWebApp();
+  if (tg?.openLink) tg.openLink(dl); else window.open(dl, '_blank');
+}
+
+// Launch ladder (round 5 — Pasha: "v2rayng exists but its not opening").
+// Telegram's Android webview does NOT parse intent:// URLs (it fires a plain
+// VIEW intent on the raw URI, which can't resolve them) — so the round-4
+// package-locked intent silently killed launches that used to work. But
+// intent:// is still the only squatter-proof form where it IS supported
+// (Chrome/Custom-Tab webviews). So: fire intent:// first, and if the page
+// is still visible after a short grace (a real launch ALWAYS backgrounds
+// the webview) step down to the plain app-own scheme; still visible after
+// that → the app isn't installed → offer the official download page.
+// A webview cannot query installed apps; visibility is the only signal.
+// The prompt never auto-navigates (desktop can stay visible on success).
+let _ladderToken = 0;
+function launchAppLadder(app, link, t) {
+  const token = ++_ladderToken;
+  const raw = app.url(link);
+  const steps = [];
+  if (PLATFORM === 'android' && app.apkg) {
+    const m = /^([a-z0-9+.-]+):\/\/(.*)$/i.exec(raw);
+    if (m) steps.push('intent://' + m[2] + '#Intent;scheme=' + m[1] + ';package=' + app.apkg + ';end');
+  }
+  steps.push(raw);
+
   let opened = false;
   const onVis = () => { if (document.hidden) { opened = true; cleanup(); } };
   const onHide = () => { opened = true; cleanup(); };
@@ -112,21 +123,21 @@ function armNotInstalledFallback(app, t) {
   };
   document.addEventListener('visibilitychange', onVis);
   window.addEventListener('pagehide', onHide);
-  _fallbackTimer = setTimeout(async () => {
-    _fallbackTimer = null;
-    cleanup();
-    if (opened || document.hidden) return;
-    const name = '\u2068' + app.label + '\u2069';
-    const yes = await astroConfirm({
-      title: app.label,
-      message: t('appNotInstalled').replace('{app}', name),
-      okText: t('getAppDownload'),
-      cancelText: t('close'),
-    });
-    if (!yes) return;
-    const tg = getWebApp();
-    if (tg?.openLink) tg.openLink(dl); else window.open(dl, '_blank');
-  }, 1800);
+
+  const next = (i) => {
+    if (token !== _ladderToken) { cleanup(); return; } // superseded by a newer tap
+    if (opened || document.hidden) { cleanup(); return; } // app opened — done
+    if (i >= steps.length) {
+      cleanup();
+      promptOfficialDownload(app, t);
+      return;
+    }
+    launchScheme(steps[i]);
+    // Short hop between ladder rungs; a longer grace before concluding
+    // "not installed" (slow phones take a beat to switch apps).
+    setTimeout(() => next(i + 1), i < steps.length - 1 ? 1200 : 1800);
+  };
+  next(0);
 }
 
 // Choose-your-app sheet, opened from the big ring button on Home. Orbit
@@ -154,10 +165,9 @@ export function AppLaunchSheet({ t, open, link, currentSubId, onClose }) {
 
   const openApp = (app) => {
     if (!link) { showToast(t('noSubOpen'), 'error'); return; }
-    launchScheme(launchUrlForApp(app, link));
     // \u2068…\u2069 isolates the Latin app name inside the RTL sentence.
     showToast(t('appLaunchHint').replace('{app}', '\u2068' + app.label + '\u2069'), 'success');
-    armNotInstalledFallback(app, t);
+    launchAppLadder(app, link, t);
   };
 
   return (
@@ -284,10 +294,9 @@ export function ExportModal({ t, open, link, showQRFirst, onClose }) {
 
   const openApp = (app) => {
     if (!link) { showToast(t('noSubOpen'), 'error'); return; }
-    // window.open launch — never navigates the webview (see launchScheme above)
-    launchScheme(launchUrlForApp(app, link));
+    // window.open launches — never navigates the webview (see launchScheme above)
     showToast(t('appLaunchHint').replace('{app}', '\u2068' + app.label + '\u2069'), 'success');
-    armNotInstalledFallback(app, t);
+    launchAppLadder(app, link, t);
   };
 
   const copyLink = async () => {
