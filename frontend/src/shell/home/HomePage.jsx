@@ -66,7 +66,10 @@ export function HomePage() {
     try { return localStorage.getItem('astro_speed_open') === '1'; } catch (_) { return false; }
   });
   const [cooldownLeft, setCooldownLeft] = useState(0);
-  const { stats: speedStats, canvasRef } = useSpeedTest(speedOpen);
+  const {
+    stats: speedStats, canvasRef,
+    run: runSpeedTest, running: speedRunning, cooldownLeft: speedCooldown,
+  } = useSpeedTest(speedOpen);
 
   const actionsRef = useRef(null);
   const ddRef = useRef(null);
@@ -565,28 +568,49 @@ export function HomePage() {
           </div>
           <div id="speedPanel" className="speed-panel" hidden={!speedOpen}>
             <div className="speed-chips">
-              <div className="speed-chip">
+              <div className={`speed-chip${speedStats.phase === 'down' ? ' measuring' : ''}`}>
                 <div className="label" id="labelDownload">{t('download')}</div>
                 <div className="value" id="downv">
-                  {speedStats.down == null ? '—' : <>{fmt(speedStats.down, 1)} <span style={{ fontSize: '0.75em', opacity: 0.8 }}>{t('mbps')}</span></>}
+                  {speedStats.down == null
+                    ? (speedStats.phase === 'down' ? '…' : '—')
+                    : <>{fmt(speedStats.down, 1)} <span style={{ fontSize: '0.75em', opacity: 0.8 }}>{t('mbps')}</span></>}
                 </div>
               </div>
-              <div className="speed-chip">
+              <div className={`speed-chip${speedStats.phase === 'up' ? ' measuring' : ''}`}>
                 <div className="label" id="labelUpload">{t('upload')}</div>
                 <div className="value" id="upv">
-                  {speedStats.up == null ? '—' : <>{fmt(speedStats.up, 1)} <span style={{ fontSize: '0.75em', opacity: 0.8 }}>{t('mbps')}</span></>}
+                  {speedStats.up == null
+                    ? (speedStats.phase === 'up' ? '…' : '—')
+                    : <>{fmt(speedStats.up, 1)} <span style={{ fontSize: '0.75em', opacity: 0.8 }}>{t('mbps')}</span></>}
                 </div>
               </div>
-              <div className="speed-chip">
+              <div className={`speed-chip${speedStats.phase === 'ping' ? ' measuring' : ''}`}>
                 <div className="label" id="labelPing">{t('ping')}</div>
-                <div className="value" id="pingv">{speedStats.ping == null ? '—' : fmt(speedStats.ping, 0) + ' ms'}</div>
+                <div className="value" id="pingv">
+                  {speedStats.ping == null ? (speedStats.phase === 'ping' ? '…' : '—') : fmt(speedStats.ping, 0) + ' ms'}
+                </div>
               </div>
             </div>
             <canvas id="chart" ref={canvasRef} />
-            <div className="chart-meta" id="speedUpdated">
-              {speedStats.updatedAt
-                ? t('lastUpdated') + ': ' + new Date(speedStats.updatedAt).toLocaleTimeString(getLocale(lang), { hour: '2-digit', minute: '2-digit', second: '2-digit' })
-                : '—'}
+            <div className="speed-foot">
+              <button
+                id="speedRunBtn"
+                className={`mini-btn${speedRunning || speedCooldown > 0 ? ' cooldown' : ''}`}
+                type="button"
+                disabled={speedRunning || speedCooldown > 0}
+                onClick={() => { hapticImpact('light'); runSpeedTest(); }}
+              >
+                {speedRunning
+                  ? t('speedTesting')
+                  : speedCooldown > 0
+                    ? faDigits(String(speedCooldown), lang) + ' ' + t('secondsShort')
+                    : (speedStats.updatedAt ? t('speedRunAgain') : t('speedRun'))}
+              </button>
+              <div className="chart-meta" id="speedUpdated">
+                {speedStats.updatedAt
+                  ? t('lastUpdated') + ': ' + new Date(speedStats.updatedAt).toLocaleTimeString(getLocale(lang), { hour: '2-digit', minute: '2-digit', second: '2-digit' })
+                  : ''}
+              </div>
             </div>
           </div>
         </div>
