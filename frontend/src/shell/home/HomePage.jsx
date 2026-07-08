@@ -21,12 +21,25 @@ const STATUS_CONFIG = {
 };
 const RING_COLORS = { active: '#22c55e', disabled: '#6b7280', inactive: '#6b7280', limited: '#f59e0b', expired: '#ef4444', on_hold: '#60a5fa', pending: '#a855f7' };
 
-// Usage-based ring color for active subs: green while healthy, warms up as data runs out.
-function usageRingColor(usedRatio) {
-  if (usedRatio >= 0.9) return '#ef4444';
-  if (usedRatio >= 0.75) return '#f97316';
-  if (usedRatio >= 0.5) return '#eab308';
-  return '#22c55e';
+// Usage-based ring color for active subs: continuous 0% green → 50% yellow →
+// 100% red (piecewise RGB lerp, so 25% is lime-ish and 75% orange — no steps).
+// Anchors are the same ok/warn/bad greens the status system already speaks.
+const USAGE_COLOR_STOPS = [
+  [0.0, [34, 197, 94]],
+  [0.5, [234, 179, 8]],
+  [1.0, [239, 68, 68]],
+];
+function usageRingRgb(usedRatio) {
+  const r = Math.max(0, Math.min(1, usedRatio));
+  for (let i = 1; i < USAGE_COLOR_STOPS.length; i++) {
+    const [p1, c1] = USAGE_COLOR_STOPS[i];
+    const [p0, c0] = USAGE_COLOR_STOPS[i - 1];
+    if (r <= p1) {
+      const f = (r - p0) / (p1 - p0);
+      return c0.map((v, k) => Math.round(v + (c1[k] - v) * f));
+    }
+  }
+  return USAGE_COLOR_STOPS[USAGE_COLOR_STOPS.length - 1][1];
 }
 
 const REFRESH_COOLDOWN_S = 300;
@@ -184,9 +197,10 @@ export function HomePage() {
   const used = overview?.used_traffic || 0;
   const limit = overview?.data_limit || 0;
   const usedRatio = limit > 0 ? Math.max(0, Math.min(1, used / limit)) : 0;
-  const ringColor = status === 'active' && limit > 0
-    ? usageRingColor(usedRatio)
-    : (RING_COLORS[status] || RING_COLORS.disabled);
+  const ringRgb = status === 'active' && limit > 0 ? usageRingRgb(usedRatio) : null;
+  const ringColor = ringRgb ? `rgb(${ringRgb.join(',')})` : (RING_COLORS[status] || RING_COLORS.disabled);
+  // The glow under the arc follows the same color (CSS default is a static orange).
+  const ringGlow = ringRgb ? `drop-shadow(0 2px 8px rgba(${ringRgb.join(',')},0.45))` : undefined;
   const circumference = 2 * Math.PI * 56;
   const dleft = overview ? fmtDays(overview.expire) : null;
   const usagePct = limit > 0 ? Math.min(100, Math.round((used / limit) * 100)) : null;
@@ -493,11 +507,14 @@ export function HomePage() {
                 className="progress"
                 id="usageRing"
                 cx="65" cy="65" r="56" fill="none"
-                stroke={ringColor}
                 strokeWidth="8"
                 strokeLinecap="round"
                 strokeDasharray={`${circumference} ${circumference}`}
                 strokeDashoffset={limit > 0 ? circumference * (1 - usedRatio) : circumference}
+                // stroke must be inline STYLE: the class rule (.progress
+                // { stroke: var(--brand) }) beats a presentation attribute,
+                // which silently pinned the ring to the accent forever.
+                style={{ stroke: ringColor, filter: ringGlow }}
               />
             </svg>
             {/* The big ring button = "connect me": opens the app chooser
