@@ -363,10 +363,9 @@ export function HomePage() {
                       <button
                         className="support-btn"
                         aria-label="Get Support"
-                        style={{ padding: '6px 10px', background: 'rgba(139, 92, 246, 0.15)', border: '1px solid rgba(139, 92, 246, 0.3)', borderRadius: 6, color: 'var(--brand, #8b5cf6)', fontSize: 12, fontWeight: 600, cursor: 'pointer', transition: 'all 0.2s' }}
                         onClick={() => { setDdOpen(false); openSupportPage(String(s.id)); }}
                       >
-                        <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" style={{ verticalAlign: 'middle', marginInlineEnd: 4 }}>
+                        <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
                           <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
                         </svg>
                         {t('support')}
