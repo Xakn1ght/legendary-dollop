@@ -3826,13 +3826,19 @@ html:not([lang="fa"]) .vpn-balance {
 }
 
 /* Persian balance (fa): normal tracking, lighter weight, breathing
-   line-height. The number + گیگابایت reads as one clean headline. */
+   line-height. The number + گیگابایت reads as one clean headline.
+   PROPORTIONAL figures ('tnum' off): tabular cells pad Vazirmatn digits
+   with air on both sides — «۲۰» read as two islands (Pasha 2026-07-09).
+   A hero number never needs column alignment. word-spacing back to normal
+   for the same reason. Negative letter-spacing stays FORBIDDEN here
+   (connected script shears). */
 html[lang="fa"] .vpn-balance {
   letter-spacing: normal !important;
   font-weight: 700 !important;
   font-size: 37px !important;
   line-height: 1.3 !important;
-  word-spacing: 1px !important;
+  word-spacing: normal !important;
+  font-feature-settings: 'lnum' 1 !important;
 }
 /* keep the row tidy and let it wrap gracefully if a value is long */
 html[lang="fa"] .vpn-balance-row {
