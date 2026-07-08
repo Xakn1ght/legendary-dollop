@@ -1,0 +1,297 @@
+<!DOCTYPE html>
+<html lang="fa" dir="rtl">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, viewport-fit=cover" />
+  <meta name="referrer" content="no-referrer" />
+  <title>AstroByte - App Guide</title>
+  <script>
+    (function(){
+      try{
+        let platform = 'unknown';
+        if (window.Telegram?.WebApp?.platform) {
+          platform = window.Telegram.WebApp.platform.toLowerCase();
+        } else {
+          const ua = (navigator.userAgent || '').toLowerCase();
+          if (ua.includes('android')) platform = 'android';
+          else if (ua.includes('iphone') || ua.includes('ipad')) platform = 'ios';
+        }
+        if (platform === 'android') document.documentElement.classList.add('platform-android');
+        else if (platform === 'ios') document.documentElement.classList.add('platform-ios');
+        window.__astroPlatform = platform;
+      }catch(_){}
+      try {
+        const savedTheme = localStorage.getItem('theme');
+        if (savedTheme === 'light' || savedTheme === 'dark') {
+          document.documentElement.setAttribute('data-theme', savedTheme);
+        }
+      } catch(_) {}
+      try {
+        // Keep in sync with ShellApp ACCENT_ALLOWED / head-boot.js.
+        const accent = localStorage.getItem('accent');
+        const allowed = ['red','cyan','emerald','violet','amber','vip','champion','legend'];
+        document.documentElement.setAttribute('data-accent', allowed.indexOf(accent) >= 0 ? accent : 'red');
+      } catch(_) {
+        document.documentElement.setAttribute('data-accent', 'red');
+      }
+      try {
+        const savedLang = localStorage.getItem('lang');
+        if (savedLang === 'en') {
+          document.documentElement.lang = 'en';
+          document.documentElement.dir = 'ltr';
+        }
+        // fa is the default (set in the markup) — Persian-first product.
+      } catch(_) {}
+    })();
+  </script>
+  <script src="https://telegram.org/js/telegram-web-app.js"></script>
+  <script>
+    // Security: stash `?auth=...` into sessionStorage and remove it from the visible URL ASAP.
+    (function () {
+      try {
+        const url = new URL(window.location.href);
+        const auth = url.searchParams.get('auth');
+        if (auth && auth.length > 10) {
+          let stored = false;
+          try {
+            sessionStorage.setItem('tma_url_auth', auth);
+            stored = (sessionStorage.getItem('tma_url_auth') === auth);
+          } catch (_) {}
+          if (stored) {
+            url.searchParams.delete('auth');
+            window.history.replaceState({}, document.title, url.pathname + (url.searchParams.toString() ? ('?' + url.searchParams.toString()) : '') + (url.hash || ''));
+          }
+        }
+      } catch (_) {}
+    })();
+  </script>
+  <script src="/webapp/dashboard/ui.js?v=3" defer></script>
+  <link rel="stylesheet" href="/webapp/static/fonts/fonts.css?v=1">
+  <link rel="stylesheet" href="/webapp/dashboard/css/apps.css?v=1">
+  <link rel="stylesheet" href="/webapp/dashboard/css/glass.css?v=59">
+</head>
+<body>
+  <div id="astro-lava" aria-hidden="true"><div class="lava-blob lava-blob-1"></div><div class="lava-blob lava-blob-2"></div><div class="lava-blob lava-blob-3"></div><div class="lava-blob lava-blob-4"></div><div class="lava-blob lava-blob-5"></div></div>
+
+  <header class="header">
+    <div class="header-row">
+      <button class="btn" type="button" id="backBtn" data-i18n="back">بازگشت</button>
+      <div class="header-title" data-i18n="headerTitle">راهنمای اپ‌ها</div>
+      <button class="btn lang-btn" type="button" id="langBtn" aria-label="Switch language">EN</button>
+    </div>
+  </header>
+
+  <div class="wrap">
+    <div class="card">
+      <div class="title" data-i18n="pageTitle">کدام برنامه را انتخاب کنم؟</div>
+      <div class="muted" data-i18n="pageSub">اشتراک شما با یک لمس به این اپ‌ها اضافه می‌شود — فقط کافی است اپ از قبل روی گوشی نصب باشد.</div>
+
+      <div class="how">
+        <div class="how-title" data-i18n="howTitle">اتصال با یک لمس چطور کار می‌کند؟</div>
+        <div class="step">
+          <span class="step-n" data-i18n="n1">۱</span>
+          <span class="step-t" data-i18n="step1">اپ موردنظر را از لینک همین صفحه نصب کنید.</span>
+        </div>
+        <div class="step">
+          <span class="step-n" data-i18n="n2">۲</span>
+          <span class="step-t" data-i18n="step2">در صفحه اصلی داشبورد روی دکمه حلقه بزنید، یا در «خروجی اشتراک» گزینه «افزودن به اپلیکیشن» را انتخاب کنید.</span>
+        </div>
+        <div class="step">
+          <span class="step-n" data-i18n="n3">۳</span>
+          <span class="step-t" data-i18n="step3">نام اپ را انتخاب کنید — اشتراک خودکار وارد می‌شود و فقط باید دکمه اتصال را بزنید.</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="tabs" role="tablist">
+      <button class="tab" type="button" id="tabAndroid" role="tab" data-i18n="tabAndroid">اندروید</button>
+      <button class="tab" type="button" id="tabIos" role="tab" data-i18n="tabIos">آیفون و آی‌پد</button>
+    </div>
+
+    <div class="group" id="groupAndroid">
+      <div class="app-card reco-card">
+        <div class="app-head">
+          <div class="app-name" dir="ltr">Orbit <span class="chip-reco" data-i18n="reco">پیشنهاد ما</span></div>
+          <a class="app-get primary" href="https://game1.astrobytech.com/orbit.apk" target="_blank" rel="noopener" data-i18n="getDirect">دریافت مستقیم</a>
+        </div>
+        <div class="app-desc" data-i18n="dOrbit">اپ رسمی آستروبایت. ساده‌ترین مسیر: نصب کنید، یک لمس، متصل شوید — اشتراک و تنظیمات را خودش انجام می‌دهد.</div>
+      </div>
+      <div class="app-card">
+        <div class="app-head">
+          <div class="app-name" dir="ltr">v2rayNG</div>
+          <a class="app-get" href="https://play.google.com/store/apps/details?id=com.v2ray.ang" target="_blank" rel="noopener">Google Play</a>
+        </div>
+        <div class="app-desc" data-i18n="dV2rayng">انتخاب کلاسیک اندروید — سبک و پایدار. برای بیشتر کاربران همین کافی است.</div>
+      </div>
+      <div class="app-card">
+        <div class="app-head">
+          <div class="app-name" dir="ltr">Hiddify</div>
+          <a class="app-get" href="https://play.google.com/store/apps/details?id=app.hiddify.com" target="_blank" rel="noopener">Google Play</a>
+        </div>
+        <div class="app-desc" data-i18n="dHiddify">رابط ساده با زبان فارسی. برای شروع عالی است و تقریباً هر نوع لینکی را می‌پذیرد.</div>
+      </div>
+      <div class="app-card">
+        <div class="app-head">
+          <div class="app-name" dir="ltr">Karing</div>
+          <a class="app-get" href="https://github.com/KaringX/karing/releases" target="_blank" rel="noopener">GitHub</a>
+        </div>
+        <div class="app-desc" data-i18n="dKaringAnd">امکانات حرفه‌ای و مسیریابی هوشمند برای کاربرانی که کنترل بیشتری می‌خواهند. در گوگل‌پلی نیست — از GitHub نصب کنید.</div>
+      </div>
+      <div class="app-card">
+        <div class="app-head">
+          <div class="app-name" dir="ltr">Clash Meta</div>
+          <a class="app-get" href="https://github.com/MetaCubeX/ClashMetaForAndroid/releases" target="_blank" rel="noopener">GitHub</a>
+        </div>
+        <div class="app-desc" data-i18n="dClash">برای علاقه‌مندان Clash — قوانین مسیریابی قدرتمند و انعطاف بالا. از GitHub نصب کنید.</div>
+      </div>
+    </div>
+
+    <div class="group" id="groupIos">
+      <div class="app-card reco-card">
+        <div class="app-head">
+          <div class="app-name" dir="ltr">Streisand <span class="chip-reco" data-i18n="reco2">پیشنهاد ما</span></div>
+          <a class="app-get primary" href="https://apps.apple.com/app/id6450534064" target="_blank" rel="noopener">App Store</a>
+        </div>
+        <div class="app-desc" data-i18n="dStreisand">پیشنهاد اول ما برای آیفون — ساده، روان و رایگان.</div>
+      </div>
+      <div class="app-card">
+        <div class="app-head">
+          <div class="app-name" dir="ltr">Karing</div>
+          <a class="app-get" href="https://apps.apple.com/app/id6472431552" target="_blank" rel="noopener">App Store</a>
+        </div>
+        <div class="app-desc" data-i18n="dKaringIos">امکانات حرفه‌ای، مسیریابی هوشمند و همگام‌سازی بین چند دستگاه.</div>
+      </div>
+      <div class="app-card">
+        <div class="app-head">
+          <div class="app-name" dir="ltr">V2Box</div>
+          <a class="app-get" href="https://apps.apple.com/app/id6446814690" target="_blank" rel="noopener">App Store</a>
+        </div>
+        <div class="app-desc" data-i18n="dV2box">پرامکانات، با پشتیبانی گسترده از پروتکل‌ها.</div>
+      </div>
+      <div class="app-card">
+        <div class="app-head">
+          <div class="app-name" dir="ltr">Hiddify</div>
+          <a class="app-get" href="https://apps.apple.com/app/id6596777532" target="_blank" rel="noopener">App Store</a>
+        </div>
+        <div class="app-desc" data-i18n="dHiddifyIos">همان تجربه ساده و فارسی Hiddify روی iOS.</div>
+      </div>
+      <div class="note" data-i18n="iosNote">اگر اپی را در اپ‌استور نمی‌بینید، ریجن اپل‌آیدی شما پشتیبانی نمی‌کند — به یک اپل‌آیدی با ریجن دیگر نیاز دارید.</div>
+    </div>
+
+    <div class="card trouble">
+      <div class="title-sm" data-i18n="troubleTitle">مشکلی پیش آمد؟</div>
+      <div class="titem" data-i18n="t1">روی نام اپ زدید و هیچ‌چیز باز نشد؟ یعنی آن اپ نصب نیست — اول از لینک همین صفحه نصبش کنید.</div>
+      <div class="titem" data-i18n="t2">اپ باز شد ولی اشتراک اضافه نشد؟ لینک را از «خروجی اشتراک» کپی کنید و داخل اپ گزینه افزودن از کلیپ‌بورد (Import) را بزنید.</div>
+      <div class="titem" data-i18n="t3">باز هم مشکل داشتید؟ از بخش پشتیبانی داشبورد برایمان پیام بفرستید.</div>
+    </div>
+  </div>
+
+  <script src="/webapp/dashboard/js/tutorial-main.js?v=1"></script>
+  <script>
+    (function(){
+      'use strict';
+      var I18N = {
+        fa: {
+          back: 'بازگشت',
+          headerTitle: 'راهنمای اپ‌ها',
+          pageTitle: 'کدام برنامه را انتخاب کنم؟',
+          pageSub: 'اشتراک شما با یک لمس به این اپ‌ها اضافه می‌شود — فقط کافی است اپ از قبل روی گوشی نصب باشد.',
+          howTitle: 'اتصال با یک لمس چطور کار می‌کند؟',
+          n1: '۱', n2: '۲', n3: '۳',
+          step1: 'اپ موردنظر را از لینک همین صفحه نصب کنید.',
+          step2: 'در صفحه اصلی داشبورد روی دکمه حلقه بزنید، یا در «خروجی اشتراک» گزینه «افزودن به اپلیکیشن» را انتخاب کنید.',
+          step3: 'نام اپ را انتخاب کنید — اشتراک خودکار وارد می‌شود و فقط باید دکمه اتصال را بزنید.',
+          tabAndroid: 'اندروید',
+          tabIos: 'آیفون و آی‌پد',
+          reco: 'پیشنهاد ما', reco2: 'پیشنهاد ما',
+          getDirect: 'دریافت مستقیم',
+          dOrbit: 'اپ رسمی آستروبایت. ساده‌ترین مسیر: نصب کنید، یک لمس، متصل شوید — اشتراک و تنظیمات را خودش انجام می‌دهد.',
+          dV2rayng: 'انتخاب کلاسیک اندروید — سبک و پایدار. برای بیشتر کاربران همین کافی است.',
+          dHiddify: 'رابط ساده با زبان فارسی. برای شروع عالی است و تقریباً هر نوع لینکی را می‌پذیرد.',
+          dKaringAnd: 'امکانات حرفه‌ای و مسیریابی هوشمند برای کاربرانی که کنترل بیشتری می‌خواهند. در گوگل‌پلی نیست — از GitHub نصب کنید.',
+          dClash: 'برای علاقه‌مندان Clash — قوانین مسیریابی قدرتمند و انعطاف بالا. از GitHub نصب کنید.',
+          dStreisand: 'پیشنهاد اول ما برای آیفون — ساده، روان و رایگان.',
+          dKaringIos: 'امکانات حرفه‌ای، مسیریابی هوشمند و همگام‌سازی بین چند دستگاه.',
+          dV2box: 'پرامکانات، با پشتیبانی گسترده از پروتکل‌ها.',
+          dHiddifyIos: 'همان تجربه ساده و فارسی Hiddify روی iOS.',
+          iosNote: 'اگر اپی را در اپ‌استور نمی‌بینید، ریجن اپل‌آیدی شما پشتیبانی نمی‌کند — به یک اپل‌آیدی با ریجن دیگر نیاز دارید.',
+          troubleTitle: 'مشکلی پیش آمد؟',
+          t1: 'روی نام اپ زدید و هیچ‌چیز باز نشد؟ یعنی آن اپ نصب نیست — اول از لینک همین صفحه نصبش کنید.',
+          t2: 'اپ باز شد ولی اشتراک اضافه نشد؟ لینک را از «خروجی اشتراک» کپی کنید و داخل اپ گزینه افزودن از کلیپ‌بورد (Import) را بزنید.',
+          t3: 'باز هم مشکل داشتید؟ از بخش پشتیبانی داشبورد برایمان پیام بفرستید.'
+        },
+        en: {
+          back: 'Back',
+          headerTitle: 'App guide',
+          pageTitle: 'Which app should I pick?',
+          pageSub: 'Your subscription is added to any of these apps in one tap — the app just has to be installed first.',
+          howTitle: 'How does one-tap connect work?',
+          n1: '1', n2: '2', n3: '3',
+          step1: 'Install the app you want using the link on this page.',
+          step2: 'On the dashboard home, tap the ring button — or open Export Subscription and choose "Add to App".',
+          step3: 'Pick the app by name — your subscription imports automatically; just hit Connect inside the app.',
+          tabAndroid: 'Android',
+          tabIos: 'iPhone & iPad',
+          reco: 'Our pick', reco2: 'Our pick',
+          getDirect: 'Direct download',
+          dOrbit: 'The official AstroByte app. The simplest path: install, one tap, connected — it handles the subscription and settings itself.',
+          dV2rayng: 'The classic Android choice — light and stable. For most users this is all you need.',
+          dHiddify: 'Simple interface with Persian support. Great for beginners and accepts almost any link format.',
+          dKaringAnd: 'Pro features and smart routing for users who want more control. Not on Google Play — install from GitHub.',
+          dClash: 'For Clash fans — powerful routing rules and lots of flexibility. Install from GitHub.',
+          dStreisand: 'Our first pick for iPhone — simple, smooth, and free.',
+          dKaringIos: 'Pro features, smart routing, and multi-device sync.',
+          dV2box: 'Feature-rich, with wide protocol support.',
+          dHiddifyIos: 'The same simple Hiddify experience on iOS.',
+          iosNote: 'If an app is missing from your App Store, your Apple ID region does not carry it — you need an Apple ID set to another region.',
+          troubleTitle: 'Something went wrong?',
+          t1: 'Tapped an app and nothing opened? That app is not installed — install it from the link on this page first.',
+          t2: 'App opened but no subscription appeared? Copy the link from Export Subscription and use the app\'s Import from clipboard option.',
+          t3: 'Still stuck? Message us from the dashboard Support section.'
+        }
+      };
+
+      var lang = (document.documentElement.lang === 'en') ? 'en' : 'fa';
+
+      function render() {
+        var dict = I18N[lang];
+        document.documentElement.lang = lang;
+        document.documentElement.dir = (lang === 'fa') ? 'rtl' : 'ltr';
+        document.querySelectorAll('[data-i18n]').forEach(function (el) {
+          var key = el.getAttribute('data-i18n');
+          if (dict[key] != null) el.textContent = dict[key];
+        });
+        var langBtn = document.getElementById('langBtn');
+        if (langBtn) langBtn.textContent = (lang === 'fa') ? 'EN' : 'FA';
+      }
+
+      var langBtn = document.getElementById('langBtn');
+      if (langBtn) langBtn.addEventListener('click', function () {
+        // View-local toggle only — the dashboard-wide preference stays untouched.
+        lang = (lang === 'fa') ? 'en' : 'fa';
+        render();
+      });
+
+      // Platform tabs: auto-select the viewer's OS, let them peek at the other.
+      var tabA = document.getElementById('tabAndroid');
+      var tabI = document.getElementById('tabIos');
+      var groupA = document.getElementById('groupAndroid');
+      var groupI = document.getElementById('groupIos');
+      function selectTab(which) {
+        var android = (which === 'android');
+        tabA.classList.toggle('active', android);
+        tabI.classList.toggle('active', !android);
+        tabA.setAttribute('aria-selected', android ? 'true' : 'false');
+        tabI.setAttribute('aria-selected', android ? 'false' : 'true');
+        groupA.style.display = android ? '' : 'none';
+        groupI.style.display = android ? 'none' : '';
+      }
+      tabA.addEventListener('click', function () { selectTab('android'); });
+      tabI.addEventListener('click', function () { selectTab('ios'); });
+      selectTab(window.__astroPlatform === 'ios' ? 'ios' : 'android');
+
+      render();
+    })();
+  </script>
+</body>
+</html>

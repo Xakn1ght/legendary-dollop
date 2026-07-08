@@ -125,7 +125,7 @@ EOF
 ## Phase 11 — Launch gate
 
 - [ ] 11.1 Push: `git push origin rewards-pricing-rework` → PR → main.  _(2026-07-08 probe: deploy key NOT added yet — `git ls-remote` still "Permission denied (publickey)". Blocked on Pasha adding ~/.ssh/id_ed25519.pub in GitHub.)_
-- [ ] 11.2 BotFather menu-button URL = https://dash.astrobytech.com/webapp/dashboard (verify what's set) _(2026-07-08: default button was `commands`; `setChatMenuButton`→web_app/داشبورد returned ok:True but the API readback still says `commands` (Telegram quirk?). NEEDS PHONE EYEBALL — if the ≡ button doesn't open the dashboard, set it in BotFather: Bot Settings ▸ Menu Button.)_
+- [ ] 11.2 BotFather menu-button URL = https://dash.astrobytech.com/webapp/dashboard (verify what's set) _(2026-07-08: default button was `commands`; `setChatMenuButton`→web_app/داشبورد returned ok:True but the API readback still said `commands`. 2026-07-09 re-probe: readback NOW returns `web_app`/داشبورد → https://dash.astrobytech.com/webapp/dashboard/ — the quirk was propagation lag. Phone eyeball on the ≡ button remains the final confirmation.)_
 - [ ] 11.3 FINAL DB reset (repeat Phase 0) so real users start at zero; delete every Marzban test user
 - [ ] 11.4 Post-launch watch: `journalctl -u astrobyte-userbot -f | grep USER_INFO` (cache misses sparse), renewal lag, panel CPU; if panel strains raise `USER_INFO_CACHE_TTL` in `services/marzban.py`
 - [ ] 11.5 Old smoke leftovers cleaned: test tickets, test subs, seed users

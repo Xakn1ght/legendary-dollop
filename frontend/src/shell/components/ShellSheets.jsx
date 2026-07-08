@@ -136,7 +136,7 @@ export function AppLaunchSheet({ t, open, link, currentSubId, onClose }) {
           </button>
         ))}
       </div>
-      <a className="btn" style={{ width: '100%', justifyContent: 'center', marginTop: 8, fontSize: 12.5 }} href="/webapp/dashboard/tutorial.html">
+      <a className="btn" style={{ width: '100%', justifyContent: 'center', marginTop: 8, fontSize: 12.5 }} href="/webapp/dashboard/apps.html">
         {t('appGridHelp')}
       </a>
       <div className="sheet-actions" style={{ marginTop: 12, justifyContent: 'center' }}>
@@ -290,7 +290,7 @@ export function ExportModal({ t, open, link, showQRFirst, onClose }) {
               {app.label}
             </button>
           ))}
-          <a className="btn exp-apps-help" href="/webapp/dashboard/tutorial.html">
+          <a className="btn exp-apps-help" href="/webapp/dashboard/apps.html">
             {t('appGridHelp')}
           </a>
         </div>
