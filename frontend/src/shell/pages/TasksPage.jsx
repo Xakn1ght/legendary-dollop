@@ -3,7 +3,7 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useBackClose } from '../../shared/backstack.js';
 import { AlertTriangleIcon, GiftIcon, Spinner, StarIcon, TicketIcon } from '../../shared/icons.jsx';
 import { getWebApp, hapticImpact, hapticNotify } from '../../shared/telegram.js';
-import { astroConfirm } from '../../shared/ui.js';
+import { astroAlert, astroConfirm } from '../../shared/ui.js';
 import { api } from '../api.js';
 import { Sheet } from '../components/Sheet.jsx';
 import { useShell } from '../ShellContext.js';
@@ -261,6 +261,20 @@ export function TasksPage() {
       }
     } catch (_) { showToast(tt('withdrawFailed'), 'error'); }
     setCardBusy(false);
+  };
+
+  // "How does this work?" popup — the one-line hints can't carry the whole
+  // two-stage model; numbers come from the live payload, never hardcoded.
+  const showEarningsInfo = () => {
+    hapticImpact('light');
+    astroAlert({
+      title: tt('earningsInfoTitle'),
+      message: tt('earningsInfoBody')
+        .replace(/\{gate\}/g, faNum(earnings?.gate ?? 20, lang))
+        .replace(/\{cap\}/g, fmt(earnings?.credit_cap_toman ?? 1000000))
+        .replace(/\{min\}/g, fmt(earnings?.min_cashout_toman ?? 200000)),
+      okText: tt('close'),
+    });
   };
 
   const requestWithdraw = async () => {
@@ -667,7 +681,23 @@ export function TasksPage() {
               <h3 className="rw-title">{tt('earningsTitle')}</h3>
               <div className="rw-sub">{tt('earningsSubtitle')}</div>
             </div>
-            {earnings.unlocked && <span className="rw-head-chip ok"><CheckIcon size={11} /></span>}
+            <div className="rw-head-actions">
+              {earnings.unlocked && <span className="rw-head-chip ok"><CheckIcon size={11} /></span>}
+              <button
+                className="rw-info-btn"
+                id="earningsInfoBtn"
+                type="button"
+                aria-label={tt('earningsInfoBtn')}
+                title={tt('earningsInfoBtn')}
+                onClick={showEarningsInfo}
+              >
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                  <circle cx="12" cy="12" r="10" />
+                  <path d="M12 16v-4" />
+                  <path d="M12 8h.01" />
+                </svg>
+              </button>
+            </div>
           </div>
 
           {!earnings.unlocked && (

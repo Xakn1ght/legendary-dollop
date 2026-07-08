@@ -9,6 +9,15 @@ export async function astroConfirm({ title, message, okText, cancelText, danger 
   return window.confirm(message);
 }
 
+// Info popup: one OK button, multiline message (AstroUI body is pre-line).
+export async function astroAlert({ title, message, okText } = {}) {
+  if (window.AstroUI?.alert) {
+    return window.AstroUI.alert({ title, message, okText });
+  }
+  window.alert(message);
+  return undefined;
+}
+
 export function showToast(message) {
   const existing = document.querySelector('.toast');
   if (existing) existing.remove();
