@@ -116,31 +116,38 @@ export function HomePage() {
     return () => { if (cooldownTimerRef.current) clearInterval(cooldownTimerRef.current); };
   }, [startCooldownTicker]);
 
-  const manualRefresh = () => {
-    if (cooldownLeft > 0) return;
+  const fmtCooldown = (secs) => faDigits(Math.floor(secs / 60) + ':' + String(secs % 60).padStart(2, '0'), lang);
+
+  // The status badge and the usage-card refresh button are the SAME action
+  // (both re-fetch the current sub, cache-busted) and share ONE cooldown —
+  // they only differ in feedback: the badge spins its icon in place, the
+  // button goes through the page loading state (Pasha, 2026-07-09).
+  const doRefresh = async (silent) => {
+    if (statusRefreshing) return;
+    if (cooldownLeft > 0) {
+      showToast(t('nextRefreshIn').replace('{time}', fmtCooldown(cooldownLeft)), 'info', 1800);
+      return;
+    }
     try { localStorage.setItem(REFRESH_TS_KEY, String(Date.now())); } catch (_) { /* ignore */ }
     hapticImpact('light');
-    if (currentSubId) fetchOverviewById(currentSubId, { skipCache: true, forceUpdate: true });
-    else fetchOverview({ skipCache: true, forceUpdate: true });
+    setStatusRefreshing(true);
     startCooldownTicker();
+    const opts = silent
+      ? { skipCache: true, forceUpdate: true, skipLoading: true }
+      : { skipCache: true, forceUpdate: true };
+    try {
+      if (currentSubId) await fetchOverviewById(currentSubId, opts);
+      else await fetchOverview(opts);
+    } finally {
+      setStatusRefreshing(false);
+    }
   };
+  const manualRefresh = () => doRefresh(false);
+  const refreshStatus = () => doRefresh(true);
 
   const setSpeed = (next) => {
     setSpeedOpen(next);
     try { localStorage.setItem('astro_speed_open', next ? '1' : '0'); } catch (_) { /* ignore */ }
-  };
-
-  // One refresh entry point for the vpn-card (status badge = the trigger).
-  const refreshStatus = async () => {
-    if (statusRefreshing) return;
-    hapticImpact('light');
-    setStatusRefreshing(true);
-    try {
-      if (currentSubId) await fetchOverviewById(currentSubId, { instant: true, skipLoading: true });
-      else await fetchOverview({ instant: true, skipLoading: true });
-    } finally {
-      setStatusRefreshing(false);
-    }
   };
 
   // "Add to Orbit" chip removed 2026-07-08 (Pasha) — the ring button's app
@@ -208,9 +215,7 @@ export function HomePage() {
     return s ? (s.name || s.marzban_username || s.username || ('ID ' + s.id)) : t('selectSubscription');
   }, [cachedSubs, currentSubId, t]);
 
-  const cooldownLabel = cooldownLeft > 0
-    ? faDigits(Math.floor(cooldownLeft / 60) + ':' + String(cooldownLeft % 60).padStart(2, '0'), lang)
-    : t('refreshNow');
+  const cooldownLabel = cooldownLeft > 0 ? fmtCooldown(cooldownLeft) : t('refreshNow');
 
   return (
     <>
@@ -443,7 +448,7 @@ export function HomePage() {
                 refresh button — both re-check the same status). */}
             <button
               type="button"
-              className={`status-badge ${status}${statusRefreshing ? ' refreshing' : ''}`}
+              className={`status-badge ${status}${statusRefreshing ? ' refreshing' : ''}${cooldownLeft > 0 ? ' cooldown' : ''}`}
               id="statusBadge"
               title={t('refresh')}
               aria-label={`${t(status) || status} — ${t('refresh')}`}

@@ -625,6 +625,9 @@
       animation:badgeSpin 0.8s linear infinite;
       opacity:1;
     }
+    /* Shared cooldown with the usage-card refresh button: still tappable
+       (tap explains the wait via toast), but the icon reads inert. */
+    .vpn-card .status-badge.cooldown .badge-refresh-ic{ opacity:0.28; }
     @keyframes badgeSpin{ to{ transform:rotate(360deg); } }
     @media (prefers-reduced-motion: reduce){
       .vpn-card .status-badge.refreshing .badge-refresh-ic{ animation:none; }
