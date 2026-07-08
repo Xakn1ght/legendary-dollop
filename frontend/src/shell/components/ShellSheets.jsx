@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 
 import { getWebApp } from '../../shared/telegram.js';
+import { astroConfirm } from '../../shared/ui.js';
 import { api } from '../api.js';
 import { showToast } from '../toast.js';
 
@@ -62,21 +63,25 @@ const PLATFORM = /android/i.test(navigator.userAgent || '') ? 'android'
 // answer — Hiddify squats clashmeta:// (their own devs acknowledge this).
 // The only deterministic Android fix is an intent:// URL pinned to the app's
 // package via `apkg`; the plain `url` stays for iOS + as the fallback.
+// `dl` = official download page when the app turns out not to be installed:
+// GitHub releases where the project officially distributes there (all four
+// Android clients), App Store for iOS (sideloading isn't a thing — the store
+// IS the official download page even when a repo exists).
 const ALL_APPS = [
-  { key: 'v2rayng', label: 'v2rayNG', os: ['android'], apkg: 'com.v2ray.ang', url: (l) => 'v2rayng://install-config?url=' + encodeURIComponent(l) },
-  { key: 'karing', label: 'Karing', os: ['android', 'ios', 'any'], apkg: 'com.nebula.karing', url: (l) => 'karing://install-config?url=' + encodeURIComponent(l + '/sing_box') + '&name=AstroByte' },
-  { key: 'hiddify', label: 'Hiddify', os: ['android', 'ios', 'any'], apkg: 'app.hiddify.com', url: (l) => 'hiddify://install-config?url=' + encodeURIComponent(l) },
-  { key: 'streisand', label: 'Streisand', os: ['ios'], url: (l) => 'streisand://import/' + l },
-  { key: 'v2box', label: 'V2Box', os: ['ios'], url: (l) => 'v2box://install-sub?url=' + encodeURIComponent(l) + '&name=AstroByte' },
-  { key: 'clashmeta', label: 'Clash Meta', os: ['android'], apkg: 'com.github.metacubex.clash.meta', url: (l) => 'clashmeta://install-config?url=' + encodeURIComponent(l + '/clash_meta') + '&name=AstroByte' },
+  { key: 'v2rayng', label: 'v2rayNG', os: ['android'], apkg: 'com.v2ray.ang', url: (l) => 'v2rayng://install-config?url=' + encodeURIComponent(l), dl: { android: 'https://github.com/2dust/v2rayNG/releases/latest' } },
+  { key: 'karing', label: 'Karing', os: ['android', 'ios', 'any'], apkg: 'com.nebula.karing', url: (l) => 'karing://install-config?url=' + encodeURIComponent(l + '/sing_box') + '&name=AstroByte', dl: { android: 'https://github.com/KaringX/karing/releases/latest', ios: 'https://apps.apple.com/app/id6472431552', any: 'https://github.com/KaringX/karing/releases/latest' } },
+  { key: 'hiddify', label: 'Hiddify', os: ['android', 'ios', 'any'], apkg: 'app.hiddify.com', url: (l) => 'hiddify://install-config?url=' + encodeURIComponent(l), dl: { android: 'https://github.com/hiddify/hiddify-app/releases/latest', ios: 'https://apps.apple.com/app/id6596777532', any: 'https://github.com/hiddify/hiddify-app/releases/latest' } },
+  { key: 'streisand', label: 'Streisand', os: ['ios'], url: (l) => 'streisand://import/' + l, dl: { ios: 'https://apps.apple.com/app/id6450534064' } },
+  { key: 'v2box', label: 'V2Box', os: ['ios'], url: (l) => 'v2box://install-sub?url=' + encodeURIComponent(l) + '&name=AstroByte', dl: { ios: 'https://apps.apple.com/app/id6446814690' } },
+  { key: 'clashmeta', label: 'Clash Meta', os: ['android'], apkg: 'com.github.metacubex.clash.meta', url: (l) => 'clashmeta://install-config?url=' + encodeURIComponent(l + '/clash_meta') + '&name=AstroByte', dl: { android: 'https://github.com/MetaCubeX/ClashMetaForAndroid/releases/latest' } },
 ];
 const appsForPlatform = () => ALL_APPS.filter((a) => PLATFORM === 'any' || a.os.includes(PLATFORM) || a.os.includes('any'));
 
 // Android: wrap the plain scheme in a package-locked intent:// URL so ONLY
 // the intended app answers (no chooser, no scheme-squatter hijack). Android
 // reconstructs "<scheme>://<rest>" from the fragment. If that app isn't
-// installed the intent throws → nothing opens (matches "install it first").
-// iOS/desktop can't parse intent:// — they keep the plain scheme.
+// installed the intent throws → nothing opens (the fallback below catches
+// that). iOS/desktop can't parse intent:// — they keep the plain scheme.
 function launchUrlForApp(app, link) {
   const raw = app.url(link);
   if (PLATFORM === 'android' && app.apkg) {
@@ -84,6 +89,44 @@ function launchUrlForApp(app, link) {
     if (m) return 'intent://' + m[2] + '#Intent;scheme=' + m[1] + ';package=' + app.apkg + ';end';
   }
   return raw;
+}
+
+// Not-installed fallback: a webview CANNOT query installed apps, but when a
+// scheme actually opens one, this page ALWAYS gets backgrounded
+// (visibilitychange/pagehide) within a beat. If we're still visible after
+// the grace window, the launch went nowhere → offer the official download
+// page (GitHub releases / App Store per ALL_APPS.dl). Prompt, never
+// auto-navigate: on desktop the webview may stay visible even on success,
+// so the user keeps the final word.
+let _fallbackTimer = null;
+function armNotInstalledFallback(app, t) {
+  const dl = app.dl && (app.dl[PLATFORM] || app.dl.any);
+  if (!dl) return;
+  if (_fallbackTimer) { clearTimeout(_fallbackTimer); _fallbackTimer = null; }
+  let opened = false;
+  const onVis = () => { if (document.hidden) { opened = true; cleanup(); } };
+  const onHide = () => { opened = true; cleanup(); };
+  const cleanup = () => {
+    document.removeEventListener('visibilitychange', onVis);
+    window.removeEventListener('pagehide', onHide);
+  };
+  document.addEventListener('visibilitychange', onVis);
+  window.addEventListener('pagehide', onHide);
+  _fallbackTimer = setTimeout(async () => {
+    _fallbackTimer = null;
+    cleanup();
+    if (opened || document.hidden) return;
+    const name = '\u2068' + app.label + '\u2069';
+    const yes = await astroConfirm({
+      title: app.label,
+      message: t('appNotInstalled').replace('{app}', name),
+      okText: t('getAppDownload'),
+      cancelText: t('close'),
+    });
+    if (!yes) return;
+    const tg = getWebApp();
+    if (tg?.openLink) tg.openLink(dl); else window.open(dl, '_blank');
+  }, 1800);
 }
 
 // Choose-your-app sheet, opened from the big ring button on Home. Orbit
@@ -114,6 +157,7 @@ export function AppLaunchSheet({ t, open, link, currentSubId, onClose }) {
     launchScheme(launchUrlForApp(app, link));
     // \u2068…\u2069 isolates the Latin app name inside the RTL sentence.
     showToast(t('appLaunchHint').replace('{app}', '\u2068' + app.label + '\u2069'), 'success');
+    armNotInstalledFallback(app, t);
   };
 
   return (
@@ -243,6 +287,7 @@ export function ExportModal({ t, open, link, showQRFirst, onClose }) {
     // window.open launch — never navigates the webview (see launchScheme above)
     launchScheme(launchUrlForApp(app, link));
     showToast(t('appLaunchHint').replace('{app}', '\u2068' + app.label + '\u2069'), 'success');
+    armNotInstalledFallback(app, t);
   };
 
   const copyLink = async () => {
