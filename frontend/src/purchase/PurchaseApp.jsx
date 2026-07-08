@@ -123,8 +123,12 @@ export function PurchaseApp() {
     const withRenewal = autoRenewal && selectedRenewalPlan;
     if (withRenewal) totalPrice += selectedRenewalPlan.price;
 
+    // VIP-exclusive plans: the VIP % never stacks (server enforces the same
+    // in flows/pricing.py — the preview must not promise a lower price).
+    const vipOnlyOrder = !!selectedPlan.vip_only || !!(withRenewal && selectedRenewalPlan?.vip_only);
     let discountPercent = 0;
     (userInfo?.auto_discounts || []).forEach((d) => {
+      if (vipOnlyOrder && String(d?.type) === 'vip') return;
       const pct = Number(d?.percent || 0) || 0;
       if (pct > 0) discountPercent += pct;
     });

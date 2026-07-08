@@ -45,10 +45,6 @@ function computeDaysLeft(sub) {
   return Math.floor(Math.max(0, expire - now) / 86400);
 }
 
-const IS_ANDROID = (() => {
-  try { return String(getWebApp()?.platform || '').toLowerCase() === 'android'; } catch (_) { return false; }
-})();
-
 export function HomePage() {
   const shell = useShell();
   const {
@@ -94,17 +90,31 @@ export function HomePage() {
     };
   }, []);
 
-  // Manual refresh cooldown ticker.
-  useEffect(() => {
+  // Manual refresh cooldown ticker — only ticks while a cooldown is running
+  // (a permanent 1Hz interval kept the CPU/radio warm for a idle counter).
+  const cooldownTimerRef = useRef(null);
+  const startCooldownTicker = useCallback(() => {
     const left = () => {
       let last = 0;
       try { last = Number(localStorage.getItem(REFRESH_TS_KEY) || 0); } catch (_) { /* ignore */ }
       return Math.max(0, REFRESH_COOLDOWN_S - Math.floor((Date.now() - last) / 1000));
     };
     setCooldownLeft(left());
-    const timer = setInterval(() => setCooldownLeft(left()), 1000);
-    return () => clearInterval(timer);
+    if (cooldownTimerRef.current) clearInterval(cooldownTimerRef.current);
+    if (left() <= 0) return;
+    cooldownTimerRef.current = setInterval(() => {
+      const l = left();
+      setCooldownLeft(l);
+      if (l <= 0 && cooldownTimerRef.current) {
+        clearInterval(cooldownTimerRef.current);
+        cooldownTimerRef.current = null;
+      }
+    }, 1000);
   }, []);
+  useEffect(() => {
+    startCooldownTicker();
+    return () => { if (cooldownTimerRef.current) clearInterval(cooldownTimerRef.current); };
+  }, [startCooldownTicker]);
 
   const manualRefresh = () => {
     if (cooldownLeft > 0) return;
@@ -112,7 +122,7 @@ export function HomePage() {
     hapticImpact('light');
     if (currentSubId) fetchOverviewById(currentSubId, { skipCache: true, forceUpdate: true });
     else fetchOverview({ skipCache: true, forceUpdate: true });
-    setCooldownLeft(REFRESH_COOLDOWN_S);
+    startCooldownTicker();
   };
 
   const setSpeed = (next) => {
@@ -133,32 +143,8 @@ export function HomePage() {
     }
   };
 
-  // ── Add to Orbit (Android-only): server mints a single-use token bound to
-  // this sub, we open the landing page which hands off to the Orbit app. ──
-  const [orbitBusy, setOrbitBusy] = useState(false);
-  const addToOrbit = async () => {
-    if (orbitBusy) return;
-    hapticImpact('light');
-    setOrbitBusy(true);
-    try {
-      const body = currentSubId ? { subscription_id: Number(currentSubId) } : {};
-      const r = await api('/api/dashboard/orbit/add-link', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(body),
-      });
-      if (r && r.ok && r.add_url) {
-        const tgApp = getWebApp();
-        if (tgApp?.openLink) tgApp.openLink(r.add_url); else window.open(r.add_url, '_blank');
-      } else {
-        showToast(r?.error === 'no_subscription' ? t('noSubOpen') : t('orbitFailed'), 'error');
-      }
-    } catch (_) {
-      showToast(t('orbitFailed'), 'error');
-    } finally {
-      setOrbitBusy(false);
-    }
-  };
+  // "Add to Orbit" chip removed 2026-07-08 (Pasha) — the ring button's app
+  // launcher already leads with Orbit, the extra chip was redundant.
 
   const copyLink = async () => {
     const link = overview?.subscription_url || '';
@@ -344,7 +330,7 @@ export function HomePage() {
         <div id="subsDropdown" ref={ddRef} className={`subs-dd${ddOpen ? ' visible' : ''}`}>
           <div className="panel">
             <div className="row">
-              <input id="subsSearch" type="text" placeholder={t('search')} value={ddQuery} onChange={(e) => setDdQuery(e.target.value)} />
+              <input id="subsSearch" type="text" maxLength={64} placeholder={t('search')} value={ddQuery} onChange={(e) => setDdQuery(e.target.value)} />
             </div>
             <div id="subsList" className="list">
               {ddRows.map((s) => {
@@ -509,18 +495,6 @@ export function HomePage() {
               {limit > 0 ? fmt(Math.round(usedRatio * 100), 0) + '%' : '∞'}
             </div>
           </div>
-          {IS_ANDROID && (
-            <button type="button" className="orbit-add-chip" id="orbitAddChip" onClick={addToOrbit} disabled={orbitBusy}>
-              {orbitBusy
-                ? <span className="orbit-chip-spin" aria-hidden="true" />
-                : (
-                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" width="15" height="15" aria-hidden="true">
-                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" /><path d="M7 10l5 5 5-5" /><path d="M12 15V3" />
-                  </svg>
-                )}
-              <span>{t('addToOrbit')}</span>
-            </button>
-          )}
           <div className="location">
             <span className="flag" id="flag">
               {geo.country || overview?.location_guess

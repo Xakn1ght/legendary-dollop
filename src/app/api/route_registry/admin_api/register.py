@@ -44,6 +44,8 @@ from .handlers import (
     handle_admin_recent_broadcasts,
     handle_admin_remove_vip,
     handle_admin_arcade_flags,
+    handle_admin_arcade_user_adjust,
+    handle_admin_arcade_user_get,
     handle_admin_reset_arcade,
     handle_admin_search_user_for_vip,
     handle_admin_send_notification,
@@ -94,6 +96,8 @@ def register_admin_api_routes(app: web.Application) -> None:
     app.router.add_post(ADMIN_API_BASE + "/users/{user_id}", handle_admin_user_update)
     app.router.add_delete(ADMIN_API_BASE + "/users/{user_id}", handle_admin_user_delete)
     app.router.add_post(ADMIN_API_BASE + "/users/{user_id}/reset-arcade", handle_admin_reset_arcade)
+    app.router.add_get(ADMIN_API_BASE + "/users/{user_id}/arcade", handle_admin_arcade_user_get)
+    app.router.add_post(ADMIN_API_BASE + "/users/{user_id}/arcade", handle_admin_arcade_user_adjust)
     app.router.add_get(ADMIN_API_BASE + "/arcade/flags", handle_admin_arcade_flags)
     app.router.add_post(ADMIN_API_BASE + "/users/{username}/toggle-status", handle_admin_toggle_user)
 

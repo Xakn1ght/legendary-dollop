@@ -144,10 +144,12 @@ async def test_monthly_prizes():
         await db.commit()
 
         n = await award_monthly_arcade_prizes(db, m_start, m_end, m_key, bot=None)
-        check("awarded exactly 4 winners", n == 4)
+        # 2026-07-08: ranks 4-10 restored (config had drifted to rank-4-only
+        # against every piece of copy that promises "#4-10 10% off")
+        check("awarded exactly 10 winners", n == 10)
 
         coupons = (await db.execute(select(RewardCoupon))).scalars().all()
-        check("4 coupons minted", len(coupons) == 4)
+        check("10 coupons minted", len(coupons) == 10)
 
         by_user = {c.user_id: c for c in coupons}
         c1 = by_user.get(users[0].id)
@@ -161,15 +163,39 @@ async def test_monthly_prizes():
         c4 = by_user.get(users[2].id)
         check("rank 4 gets 10% discount", c4 is not None and c4.coupon_type == "discount_percent"
               and json.loads(c4.payload)["discount_percent"] == 10)
+        c10 = by_user.get(users[8].id)   # ranking: u0, late, u1..u8 = ranks 1..10
+        check("rank 10 gets 10% discount", c10 is not None
+              and c10.coupon_type == "discount_percent")
         check("ghost (hidden) got nothing", ghost.id not in by_user)
         check("unrewarded score got nothing", cheat.id not in by_user)
-        check("rank 5+ got nothing", users[3].id not in by_user and users[10].id not in by_user)
+        check("rank 11+ got nothing", users[9].id not in by_user and users[11].id not in by_user)
+
+        # race coins (2026-07-08): 40/25/15 podium, 8 for ranks 4-10 —
+        # credited to the arcade wallet, nothing else
+        async def coins_of(uid):
+            w = await crud.get_or_create_arcade_wallet(db, uid)
+            return w.coins or 0
+        check("rank 1 got 40 coins", await coins_of(users[0].id) == 40)
+        check("rank 2 got 25 coins", await coins_of(late.id) == 25)
+        check("rank 3 got 15 coins", await coins_of(users[1].id) == 15)
+        check("rank 4 got 8 coins", await coins_of(users[2].id) == 8)
+        check("rank 10 got 8 coins", await coins_of(users[8].id) == 8)
+        check("rank 11 got 0 coins", await coins_of(users[9].id) == 0)
+
+        # ECONOMY SEAL: race coins touch only the wallet
+        winner = (await db.execute(
+            select(User).filter(User.id == users[0].id)
+        )).scalars().first()
+        check("race coins don't touch credit/stars",
+              (winner.credit or 0) == 0 and (winner.stars or 0) == 0)
 
     # idempotency: running the JOB now must mint nothing new
     await arcade_monthly_prizes_job(bot=None)
     async with maker() as db:
         coupons = (await db.execute(select(RewardCoupon))).scalars().all()
-        check("job is idempotent (still 4 coupons)", len(coupons) == 4)
+        check("job is idempotent (still 10 coupons)", len(coupons) == 10)
+        w = await crud.get_or_create_arcade_wallet(db, users[0].id)
+        check("job re-run doesn't re-pay coins", (w.coins or 0) == 40)
 
 
 async def test_ranking_and_flags():

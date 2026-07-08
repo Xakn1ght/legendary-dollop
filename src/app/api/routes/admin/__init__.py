@@ -53,7 +53,11 @@ from app.api.routes.admin.tickets import (
     handle_admin_ticket_user_photo,
     handle_admin_tickets,
 )
-from app.api.routes.admin.arcade_flags import handle_admin_arcade_flags
+from app.api.routes.admin.arcade_flags import (
+    handle_admin_arcade_flags,
+    handle_admin_arcade_user_adjust,
+    handle_admin_arcade_user_get,
+)
 from app.api.routes.admin.ops import (
     handle_admin_analytics_expiring,
     handle_admin_analytics_revenue,
@@ -110,6 +114,8 @@ __all__ = [
     "handle_admin_recent_broadcasts",
     "handle_admin_receipt_detail",
     "handle_admin_arcade_flags",
+    "handle_admin_arcade_user_adjust",
+    "handle_admin_arcade_user_get",
     "handle_admin_remove_vip",
     "handle_admin_reset_arcade",
     "handle_admin_search_user_for_vip",

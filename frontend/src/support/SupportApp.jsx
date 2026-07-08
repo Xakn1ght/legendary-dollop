@@ -387,6 +387,14 @@ export function SupportApp() {
       else loadTickets(false);
       return true;
     }
+    if (res.error === 'too_many_open_tickets') {
+      showToast(tt('tooManyOpenTickets'), 'error');
+      return false;
+    }
+    if (res.error === 'daily_ticket_limit') {
+      showToast(tt('dailyTicketLimit'), 'error');
+      return false;
+    }
     const localized = localizeValidationError(res, tt, langRef.current);
     showToast(localized || res.message || tt('errorCreating'), 'error');
     return false;
@@ -563,6 +571,7 @@ export function SupportApp() {
 
       <CreateTicketModal
         t={t}
+        lang={lang}
         active={modalActive}
         subs={subs}
         initialSubId={modalInitialSub}

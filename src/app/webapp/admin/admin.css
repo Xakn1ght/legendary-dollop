@@ -4390,9 +4390,10 @@ body.admin-panel tbody tr:hover { background: rgba(var(--brandRgb), 0.05); }
   animation: adminToastIn 0.24s cubic-bezier(.2,.7,.3,1);
   max-width: min(420px, 90vw);
 }
-.admin-toast-error { border-left: 3px solid var(--danger); }
-.admin-toast-success { border-left: 3px solid var(--success); }
-.admin-toast-info { border-left: 3px solid var(--brand); }
+/* Edge accent bars purged 2026-07-08 (Pasha) — state via border tint, no stripe. */
+.admin-toast-error { border-color: rgba(248, 113, 113, 0.45); }
+.admin-toast-success { border-color: rgba(52, 211, 153, 0.45); }
+.admin-toast-info { border-color: rgba(var(--brandRgb), 0.40); }
 @keyframes adminToastIn {
   from { opacity: 0; transform: translateY(12px); }
   to   { opacity: 1; transform: translateY(0); }
@@ -4571,10 +4572,11 @@ body.admin-panel.support-page { overflow: hidden; }
 .sup-inbox .glass-card { display: flex; flex-direction: column; min-height: 0; padding: 0 !important; }
 
 /* left rail */
-.sup-list-head { display: flex; justify-content: space-between; align-items: center; padding: 18px 18px 12px; }
+/* Back-to-panel sits on the LEFT (it's a back action); title block follows. */
+.sup-list-head { display: flex; align-items: center; gap: 12px; padding: 18px 18px 12px; }
 .sup-title { font-size: 18px; font-weight: 800; letter-spacing: -0.02em; }
 .sup-sub { font-size: 12px; color: var(--muted); margin-top: 2px; }
-.sup-home { padding: 6px 12px !important; font-size: 12px; }
+.sup-home { padding: 6px 12px !important; font-size: 12px; white-space: nowrap; flex-shrink: 0; }
 .sup-search {
   display: flex; align-items: center; gap: 8px; margin: 0 18px 10px;
   padding: 9px 12px; border-radius: 11px; color: var(--muted);
@@ -5175,7 +5177,9 @@ body.admin-panel .sms-log {
 }
 
 /* ---- typing indicator (contract shared with user dashboard) ---- */
-body.admin-panel .sup-typing { display: inline-flex; gap: 5px; align-items: center; padding: 12px 16px; }
+/* flex-direction: row is load-bearing — the element also carries .sup-bubble,
+   whose column layout stacked the three dots vertically. */
+body.admin-panel .sup-typing { display: inline-flex; flex-direction: row; gap: 5px; align-items: center; padding: 12px 16px; }
 body.admin-panel .sup-typing-dot {
   width: 7px; height: 7px; border-radius: 50%;
   background: currentColor; opacity: 0.4;
@@ -5241,8 +5245,12 @@ body.admin-panel .sup-bubble.has-photo { padding: 4px; background: rgba(255,255,
 body.admin-panel .sup-bubble.admin.has-photo { background: rgba(255,255,255,0.06); }
 body.admin-panel .sup-bubble.has-photo .sup-bubble-time { padding: 2px 8px 4px 0; }
 body.admin-panel .sup-photo-btn { padding: 0; border: 0; background: none; cursor: zoom-in; display: block; line-height: 0; }
+/* Fixed square crop, same treatment as the user dashboard chat
+   (.msg-photo): tall phone screenshots were rendering as full-aspect
+   strips. Tap opens the lightbox for the uncropped view. */
 body.admin-panel .sup-photo {
-  max-width: min(280px, 100%); max-height: 240px; width: auto;
+  width: min(180px, 56vw); height: min(180px, 56vw);
+  max-width: none; max-height: none;
   object-fit: cover; border-radius: 12px; display: block;
 }
 
@@ -5277,7 +5285,7 @@ body.admin-panel .sup-send { border-radius: 12px !important; }
   body.admin-panel .sup-hbtn { width: 36px; padding: 0; justify-content: center; }
   body.admin-panel .sup-thread { padding: 14px 12px 18px; }
   body.admin-panel .sup-bubble { max-width: 84%; }
-  body.admin-panel .sup-photo { max-width: min(240px, 78vw); max-height: 220px; }
+  body.admin-panel .sup-photo { width: min(180px, 56vw); height: min(180px, 56vw); }
   body.admin-panel .sup-rows { padding: 4px 8px 12px; }
   body.admin-panel .sup-row { padding: 13px 10px; }
   body.admin-panel .sup-canned { margin: 0 10px; }
@@ -5432,4 +5440,26 @@ body.admin-panel aside.sup-ctx:hover { transform: none; }
   body.admin-panel aside.sup-ctx:hover { transform: translateX(105%); }
   body.admin-panel aside.sup-ctx.open,
   body.admin-panel aside.sup-ctx.open:hover { transform: translateX(0); }
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   v59 — RESPONSIVE TWO-COLUMN PAGES (2026-07-08)
+   Broadcasts/Database used inline fixed-column grids that crushed the form
+   into a ~60px sliver on phones (Pasha's iPhone screenshot). Pages now use
+   these classes; single column under 920px (the panel's mobile breakpoint).
+   ═══════════════════════════════════════════════════════════════════════════ */
+.page-two-col {
+  display: grid;
+  gap: 20px;
+  align-items: start;
+  min-width: 0;
+}
+.page-two-col > * { min-width: 0; }
+.page-two-col.aside-right { grid-template-columns: minmax(0, 1fr) minmax(0, 360px); }
+.page-two-col.aside-left  { grid-template-columns: minmax(0, 300px) minmax(0, 1fr); }
+@media (max-width: 920px) {
+  .page-two-col.aside-right,
+  .page-two-col.aside-left { grid-template-columns: 1fr; gap: 14px; }
+  /* recent/list panes read better after the form on phones */
+  .page-two-col.aside-right > :last-child { order: 2; }
 }

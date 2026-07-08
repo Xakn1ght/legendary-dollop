@@ -20,6 +20,9 @@ class User(Base):
     created_at = Column(DateTime, default=datetime.datetime.utcnow)
     stars = Column(Integer, default=0, nullable=False)
     credit = Column(Integer, default=0, nullable=False)
+    # Saved cash-out destination (digits only, 16 chars) — masked everywhere in
+    # the user UI; admins see it in full on the payout request they approve.
+    payout_card = Column(String(20), nullable=True)
     banned = Column(Boolean, default=False, nullable=False)
     is_admin = Column(Boolean, default=False, nullable=False)
     category = Column(String(32), nullable=False, default="normal")

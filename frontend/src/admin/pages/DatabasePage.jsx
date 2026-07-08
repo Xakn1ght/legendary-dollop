@@ -101,7 +101,7 @@ export function DatabasePage() {
         </div>
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: '300px 1fr', gap: 16, alignItems: 'start' }}>
+      <div className="page-two-col aside-left">
         <div className="glass-card" style={{ padding: 14 }}>
           <input className="input-field" placeholder="Search tables…" value={tableQuery} onChange={(e) => setTableQuery(e.target.value)} style={{ marginBottom: 12 }} />
           <div style={{ maxHeight: '60vh', overflow: 'auto', fontSize: 13 }}>

@@ -8,11 +8,144 @@ import { fmtNum } from '../util.js';
 
 const PER_PAGE = 50;
 
+const DIFF_LABELS = {
+  easy: 'Easy — enemies 15% slower',
+  normal: 'Normal (default)',
+  hard: 'Hard — enemies 15% faster',
+  boss_rush: 'Boss test (QA) — all bosses from level 2',
+};
+
+// Per-user arcade panel: coin grants + difficulty + daily-limit reset.
+// Coins are arcade-only (skins/powers/retries) so grants can't mint money.
+function ArcadeModal({ user, onClose }) {
+  const toast = useToast();
+  const [wallet, setWallet] = useState(null);
+  const [loadError, setLoadError] = useState('');
+  const [diffs, setDiffs] = useState(['easy', 'normal', 'hard', 'boss_rush']);
+  const [grant, setGrant] = useState('');
+  const [busy, setBusy] = useState(false);
+
+  const load = async () => {
+    setLoadError('');
+    try {
+      const { status, data } = await apiJson(`/api/admin/users/${user.id}/arcade`);
+      if (data.ok) {
+        setWallet(data.wallet);
+        if (data.difficulties?.length) setDiffs(data.difficulties);
+      } else if (status === 404) {
+        // endpoint missing = the bot is running pre-arcade-panel code
+        setLoadError('Endpoint not found (404) — the bot needs a restart to serve this panel.');
+      } else {
+        setLoadError(`Failed to load wallet (${status || 'network'}${data.error ? ': ' + data.error : ''}).`);
+      }
+    } catch (_) { setLoadError('Failed to load wallet (network).'); }
+  };
+  useEffect(() => { load(); }, [user.id]);
+
+  async function adjust(body, okMsg) {
+    setBusy(true);
+    try {
+      const { data } = await postJson(`/api/admin/users/${user.id}/arcade`, body);
+      if (data?.ok) { setWallet(data.wallet); toast(okMsg, 'success'); }
+      else toast(data?.error || 'Failed', 'error');
+    } catch (_) { toast('Failed', 'error'); } finally { setBusy(false); }
+  }
+
+  async function grantCoins() {
+    const n = parseInt(String(grant).trim(), 10);
+    if (!isFinite(n) || !n) { toast('Enter a non-zero number', 'error'); return; }
+    await adjust({ coins_delta: n }, n > 0 ? `+${n} coins granted` : `${n} coins removed`);
+    setGrant('');
+  }
+
+  async function resetDaily() {
+    setBusy(true);
+    try {
+      const { data } = await postJson(`/api/admin/users/${user.id}/reset-arcade`, {});
+      if (!data?.ok) toast(data?.error || 'Reset failed', 'error');
+      else if (data.reset) toast(`Today's run cleared (was ${fmtNum(data.cleared_best)})`, 'success');
+      else toast('Gate already open — nothing to clear', 'success');
+    } catch (_) { toast('Reset failed', 'error'); } finally { setBusy(false); }
+  }
+
+  return (
+    <div className="v3-modal-backdrop open" onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}>
+      <div className="v3-modal" role="dialog" aria-modal="true">
+        <div className="v3-modal-head">
+          <div>
+            <div className="v3-modal-title">Arcade — @{user.username || user.chat_id}</div>
+            <div className="v3-modal-sub">Coins are arcade-only; they never convert to credit.</div>
+          </div>
+          <button className="mini-close" type="button" aria-label="Close" onClick={onClose}>✕</button>
+        </div>
+        <div className="v3-modal-body">
+          {!wallet && !loadError && <div style={{ color: 'var(--text-muted)', padding: 12 }}>Loading…</div>}
+          {!wallet && loadError && (
+            <div style={{ padding: 12 }}>
+              <div style={{ color: 'var(--danger)', marginBottom: 10 }}>{loadError}</div>
+              <button className="btn btn-secondary" onClick={load}>Retry</button>
+            </div>
+          )}
+          {wallet && (
+            <>
+              <div style={{ display: 'flex', gap: 8, marginBottom: 14 }}>
+                <div style={{ flex: 1, background: 'rgba(255,210,63,0.08)', border: '1px solid rgba(255,210,63,0.3)', borderRadius: 10, padding: 10 }}>
+                  <div style={{ fontSize: 10, color: 'var(--text-muted)' }}>COINS</div>
+                  <div style={{ fontWeight: 700, fontSize: 18 }}>{wallet.coins}</div>
+                </div>
+                <div style={{ flex: 1, background: 'rgba(0,0,0,0.2)', borderRadius: 10, padding: 10 }}>
+                  <div style={{ fontSize: 10, color: 'var(--text-muted)' }}>SKIN</div>
+                  <div style={{ fontWeight: 700, fontSize: 14, paddingTop: 3 }}>{wallet.equipped_skin}</div>
+                </div>
+                <div style={{ flex: 1, background: 'rgba(0,0,0,0.2)', borderRadius: 10, padding: 10 }}>
+                  <div style={{ fontSize: 10, color: 'var(--text-muted)' }}>EXTRA LIVES</div>
+                  <div style={{ fontWeight: 700, fontSize: 18 }}>{wallet.extra_lives}</div>
+                </div>
+              </div>
+
+              <div style={{ marginBottom: 14 }}>
+                <div style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 6 }}>Grant / remove coins</div>
+                <div style={{ display: 'flex', gap: 8 }}>
+                  <input
+                    className="input-field" type="number" placeholder="e.g. 100 or -20"
+                    value={grant} onChange={(e) => setGrant(e.target.value)}
+                    onKeyDown={(e) => { if (e.key === 'Enter') grantCoins(); }}
+                    style={{ flex: 1 }}
+                  />
+                  <button className="btn btn-primary" disabled={busy} onClick={grantCoins}>Apply</button>
+                </div>
+              </div>
+
+              <div style={{ marginBottom: 14 }}>
+                <div style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 6 }}>Difficulty (applies from their next run)</div>
+                <select
+                  className="input-field" value={wallet.difficulty || 'normal'} disabled={busy}
+                  onChange={(e) => adjust({ difficulty: e.target.value }, `Difficulty set to ${e.target.value}`)}
+                >
+                  {diffs.map((d) => <option key={d} value={d}>{DIFF_LABELS[d] || d}</option>)}
+                </select>
+              </div>
+
+              <button className="btn btn-secondary" disabled={busy} onClick={resetDaily} style={{ width: '100%' }}>
+                Reset today's play limit
+              </button>
+            </>
+          )}
+        </div>
+        <div className="v3-modal-actions">
+          <button className="btn btn-primary" type="button" onClick={onClose}>Done</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export function UsersPage() {
   const modal = useModal();
   const toast = useToast();
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [arcadeUser, setArcadeUser] = useState(null);
   // command palette can hand us a prefilled search (sessionStorage, one-shot)
   const [q, setQ] = useState(() => {
     try {
@@ -74,12 +207,7 @@ export function UsersPage() {
     toast(u.banned ? 'User unbanned' : 'User banned', 'success');
     load();
   }
-  async function resetArcade(u) {
-    const ok = await modal.confirm('Reset daily arcade limit?', 'This resets the daily arcade limit for this user.');
-    if (!ok) return;
-    await postJson(`/api/admin/users/${u.id}/reset-arcade`, {});
-    toast('Arcade limit reset', 'success');
-  }
+  // gamepad button → full arcade panel (coins / difficulty / daily reset)
 
   return (
     <>
@@ -124,7 +252,7 @@ export function UsersPage() {
             </div>
             <div style={{ display: 'flex', gap: 8 }}>
               <button onClick={() => editCredit(u)} className="btn btn-secondary" style={{ flex: 1, padding: 8, fontSize: 12 }}>Edit</button>
-              <button onClick={() => resetArcade(u)} className="btn btn-secondary" style={{ flex: 1, padding: 8, display: 'flex', alignItems: 'center', justifyContent: 'center' }} title="Reset Arcade Limit"><Icons.gamepad width={16} height={16} /></button>
+              <button onClick={() => setArcadeUser(u)} className="btn btn-secondary" style={{ flex: 1, padding: 8, display: 'flex', alignItems: 'center', justifyContent: 'center' }} title="Arcade: coins / difficulty / daily reset"><Icons.gamepad width={16} height={16} /></button>
               <button onClick={() => toggleBan(u)} className="btn" style={{ flex: 1, padding: 8, fontSize: 12, background: 'rgba(248,113,113,0.12)', color: 'var(--danger)' }}>{u.banned ? 'Unban' : 'Ban'}</button>
             </div>
           </div>
@@ -141,6 +269,8 @@ export function UsersPage() {
           <button className="btn btn-secondary" disabled={start + PER_PAGE >= view.length} onClick={() => setPage(curPage + 1)}>Next →</button>
         </div>
       </div>
+
+      {arcadeUser && <ArcadeModal user={arcadeUser} onClose={() => setArcadeUser(null)} />}
     </>
   );
 }

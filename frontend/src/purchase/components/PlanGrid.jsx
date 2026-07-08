@@ -6,8 +6,18 @@ import { isAndroidLike } from '../../shared/keyboard.js';
 import { hapticSelection } from '../../shared/telegram.js';
 
 // Aggregate auto-discount badges shown on every plan card (VIP + event promos).
-function AutoBadges({ autoDiscounts, fmt, t, lang }) {
-  const badges = (autoDiscounts || []).map((d, i) => {
+// VIP-exclusive plans never show/get the VIP % — they already carry the best
+// per-GB price and the server refuses to stack (flows/pricing.py).
+function applicableDiscounts(autoDiscounts, vipOnly) {
+  return (autoDiscounts || []).filter((d) => !(vipOnly && String(d?.type) === 'vip'));
+}
+function discountPctFor(autoDiscounts, vipOnly) {
+  const sum = applicableDiscounts(autoDiscounts, vipOnly)
+    .reduce((s, d) => s + (Number(d?.percent || 0) || 0), 0);
+  return Math.max(0, Math.min(90, sum));
+}
+function AutoBadges({ autoDiscounts, fmt, t, lang, vipOnly }) {
+  const badges = applicableDiscounts(autoDiscounts, vipOnly).map((d, i) => {
     const type = d?.type ? String(d.type) : 'event';
     const pct = Number(d?.percent || 0) || 0;
     if (pct <= 0) return null;
@@ -21,7 +31,12 @@ function AutoBadges({ autoDiscounts, fmt, t, lang }) {
 
 // "Build your own" card + slider/number pop. Quote comes from the server;
 // a successful quote auto-selects the virtual custom plan (parity with legacy).
-function CustomPlanCard({ t, fmt, selected, onSelect, autoOpen }) {
+// autoDiscounts: custom plans are NOT vip_only, so the VIP % applies — show
+// the discounted price here exactly like the fixed cards (Pasha bug report:
+// "the VIP offer isn't applied on the custom").
+function CustomPlanCard({ t, fmt, selected, onSelect, autoOpen, autoDiscounts }) {
+  const customPct = discountPctFor(autoDiscounts, false);
+  const discounted = (price) => (customPct > 0 ? price - Math.floor(price * (customPct / 100)) : price);
   const [open, setOpen] = useState(autoOpen || (selected?.custom ?? false));
   const [gb, setGb] = useState(selected?.custom ? selected.gb : 50);
   const [priceLabel, setPriceLabel] = useState(null); // null=tap hint, 'loading', number=price
@@ -134,13 +149,19 @@ function CustomPlanCard({ t, fmt, selected, onSelect, autoOpen }) {
         onClick={onCardClick}
         onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onCardClick(); } }}
       >
+        <AutoBadges autoDiscounts={autoDiscounts} fmt={fmt} t={t} lang="fa" vipOnly={false} />
         <div className="plan-gb" style={{ fontSize: 26, display: 'flex', justifyContent: 'center' }}><PackageIcon size={26} /></div>
         <div className="plan-gb-label">{t('customPlan')}</div>
         <div className="plan-price">
+          {customPct > 0 && typeof (priceLabel === 'number' ? priceLabel : (isSelected ? selected.price : null)) === 'number' && (
+            <div className="old">
+              {fmt(typeof priceLabel === 'number' ? priceLabel : selected.price)} <span>{t('currency')}</span>
+            </div>
+          )}
           <div className="new custom-price-label">
             {priceLabel === 'loading' ? '…'
-              : typeof priceLabel === 'number' ? <>{fmt(priceLabel)} <span>{t('currency')}</span></>
-                : isSelected ? <>{fmt(selected.price)} <span>{t('currency')}</span></>
+              : typeof priceLabel === 'number' ? <>{fmt(discounted(priceLabel))} <span>{t('currency')}</span></>
+                : isSelected ? <>{fmt(discounted(selected.price))} <span>{t('currency')}</span></>
                   : t('customPlanTap')}
           </div>
         </div>
@@ -188,14 +209,13 @@ function CustomPlanCard({ t, fmt, selected, onSelect, autoOpen }) {
 }
 
 export function PlanGrid({ id, t, fmt, lang, plans, autoDiscounts, selectedPlan, onSelect, autoOpenCustom }) {
-  const autoDiscountPercent = (autoDiscounts || []).reduce((sum, d) => sum + (Number(d?.percent || 0) || 0), 0);
-  const discountPct = Math.max(0, Math.min(90, autoDiscountPercent));
-
   return (
     <div className="plans-grid" id={id}>
       {plans.map((plan) => {
+        const vipOnly = !!plan.vip_only;
+        const pct = discountPctFor(autoDiscounts, vipOnly);
         const totalPrice = Number(plan.price || 0);
-        const discountAmount = discountPct > 0 ? Math.floor(totalPrice * (discountPct / 100)) : 0;
+        const discountAmount = pct > 0 ? Math.floor(totalPrice * (pct / 100)) : 0;
         const finalPrice = totalPrice - discountAmount;
         const isSelected = !!selectedPlan && !selectedPlan.custom && selectedPlan.name === plan.name;
         return (
@@ -208,7 +228,7 @@ export function PlanGrid({ id, t, fmt, lang, plans, autoDiscounts, selectedPlan,
             onClick={() => { onSelect(plan); hapticSelection(); }}
             onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onSelect(plan); hapticSelection(); } }}
           >
-            <AutoBadges autoDiscounts={autoDiscounts} fmt={fmt} t={t} lang={lang} />
+            <AutoBadges autoDiscounts={autoDiscounts} fmt={fmt} t={t} lang={lang} vipOnly={vipOnly} />
             <div className="plan-gb">{fmt(plan.gb)}</div>
             <div className="plan-gb-label">{t('GB')}</div>
             <div className="plan-price">
@@ -218,7 +238,7 @@ export function PlanGrid({ id, t, fmt, lang, plans, autoDiscounts, selectedPlan,
           </div>
         );
       })}
-      <CustomPlanCard t={t} fmt={fmt} selected={selectedPlan} onSelect={onSelect} autoOpen={autoOpenCustom} />
+      <CustomPlanCard t={t} fmt={fmt} selected={selectedPlan} onSelect={onSelect} autoOpen={autoOpenCustom} autoDiscounts={autoDiscounts} />
     </div>
   );
 }

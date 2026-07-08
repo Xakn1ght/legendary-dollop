@@ -15,6 +15,9 @@ export const translations = {
     ticketCreated: 'Ticket created!',
     errorCreating: 'Error creating ticket',
     messageTooShort: 'Message must be at least 10 characters long',
+    messageTooLong: 'Message is too long (max 2,000 characters)',
+    tooManyOpenTickets: 'You already have 3 open tickets — please wait for a reply first',
+    dailyTicketLimit: 'Daily ticket limit reached — please try again tomorrow',
     errorDeleting: 'Error deleting ticket',
     ticketDeleted: 'Ticket deleted',
     deleteConfirm: 'Delete this ticket?',
@@ -59,6 +62,9 @@ export const translations = {
     ticketCreated: 'تیکت ایجاد شد!',
     errorCreating: 'خطا در ایجاد تیکت',
     messageTooShort: 'پیام باید حداقل ۱۰ کاراکتر باشد',
+    messageTooLong: 'پیام بیش از حد طولانی است (حداکثر ۲۰۰۰ کاراکتر)',
+    tooManyOpenTickets: 'شما ۳ تیکت باز دارید — لطفاً ابتدا منتظر پاسخ بمانید',
+    dailyTicketLimit: 'به سقف روزانه ایجاد تیکت رسیدید — فردا دوباره تلاش کنید',
     errorDeleting: 'خطا در حذف تیکت',
     ticketDeleted: 'تیکت حذف شد',
     deleteConfirm: 'این تیکت حذف شود؟',
@@ -100,6 +106,7 @@ export function localizeValidationError(res, t, lang) {
   const field = String(first.field || '');
   const msg = String(first.message || '');
   if (field === 'message' && /at least 10 characters/i.test(msg)) return t('messageTooShort');
+  if (field === 'message' && /(at most 2000|exceed 2000)/i.test(msg)) return t('messageTooLong');
   if (field === 'message' && /cannot be empty/i.test(msg)) return lang === 'fa' ? 'پیام نمی‌تواند خالی باشد' : 'Message cannot be empty';
   if (field === 'category' && /Field required/i.test(msg)) return lang === 'fa' ? 'لطفاً دسته‌بندی را انتخاب کنید' : 'Please select a category';
   return msg || null;

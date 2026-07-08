@@ -141,7 +141,10 @@
       }catch(_){}
       try{
         const accent = localStorage.getItem('accent');
-        const allowed = ['red','cyan','emerald','violet','amber'];
+        // Keep in sync with ShellApp's ACCENT_ALLOWED — this stale list once
+        // dropped the unlockable accents (vip/champion/legend), so platinum
+        // users flashed red here and standalone pages lost the accent for good.
+        const allowed = ['red','cyan','emerald','violet','amber','vip','champion','legend'];
         document.documentElement.setAttribute('data-accent', allowed.indexOf(accent) >= 0 ? accent : 'red');
       }catch(_){
         document.documentElement.setAttribute('data-accent', 'red');
@@ -311,6 +314,88 @@
       }catch(_){}
     })();
 
+// Plain Android WEBVIEWS outside Telegram (the Orbit app embeds the dashboard)
+// draw edge-to-edge under a transparent system navbar while env(safe-area-*)
+// reports 0 — Pasha's screenshot had the ||| O < buttons ON TOP of a sheet's
+// action row. Telegram sets --astro-safe-bottom-extra itself (block above);
+// here we floor it for the no-Telegram webview case. Gate: the "; wv)" UA
+// token marks a WebView (plain Chrome doesn't have it, so no dead air there).
+(function () {
+  try {
+    var ua = navigator.userAgent || '';
+    var isWv = /; wv\)/i.test(ua) || /Version\/[\d.]+ Chrome\/[\d.]+ Mobile/i.test(ua);
+    // telegram-web-app.js defines window.Telegram.WebApp EVERYWHERE (it's in
+    // our <head>), so "object exists" proves nothing. Real Telegram = live
+    // initData or a real platform name (Orbit reports platform "unknown").
+    var twa = window.Telegram && window.Telegram.WebApp;
+    var hasTg = !!(twa && ((twa.initData && twa.initData.length > 10) || (twa.platform && twa.platform !== 'unknown')));
+    if (/android/i.test(ua) && isWv && !hasTg) {
+      var cur = parseInt(getComputedStyle(document.documentElement).getPropertyValue('--astro-safe-bottom-extra') || '0', 10) || 0;
+      if (cur < 44) document.documentElement.style.setProperty('--astro-safe-bottom-extra', '44px');
+    }
+  } catch (_) {}
+})();
+
+// STICKY-HOVER KILLER (touch devices): Android/iOS webviews latch :hover onto
+// the last tapped element, so every desktop hover style becomes a stuck state
+// on phones (frozen FAB float, lifted+clipped profile stat tiles, washed
+// buttons…). ~120 ungated :hover rules exist across the dashboard CSS —
+// instead of gating them one by one forever, strip them from the CSSOM at
+// runtime when the device can't hover. :active/:focus feedback is untouched
+// (mixed selector lists only lose their :hover members). Rules inside
+// @media (hover: hover) blocks are left alone — they can never match here.
+(function () {
+  'use strict';
+  try {
+    var canHover = window.matchMedia && matchMedia('(hover: hover)').matches
+      && !matchMedia('(pointer: coarse)').matches;
+    if (canHover) return;
+  } catch (_) { return; }
+  var done = (typeof WeakSet === 'function') ? new WeakSet() : null;
+
+  function stripGroup(group) {
+    var rules;
+    try { rules = group.cssRules; } catch (_) { return; } // cross-origin — skip
+    if (!rules) return;
+    for (var i = rules.length - 1; i >= 0; i--) {
+      var r = rules[i];
+      try {
+        if (r.type === 1 && r.selectorText && r.selectorText.indexOf(':hover') !== -1) {
+          var kept = r.selectorText.split(',').filter(function (s) { return s.indexOf(':hover') === -1; });
+          if (!kept.length) group.deleteRule(i);
+          else {
+            try { r.selectorText = kept.join(','); } catch (_) { group.deleteRule(i); }
+          }
+        } else if (r.cssRules && (r.type === 4 || r.type === 12)) { // @media / @supports
+          var cond = '';
+          try { cond = r.conditionText || (r.media && r.media.mediaText) || ''; } catch (_) { cond = ''; }
+          if (/hover:\s*hover/i.test(cond)) continue; // already touch-safe
+          stripGroup(r);
+        }
+      } catch (_) { /* one bad rule must not stop the sweep */ }
+    }
+  }
+
+  function sweep() {
+    try {
+      for (var i = 0; i < document.styleSheets.length; i++) {
+        var sh = document.styleSheets[i];
+        var rules = null;
+        try { rules = sh.cssRules; } catch (_) { continue; } // loading/cross-origin — retry next sweep
+        if (!rules || !rules.length) continue;               // not loaded yet — retry next sweep
+        if (done) { if (done.has(sh)) continue; done.add(sh); }
+        stripGroup(sh);
+      }
+    } catch (_) {}
+  }
+  // Sheets finish loading after head-boot runs; sweep at readiness milestones
+  // and once more late for lazily injected chunks.
+  document.addEventListener('DOMContentLoaded', sweep);
+  window.addEventListener('load', sweep);
+  setTimeout(sweep, 2500);
+  setTimeout(sweep, 6000);
+})();
+
 // Keyboard helper: keep the focused input visible above the on-screen keyboard.
 // On Android the webview is NOT resized when the keyboard opens — it just covers
 // the bottom of the page, so scrollIntoView alone can't help short pages or
@@ -329,6 +414,15 @@
   }
   var IS_ANDROID = /android/i.test(navigator.userAgent || '');
   var baseHeight = window.innerHeight; // refreshed whenever no field is focused
+  // Guess-lift staleness: the 50% Android fallback has NO closing signal (the
+  // webview reports nothing when the keyboard is back-dismissed), so it decays:
+  // typing ('input' events), focus changes and viewport resizes all refresh
+  // lastKbActivity; with no signs of life the guessed lift auto-drops and the
+  // next keystroke re-lifts instantly. Measured lifts (vv/tg) are exempt —
+  // they get real close events. Fixes the giant stuck bottom gap on Samsung
+  // webviews (Orbit app screenshot, 2026-07-08).
+  var KB_GUESS_STALE_MS = 25000;
+  var lastKbActivity = 0;
   // NOTE: the VirtualKeyboard API is a trap here — it exists in this webview
   // but the keyboard isn't chromium-managed, so geometrychange reports height
   // 0 while the keyboard is actually covering the page. Trusting it disabled
@@ -348,7 +442,10 @@
     // so 42% left the composer clipped under the keyboard; slight over-lift
     // (a gap above a short keyboard) is the cheaper failure.
     // ponytail: over-lifts with external keyboards; the outside-tap blur below resets it.
-    if (IS_ANDROID) return Math.round(window.innerHeight * 0.50);
+    if (IS_ANDROID) {
+      if (lastKbActivity && (Date.now() - lastKbActivity) > KB_GUESS_STALE_MS) return 0;
+      return Math.round(window.innerHeight * 0.50);
+    }
     return 0;
   }
   function inFixed(el) {
@@ -389,30 +486,69 @@
     if (timer) clearTimeout(timer);
     timer = setTimeout(function () { timer = null; apply(); }, delay || 80);
   }
-  document.addEventListener('focusin', function () { queue(320); }, true);
+  var staleTimer = null;
+  function armStaleSweep() {
+    // Re-check shortly after the guess goes stale so the gap self-heals even
+    // with zero further user events (the exact stuck-screenshot scenario).
+    if (staleTimer) clearTimeout(staleTimer);
+    if (!root.classList.contains('kb-open')) return;
+    staleTimer = setTimeout(function () { staleTimer = null; apply(); armStaleSweep(); }, KB_GUESS_STALE_MS + 500);
+  }
+  function touchKbActivity() { lastKbActivity = Date.now(); }
+  document.addEventListener('focusin', function () { touchKbActivity(); queue(320); setTimeout(armStaleSweep, 400); }, true);
   document.addEventListener('focusout', function () { queue(120); }, true);
+  // Typing proves the keyboard is really up — keeps the guessed lift alive,
+  // and re-lifts instantly if the stale sweep had dropped it mid-composition.
+  document.addEventListener('input', function () {
+    touchKbActivity();
+    if (!root.classList.contains('kb-open') && focusedField()) { queue(60); setTimeout(armStaleSweep, 400); }
+  }, true);
   // The webview gives NO signal when the keyboard is dismissed with the Android
   // back button — focus stays in the field, so the guessed lift got stuck and
   // left a dead gap. Recovery (and native chat feel): tapping anything that is
   // not the field itself or another control blurs the field, which closes the
   // keyboard if it is still up and always drops the lift. Buttons/links are
   // exempt so tapping Send doesn't collapse the composer mid-action.
+  // A dismiss-tap must do NOTHING but dismiss: the blur collapses the keyboard
+  // and the page re-lays-out mid-tap, so the tap's synthesized click fires on
+  // whatever shifted under the finger (the bottom-nav Support tab kept
+  // "opening tickets" — Pasha, 2026-07-08). Swallow that one click.
+  // Swallow EVERY click in the window (not one-shot): some webviews emulate
+  // a second mouse click after touchend and either one can land on a nav tab.
+  var suppressClickUntil = 0;
+  document.addEventListener('click', function (ev) {
+    if (Date.now() < suppressClickUntil) {
+      ev.stopPropagation();
+      ev.preventDefault();
+    }
+  }, true);
   document.addEventListener('touchstart', function (ev) {
     var el = focusedField();
-    if (!el || !root.classList.contains('kb-open')) return;
+    if (!root.classList.contains('kb-open')) return;
+    if (!el) {
+      // Focused field vanished without a blur event (hidden/unmounted mid-lift,
+      // a webview quirk): any touch clears the orphaned lift immediately.
+      queue(40);
+      return;
+    }
     var t = ev.target;
-    if (t === el) return;
+    if (t === el) { touchKbActivity(); return; }
     try {
       if (t && t.closest && t.closest('input, textarea, select, [contenteditable="true"], button, a, label')) return;
     } catch (_) {}
     try { el.blur(); } catch (_) {}
+    suppressClickUntil = Date.now() + 700;
+  }, { capture: true, passive: true });
+  // Same orphan guard for scrolling (reading the page with a phantom gap).
+  document.addEventListener('scroll', function () {
+    if (root.classList.contains('kb-open') && !focusedField()) queue(80);
   }, { capture: true, passive: true });
   if (vv) {
-    try { vv.addEventListener('resize', function () { queue(60); }); } catch (_) {}
+    try { vv.addEventListener('resize', function () { touchKbActivity(); queue(60); }); } catch (_) {}
   }
   try {
     var tg = window.Telegram && window.Telegram.WebApp;
-    if (tg && typeof tg.onEvent === 'function') tg.onEvent('viewportChanged', function () { queue(60); });
+    if (tg && typeof tg.onEvent === 'function') tg.onEvent('viewportChanged', function () { touchKbActivity(); queue(60); });
   } catch (_) {}
 })();
 

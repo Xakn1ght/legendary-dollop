@@ -9,6 +9,7 @@ from app.core.redis_config import close_redis, init_redis
 from app.core.settings import ADMIN_BOT_TOKEN, security_sanity_warnings
 from app.database.models import AsyncSessionLocal, engine, init_db
 from app.handlers.admin import (
+    bot_texts,
     broadcast,
     cache,
     charge,
@@ -130,6 +131,9 @@ async def main() -> None:
         system.router,
         user_management.router,
         vip.router,
+        # LAST on purpose: its free-text handler catches search/edit input
+        # only after every other admin text handler declined the update.
+        bot_texts.router,
     ]
     for r in routers:
         try:

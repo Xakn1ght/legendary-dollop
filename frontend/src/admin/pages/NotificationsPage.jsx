@@ -80,7 +80,7 @@ export function NotificationsPage() {
   }
 
   return (
-    <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) minmax(0, 360px)', gap: 20, alignItems: 'start' }}>
+    <div className="page-two-col aside-right">
       <form className="glass-card" style={{ padding: 20 }} onSubmit={send}>
         <h3 style={{ marginTop: 0, fontSize: 15 }}>New Broadcast</h3>
         <input className="input-field" placeholder="Title" value={title} onChange={(e) => setTitle(e.target.value)} style={{ marginBottom: 12 }} />

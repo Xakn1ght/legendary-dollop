@@ -89,17 +89,22 @@ async def handle_dashboard_orbit_add_link(request: web.Request):
             info = await marzban_api.get_fast_user_info(sub.marzban_username, getattr(sub, "sub_token", None))
         except Exception:
             info = None
-        sub_url = (info or {}).get("subscription_url")
-        token = getattr(sub, "sub_token", None)
-        if not sub_url and token:
-            from app.core.settings import SUBLINK
+        from app.core.settings import SUBLINK
 
-            base = SUBLINK.rstrip("/")
-            if not base.startswith(("http://", "https://")):
-                base = "https://" + base
-            sub_url = f"{base}/{token}"
-        elif sub_url and not re.match(r"^https?://", sub_url):
-            sub_url = "https://" + sub_url.lstrip("/")
+        _base = SUBLINK.rstrip("/")
+        if not _base.startswith(("http://", "https://")):
+            _base = "https://" + _base
+        _raw = (info or {}).get("subscription_url")
+        token = getattr(sub, "sub_token", None)
+        if _raw and re.match(r"^https?://", _raw):
+            sub_url = _raw
+        elif token:
+            # PasarGuard /sub/{token}/info has no subscription_url, so info gives a
+            # RELATIVE "/sub/{token}". Host it on the public SUBLINK domain rather
+            # than the broken "https://sub/{token}" the old concat produced.
+            sub_url = f"{_base}/{token}"
+        else:
+            sub_url = None
         if not sub_url:
             return web.json_response({"ok": False, "error": "no_sub_url"}, status=404)
 
@@ -111,27 +116,15 @@ async def handle_dashboard_orbit_add_link(request: web.Request):
         except Exception:
             expires_ms = None
 
-    try:
-        timeout = aiohttp.ClientTimeout(total=6)
-        async with aiohttp.ClientSession(timeout=timeout) as s:
-            async with s.post(
-                ORBIT_MINT_URL,
-                headers={"X-Orbit-Secret": secret},
-                json={
-                    "sub_url": sub_url,
-                    "display_name": display_name,
-                    "expires_at": expires_ms,
-                    "tg_user_id": str(user_chat_id),
-                },
-            ) as r:
-                data = await r.json()
-                if r.status != 200 or not data.get("add_url"):
-                    logger.warning("orbit mint failed: status=%s", r.status)
-                    return web.json_response({"ok": False, "error": "orbit_unavailable"}, status=502)
-                add_url = data["add_url"]
-    except Exception as e:
-        logger.warning("orbit mint unreachable: %s", e)
-        return web.json_response({"ok": False, "error": "orbit_unavailable"}, status=502)
+    # Embedded add link: the subscription travels inside the link so the Orbit app
+    # resolves it on-device (no Cloudflare claim round-trip, which some ISPs SNI-block).
+    # base64url(JSON) payload; the app imports the sub straight from its own host.
+    import base64 as _b64
+    import json as _json
+    _payload = _b64.urlsafe_b64encode(
+        _json.dumps({"u": sub_url, "n": display_name, "e": expires_ms}, separators=(",", ":")).encode()
+    ).decode().rstrip("=")
+    add_url = f"https://game1.astrobytech.com/o/{_payload}"
 
     resp = web.json_response({"ok": True, "add_url": add_url})
     if new_session_token:

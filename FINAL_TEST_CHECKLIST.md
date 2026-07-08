@@ -97,19 +97,22 @@ EOF
 
 ## Phase 8 — Cheat-seeds `[A]` (fabricate big states, test, wipe — snippets in SMOKE_CHECKLIST.md Phase 6)
 
-- [ ] 8.1 Grant 40★ → Champion badge + gold accent + free-plan/autorenew/pack coupons; free_plan zeroes a 20GB checkout
-- [ ] 8.2 Seed 20 active referrals + 500k credit → cash-out 100k → "min 200k" · 250k → request → Deny → credit back → 250k → Approve → paid
-- [ ] 8.3 Wipe seeds (snippet 6.3) → invite count back to real
+- [x] 8.1 Grant 40★ → Champion badge + gold accent + free-plan/autorenew/pack coupons; free_plan zeroes a 20GB checkout
+      _(2026-07-08 `scripts/phase8_cheatseed_run.py`: 2→42★, milestones 3..40 unlocked, wallet got 3×free_plan +3×discount +1×free_gb, quote_purchase 90000→0 with the 20GB free_plan coupon. Stars/coupons left on Paşanim so the Champion look can be eyeballed on-phone — final DB reset clears.)_
+- [x] 8.2 Seed 20 active referrals + 500k credit → cash-out 100k → "min 200k" · 250k → request → Deny → credit back → 250k → Approve → paid
+      _(same run, real flow services: amount_below_minimum on 100k; reserve→deny→refund; reserve→paid stays deducted; paid request can't be re-denied. 16/16 checks green. Two cashout_requests rows (denied+paid) left in DB deliberately.)_
+- [x] 8.3 Wipe seeds (snippet 6.3) → invite count back to real
+      _(seed users/subs/referrals wiped in the same run; credit restored to pre-run snapshot (0); active referrals back to 1.)_
 
 ## Phase 9 — Jobs & ops `[A]`
 
-- [ ] 9.1 `journalctl -u astrobyte-userbot --since '-15 min' | grep -iE 'scheduler|job'` — renewal 60s, low-data 10min
-- [ ] 9.2 Panel shield: `grep USER_INFO` on journal → sparse misses; dashboard warm loads fast
-- [ ] 9.3 Auto-renew: reserved-renewal sub → shrink limit in panel → renews in ~2–3 min, ≤5GB carry
-- [ ] 9.4 Season reset logged each 12h; arcade monthly-prize job registered (fires on the 1st)
-- [ ] 9.5 Watchdog: `/errors` command in admin bot answers; disk-alert wired
-- [ ] 9.6 Backup timer: `systemctl list-timers | grep astrobyte-backup` + fresh dir in `backups/auto/` (14 kept)
-- [ ] 9.7 RESTORE REHEARSAL (never done): restore latest auto backup into a scratch DB, confirm tables/counts
+- [x] 9.1 Jobs running (journal logs at INFO go to logs/bot.log, not journald): `src/app/data/job_status.json` shows renewal/low-data/node-watch/cleanup/claims/analytics all ok:true with fresh last_run_at (2026-07-08)
+- [ ] 9.2 Panel shield: `grep USER_INFO` on logs/bot.log → sparse misses; dashboard warm loads fast _(shield in place since cdd96af; headless dashboard loads were fast; leave the miss-rate check for post-launch watch 11.4)_
+- [ ] 9.3 Auto-renew: reserved-renewal sub → shrink limit in panel → renews in ~2–3 min, ≤5GB carry _(webhook instant-renew path was verified live 2026-07-07; the panel-shrink drill still needs a live sub)_
+- [x] 9.4 season_reset_job + arcade_monthly_prizes_job registered in main.py scheduler list (verified in code; run-log appears in job_status.json after first fire)
+- [ ] 9.5 Watchdog: `/errors` command in admin bot answers; disk-alert wired `[M — needs Telegram]`
+- [x] 9.6 Backup timer: astrobyte-backup.timer INSTALLED+enabled 2026-07-08 (was lost in the box migration; next run 01:30 UTC nightly, keeps 14) + fresh manual `backups/auto/backup_20260707_214420`
+- [x] 9.7 RESTORE REHEARSAL done 2026-07-08: latest dump → scratch DB `astrobyte_restore_rehearsal` via pg_restore → 39 tables match live, row counts match on users/subscriptions/referrals/reward_coupons/admin_audit_logs/vip_orders, alembic head d19c6a05e3b2 → scratch dropped. PASSED
 
 ## Phase 10 — SMS auto-approve (optional live arm — currently DISARMED, correct)
 
@@ -121,8 +124,8 @@ EOF
 
 ## Phase 11 — Launch gate
 
-- [ ] 11.1 Push: `git push origin rewards-pricing-rework` (3 commits ahead + 1 local lint fix uncommitted) → PR → main. 
-- [ ] 11.2 BotFather menu-button URL = https://dash.astrobytech.com/webapp/dashboard (verify what's set)
+- [ ] 11.1 Push: `git push origin rewards-pricing-rework` → PR → main.  _(2026-07-08 probe: deploy key NOT added yet — `git ls-remote` still "Permission denied (publickey)". Blocked on Pasha adding ~/.ssh/id_ed25519.pub in GitHub.)_
+- [ ] 11.2 BotFather menu-button URL = https://dash.astrobytech.com/webapp/dashboard (verify what's set) _(2026-07-08: default button was `commands`; `setChatMenuButton`→web_app/داشبورد returned ok:True but the API readback still says `commands` (Telegram quirk?). NEEDS PHONE EYEBALL — if the ≡ button doesn't open the dashboard, set it in BotFather: Bot Settings ▸ Menu Button.)_
 - [ ] 11.3 FINAL DB reset (repeat Phase 0) so real users start at zero; delete every Marzban test user
 - [ ] 11.4 Post-launch watch: `journalctl -u astrobyte-userbot -f | grep USER_INFO` (cache misses sparse), renewal lag, panel CPU; if panel strains raise `USER_INFO_CACHE_TTL` in `services/marzban.py`
 - [ ] 11.5 Old smoke leftovers cleaned: test tickets, test subs, seed users

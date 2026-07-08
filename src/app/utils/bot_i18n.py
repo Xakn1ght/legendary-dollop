@@ -1,6 +1,14 @@
 from __future__ import annotations
 
+import json
+import logging
+import os
+import re
+import time
+from pathlib import Path
 from typing import Callable
+
+logger = logging.getLogger(__name__)
 
 # In-memory cache (best-effort) so we can localize keyboards without extra DB lookups.
 _LANG_CACHE: dict[int, str] = {}
@@ -71,16 +79,17 @@ STRINGS: dict[str, dict[str, str]] = {
     "tutorial_invalid": {"fa": "لطفا یکی از گزینه‌های موجود را انتخاب کنید.", "en": "Please choose one of the available options."},
 
     # Referral
+    # The referee's name is usually Latin (e.g. "Tsuki") inside a Persian
+    # sentence — \u2068…\u2069 (FSI/PDI directional isolate) keeps it from
+    # scrambling the RTL line. Brand name stays Persian for the same reason.
     "referral_new_user_dm": {
         "fa": (
-            "🎉 دعوت شما نتیجه داد\n"
-            "👤 <b>{name}</b> همین حالا با کد شما عضو AstroByte شد.\n\n"
+            "⭐️ \u2068<b>{name}</b>\u2069 با کد دعوت شما عضو آستروبایت شد.\n\n"
             "به‌محض اولین خریدش، انتخاب با شماست — یکی از این چهار پاداش:\n"
             "💰 اعتبار نقدی · 📶 حجم هدیه · 📅 روز هدیه · ⭐ ستاره فصل"
         ),
         "en": (
-            "🎉 Your invite paid off\n"
-            "👤 <b>{name}</b> just joined AstroByte with your code.\n\n"
+            "⭐️ <b>{name}</b> joined AstroByte with your invite code.\n\n"
             "The moment they make their first purchase, the choice is yours — one of four rewards:\n"
             "💰 cash credit · 📶 bonus data · 📅 extra days · ⭐ a season star"
         ),
@@ -506,15 +515,110 @@ LEGACY_BUTTON_TEXTS: dict[str, set[str]] = {
 }
 
 
+# ═══════════════════════════════════════════════════════════════════════════
+# OWNER-EDITABLE OVERRIDES (2026-07-08)
+# Pasha edits any bot message from the ADMIN bot (/texts) — formatting and
+# premium <tg-emoji> entities included — without code changes or restarts.
+# Overrides live in data/bot_texts_overrides.json (gitignored runtime state);
+# BOTH bot processes hot-reload it via a throttled mtime poll, so a save in
+# the admin bot is live in the user bot within ~3 seconds.
+# ═══════════════════════════════════════════════════════════════════════════
+_OVERRIDES_PATH = Path(__file__).resolve().parents[1] / "data" / "bot_texts_overrides.json"
+_OVERRIDES: dict[str, dict[str, str]] = {}
+_OV_MTIME: float = -1.0
+_OV_NEXT_CHECK: float = 0.0
+_OV_POLL_SECONDS = 3.0
+
+_PLACEHOLDER_RE = re.compile(r"\{([a-zA-Z_][a-zA-Z0-9_]*)\}")
+
+
+def _load_overrides(force: bool = False) -> None:
+    global _OVERRIDES, _OV_MTIME, _OV_NEXT_CHECK
+    now = time.monotonic()
+    if not force and now < _OV_NEXT_CHECK:
+        return
+    _OV_NEXT_CHECK = now + _OV_POLL_SECONDS
+    try:
+        mtime = _OVERRIDES_PATH.stat().st_mtime
+    except OSError:
+        if _OV_MTIME != -1.0:
+            _OVERRIDES, _OV_MTIME = {}, -1.0
+        return
+    if not force and mtime == _OV_MTIME:
+        return
+    try:
+        with open(_OVERRIDES_PATH, encoding="utf-8") as f:
+            data = json.load(f)
+        if isinstance(data, dict):
+            _OVERRIDES = {
+                str(k): {lk: str(lv) for lk, lv in v.items() if lk in ("fa", "en") and lv}
+                for k, v in data.items()
+                if isinstance(v, dict)
+            }
+            _OV_MTIME = mtime
+    except Exception as e:  # a broken file must never take the bots down
+        logger.error("bot_texts_overrides.json unreadable, keeping previous overrides: %s", e)
+
+
+def get_default(key: str) -> dict[str, str]:
+    return dict(STRINGS.get(key) or {})
+
+
+def get_override(key: str) -> dict[str, str]:
+    _load_overrides()
+    return dict(_OVERRIDES.get(key) or {})
+
+
+def set_override(key: str, lang: str, text: str | None) -> None:
+    """Write (or clear, when text is None/empty) one override. Atomic replace."""
+    if key not in STRINGS:
+        raise KeyError(key)
+    lang = "en" if normalize_lang(lang) == "en" else "fa"
+    _load_overrides(force=True)
+    data = {k: dict(v) for k, v in _OVERRIDES.items()}
+    entry = data.setdefault(key, {})
+    if text:
+        entry[lang] = str(text)
+    else:
+        entry.pop(lang, None)
+    if not entry:
+        data.pop(key, None)
+    _OVERRIDES_PATH.parent.mkdir(parents=True, exist_ok=True)
+    tmp = _OVERRIDES_PATH.with_suffix(".json.tmp")
+    with open(tmp, "w", encoding="utf-8") as f:
+        json.dump(data, f, ensure_ascii=False, indent=2)
+    os.replace(tmp, _OVERRIDES_PATH)
+    _load_overrides(force=True)
+
+
+def placeholders(text: str) -> set[str]:
+    """{tokens} a text uses — an override may only use the default's tokens."""
+    return set(_PLACEHOLDER_RE.findall(text or ""))
+
+
+def list_text_keys() -> list[str]:
+    return list(STRINGS.keys())
+
+
 def t(lang: str, key: str) -> str:
     lang = normalize_lang(lang)
+    _load_overrides()
+    ov = _OVERRIDES.get(key) or {}
     table = STRINGS.get(key) or {}
-    return table.get(lang) or table.get("fa") or key
+    return ov.get(lang) or table.get(lang) or ov.get("fa") or table.get("fa") or key
 
 
 def variants(key: str) -> set[str]:
+    # Reply-keyboard matching must recognise BOTH the default and any
+    # override label (users keep old keyboards until the bot re-sends them).
+    _load_overrides()
     table = STRINGS.get(key) or {}
-    return {v for v in table.values() if v} | LEGACY_BUTTON_TEXTS.get(key, set())
+    ov = _OVERRIDES.get(key) or {}
+    return (
+        {v for v in table.values() if v}
+        | {v for v in ov.values() if v}
+        | LEGACY_BUTTON_TEXTS.get(key, set())
+    )
 
 
 def text_matches(key: str) -> Callable:

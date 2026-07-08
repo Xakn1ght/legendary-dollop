@@ -9,10 +9,28 @@ import { Sheet } from './Sheet.jsx';
 // ---- one-tap app import -----------------------------------------------
 // Launching a custom scheme via window.location navigates the Telegram
 // webview to net::ERR_UNKNOWN_URL_SCHEME and KILLS the SPA (the mini app
-// stays dead until Telegram is force-closed). A throwaway iframe fires the
-// scheme without ever navigating the top frame: app installed → OS opens
-// it; not installed → silent no-op and the dashboard stays alive.
+// stays dead until Telegram is force-closed) — never top-navigate.
+//
+// Per-OS ladder (2026-07-08, Pasha: "doesn't open the apps at all" on
+// Android): Android webviews silently BLOCK iframe navigations to custom
+// schemes, so the iframe was a no-op there. window.open() instead hands the
+// URL to the host app's handler (Telegram routes it into Android intent
+// resolution → the VPN app opens) while the current page never navigates;
+// a blocked popup returns null and we still try the iframe as a fallback.
+// iOS keeps the iframe path (WKWebView honors it).
 function launchScheme(url) {
+  const isAndroid = /android/i.test(navigator.userAgent || '');
+  if (isAndroid) {
+    try {
+      const w = window.open(url, '_blank');
+      if (w) {
+        // If the scheme resolved, the OS already switched apps; close the
+        // stray about:blank so it doesn't linger behind the webview.
+        setTimeout(() => { try { w.close(); } catch (_) { /* ignore */ } }, 1200);
+        return;
+      }
+    } catch (_) { /* ignore */ }
+  }
   try {
     const f = document.createElement('iframe');
     f.style.display = 'none';
@@ -130,6 +148,7 @@ export function AddSubSheet({ t, open, onClose, onSubmit }) {
           autoCapitalize="none"
           autoComplete="off"
           spellCheck={false}
+          maxLength={2000}
           value={value}
           onChange={(e) => setValue(e.target.value)}
           onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); submit(); } }}
@@ -170,7 +189,8 @@ export function ConfirmRemoveSheet({ t, open, label, onClose, onConfirm }) {
 export function ExportModal({ t, open, link, showQRFirst, onClose }) {
   const [qrVisible, setQrVisible] = useState(false);
   const [qrDataUrl, setQrDataUrl] = useState('');
-  useEffect(() => { if (open) setQrVisible(!!showQRFirst); }, [open, showQRFirst]);
+  const [copied, setCopied] = useState(false);
+  useEffect(() => { if (open) { setQrVisible(!!showQRFirst); setCopied(false); } }, [open, showQRFirst]);
 
   // QR is generated locally (lazy chunk): no third-party service, so the
   // subscription link never leaves the device and CSP stays closed.
@@ -194,51 +214,67 @@ export function ExportModal({ t, open, link, showQRFirst, onClose }) {
     showToast(t('appLaunchHint'), 'success');
   };
 
+  const copyLink = async () => {
+    if (!link) { showToast(t('noSubOpen'), 'error'); return; }
+    try {
+      await navigator.clipboard.writeText(link);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1800);
+      showToast(t('linkCopied'), 'success', 1800);
+    } catch (_) { showToast(t('copyFailed'), 'error'); }
+  };
+
   return (
     <Sheet open={open} onClose={onClose} panelId="exportModal" backdropId="exportModalBackdrop" labelledBy="exportModalTitle">
-      <h2 id="exportModalTitle">{t('exportTitle')}</h2>
-      <p
-        className="sheet-subtitle"
-        id="exportLinkText"
-        style={{ wordBreak: 'break-all', fontSize: 12, fontFamily: 'monospace', background: 'var(--chip)', padding: 10, borderRadius: 8, marginTop: 12, direction: 'ltr', textAlign: 'left' }}
-      >
-        {link || '—'}
-      </p>
-      {qrVisible && link && qrDataUrl && (
-        <div id="exportQRContainer" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', marginTop: 16 }}>
-          <img
-            id="exportQRImg"
-            src={qrDataUrl}
-            alt="QR Code"
-            style={{ width: 300, height: 300, borderRadius: 12, background: '#fff', padding: 10 }}
-          />
+      <div className="exp-head">
+        <h2 id="exportModalTitle">{t('exportTitle')}</h2>
+        <button id="exportModalClose" className="exp-close" type="button" aria-label={t('close')} onClick={onClose}>
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" width="16" height="16" aria-hidden="true">
+            <path d="M18 6 6 18M6 6l12 12" />
+          </svg>
+        </button>
+      </div>
+
+      <div className="exp-link-row">
+        <div className="exp-link" id="exportLinkText" dir="ltr">{link || '—'}</div>
+        <button className={`exp-copy${copied ? ' ok' : ''}`} type="button" aria-label={t('copyLink')} onClick={copyLink}>
+          {copied
+            ? <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" width="16" height="16" aria-hidden="true"><polyline points="20 6 9 17 4 12" /></svg>
+            : <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" width="16" height="16" aria-hidden="true"><rect x="9" y="9" width="13" height="13" rx="2" ry="2" /><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" /></svg>}
+        </button>
+      </div>
+
+      {qrVisible && link && (
+        <div className="exp-qr-wrap" id="exportQRContainer">
+          {qrDataUrl
+            ? <img id="exportQRImg" className="exp-qr" src={qrDataUrl} alt="QR Code" />
+            : <div className="exp-qr exp-qr-loading" aria-hidden="true" />}
         </div>
       )}
+
       {appsVisible && (
-        <div id="exportAppGrid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginTop: 14 }}>
+        <div id="exportAppGrid" className="exp-apps">
           {appsForPlatform().map((app) => (
-            <button
-              key={app.key}
-              className="btn"
-              style={{ justifyContent: 'center', fontWeight: 700 }}
-              onClick={() => openApp(app)}
-            >
+            <button key={app.key} className="btn" style={{ justifyContent: 'center', fontWeight: 700 }} onClick={() => openApp(app)}>
               {app.label}
             </button>
           ))}
-          <a
-            className="btn"
-            style={{ gridColumn: '1 / -1', justifyContent: 'center', fontSize: 12.5, color: 'var(--muted, inherit)' }}
-            href="/webapp/dashboard/tutorial.html"
-          >
+          <a className="btn exp-apps-help" href="/webapp/dashboard/tutorial.html">
             {t('appGridHelp')}
           </a>
         </div>
       )}
-      <div className="sheet-actions" style={{ marginTop: 16, justifyContent: 'center' }}>
-        <button id="exportAddBtn" className="btn btn-primary" onClick={() => setAppsVisible((v) => !v)}>{t('addToApp')}</button>
-        <button id="exportQRBtn" className="btn" onClick={() => setQrVisible(!qrVisible)}>{t('showQR')}</button>
-        <button id="exportModalClose" className="btn" onClick={onClose}>{t('close')}</button>
+
+      <div className="exp-actions">
+        <button id="exportAddBtn" className={`btn btn-primary exp-primary${appsVisible ? ' open' : ''}`} onClick={() => setAppsVisible((v) => !v)}>
+          {t('addToApp')}
+        </button>
+        <div className="exp-actions-row">
+          <button id="exportCopyBtn" className="btn" onClick={copyLink}>{t('copyLink')}</button>
+          <button id="exportQRBtn" className="btn" onClick={() => setQrVisible(!qrVisible)}>
+            {qrVisible ? t('hideQR') : t('showQR')}
+          </button>
+        </div>
       </div>
     </Sheet>
   );

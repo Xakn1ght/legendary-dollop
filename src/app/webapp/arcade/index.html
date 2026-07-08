@@ -359,7 +359,34 @@
     }
     .mission-desc { margin: 0 0 18px; font-size: 13.5px; color: var(--text-muted); }
 
-    /* Enemy Intel roster */
+    /* Enemy Intel drawer */
+    .intel-toggle {
+      background: none;
+      border: 0;
+      padding: 0;
+      width: 100%;
+      font: inherit;
+      color: inherit;
+      text-align: inherit;
+      cursor: pointer;
+      margin-bottom: 0;
+      min-height: 44px;
+    }
+    .intel-chev {
+      flex: none;
+      color: var(--text-muted);
+      transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+    #intelCard.open .intel-chev { transform: rotate(180deg); }
+    .intel-body {
+      display: grid;
+      grid-template-rows: 0fr;
+      transition: grid-template-rows 0.32s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+    .intel-inner { overflow: hidden; min-height: 0; }
+    #intelCard.open .intel-body { grid-template-rows: 1fr; }
+    .intel-legend { padding-top: 12px; }
+
     .intel-legend {
       display: flex; justify-content: flex-end; gap: 18px;
       font-family: var(--font-px); font-size: 7px; letter-spacing: 1px;
@@ -391,6 +418,30 @@
     .intel-hits { color: var(--blue, #7be0ff); }
     .intel-pts { color: var(--gold); }
     .intel-row.boss .intel-pts { color: var(--pink, #ff4fa3); }
+
+    /* today's daily-theme arena chip */
+    .today-arena {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      margin: -6px 0 14px;
+      font-family: var(--font-px);
+      font-size: 7px;
+      letter-spacing: 1px;
+      color: var(--text-muted);
+      text-transform: uppercase;
+    }
+    .today-arena b {
+      color: var(--blue);
+      font-size: 8px;
+      background: rgba(123, 224, 255, 0.08);
+      border: 1px solid rgba(123, 224, 255, 0.35);
+      border-radius: 4px;
+      padding: 4px 8px;
+    }
+    body.lang-fa .today-arena { font-family: var(--font-body); font-size: 11px; font-weight: 700; letter-spacing: 0; }
+    body.lang-fa .today-arena b { font-size: 12px; }
 
     .play-btn {
       width: 100%;
@@ -497,6 +548,14 @@
     }
     .skin-cell canvas { width: 39px; height: 24px; image-rendering: pixelated; }
     .skin-cell .skin-name { font-size: 11px; font-weight: 700; }
+    /* ship classes (2026-07-08): short power tag under the name */
+    .skin-cell .skin-power {
+      font-size: 9px; font-weight: 700; color: var(--blue, #7be0ff);
+      white-space: nowrap; overflow: hidden; max-width: 100%; text-overflow: ellipsis;
+    }
+    body.lang-fa .skin-cell .skin-power { font-family: var(--font-body); }
+    .skin-cell.has-ability .skin-power { color: var(--gold); }
+    .skin-cell.has-ability:not(.equipped) { border-color: rgba(255, 210, 63, 0.35); }
     .skin-cell .skin-state {
       font-family: var(--font-px);
       font-size: 7px;
@@ -574,7 +633,7 @@
       gap: 8px;
       align-items: flex-start;
       background: rgba(255, 210, 63, 0.07);
-      border-inline-start: 3px solid var(--gold);
+      border: 1px solid rgba(255, 210, 63, 0.22); /* edge bar purged 2026-07-08 (Pasha) */
       border-radius: 4px;
       padding: 9px 11px;
       margin-bottom: 12px;
@@ -621,12 +680,13 @@
       padding: 9px 12px;
       background: #120a28;
       border: 1px solid rgba(192, 77, 255, 0.12);
-      border-inline-start: 3px solid rgba(192, 77, 255, 0.25);
       border-radius: 6px;
     }
-    .lb-item:nth-child(1) { border-inline-start-color: var(--gold); background: linear-gradient(90deg, rgba(255, 210, 63, 0.08), #120a28 60%); }
-    .lb-item:nth-child(2) { border-inline-start-color: #cbd5e1; }
-    .lb-item:nth-child(3) { border-inline-start-color: #f59e0b; }
+    /* edge bars purged 2026-07-08 (Pasha) — top-3 rank reads from the full
+       border tint + gradient wash instead of a side stripe */
+    .lb-item:nth-child(1) { border-color: rgba(255, 210, 63, 0.45); background: linear-gradient(90deg, rgba(255, 210, 63, 0.08), #120a28 60%); }
+    .lb-item:nth-child(2) { border-color: rgba(203, 213, 225, 0.40); }
+    .lb-item:nth-child(3) { border-color: rgba(245, 158, 11, 0.40); }
     [dir="rtl"] .lb-item:nth-child(1) { background: linear-gradient(270deg, rgba(255, 210, 63, 0.08), #120a28 60%); }
     .lb-rank {
       min-width: 26px;
@@ -771,6 +831,10 @@
       <div class="daily-badge" data-i18n="dailyBadge">DAILY MISSION</div>
       <h2 class="mission-title">ASTROBUGZ DEFENSE</h2>
       <p class="mission-desc" data-i18n="gameDesc">Defend the station from alien swarms!</p>
+      <div id="todayArena" class="today-arena" style="display:none;">
+        <span data-i18n="arenaLabel">TODAY'S ARENA</span>
+        <b id="todayArenaName"></b>
+      </div>
 
       <button id="playBtn" class="play-btn">
         <span class="icon">
@@ -812,18 +876,23 @@
       </div>
     </div>
 
-    <!-- Enemy Intel (roster + scores; rows rendered by JS for i18n) -->
+    <!-- Enemy Intel (collapsible drawer; rows rendered by JS for i18n) -->
     <div class="card" id="intelCard">
-      <div class="sec-head">
+      <button type="button" class="sec-head intel-toggle" id="intelToggle" aria-expanded="false" aria-controls="intelBody">
         <span class="sec-bullet" style="background: var(--pink, #ff4fa3);"></span>
         <span class="sec-title" style="color: var(--pink, #ff4fa3);" data-i18n="intelTitle">ENEMY INTEL</span>
         <span class="sec-side" data-i18n="intelSide">KNOW YOUR TARGETS</span>
+        <svg class="intel-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"></polyline></svg>
+      </button>
+      <div class="intel-body" id="intelBody">
+        <div class="intel-inner">
+          <div class="intel-legend">
+            <span data-i18n="intelHits">HITS</span>
+            <span data-i18n="intelPts">POINTS</span>
+          </div>
+          <div id="intelList"></div>
+        </div>
       </div>
-      <div class="intel-legend">
-        <span data-i18n="intelHits">HITS</span>
-        <span data-i18n="intelPts">POINTS</span>
-      </div>
-      <div id="intelList"></div>
     </div>
 
     <!-- Monthly Race -->
@@ -834,7 +903,7 @@
         <span id="raceCountdown" class="sec-side"></span>
       </div>
       <!-- one-line rule: how + when winners are decided -->
-      <div class="race-note"><span aria-hidden="true">🏁</span><span data-i18n="raceNote">Every daily mission adds to your monthly total. Top 3 win 50 / 25 / 10 GB — winners are picked automatically on the 1st of next month.</span></div>
+      <div class="race-note"><span aria-hidden="true">🏁</span><span data-i18n="raceNote">Every daily mission adds to your monthly total. Top 3 win 50 / 25 / 10 GB + hangar coins (40 / 25 / 15, ranks 4-10 get 8) — winners are picked automatically on the 1st of next month.</span></div>
       <div class="race-prizes" id="racePrizes">
         <div class="race-prize gold"><b>#1</b><span>50GB</span></div>
         <div class="race-prize silver"><b>#2</b><span>25GB</span></div>
@@ -913,8 +982,9 @@
         launch: 'LAUNCH MISSION',
         launched: 'MISSION COMPLETE',
         nextIn: 'Next mission in',
+        arenaLabel: "TODAY'S ARENA",
         raceTitle: 'MONTHLY RACE',
-        raceNote: 'Every daily mission adds to your monthly total. Top 3 win 50 / 25 / 10 GB — winners are picked automatically on the 1st of next month.',
+        raceNote: 'Every daily mission adds to your monthly total. Top 3 win 50 / 25 / 10 GB + hangar coins (40 / 25 / 15, ranks 4-10 get 8) — winners are picked automatically on the 1st of next month.',
         offP1: '10% off',
         lastDay: 'Last day!',
         daysLeft: n => n + ' days left',
@@ -954,7 +1024,24 @@
         notEnough: 'Not enough coins yet — they drop during ranked missions!',
         cancel: 'CANCEL',
         confirm: 'CONFIRM',
-        skinNames: { default: 'Classic', crimson: 'Crimson', ice: 'Ice', void: 'Void', gold: 'Gold' },
+        skinNames: { default: 'Classic', crimson: 'Crimson', ice: 'Ice', void: 'Void', gold: 'Gold',
+                     falcon: 'Falcon', comet: 'Comet', titan: 'Titan', phantom: 'Phantom',
+                     reaper: 'Reaper', vulcan: 'Vulcan', aegis: 'Aegis' },
+        // ship classes (2026-07-08): short tag on the cell + full line in the
+        // buy dialog. Keys match catalog perk/ability ids.
+        skinPowers: {
+          speed:        ['Speed+', 'Passive: ship moves 5% faster.'],
+          iframes:      ['Shield+', 'Passive: shield protection lasts longer after a hit.'],
+          slow_tokens:  ['Easy catch', 'Passive: powerups fall 15% slower.'],
+          coin_luck:    ['Coin luck', 'Passive: luckier golden-coin drops (daily cap unchanged).'],
+          fire_rate:    ['Fire rate+', 'Passive: +20% fire rate.'],
+          bullet_speed: ['Fast shots', 'Passive: bullets fly 25% faster.'],
+          shield_cap:   ['3 shields', 'Passive: stack up to 3 shields instead of 2.'],
+          cheat_death:  ['Cheat death', 'Passive: once per mission, ghost through a killing blow.'],
+          scythe:       ['⚡ Scythe', 'ABILITY: wipe every enemy shot and hit all bugs. Charge it by destroying enemies, fire with the button.'],
+          overdrive:    ['⚡ Overdrive', 'ABILITY: 3s of triple fire rate + piercing shots. Charge it by destroying enemies.'],
+          bastion:      ['⚡ Bastion', 'ABILITY: 4s invulnerable + magnet pull. Charge it by destroying enemies.'],
+        },
         powerNames: {
           shield_start: ['Guardian Shield', 'Start every mission with 1 shield'],
           spread_start: ['3-Way Launch', 'Start every mission with the 3-way shot'],
@@ -971,8 +1058,9 @@
         launch: 'شروع مأموریت',
         launched: 'مأموریت امروز انجام شد',
         nextIn: 'مأموریت بعدی تا',
+        arenaLabel: 'میدان امروز',
         raceTitle: 'مسابقه ماهانه',
-        raceNote: 'امتیاز هر مأموریت روزانه به مجموع ماهانه‌ات اضافه می‌شه. سه نفر اول ۵۰ / ۲۵ / ۱۰ گیگ جایزه می‌گیرن — برنده‌ها روز اول ماه بعد به‌صورت خودکار انتخاب می‌شن.',
+        raceNote: 'امتیاز هر مأموریت روزانه به مجموع ماهانه‌ات اضافه می‌شه. سه نفر اول ۵۰ / ۲۵ / ۱۰ گیگ + سکه آشیانه (۴۰ / ۲۵ / ۱۵، رتبه ۴ تا ۱۰ هم ۸ تا) می‌گیرن — برنده‌ها روز اول ماه بعد خودکار انتخاب می‌شن.',
         offP1: '۱۰٪ تخفیف',
         lastDay: 'روز آخر!',
         daysLeft: n => n + ' روز مانده',
@@ -992,7 +1080,7 @@
         prizeGb: gb => gb + ' گیگ رایگان',
         prizeOff: p => p + '٪ تخفیف',
         intelTitle: 'اطلاعات دشمن',
-        intelSide: 'هدف‌هات رو بشناس',
+        intelSide: 'دشمن‌هاتو بشناس',
         intelHits: 'ضربه',
         intelPts: 'امتیاز',
         hangarTitle: 'آشیانه',
@@ -1012,7 +1100,22 @@
         notEnough: 'هنوز سکه کافی نداری — سکه‌ها توی مأموریت‌های رتبه‌دار می‌افتن!',
         cancel: 'بی‌خیال',
         confirm: 'تأیید',
-        skinNames: { default: 'کلاسیک', crimson: 'سرخ', ice: 'یخی', void: 'شب', gold: 'طلایی' },
+        skinNames: { default: 'کلاسیک', crimson: 'سرخ', ice: 'یخی', void: 'شب', gold: 'طلایی',
+                     falcon: 'شاهین', comet: 'دنباله‌دار', titan: 'تایتان', phantom: 'شبح',
+                     reaper: 'دروگر', vulcan: 'آتشبار', aegis: 'نگهبان' },
+        skinPowers: {
+          speed:        ['سرعت+', 'همیشگی: سفینه ۵٪ تندتر حرکت می‌کنه.'],
+          iframes:      ['سپر+', 'همیشگی: بعد از ضربه، محافظت سپر بیشتر طول می‌کشه.'],
+          slow_tokens:  ['شکار راحت', 'همیشگی: آیتم‌ها ۱۵٪ آروم‌تر می‌افتن.'],
+          coin_luck:    ['شانس سکه', 'همیشگی: شانس افتادن سکه طلایی بیشتره (سقف روزانه همونه).'],
+          fire_rate:    ['شلیک تندتر', 'همیشگی: ۲۰٪ سریع‌تر شلیک می‌کنی.'],
+          bullet_speed: ['تیر سریع', 'همیشگی: تیرهات ۲۵٪ سریع‌تر می‌رن.'],
+          shield_cap:   ['۳ سپر', 'همیشگی: به‌جای ۲ تا، ۳ تا سپر روی هم.'],
+          cheat_death:  ['فرار از مرگ', 'همیشگی: یه بار در هر مأموریت، از ضربه‌ی کشنده شبح‌وار رد می‌شی.'],
+          scythe:       ['⚡ داس', 'قابلیت ویژه: همه‌ی تیرهای دشمن پاک می‌شن و به همه ضربه می‌خوره. با کشتن حشره‌ها شارژ می‌شه، با دکمه شلیک کن.'],
+          overdrive:    ['⚡ رگبار', 'قابلیت ویژه: ۳ ثانیه شلیک سه‌برابر + تیر نافذ. با کشتن حشره‌ها شارژ می‌شه.'],
+          bastion:      ['⚡ حباب', 'قابلیت ویژه: ۴ ثانیه شکست‌ناپذیری + آهن‌ربای آیتم. با کشتن حشره‌ها شارژ می‌شه.'],
+        },
         powerNames: {
           shield_start: ['سپر نگهبان', 'هر مأموریت رو با ۱ سپر شروع کن'],
           spread_start: ['شلیک سه‌گانه', 'هر مأموریت رو با شلیک سه‌طرفه شروع کن'],
@@ -1026,43 +1129,99 @@
     }
     /* ============== Enemy Intel roster (numbers mirror astrobugz2/config.js) ============== */
     const SPR = '/webapp/arcade/astrobugz/images/';
+    const SPR2 = '/webapp/arcade/astrobugz2/sprites/';
+    // ordered by when you actually meet them (level gates), bosses last
     const INTEL = [
       { img: 'player-sheet0.png',    boss: false, hits: '—',   pts: '—',
-        en: ['Your ship', '3 lives per mission — powerups drop from downed bugs'],
-        fa: ['سفینه شما', '۳ جان در هر مأموریت — از حشره‌های ساقط‌شده آیتم می‌افتد'] },
+        en: ['Your ship', 'one life — downed bugs drop powerups, grab them'],
+        fa: ['سفینه‌ی تو', 'فقط یه جان داری — از حشره‌های بزرگ آیتم می‌افته، بگیرشون'] },
       { img: 'mushroom-sheet0.png',  boss: false, hits: 3,   pts: 1,
-        en: ['Mushroom', '+2 bonus for each one alive at level end'],
-        fa: ['قارچ', 'برای هر قارچ سالم در پایان مرحله ۲+ امتیاز'] },
+        en: ['Mushroom', 'each one still standing at level end pays +2'],
+        fa: ['قارچ', 'آخر مرحله هر قارچ سالم ۲ امتیاز اضافه می‌ده'] },
       { img: 'segment-sheet1.png',   boss: false, hits: 1,   pts: 10,
-        en: ['Worm body', 'the swarm — each segment pops for points'],
-        fa: ['بدنه کرم', 'هر بند با یک شلیک می‌ترکد'] },
-      { img: 'segment-sheet1.png',   boss: false, hits: 2,   pts: 25,
-        en: ['Armored segment', 'level 4+ — first hit shatters the cyan plate'],
-        fa: ['بند زره‌دار', 'مرحله ۴ به بعد — ضربه اول زره را می‌شکند'] },
+        en: ['Centipede body', 'the swarm — one shot pops each segment'],
+        fa: ['بدنه‌ی صدپا', 'با یه تیر می‌ترکه'] },
       { img: 'segment-sheet0.png',   boss: false, hits: 1,   pts: 100,
-        en: ['Worm head', 'aim for the head — 10x a body segment'],
-        fa: ['سر کرم', 'سر را بزن — ۱۰ برابر بدنه امتیاز دارد'] },
-      { img: 'pinkbomb-sheet0.png',  boss: false, hits: 4,   pts: 150,
-        en: ['Splitter pod', 'level 3+ — bursts into 2 divers, dead or landed'],
-        fa: ['کیسه تخم', 'مرحله ۳ به بعد — در هر صورت به ۲ شیرجه‌زن تبدیل می‌شود'] },
+        en: ['Centipede head', 'aim here — worth 10x a body segment'],
+        fa: ['سر صدپا', 'سرشو بزن — ۱۰ برابر بدنه امتیاز داره'] },
+      { img: 'spider-sheet0.png',    boss: false, hits: 10,  pts: '300–900',
+        en: ['Spider', 'the closer the kill, the bigger the score'],
+        fa: ['عنکبوت', 'هرچی نزدیک‌تر بزنیش، امتیازش بیشتره'] },
       { img: 'flea-sheet0.png',      boss: false, hits: 5,   pts: 200,
         en: ['Flea', 'level 2+ — dive-bombs and plants mushrooms'],
-        fa: ['کک', 'مرحله ۲ به بعد — شیرجه می‌زند و قارچ می‌کارد'] },
-      { img: 'spider-sheet0.png',    boss: false, hits: 10,  pts: '300–900',
-        en: ['Spider', 'closer kill = bigger score'],
-        fa: ['عنکبوت', 'هرچه نزدیک‌تر بکشی، امتیاز بیشتر'] },
+        fa: ['کک', 'مرحله ۲+ — شیرجه می‌زنه و قارچ می‌کاره'] },
+      { src: SPR2 + 'worm.png',        boss: false, hits: 2,  pts: 150,
+        en: ['Poison worm', 'level 2+ — crawls low, leaves poison clouds behind'],
+        fa: ['کرم سمی', 'مرحله ۲+ — پایین می‌خزه و پشت سرش ابر سمی جا می‌ذاره'] },
+      { img: 'pinkbomb-sheet0.png',  boss: false, hits: 4,   pts: 150,
+        en: ['Splitter pod', 'level 3+ — splits into 2 divers, shot or landed'],
+        fa: ['کیسه‌ی تخم', 'مرحله ۳+ — هر جور بمیره دو تا شیرجه‌زن ازش درمیاد'] },
       { img: 'scorpion-sheet0.png',  boss: false, hits: 10,  pts: 1000,
-        en: ['Scorpion', 'level 3+ — poisons mushrooms in its path'],
-        fa: ['عقرب', 'مرحله ۳ به بعد — قارچ‌ها را مسموم می‌کند'] },
+        en: ['Scorpion', 'level 3+ — poisons every mushroom it touches'],
+        fa: ['عقرب', 'مرحله ۳+ — به هر قارچی برسه سمی‌ش می‌کنه'] },
+      { src: SPR2 + 'gold_flea.png',   boss: false, hits: 3,  pts: 500,
+        en: ['Gold flea', 'level 3+ — rare and harmless, rains gold nuggets'],
+        fa: ['کک طلایی', 'مرحله ۳+ — کمیابه، کاریت نداره، طلا می‌باره ازش'] },
+      { src: SPR2 + 'firefly.png',     boss: false, hits: 2,  pts: 300,
+        en: ['Firefly', 'level 3+ — blinks out, sprays light when it returns'],
+        fa: ['شب‌تاب', 'مرحله ۳+ — غیب می‌شه، برگشتنی دورش نور می‌پاشه'] },
+      { img: 'segment-sheet1.png',   boss: false, hits: 2,   pts: 25,
+        en: ['Armored segment', 'level 4+ — first shot cracks the armor'],
+        fa: ['بند زره‌دار', 'مرحله ۴+ — تیر اول زره‌شو می‌شکنه، تیر دوم خودشو'] },
+      { src: SPR2 + 'mosquito.png',    boss: false, hits: 3,  pts: 400,
+        en: ['Mosquito', 'level 4+ — red warning flash, then a straight dive at you'],
+        fa: ['پشه', 'مرحله ۴+ — اول اخطار قرمز، بعد صاف میاد سمت خودت'] },
+      { src: SPR2 + 'larva_egg.png',   boss: false, hits: 2,  pts: 100,
+        en: ['Larva egg', 'level 4+ — pop it before it hatches'],
+        fa: ['تخم لارو', 'مرحله ۴+ — قبل از اینکه باز شه بترکونش'] },
       { img: 'flea-sheet2.png',      boss: false, hits: 3,   pts: 2000,
-        en: ['UFO raider', 'level 5+ — rare, fast, escapes if ignored'],
-        fa: ['یوفوی مهاجم', 'مرحله ۵ به بعد — کمیاب و فراری؛ از دستش نده'] },
+        en: ['UFO raider', 'level 5+ — rare and fast, gone if you hesitate'],
+        fa: ['یوفو', 'مرحله ۵+ — کمیاب و سریعه، دیر بجنبی رفته'] },
+      { src: SPR2 + 'snail_cannon.png', boss: false, hits: 8, pts: 700,
+        en: ['Snail cannon', 'level 5+ — lobs shell cannonballs in arcs'],
+        fa: ['حلزون توپدار', 'مرحله ۵+ — گلوله‌هاش کمونی میان پایین'] },
+      { src: SPR2 + 'seg_split.png',   boss: false, hits: 1,  pts: 40,
+        en: ['Split bud', 'level 5+ — kill it and a fast diver jumps out'],
+        fa: ['غنچه‌ی طلایی', 'مرحله ۵+ — بکشیش یه شیرجه‌زن سریع ازش می‌پره بیرون'] },
+      { src: SPR2 + 'crystal_bug.png', boss: false, hits: 6,  pts: 1000,
+        en: ['Crystal bug', 'level 6+ — sometimes bounces your shot right back'],
+        fa: ['سوسک کریستالی', 'مرحله ۶+ — بعضی تیرها رو برمی‌گردونه سمت خودت'] },
+      { src: SPR2 + 'seg_poison.png',  boss: false, hits: 1,  pts: 30,
+        en: ['Poison bloom', 'level 6+ — bursts into a falling poison glob'],
+        fa: ['شکوفه‌ی سمی', 'مرحله ۶+ — بترکونیش یه گلوله‌ی سم می‌افته پایین'] },
+      { src: SPR2 + 'wasp.png',        boss: false, hits: 6,  pts: 800,
+        en: ['Wasp', 'level 7+ — sharp zigzags, flicks a stinger every turn'],
+        fa: ['زنبور', 'مرحله ۷+ — زیگزاگی میاد پایین و هی نیش پرت می‌کنه'] },
+      { src: SPR2 + 'beetle_tank.png', boss: false, hits: 12, pts: 600,
+        en: ['Beetle tank', 'level 8+ — digs in mid-field and lobs mortars'],
+        fa: ['سوسک زرهی', 'مرحله ۸+ — وسط زمین سنگر می‌گیره و خمپاره می‌ندازه'] },
       { img: 'spiderboss-sheet0.png', boss: true, hits: 50,  pts: 2500,
-        en: ['SPIDER BOSS', 'fires bombs — sprays 10 more when it dies'],
-        fa: ['غول عنکبوتی', 'بمب می‌اندازد — موقع مرگ ۱۰ بمب دیگر می‌پاشد'] },
+        en: ['SPIDER BOSS', 'level 5+ — the first boss; sprays 10 bombs when it dies'],
+        fa: ['غول عنکبوتی', 'مرحله ۵+ — اولین غول؛ موقع مردن ۱۰ تا بمب می‌پاشه'] },
+      { src: SPR2 + 'boss_horned.png', boss: true, hits: 55, pts: 3000,
+        en: ['HORNED BOSS', 'level 6+ — faster, and its shots come as a V pair'],
+        fa: ['غول شاخدار', 'مرحله ۶+ — تندتره و تیرهاش جفتی هفتی میان پایین'] },
+      { src: SPR2 + 'queen_spider.png', boss: true, hits: 15, pts: 900,
+        en: ['QUEEN SPIDER', 'level 6+ — her eggs hatch baby spiders that hunt you'],
+        fa: ['ملکه‌ی عنکبوت', 'مرحله ۶+ — تخم می‌ذاره و توش بچه عنکبوته که میاد سراغت'] },
+      { src: SPR2 + 'boss_egg.png',    boss: true, hits: 60, pts: 3500,
+        en: ['EGG BOSS', 'level 7+ — keeps laying eggs, even while dying'],
+        fa: ['غول تخمگذار', 'مرحله ۷+ — همش تخم می‌ذاره، حتی وقت مردن'] },
+      { src: SPR2 + 'boss_crystal.png', boss: true, hits: 70, pts: 4000,
+        en: ['CRYSTAL BOSS', 'level 8+ — reflects shots, dies in a shard storm'],
+        fa: ['غول کریستالی', 'مرحله ۸+ — تیر برمی‌گردونه و آخرش ترکش‌بارون می‌کنه'] },
+      { src: SPR2 + 'mega_mini.png',   boss: true, hits: 100, pts: 2500,
+        en: ['MINI MEGA', 'levels 8-9 — a taste of the finale, lasers only'],
+        fa: ['غول کوچیکه', 'مرحله ۸ و ۹ — پیش‌غذای غول آخر، فقط لیزر می‌زنه'] },
       { img: 'megaboss-sheet0.png',  boss: true, hits: 250, pts: 5000,
-        en: ['MEGA BOSS', 'level 6+ — volleys of bombs, the final test'],
-        fa: ['غول نهایی', 'مرحله ۶ به بعد — رگبار بمب؛ آزمون نهایی'] },
+        en: ['MEGA BOSS', 'level 10 — the finale has three forms; this is the classic'],
+        fa: ['غول آخر', 'مرحله ۱۰ — غول آخر سه شکل داره؛ این کلاسیکه‌ست'] },
+      { src: SPR2 + 'mega_true.png',   boss: true, hits: 300, pts: 8000,
+        en: ['TRUE MEGABOSS', 'level 10 — loses half its health and snaps into rage'],
+        fa: ['غول واقعی', 'مرحله ۱۰ — نصف جونش که رفت، وحشی می‌شه'] },
+      { src: SPR2 + 'mega_glitch.png', boss: true, hits: 220, pts: 7000,
+        en: ['GLITCH MEGABOSS', 'level 10 — teleports around and tears the screen'],
+        fa: ['غول گلیچی', 'مرحله ۱۰ — هی جابه‌جا می‌شه و صفحه رو می‌شکنه'] },
     ];
     function renderIntel() {
       const list = document.getElementById('intelList');
@@ -1070,14 +1229,33 @@
       const faN = s => LANG === 'fa' ? String(s).replace(/[0-9]/g, d => '۰۱۲۳۴۵۶۷۸۹'[d]) : String(s);
       list.innerHTML = INTEL.map(e => {
         const [name, note] = LANG === 'fa' ? e.fa : e.en;
+        const url = e.src || (SPR + e.img);
+        // expansion sprites aren't square sheets — contain, don't crop
+        const fit = e.src ? ';background-size:contain;background-repeat:no-repeat;background-position:center' : '';
         return `<div class="intel-row${e.boss ? ' boss' : ''}">
-          <span class="intel-sprite" style="background-image:url('${SPR}${e.img}')"></span>
+          <span class="intel-sprite" style="background-image:url('${url}')${fit}"></span>
           <span class="intel-name"><b>${name}</b><small>${note}</small></span>
           <span class="intel-hits">${faN(e.hits)}</span>
           <span class="intel-pts">${faN(e.pts)}</span>
         </div>`;
       }).join('');
     }
+
+    // Enemy Intel drawer: collapsed by default, remembers your choice
+    (function initIntelDrawer(){
+      const card = document.getElementById('intelCard');
+      const btn = document.getElementById('intelToggle');
+      if(!card || !btn) return;
+      let open = false;
+      try { open = localStorage.getItem('astro_intel_open') === '1'; } catch(_){}
+      if(open) card.classList.add('open');
+      btn.setAttribute('aria-expanded', String(open));
+      btn.addEventListener('click', () => {
+        const now = card.classList.toggle('open');
+        btn.setAttribute('aria-expanded', String(now));
+        try { localStorage.setItem('astro_intel_open', now ? '1' : '0'); } catch(_){}
+      });
+    })();
 
     function applyI18n() {
       document.documentElement.lang = LANG;
@@ -1161,6 +1339,7 @@
       loadRace();
       loadHallOfFame();
       loadShop();
+      loadTodayArena();
 
       // Re-check on focus (in case user played and came back)
       window.addEventListener('focus', checkStatus);
@@ -1529,6 +1708,24 @@
       return String(text).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#039;");
     }
 
+    /* ---- today's arena (30-day daily theme rotation, IRAN clock) ----
+     * Mirrors the game engine's mapping exactly (astrobugz2/config.js THEME):
+     * anchorDay 20641 = 2026-07-07 = day 1. */
+    async function loadTodayArena(){
+      try {
+        const iranDay = Math.floor((Date.now() + 12600000) / 86400000);
+        const res = await fetch('/webapp/arcade/astrobugz2/sprites/themes30.json?d=' + iranDay);
+        const cfg = await res.json();
+        const list = cfg.themes || [];
+        if(!list.length) return;
+        const idx = ((iranDay - 20641) % list.length + list.length) % list.length;
+        const t = list[idx];
+        if(!t) return;
+        document.getElementById('todayArenaName').textContent = t.name;
+        document.getElementById('todayArena').style.display = 'flex';
+      } catch(e){ /* chip simply stays hidden */ }
+    }
+
     /* ================= HANGAR (coin shop) =================
      * Catalog + wallet come from /api/arcade/shop (server is the only truth
      * on prices/ownership). Coins are earned in ranked runs only. */
@@ -1564,8 +1761,26 @@
       } catch(e){ console.error('[ARCADE] shop load failed', e); }
     }
 
-    // same tint recipe as the in-game engine (source-atop keeps pixel alpha)
-    function drawShipPreview(canvas, color){
+    // same tint recipe as the in-game engine (source-atop keeps pixel alpha);
+    // sprite skins (full redesigns) draw their own image instead
+    const skinSpriteCache = {};
+    function drawShipPreview(canvas, color, spriteUrl){
+      if(spriteUrl){
+        const full = '/webapp/arcade/astrobugz2/' + spriteUrl;
+        let img = skinSpriteCache[full];
+        if(!img){
+          img = new Image();
+          img.onload = () => renderHangar();   // redraw once it arrives
+          img.src = full;
+          skinSpriteCache[full] = img;
+        }
+        if(img.complete && img.naturalWidth){
+          canvas.width = img.naturalWidth;
+          canvas.height = img.naturalHeight;
+          canvas.getContext('2d').drawImage(img, 0, 0);
+        }
+        return;
+      }
       if(!shipImgReady) return;
       canvas.width = shipImg.naturalWidth;
       canvas.height = shipImg.naturalHeight;
@@ -1592,21 +1807,26 @@
         const equipped = shopWallet.equipped_skin === skin.key;
         const cell = document.createElement('button');
         cell.type = 'button';
-        cell.className = 'skin-cell' + (equipped ? ' equipped' : owned ? ' owned' : ' locked');
+        cell.className = 'skin-cell' + (equipped ? ' equipped' : owned ? ' owned' : ' locked')
+                       + (skin.ability ? ' has-ability' : '');
         const name = (T('skinNames') || {})[skin.key] || skin.key;
+        // ship classes: short power tag on the cell, full line in the dialog
+        const power = (T('skinPowers') || {})[skin.ability || skin.perk] || null;
         const state = equipped ? T('equipped')
                     : owned ? T('ownedTap')
                     : faN(skin.price) + ' 🪙';
         cell.innerHTML = '<canvas></canvas>' +
           '<span class="skin-name">' + escapeHtml(name) + '</span>' +
+          (power ? '<span class="skin-power">' + escapeHtml(power[0]) + '</span>' : '') +
           '<span class="skin-state">' + state + '</span>';
-        drawShipPreview(cell.querySelector('canvas'), skin.color);
+        drawShipPreview(cell.querySelector('canvas'), skin.color, skin.sprite);
         cell.addEventListener('click', () => {
           if(equipped) return;
           if(owned) return equipSkin(skin.key);
           if(shopWallet.coins < skin.price) return showDialog(T('hangarTitle'), T('notEnough'));
-          showConfirm(T('buyConfirmTitle'), T('buyConfirmMsg')(name, faN(skin.price)),
-                      () => buyItem('skin:' + skin.key));
+          const msg = T('buyConfirmMsg')(name, faN(skin.price)) +
+                      (power ? '\n\n' + power[1] : '');
+          showConfirm(T('buyConfirmTitle'), msg, () => buyItem('skin:' + skin.key));
         });
         grid.appendChild(cell);
       });

@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import { useBackClose } from '../../shared/backstack.js';
-import { AlertTriangleIcon, CheckCircleIcon, ClockIcon, GiftIcon, LockIcon, Spinner, StarIcon, TicketIcon } from '../../shared/icons.jsx';
+import { AlertTriangleIcon, GiftIcon, Spinner, StarIcon, TicketIcon } from '../../shared/icons.jsx';
 import { getWebApp, hapticImpact, hapticNotify } from '../../shared/telegram.js';
 import { astroConfirm } from '../../shared/ui.js';
 import { api } from '../api.js';
@@ -11,57 +11,37 @@ import { showToast } from '../toast.js';
 
 import { couponLabel, faNum, i18nTasks } from './tasksI18n.js';
 
-const Chevron = () => (
-  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" width="18" height="18">
-    <polyline points="6 9 12 15 18 9" />
+const ShareIcon = () => (
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" width="16" height="16" aria-hidden="true">
+    <circle cx="18" cy="5" r="3" /><circle cx="6" cy="12" r="3" /><circle cx="18" cy="19" r="3" />
+    <line x1="8.59" y1="13.51" x2="15.42" y2="17.49" /><line x1="15.41" y1="6.51" x2="8.59" y2="10.49" />
+  </svg>
+);
+const CopyIcon = () => (
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" width="16" height="16" aria-hidden="true">
+    <rect x="9" y="9" width="13" height="13" rx="2" ry="2" /><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
+  </svg>
+);
+const CheckIcon = ({ size = 12 }) => (
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" width={size} height={size} aria-hidden="true">
+    <polyline points="20 6 9 17 4 12" />
   </svg>
 );
 
-// Collapsible reward card with per-card persistence (legacy parity).
-function RewardCard({ id, extraClass = '', title, subtitle, children }) {
-  const [collapsed, setCollapsed] = useState(() => {
-    try { return localStorage.getItem(`reward_card_${id}_collapsed`) === '1'; } catch (_) { return false; }
-  });
-  const toggle = () => {
-    const next = !collapsed;
-    setCollapsed(next);
-    try { localStorage.setItem(`reward_card_${id}_collapsed`, next ? '1' : '0'); } catch (_) { /* ignore */ }
-    hapticImpact('light');
-  };
-  return (
-    <div className={`referral-card ${extraClass}${collapsed ? ' collapsed' : ''}`} id={id} data-collapsible="true">
-      <div
-        className="referral-header"
-        role="button"
-        tabIndex={0}
-        style={{ cursor: 'pointer' }}
-        onClick={(e) => { if (e.target.closest('button, a, input, label')) return; toggle(); }}
-        onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggle(); } }}
-      >
-        <div>
-          <div className="referral-title">{title}</div>
-          <div className="referral-subtitle">{subtitle}</div>
-        </div>
-        <div className="referral-actions">
-          <button
-            className="reward-toggle"
-            type="button"
-            data-toggle="collapse"
-            aria-expanded={!collapsed}
-            aria-label={collapsed ? 'Expand section' : 'Collapse section'}
-            onClick={toggle}
-          >
-            <Chevron />
-          </button>
-        </div>
-      </div>
-      <div className="reward-body">{children}</div>
-    </div>
-  );
+// Milestone reward → short label for rail caption + full couponLabel reuse.
+function milestoneLabel(m, tt, lang) {
+  let label = couponLabel(m, tt, lang);
+  (m.extra_coupons || []).forEach((ex) => { label += ' + ' + couponLabel(ex, tt, lang); });
+  if (m.badge) {
+    label += lang === 'fa'
+      ? ` + نشان ${m.badge === 'Champion' ? 'قهرمان' : 'افسانه'}`
+      : ` + ${m.badge} badge`;
+  }
+  return label;
 }
 
 export function TasksPage() {
-  const { lang } = useShell();
+  const { lang, openPurchasePage } = useShell();
   const tt = useCallback((key) => (i18nTasks[lang] || i18nTasks.en)[key] || i18nTasks.en[key] || key, [lang]);
   const fmt = useCallback((n) => Number(n || 0).toLocaleString(lang === 'fa' ? 'fa-IR' : 'en-US'), [lang]);
 
@@ -69,19 +49,34 @@ export function TasksPage() {
   const [seasonData, setSeasonData] = useState(null);
   const [vouchers, setVouchers] = useState(null); // null = loading
   const [voucherError, setVoucherError] = useState('');
-  const [ladderOpen, setLadderOpen] = useState(false);
-  const [redeem, setRedeem] = useState(null); // { reward, selectedType, selectedSubId, subs, subsLoading }
+  const [railSel, setRailSel] = useState(null); // manually tapped milestone (stars)
+  const [copied, setCopied] = useState(false);
+  const [redeem, setRedeem] = useState(null); // { reward, options, selectedType, selectedSubId, subs }
   const [addToken, setAddToken] = useState('');
+  const [earnings, setEarnings] = useState(null); // null = loading/hidden
+  const [cardSheet, setCardSheet] = useState(false);
+  const [cardInput, setCardInput] = useState('');
+  const [cardBusy, setCardBusy] = useState(false);
+  const [withdrawBusy, setWithdrawBusy] = useState(false);
   const retryCountRef = useRef(0);
+  const railRef = useRef(null);
 
   // Back closes the redeem sheet before leaving the tab.
   useBackClose(!!redeem, () => setRedeem(null));
+  useBackClose(cardSheet, () => setCardSheet(false));
 
   const fetchReferrals = useCallback(async () => {
     try {
       const r = await api('/api/dashboard/referrals');
       setReferralData(r);
     } catch (_) { setReferralData({ ok: false }); }
+  }, []);
+
+  const fetchEarnings = useCallback(async () => {
+    try {
+      const r = await api('/api/dashboard/earnings');
+      if (r && r.ok) setEarnings(r);
+    } catch (_) { /* card stays hidden — never break the page */ }
   }, []);
 
   const fetchSeason = useCallback(async () => {
@@ -121,10 +116,11 @@ export function TasksPage() {
       fetchReferrals();
       fetchSeason();
       fetchVouchers();
+      fetchEarnings();
     }, 100);
     const t2 = setTimeout(() => fetchVouchers(), 900);
     return () => { clearTimeout(t1); clearTimeout(t2); };
-  }, [fetchReferrals, fetchSeason, fetchVouchers]);
+  }, [fetchReferrals, fetchSeason, fetchVouchers, fetchEarnings]);
 
   // ── Season derived values ───────────────────────────────────────
   const season = useMemo(() => {
@@ -146,15 +142,60 @@ export function TasksPage() {
 
   const coupons = seasonData?.coupons || [];
 
+  // Rail selection: tapped node wins, else the next milestone, else the last rung.
+  const selectedMilestone = useMemo(() => {
+    if (!season.ladder.length) return null;
+    if (railSel != null) {
+      const m = season.ladder.find((x) => Number(x.stars) === railSel);
+      if (m) return m;
+    }
+    if (season.nextMilestoneEntry) return season.nextMilestoneEntry;
+    return season.ladder[season.ladder.length - 1];
+  }, [season, railSel]);
+
+  // Keep the highlighted milestone centered in the rail. Scroll ONLY the rail:
+  // scrollIntoView also scrolls ancestors, and on RTL it shoved the whole PAGE
+  // sideways (overflow:hidden containers still scroll programmatically).
+  useEffect(() => {
+    if (!selectedMilestone || !railRef.current) return undefined;
+    const center = () => {
+      try {
+        const rail = railRef.current;
+        if (!rail) return false;
+        const el = rail.querySelector(`[data-stars="${selectedMilestone.stars}"]`);
+        if (!el) return false;
+        const rRect = rail.getBoundingClientRect();
+        if (rRect.width < 10) return false; // not laid out yet — retry
+        const eRect = el.getBoundingClientRect();
+        const delta = (eRect.left + eRect.width / 2) - (rRect.left + rRect.width / 2);
+        if (Math.abs(delta) >= 2) {
+          if (typeof rail.scrollBy === 'function') {
+            rail.scrollBy({ left: delta, behavior: railSel == null ? 'auto' : 'smooth' });
+          } else {
+            rail.scrollLeft += delta;
+          }
+        }
+        return true;
+      } catch (_) { return true; }
+    };
+    // First paint can race layout (fonts/tab mount) — retry briefly until
+    // the rail has real geometry.
+    if (center()) return undefined;
+    const t1 = setTimeout(center, 150);
+    const t2 = setTimeout(center, 600);
+    return () => { clearTimeout(t1); clearTimeout(t2); };
+  }, [selectedMilestone, railSel]);
+
   // ── Referral actions ────────────────────────────────────────────
   const refLink = referralData?.referral_link || referralData?.referral_code || '';
   const copyRefLink = async () => {
     try {
       await navigator.clipboard.writeText(refLink);
-      showToast('Copied!', 'success', 1800);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1600);
       hapticNotify('success');
     } catch (_) {
-      showToast('Copy failed', 'error', 1800);
+      showToast(lang === 'fa' ? 'کپی نشد' : 'Copy failed', 'error', 1800);
     }
   };
   const shareRefLink = () => {
@@ -164,7 +205,7 @@ export function TasksPage() {
     } else copyRefLink();
   };
 
-  // ── Enter a friend's invite code (moved off the old first-launch screen) ──
+  // ── Enter a friend's invite code ────────────────────────────────
   const [friendCode, setFriendCode] = useState('');
   const [friendMsg, setFriendMsg] = useState(null); // { type:'error'|'ok', text }
   const [friendBusy, setFriendBusy] = useState(false);
@@ -196,6 +237,62 @@ export function TasksPage() {
       setFriendMsg({ type: 'error', text: tt('friendCodeErrServer') });
     }
     setFriendBusy(false);
+  };
+
+  // ── Earnings (cash-out) actions ─────────────────────────────────
+  const saveCard = async () => {
+    const digits = cardInput.replace(/\D/g, '');
+    if (digits.length !== 16) { showToast(tt('cardInvalid'), 'error'); return; }
+    setCardBusy(true);
+    try {
+      const r = await api('/api/dashboard/earnings/card', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ card: digits }),
+      });
+      if (r && r.ok) {
+        setEarnings((cur) => (cur ? { ...cur, card_masked: r.card_masked } : cur));
+        setCardSheet(false);
+        setCardInput('');
+        showToast(tt('cardSaved'), 'success');
+        hapticNotify('success');
+      } else {
+        showToast(tt(r?.error === 'invalid_card' ? 'cardInvalid' : 'withdrawFailed'), 'error');
+      }
+    } catch (_) { showToast(tt('withdrawFailed'), 'error'); }
+    setCardBusy(false);
+  };
+
+  const requestWithdraw = async () => {
+    if (!earnings || withdrawBusy) return;
+    if (!earnings.card_masked) { setCardSheet(true); showToast(tt('needCardFirst'), 'error'); return; }
+    const ok = await astroConfirm({
+      title: tt('withdraw'),
+      message: tt('withdrawConfirm'),
+      okText: tt('withdraw'),
+      cancelText: tt('close'),
+    });
+    if (!ok) return;
+    setWithdrawBusy(true);
+    try {
+      const r = await api('/api/dashboard/wallet/cashout', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ amount: earnings.credit_toman }),
+      });
+      if (r && r.ok) {
+        showToast(tt('withdrawSuccess'), 'success');
+        hapticNotify('success');
+        fetchEarnings();
+      } else {
+        const key = r?.error === 'requires_active_paid_subscription' ? 'withdrawNeedsPaidSub'
+          : r?.error === 'amount_below_minimum' ? 'minCashoutHint'
+            : 'withdrawFailed';
+        showToast(tt(key).replace('{amount}', fmt(earnings.min_cashout_toman)), 'error');
+        hapticNotify('error');
+      }
+    } catch (_) { showToast(tt('withdrawFailed'), 'error'); }
+    setWithdrawBusy(false);
   };
 
   // ── Redeem sheet ────────────────────────────────────────────────
@@ -311,194 +408,125 @@ export function TasksPage() {
     ? (redeem.options.length > 1 && !redeem.selectedType) || (redeemNeedsSubSection && !redeem.selectedSubId)
     : true;
 
+  const selReached = !!(selectedMilestone && selectedMilestone.reached);
+  const selIsNext = !!(selectedMilestone && season.nextStars != null && Number(selectedMilestone.stars) === season.nextStars);
+
   return (
-    <div id="rewardsSection">
-      {/* ── Star Season ── */}
-      <RewardCard id="seasonCard" extraClass="season-hero" title={tt('seasonTitle')} subtitle={tt('seasonSubtitle')}>
-        <div className="season-count">
-          <span className="season-count-num" id="seasonStars">{fmt(season.stars)}</span>
-          <span className="season-count-label">{tt('seasonStarsLabel')}</span>
-        </div>
-        <div className="season-next-block">
-          <div className="season-next-row">
-            <span className="season-next-label">{tt('seasonNextLabel')}</span>
-            <span className="season-togo" id="seasonToGo">
-              {season.nextStars != null
-                ? (
-                  <>
-                    {faNum(Math.max(0, season.nextStars - season.stars), lang)}
-                    <StarIcon size={11} />{' '}
-                    {lang === 'fa' ? 'مانده' : 'to go'}
-                  </>
-                )
-                : tt('seasonAllUnlocked')}
+    <div id="rewardsSection" className="rw">
+
+      {/* ── Season hero ── */}
+      <section className="rw-card rw-hero" id="seasonCard">
+        <div className="rw-hero-top">
+          <div className="rw-hero-heading">
+            <h2 className="rw-title">{tt('seasonTitle')}</h2>
+            <div className="rw-sub">{tt('seasonSubtitle')}</div>
+          </div>
+          {season.daysLeft != null && (
+            <span className="rw-days-chip">
+              {lang === 'fa' ? `${faNum(season.daysLeft, lang)} روز مانده` : `${season.daysLeft}d left`}
             </span>
+          )}
+        </div>
+
+        <div className="rw-hero-mid">
+          <div className="rw-count">
+            <div className="rw-count-num">
+              <span>{faNum(season.stars, lang)}</span>
+              <StarIcon size={22} />
+            </div>
+            <div className="rw-count-label">{tt('seasonStarsLabel')}</div>
           </div>
-          <div className="season-progress">
-            <div className="season-progress-fill" id="seasonProgressFill" style={{ width: season.pct + '%' }} />
-          </div>
-          <div className="season-progress-nums" id="seasonProgressNums">
-            {season.nextStars != null
-              ? (
-                <>
-                  <StarIcon size={11} />{' '}
+          <div className="rw-next">
+            <div className="rw-next-label">{tt('seasonNextLabel')}</div>
+            {season.nextStars != null ? (
+              <>
+                <div className="rw-next-reward">
+                  {season.nextMilestoneEntry ? couponLabel(season.nextMilestoneEntry, tt, lang) : '—'}
+                </div>
+                <div className="rw-next-togo">
+                  <StarIcon size={11} />
                   {lang === 'fa'
-                    ? `${faNum(season.stars, lang)} از ${faNum(season.nextStars, lang)}`
-                    : `${season.stars} of ${season.nextStars}`}
-                </>
-              )
-              : '—'}
-          </div>
-          <div className="season-next-reward" id="seasonNextReward">
-            {season.nextMilestoneEntry ? couponLabel(season.nextMilestoneEntry, tt, lang) : '—'}
+                    ? `${faNum(Math.max(0, season.nextStars - season.stars), lang)} ستاره مانده`
+                    : `${Math.max(0, season.nextStars - season.stars)} to go`}
+                </div>
+              </>
+            ) : (
+              <div className="rw-next-reward">{tt('seasonAllUnlocked')}</div>
+            )}
           </div>
         </div>
-        <div className="season-ends" id="seasonEnds">
-          {season.daysLeft != null
-            ? (lang === 'fa' ? `پایان فصل تا ${faNum(season.daysLeft, lang)} روز` : `Season ends in ${season.daysLeft} days`)
+
+        <div className="rw-progress" role="progressbar" aria-valuenow={season.pct} aria-valuemin={0} aria-valuemax={100}>
+          <div className="rw-progress-fill" style={{ width: season.pct + '%' }} />
+        </div>
+        <div className="rw-progress-nums">
+          {season.nextStars != null
+            ? (lang === 'fa'
+              ? `${faNum(season.stars, lang)} از ${faNum(season.nextStars, lang)}`
+              : `${season.stars} of ${season.nextStars}`)
             : ''}
         </div>
-        <button
-          className={`season-ladder-toggle${ladderOpen ? ' open' : ''}`}
-          type="button"
-          aria-expanded={ladderOpen}
-          onClick={() => { setLadderOpen(!ladderOpen); hapticImpact('light'); }}
-        >
-          <span>{tt('seasonLadderLabel')}</span>
-          <Chevron />
-        </button>
-        <div className="season-ladder" id="seasonLadderWrap" style={{ display: ladderOpen ? 'block' : 'none' }}>
-          <div id="seasonLadderList">
-            {season.ladder.map((m) => {
-              const isNext = season.nextStars != null && Number(m.stars) === season.nextStars;
-              return (
-                <div key={m.stars} className={`season-rung${m.reached ? ' reached' : ''}${isNext ? ' next' : ''}`}>
-                  <div className="season-rung-node">
-                    {m.badge
-                      ? <img src={`/webapp/static/badges/${String(m.theme || m.badge).toLowerCase()}.png`} alt={m.badge} style={{ width: 22, height: 22, objectFit: 'contain' }} />
-                      : m.reached ? <StarIcon size={12} /> : faNum(m.stars, lang)}
-                  </div>
-                  <div className="season-rung-body">
-                    <div className="season-rung-reward">
-                      {couponLabel(m, tt, lang)}
-                      {(m.extra_coupons || []).map((ex, xi) => (
-                        <span key={xi}>{' + '}{couponLabel(ex, tt, lang)}</span>
-                      ))}
-                      {m.badge && <span style={{ opacity: 0.8 }}>{lang === 'fa' ? ` + نشان ${m.badge === 'Champion' ? 'قهرمان' : 'افسانه'}` : ` + ${m.badge} badge`}</span>}
-                    </div>
-                    <div className="season-rung-stars">{faNum(m.stars, lang)} <StarIcon size={10} /></div>
-                  </div>
-                  <div className="season-rung-state">
-                    {m.reached
-                      ? <span style={{ color: 'var(--ok, #34d399)' }}><CheckCircleIcon size={16} /></span>
-                      : isNext
-                        ? <span style={{ color: 'var(--brand)' }}><ClockIcon size={16} /></span>
-                        : <span style={{ opacity: 0.55 }}><LockIcon size={16} /></span>}
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        </div>
-      </RewardCard>
 
-      {/* ── Referral Rewards (vouchers) ── */}
-      <RewardCard id="voucherCard" title={tt('referralRewardsTitle')} subtitle={tt('referralRewardsSubtitle')}>
-        <div className="referral-list" id="voucherListWrap" style={{ display: 'block' }}>
-          <div className="referral-list-title">{tt('available')}</div>
-          <div id="voucherList">
-            {vouchers === null && (
-              <div className="referral-item" style={{ alignItems: 'center', padding: 24, textAlign: 'center' }}>
-                <div className="referral-item-name" style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}>
-                  <Spinner size={15} /> {tt('fetchingVouchers')}…
-                </div>
-              </div>
-            )}
-            {vouchers !== null && voucherError && (
-              <div className="referral-item" style={{ alignItems: 'flex-start', padding: 20 }}>
-                <div className="referral-item-name" style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}>
-                  <span style={{ color: '#fbbf24' }}><AlertTriangleIcon size={15} /></span>
-                  {tt('failedToLoad')}: {voucherError}
-                </div>
-                <button className="ref-btn" onClick={() => { retryCountRef.current = 0; setVouchers(null); setVoucherError(''); fetchVouchers(); }}>{tt('retry')}</button>
-              </div>
-            )}
-            {vouchers !== null && !voucherError && vouchers.length === 0 && (
-              <div className="referral-item" style={{ alignItems: 'center', padding: 24, textAlign: 'center' }}>
-                <div className="referral-item-name" style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}>
-                  <GiftIcon size={16} /> {tt('noVouchers')}
-                </div>
-                <div className="referral-item-meta">{tt('noVouchersHint')}</div>
-              </div>
-            )}
-            {vouchers !== null && !voucherError && vouchersShown.map((rw, i) => {
-              const gb = (rw.traffic_bytes || 0) / (1024 ** 3);
-              return (
-                <div key={rw.id} className="referral-item voucher-item" style={{ marginBottom: i === vouchersShown.length - 1 ? 0 : 8 }}>
-                  <div>
-                    <div className="referral-item-name" style={{ fontSize: 14, fontWeight: 700 }}>#{rw.id}</div>
-                    <div className="voucher-chips">
-                      {gb >= 0.5 && <span className="voucher-chip vc-gb">+{faNum(Math.round(gb), lang)}GB</span>}
-                      {rw.extra_days > 0 && <span className="voucher-chip vc-days">+{faNum(rw.extra_days, lang)}d</span>}
-                      {rw.credit_amount > 0 && <span className="voucher-chip vc-credit">+{fmt(rw.credit_amount)}</span>}
-                      {rw.star_increment > 0 && <span className="voucher-chip vc-star">+{faNum(rw.star_increment, lang)} <StarIcon size={10} /></span>}
-                    </div>
-                  </div>
-                  <button className="ref-btn primary" onClick={() => openRedeemSheet(rw)}>{tt('redeem')}</button>
-                </div>
-              );
-            })}
-          </div>
-        </div>
-      </RewardCard>
-
-      {/* ── My Coupons ── */}
-      <RewardCard id="couponsCard" title={tt('couponsTitle')} subtitle={tt('couponsSubtitle')}>
-        <div className="coupon-list" id="couponList">
-          {coupons.length === 0 ? (
-            <div className="coupon-empty">
-              <div className="coupon-empty-icon"><GiftIcon size={26} /></div>
-              <div className="coupon-empty-text">{tt('couponsEmpty')}</div>
+        {/* Milestone rail (replaces the old hidden vertical ladder) */}
+        {season.ladder.length > 0 && (
+          <>
+            <div className="rw-rail" ref={railRef}>
+              {season.ladder.map((m, i) => {
+                const reached = !!m.reached;
+                const isNext = season.nextStars != null && Number(m.stars) === season.nextStars;
+                const isSel = selectedMilestone && Number(m.stars) === Number(selectedMilestone.stars);
+                return (
+                  <React.Fragment key={m.stars}>
+                    {i > 0 && <span className={`rw-rail-link${reached ? ' reached' : ''}`} aria-hidden="true" />}
+                    <button
+                      type="button"
+                      data-stars={m.stars}
+                      className={`rw-node${reached ? ' reached' : ''}${isNext ? ' next' : ''}${isSel ? ' sel' : ''}`}
+                      onClick={() => { setRailSel(Number(m.stars)); hapticImpact('light'); }}
+                      aria-label={`${m.stars}★ — ${milestoneLabel(m, tt, lang)}`}
+                    >
+                      {m.badge
+                        ? <img src={`/webapp/static/badges/${String(m.theme || m.badge).toLowerCase()}.png`} alt="" />
+                        : <span className="rw-node-num">{faNum(m.stars, lang)}</span>}
+                    </button>
+                  </React.Fragment>
+                );
+              })}
             </div>
-          ) : coupons.map((c, i) => {
-            const dleft = Number(c.days_left);
-            return (
-              <div key={i} className="coupon-ticket">
-                <div className="coupon-ticket-stub"><TicketIcon size={20} /></div>
-                <div className="coupon-ticket-body">
-                  <div className="coupon-ticket-label">{couponLabel(c, tt, lang)}</div>
-                  {Number.isFinite(dleft) && (
-                    <div className={`coupon-ticket-exp${dleft <= 7 ? ' soon' : ''}`}>
-                      {tt('couponExpires')} {faNum(dleft, lang)} {lang === 'fa' ? 'روز' : 'days'}
-                    </div>
-                  )}
-                </div>
-                {c.coupon_type === 'vip_days' && (
-                  <button
-                    className="ref-btn primary"
-                    type="button"
-                    style={{ alignSelf: 'center', flexShrink: 0 }}
-                    onClick={() => activateVipCoupon(c)}
-                  >
-                    {lang === 'fa' ? 'فعال‌سازی' : 'Activate'}
-                  </button>
-                )}
+            {selectedMilestone && (
+              <div className="rw-rail-caption" key={selectedMilestone.stars}>
+                <span className={`rw-rail-tag${selReached ? ' ok' : selIsNext ? ' next' : ''}`}>
+                  {selReached
+                    ? <><CheckIcon size={11} /> {tt('railUnlocked')}</>
+                    : <>{faNum(selectedMilestone.stars, lang)} <StarIcon size={10} /></>}
+                </span>
+                <span className="rw-rail-caption-text">{milestoneLabel(selectedMilestone, tt, lang)}</span>
               </div>
-            );
-          })}
-        </div>
-      </RewardCard>
+            )}
+          </>
+        )}
+      </section>
 
-      {/* ── Referrals ── */}
+      {/* ── Invite friends (the earn action) ── */}
       {referralData?.ok !== false && (
-        <RewardCard id="referralCard" title={tt('referralsTitle')} subtitle={tt('referralsSubtitle')}>
-          <div className="card-actions grid-2" id="referralActions">
-            <button className="ref-btn primary" id="referralShareBtn" type="button" onClick={shareRefLink}>{tt('share')}</button>
-            <button className="ref-btn" id="referralCopyBtn" type="button" onClick={copyRefLink}>{tt('copy')}</button>
+        <section className="rw-card" id="referralCard">
+          <div className="rw-card-head">
+            <div>
+              <h3 className="rw-title">{tt('referralsTitle')}</h3>
+              <div className="rw-sub">{tt('referralsSubtitle')}</div>
+            </div>
           </div>
-          <div className="referral-code-row">
-            <div className="referral-code" id="referralCode">{referralData?.referral_code || '—'}</div>
+
+          <div className="rw-code-row">
+            <div className="rw-code" dir="ltr">{referralData?.referral_code || '—'}</div>
+            <button className={`rw-icon-btn${copied ? ' ok' : ''}`} type="button" onClick={copyRefLink} aria-label={tt('copy')}>
+              {copied ? <CheckIcon size={16} /> : <CopyIcon />}
+            </button>
           </div>
+          <button className="rw-btn primary rw-share-btn" id="referralShareBtn" type="button" onClick={shareRefLink}>
+            <ShareIcon />
+            {tt('shareInvite')}
+          </button>
 
           {referralData?.has_referrer === false && (
             <div className="friend-code-box">
@@ -517,7 +545,7 @@ export function TasksPage() {
                   onChange={(e) => { setFriendCode(e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, '')); setFriendMsg(null); }}
                   onKeyDown={(e) => { if (e.key === 'Enter') submitFriendCode(); }}
                 />
-                <button className="friend-code-btn" type="button" disabled={friendBusy || friendCode.length !== 6} onClick={submitFriendCode}>
+                <button className="friend-code-btn" type="button" disabled={friendBusy || friendCode.length !== 6} onClick={submitFriendCode} aria-label={tt('add')}>
                   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" width="18" height="18"><path d="M5 12h14M12 5l7 7-7 7" /></svg>
                 </button>
               </div>
@@ -525,35 +553,198 @@ export function TasksPage() {
             </div>
           )}
 
-          <div className="referral-stats">
-            <div className="ref-stat">
-              <div id="refTotal">{fmt(referralData?.total || 0)}</div>
-              <div id="refTotalLabel">{tt('total')}</div>
+          <div className="rw-stats">
+            <div className="rw-stat">
+              <div className="rw-stat-num">{fmt(referralData?.total || 0)}</div>
+              <div className="rw-stat-label">{tt('total')}</div>
             </div>
-            <div className="ref-stat">
-              <div id="refActive">{fmt(referralData?.active || 0)}</div>
-              <div id="refActiveLabel">{tt('active')}</div>
+            <div className="rw-stat">
+              <div className="rw-stat-num">{fmt(referralData?.active || 0)}</div>
+              <div className="rw-stat-label">{tt('active')}</div>
             </div>
-            <div className="ref-stat">
-              <div id="refEarned">{fmt(referralData?.earned || 0)}</div>
-              <div id="refEarnedLabel">{tt('earned')}</div>
+            <div className="rw-stat">
+              <div className="rw-stat-num">{fmt(referralData?.earned || 0)}</div>
+              <div className="rw-stat-label">{tt('earned')}</div>
             </div>
           </div>
+
           {(referralData?.referrals || []).length > 0 && (
-            <div className="referral-list" id="referralListWrap" style={{ display: 'block' }}>
-              <div className="referral-list-title">{tt('recent')}</div>
-              <div id="referralList">
-                {(referralData.referrals || []).slice(0, 5).map((r, i) => (
-                  <div key={i} className="referral-item">
-                    <div className="referral-item-name">{r.full_name || r.username || '—'}</div>
-                    <div className="referral-item-meta">{r.is_active ? tt('active') : tt('joined')}</div>
-                  </div>
-                ))}
-              </div>
+            <div className="rw-list">
+              <div className="rw-list-title">{tt('recent')}</div>
+              {(referralData.referrals || []).slice(0, 5).map((r, i) => (
+                <div key={i} className="rw-row">
+                  <div className="rw-row-main">{r.full_name || r.username || '—'}</div>
+                  <div className={`rw-row-meta${r.is_active ? ' ok' : ''}`}>{r.is_active ? tt('active') : tt('joined')}</div>
+                </div>
+              ))}
             </div>
           )}
-        </RewardCard>
+        </section>
       )}
+
+      {/* ── Earnings: invite → earn → get paid ── */}
+      {earnings?.ok && (
+        <section className="rw-card" id="earningsCard">
+          <div className="rw-card-head">
+            <div>
+              <h3 className="rw-title">{tt('earningsTitle')}</h3>
+              <div className="rw-sub">{tt('earningsSubtitle')}</div>
+            </div>
+            {earnings.unlocked && <span className="rw-head-chip ok"><CheckIcon size={11} /></span>}
+          </div>
+
+          {!earnings.unlocked && (
+            <>
+              <div className="rw-earn-progress-row">
+                <div className="rw-progress">
+                  <div
+                    className="rw-progress-fill"
+                    style={{ width: Math.min(100, Math.round((earnings.active_referrals / earnings.gate) * 100)) + '%' }}
+                  />
+                </div>
+                <div className="rw-progress-nums">
+                  {faNum(earnings.active_referrals, lang)} / {faNum(earnings.gate, lang)} {tt('earningsProgressLabel')}
+                </div>
+              </div>
+              <div className="rw-earn-stat">
+                <span className="rw-earn-stat-label">{tt('earnedSoFar')}</span>
+                <span className="rw-earn-stat-num">{fmt(earnings.earned_total_toman)} {tt('toman')}</span>
+              </div>
+              <div className="rw-earn-hint">{tt('earningsGoalHint')}</div>
+            </>
+          )}
+
+          {earnings.unlocked && (
+            <>
+              <div className="rw-earn-balance">
+                <div className="rw-earn-balance-label">{tt('withdrawableBalance')}</div>
+                <div className="rw-earn-balance-num">{fmt(earnings.credit_toman)} <span>{tt('toman')}</span></div>
+              </div>
+              <button
+                className={`rw-btn primary rw-earn-withdraw${withdrawBusy ? ' loading' : ''}`}
+                type="button"
+                disabled={withdrawBusy || earnings.credit_toman < earnings.min_cashout_toman}
+                onClick={requestWithdraw}
+              >
+                {earnings.credit_toman >= earnings.min_cashout_toman
+                  ? tt('withdraw')
+                  : tt('minCashoutHint').replace('{amount}', fmt(earnings.min_cashout_toman))}
+              </button>
+              <div className="rw-earn-card-row">
+                <span className="rw-earn-card-label">{tt('savedCardLabel')}</span>
+                <button className="rw-btn sm" type="button" onClick={() => { setCardInput(''); setCardSheet(true); }}>
+                  {earnings.card_masked
+                    ? <span dir="ltr" className="rw-earn-card-num">{earnings.card_masked}</span>
+                    : tt('addCard')}
+                </button>
+              </div>
+              {(earnings.recent_payouts || []).length > 0 && (
+                <div className="rw-list">
+                  <div className="rw-list-title">{tt('recentPayouts')}</div>
+                  {earnings.recent_payouts.map((p) => (
+                    <div key={p.id} className="rw-row">
+                      <div className="rw-row-main">{fmt(p.amount_toman)} {tt('toman')}</div>
+                      <div className={`rw-row-meta${p.status === 'paid' ? ' ok' : ''}${p.status === 'denied' ? ' bad' : ''}`}>
+                        {tt(p.status === 'paid' ? 'payoutPaid' : p.status === 'denied' ? 'payoutDenied' : 'payoutPending')}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </>
+          )}
+        </section>
+      )}
+
+      {/* ── Referral vouchers ── */}
+      <section className="rw-card" id="voucherCard">
+        <div className="rw-card-head">
+          <div>
+            <h3 className="rw-title">{tt('referralRewardsTitle')}</h3>
+            <div className="rw-sub">{tt('referralRewardsSubtitle')}</div>
+          </div>
+          {vouchers !== null && !voucherError && vouchers.length > 0 && (
+            <span className="rw-head-chip">{faNum(vouchers.length, lang)}</span>
+          )}
+        </div>
+
+        {vouchers === null && (
+          <div className="rw-empty">
+            <Spinner size={15} />
+            <span>{tt('fetchingVouchers')}…</span>
+          </div>
+        )}
+        {vouchers !== null && voucherError && (
+          <div className="rw-empty">
+            <span className="rw-empty-warn"><AlertTriangleIcon size={15} /></span>
+            <span>{tt('failedToLoad')}</span>
+            <button className="rw-btn sm" type="button" onClick={() => { retryCountRef.current = 0; setVouchers(null); setVoucherError(''); fetchVouchers(); }}>
+              {tt('retry')}
+            </button>
+          </div>
+        )}
+        {vouchers !== null && !voucherError && vouchers.length === 0 && (
+          <div className="rw-empty">
+            <GiftIcon size={16} />
+            <span>{tt('noVouchers')} — {tt('noVouchersHint')}</span>
+          </div>
+        )}
+        {vouchers !== null && !voucherError && vouchersShown.map((rw) => {
+          const gb = (rw.traffic_bytes || 0) / (1024 ** 3);
+          return (
+            <div key={rw.id} className="rw-row rw-voucher">
+              <div className="rw-row-main">
+                <div className="rw-chips">
+                  {gb >= 0.5 && <span className="rw-chip">+{faNum(Math.round(gb), lang)}GB</span>}
+                  {rw.extra_days > 0 && <span className="rw-chip">+{faNum(rw.extra_days, lang)} {lang === 'fa' ? 'روز' : 'd'}</span>}
+                  {rw.credit_amount > 0 && <span className="rw-chip">+{fmt(rw.credit_amount)}</span>}
+                  {rw.star_increment > 0 && <span className="rw-chip star">+{faNum(rw.star_increment, lang)} <StarIcon size={10} /></span>}
+                </div>
+                <div className="rw-row-sub">#{faNum(rw.id, lang)}</div>
+              </div>
+              <button className="rw-btn primary sm" type="button" onClick={() => openRedeemSheet(rw)}>{tt('redeem')}</button>
+            </div>
+          );
+        })}
+      </section>
+
+      {/* ── My coupons ── */}
+      <section className="rw-card" id="couponsCard">
+        <div className="rw-card-head">
+          <div>
+            <h3 className="rw-title">{tt('couponsTitle')}</h3>
+            <div className="rw-sub">{tt('couponsSubtitle')}</div>
+          </div>
+          {coupons.length > 0 && <span className="rw-head-chip">{faNum(coupons.length, lang)}</span>}
+        </div>
+
+        {coupons.length === 0 ? (
+          <div className="rw-empty">
+            <TicketIcon size={16} />
+            <span>{tt('couponsEmpty')}</span>
+          </div>
+        ) : coupons.map((c, i) => {
+          const dleft = Number(c.days_left);
+          return (
+            <div key={i} className="rw-ticket">
+              <div className="rw-ticket-stub"><TicketIcon size={18} /></div>
+              <div className="rw-ticket-body">
+                <div className="rw-ticket-label">{couponLabel(c, tt, lang)}</div>
+                {Number.isFinite(dleft) && (
+                  <div className={`rw-ticket-exp${dleft <= 7 ? ' soon' : ''}`}>
+                    {tt('couponExpires')} {faNum(dleft, lang)} {lang === 'fa' ? 'روز' : 'days'}
+                  </div>
+                )}
+              </div>
+              {c.coupon_type === 'vip_days' && (
+                <button className="rw-btn primary sm" type="button" onClick={() => activateVipCoupon(c)}>
+                  {lang === 'fa' ? 'فعال‌سازی' : 'Activate'}
+                </button>
+              )}
+            </div>
+          );
+        })}
+      </section>
 
       {/* ── Redeem bottom sheet ── */}
       <Sheet open={!!redeem} onClose={() => setRedeem(null)} panelId="redeemPanel" backdropId="redeemBackdrop" labelledBy="redeemTitle">
@@ -564,20 +755,21 @@ export function TasksPage() {
         <p className="sheet-subtitle">{tt('redeemSubtitle')}</p>
         {redeem && (
           <>
-            <div className="referral-item" id="redeemVoucherMeta" style={{ display: 'flex' }}>
-              <div className="referral-item-name" id="redeemVoucherMetaText">
-                #{redeem.reward.id}
-                {(redeem.reward.traffic_bytes || 0) / (1024 ** 3) >= 0.5 && ` +${Math.round(redeem.reward.traffic_bytes / (1024 ** 3))}GB`}
-                {redeem.reward.extra_days > 0 && ` +${redeem.reward.extra_days}D`}
-                {redeem.reward.credit_amount > 0 && ` +${fmt(redeem.reward.credit_amount)}`}
-                {redeem.reward.star_increment > 0 && <> +{redeem.reward.star_increment} <StarIcon size={11} /></>}
+            <div className="rw-row rw-sheet-meta">
+              <div className="rw-chips">
+                {(redeem.reward.traffic_bytes || 0) / (1024 ** 3) >= 0.5 && (
+                  <span className="rw-chip">+{faNum(Math.round(redeem.reward.traffic_bytes / (1024 ** 3)), lang)}GB</span>
+                )}
+                {redeem.reward.extra_days > 0 && <span className="rw-chip">+{faNum(redeem.reward.extra_days, lang)} {lang === 'fa' ? 'روز' : 'd'}</span>}
+                {redeem.reward.credit_amount > 0 && <span className="rw-chip">+{fmt(redeem.reward.credit_amount)}</span>}
+                {redeem.reward.star_increment > 0 && <span className="rw-chip star">+{faNum(redeem.reward.star_increment, lang)} <StarIcon size={10} /></span>}
               </div>
-              <div className="referral-item-meta"><TicketIcon size={18} /></div>
+              <div className="rw-row-meta">#{faNum(redeem.reward.id, lang)}</div>
             </div>
 
             {redeem.options.length > 1 && (
               <div id="redeemChoiceSection">
-                <div className="referral-list-title">{tt('redeemChoiceLabel')}</div>
+                <div className="rw-list-title">{tt('redeemChoiceLabel')}</div>
                 <div className="sheet-list" id="redeemChoiceList">
                   {redeem.options.map((o) => (
                     <div
@@ -597,12 +789,30 @@ export function TasksPage() {
 
             {redeemNeedsSubSection && (
               <div id="redeemSubsSection">
-                <div className="referral-list-title">{tt('selectSubscription')}</div>
+                <div className="rw-list-title">{tt('selectSubscription')}</div>
                 {redeem.subs === null && <p className="sheet-subtitle">{tt('loading')}…</p>}
                 {redeem.subs !== null && redeem.subs.length === 0 && (
-                  <div id="redeemNoSubs" style={{ display: 'block' }}>
+                  <>
                     <p className="sheet-subtitle">{tt('noSubscriptions')}</p>
-                  </div>
+                    <div className="rw-sheet-add">
+                      <input
+                        className="sheet-input"
+                        type="text"
+                        placeholder={tt('addTokenPlaceholder')}
+                        inputMode="text"
+                        autoCapitalize="none"
+                        autoComplete="off"
+                        spellCheck={false}
+                        maxLength={2000}
+                        value={addToken}
+                        onChange={(e) => setAddToken(e.target.value)}
+                      />
+                      <div className="rw-sheet-add-btns">
+                        <button className="rw-btn" type="button" onClick={submitToken}>{tt('add')}</button>
+                        <button className="rw-btn" type="button" onClick={openPurchasePage}>{tt('buyNew')}</button>
+                      </div>
+                    </div>
+                  </>
                 )}
                 {redeem.subs !== null && redeem.subs.length > 0 && (
                   <div className="sheet-list" id="redeemSubsList">
@@ -626,25 +836,10 @@ export function TasksPage() {
               </div>
             )}
 
-            <div className="sheet-actions">
-              <input
-                className="sheet-input"
-                id="redeemAddTokenInput"
-                type="text"
-                placeholder={tt('addTokenPlaceholder')}
-                inputMode="text"
-                autoCapitalize="none"
-                autoComplete="off"
-                spellCheck={false}
-                value={addToken}
-                onChange={(e) => setAddToken(e.target.value)}
-              />
-              <button className="ref-btn" type="button" onClick={submitToken}>{tt('add')}</button>
-              <button className="ref-btn" type="button" onClick={() => { window.location.href = '/webapp/dashboard/purchase.html'; }}>{tt('buyNew')}</button>
+            <div className="rw-sheet-actions">
               <button
-                className="ref-btn primary"
+                className="rw-btn primary wide"
                 type="button"
-                style={redeemConfirmDisabled ? { opacity: 0.55 } : undefined}
                 disabled={redeemConfirmDisabled}
                 onClick={confirmRedeem}
               >
@@ -653,6 +848,42 @@ export function TasksPage() {
             </div>
           </>
         )}
+      </Sheet>
+
+      {/* ── Payout card sheet ── */}
+      <Sheet open={cardSheet} onClose={() => setCardSheet(false)} panelId="payoutCardSheet" backdropId="payoutCardBackdrop" labelledBy="payoutCardTitle">
+        <h2 id="payoutCardTitle">{tt('cardSheetTitle')}</h2>
+        <p className="sheet-subtitle">{tt('cardSheetSubtitle')}</p>
+        <div className="sheet-field">
+          <input
+            className="sheet-input"
+            type="text"
+            dir="ltr"
+            inputMode="numeric"
+            autoComplete="off"
+            spellCheck={false}
+            maxLength={19}
+            placeholder={tt('cardPlaceholder')}
+            value={cardInput}
+            onChange={(e) => {
+              // digits only, grouped 4-4-4-4 for readability
+              const d = e.target.value.replace(/\D/g, '').slice(0, 16);
+              setCardInput(d.replace(/(.{4})/g, '$1 ').trim());
+            }}
+            onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); saveCard(); } }}
+          />
+        </div>
+        <div className="rw-sheet-actions">
+          <button className="rw-btn" type="button" onClick={() => setCardSheet(false)}>{tt('close')}</button>
+          <button
+            className={`rw-btn primary${cardBusy ? ' loading' : ''}`}
+            type="button"
+            disabled={cardBusy || cardInput.replace(/\D/g, '').length !== 16}
+            onClick={saveCard}
+          >
+            {tt('saveCard')}
+          </button>
+        </div>
       </Sheet>
     </div>
   );

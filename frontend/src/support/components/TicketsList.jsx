@@ -14,9 +14,12 @@ const CATEGORY_ICONS = {
   ),
 };
 
+// "archived" is an admin-inbox concept — users just see those tickets as closed.
+const displayStatus = (s) => (s === 'archived' ? 'closed' : s);
+
 export function TicketsList({ t, lang, tickets, filter, loading, onOpen, onCreate }) {
   const locale = lang === 'fa' ? 'fa-IR' : 'en-US';
-  const filtered = filter === 'all' ? tickets : tickets.filter((tk) => tk.status === filter);
+  const filtered = filter === 'all' ? tickets : tickets.filter((tk) => displayStatus(tk.status) === filter);
 
   if (loading) {
     return (
@@ -67,7 +70,8 @@ export function TicketsList({ t, lang, tickets, filter, loading, onOpen, onCreat
     <div className="tickets-list" id="ticketsList">
       {filtered.map((tk) => {
         const date = parseTs(tk.updated_at || tk.created_at).toLocaleDateString(locale);
-        const statusText = t(tk.status) || tk.status;
+        const status = displayStatus(tk.status);
+        const statusText = t(status) || status;
         const categoryText = t(tk.category) || (tk.category || '').charAt(0).toUpperCase() + (tk.category || '').slice(1);
         const unreadCount = Number(tk.unread_count || 0) || 0;
         return (
@@ -86,7 +90,7 @@ export function TicketsList({ t, lang, tickets, filter, loading, onOpen, onCreat
                 {unreadCount > 0 && (
                   <span className="unread-pill" data-role="unread">{unreadCount > 99 ? '99+' : unreadCount}</span>
                 )}
-                <span className={`ticket-status status-${tk.status}`}>{statusText}</span>
+                <span className={`ticket-status status-${status}`}>{statusText}</span>
               </span>
             </div>
             <div className="ticket-category">

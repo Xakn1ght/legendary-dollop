@@ -134,6 +134,7 @@ arcade_wallet_public = RewardRepository.wallet_public
 arcade_buy = RewardRepository.arcade_buy
 arcade_equip = RewardRepository.arcade_equip
 arcade_retry = RewardRepository.arcade_retry
+admin_arcade_adjust = RewardRepository.admin_arcade_adjust
 get_active_challenges = RewardRepository.get_active_challenges
 get_user_challenge_progress = RewardRepository.get_user_challenge_progress
 update_challenge_progress = RewardRepository.update_challenge_progress

@@ -224,3 +224,33 @@ export function schedulePrefsSave(patch) {
     } catch (_) { /* ignore */ }
   }, 450);
 }
+
+// The 450ms debounce DIES when the page unloads (purchase/charge/support are
+// full navigations) — a fresh accent/theme pick made right before leaving was
+// never saved, and the next boot restored the STALE server value over it
+// (Pasha's "theme changed on its own" after buying). Flush pending prefs the
+// moment the page starts hiding, with keepalive so the request survives the
+// navigation. Cookie auth rides along; the bearer is attached when present.
+function flushPrefsSave() {
+  const payload = _prefsPending;
+  if (!payload || !Object.keys(payload).length) return;
+  _prefsPending = {};
+  if (_prefsSaveTimer) { clearTimeout(_prefsSaveTimer); _prefsSaveTimer = null; }
+  try {
+    const headers = { 'Content-Type': 'application/json' };
+    if (bearerToken) headers['Authorization'] = 'Bearer ' + bearerToken;
+    fetch('/api/dashboard/preferences?v=' + Date.now(), {
+      method: 'POST',
+      headers,
+      credentials: 'include',
+      keepalive: true,
+      body: JSON.stringify(payload),
+    }).catch(() => {});
+  } catch (_) { /* ignore */ }
+}
+try {
+  window.addEventListener('pagehide', flushPrefsSave);
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'hidden') flushPrefsSave();
+  });
+} catch (_) { /* ignore */ }

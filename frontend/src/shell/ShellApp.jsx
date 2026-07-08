@@ -460,6 +460,12 @@ export function ShellApp() {
   }, []);
 
   const markNotificationAsRead = useCallback(async (notificationId = null) => {
+    // Optimistic flip: the panel stays open on "read all", so the rows must
+    // react instantly; the follow-up fetch (and the 5s poll) re-syncs truth.
+    setNotifications((cur) => cur.map((n) => (
+      notificationId == null || String(n.id) === String(notificationId) ? { ...n, read: true } : n
+    )));
+    setUnreadCount((cur) => (notificationId == null ? 0 : Math.max(0, cur - 1)));
     try {
       await api('/api/dashboard/notifications/mark-read', {
         method: 'POST',

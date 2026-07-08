@@ -1,5 +1,5 @@
 import traceback
-from datetime import datetime
+from datetime import datetime, timedelta
 
 from aiohttp import web
 from sqlalchemy import func
@@ -9,6 +9,12 @@ from app.api.deps import _verify_webapp_auth, set_tma_session_cookie
 from app.api.routes.dashboard_tickets.common import broadcast_ticket_list_update, broadcast_user_ticket_list_update
 from app.api.schemas import TicketCreateRequest, validate_request
 from app.database.models import AsyncSessionLocal, Ticket, TicketMessage, User
+
+# Anti-spam caps (per user). Open = anything not closed/archived and still
+# visible to the user; the daily cap counts hidden ones too so delete+recreate
+# can't be used to spam the admin inbox.
+MAX_OPEN_TICKETS = 3
+MAX_TICKETS_PER_DAY = 10
 
 
 async def handle_dashboard_tickets_create(request: web.Request):
@@ -36,6 +42,31 @@ async def handle_dashboard_tickets_create(request: web.Request):
             user = user.scalar_one_or_none()
             if not user:
                 return web.json_response({"ok": False, "error": "user_not_found"}, status=404)
+
+            open_count = await session.scalar(
+                select(func.count(Ticket.id)).where(
+                    Ticket.user_id == user.id,
+                    Ticket.status.notin_(("closed", "archived")),
+                    Ticket.hidden_from_user.is_(False),
+                )
+            ) or 0
+            if open_count >= MAX_OPEN_TICKETS:
+                return web.json_response(
+                    {"ok": False, "error": "too_many_open_tickets", "limit": MAX_OPEN_TICKETS},
+                    status=429,
+                )
+
+            day_count = await session.scalar(
+                select(func.count(Ticket.id)).where(
+                    Ticket.user_id == user.id,
+                    Ticket.created_at >= datetime.utcnow() - timedelta(hours=24),
+                )
+            ) or 0
+            if day_count >= MAX_TICKETS_PER_DAY:
+                return web.json_response(
+                    {"ok": False, "error": "daily_ticket_limit", "limit": MAX_TICKETS_PER_DAY},
+                    status=429,
+                )
 
             max_ticket_number = await session.scalar(
                 select(func.max(Ticket.user_ticket_number)).where(Ticket.user_id == user.id)

@@ -3,6 +3,7 @@ import React, { useEffect, useState } from 'react';
 import { useBackClose } from '../../shared/backstack.js';
 
 const CATEGORIES = ['connection', 'money', 'other'];
+export const MAX_MESSAGE_LEN = 2000;
 
 // Telegram mobile gets the designed bottom-sheet picker instead of a web <select>.
 function useDesignedPicker() {
@@ -58,6 +59,7 @@ function PickerSheet({ t, type, subs, current, onPick, onClose }) {
               type="text"
               placeholder={t('search')}
               autoComplete="off"
+              maxLength={64}
               value={query}
               onChange={(e) => setQuery(e.target.value)}
               // eslint-disable-next-line jsx-a11y/no-autofocus
@@ -84,13 +86,14 @@ function PickerSheet({ t, type, subs, current, onPick, onClose }) {
   );
 }
 
-export function CreateTicketModal({ t, active, subs, initialSubId, onSubmit, onClose }) {
+export function CreateTicketModal({ t, active, subs, initialSubId, onSubmit, onClose, lang }) {
   const [category, setCategory] = useState('');
   const [subId, setSubId] = useState(initialSubId || '');
   const [message, setMessage] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [picker, setPicker] = useState(null); // null | 'category' | 'sub'
   const designed = useDesignedPicker();
+  const fmtNum = (n) => n.toLocaleString(lang === 'fa' ? 'fa-IR' : 'en-US');
 
   // Back closes the picker sheet before the modal itself.
   useBackClose(active && !!picker, () => setPicker(null));
@@ -162,9 +165,15 @@ export function CreateTicketModal({ t, active, subs, initialSubId, onSubmit, onC
               rows={4}
               placeholder={t('describeIssue')}
               required
+              maxLength={MAX_MESSAGE_LEN}
               value={message}
-              onChange={(e) => setMessage(e.target.value)}
+              onChange={(e) => setMessage(e.target.value.slice(0, MAX_MESSAGE_LEN))}
             />
+            {message.length >= MAX_MESSAGE_LEN * 0.6 && (
+              <div className={`char-counter${message.length >= MAX_MESSAGE_LEN ? ' at-limit' : ''}`} dir="ltr">
+                {fmtNum(message.length)} / {fmtNum(MAX_MESSAGE_LEN)}
+              </div>
+            )}
           </div>
           <button type="submit" className={`btn-block${submitting ? ' btn-loading' : ''}`}>{t('createTicketBtn')}</button>
         </form>

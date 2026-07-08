@@ -41,6 +41,9 @@
     submittedMsg: 'امتیازت ثبت شد!',
     dailyLimitMsg: 'سهمیه امروزت استفاده شده — فردا دوباره بازی کن!',
     earnedXp: function (xp) { return xp + ' XP گرفتی!'; },
+    tooShortMsg: function (n) { return 'بازی کوتاه بود — حداقل ' + faDigits(n) + ' ثانیه بازی کن تا جایزه بگیری!'; },
+    notVerifiedMsg: 'دور بازی تأیید نشد — بازی را ببند و دوباره باز کن.',
+    notValidatedMsg: 'امتیاز تأیید نشد.',
     seeYouTomorrow: 'تا فردا!',
     lockedMsg: 'دور امتیازیِ امروزت رو انجام دادی.<br>فردا یه دور جدید باز می‌شه!',
     credits: 'اعتبار', stars: 'ستاره', xp: 'XP', coins: 'سکه',
@@ -62,6 +65,9 @@
     submittedMsg: 'Score submitted!',
     dailyLimitMsg: 'Daily run already used — play again tomorrow!',
     earnedXp: function (xp) { return 'Earned ' + xp + ' XP!'; },
+    tooShortMsg: function (n) { return 'Game too short — play at least ' + n + ' seconds for rewards!'; },
+    notVerifiedMsg: 'Round could not be verified — reopen the game and try again.',
+    notValidatedMsg: 'Score could not be validated.',
     seeYouTomorrow: 'SEE YOU TOMORROW',
     lockedMsg: 'You already played today\u2019s run.<br>A new rewarded run unlocks tomorrow!',
     credits: 'Credits', stars: 'Stars', xp: 'XP', coins: 'Coins',
@@ -74,6 +80,7 @@
     raceAuto: 'Winners picked automatically on the 1st of next month',
   };
   var IS_RTL = LANG === 'fa';
+  function faDigits(v) { return String(v).replace(/\d/g, function (d) { return '۰۱۲۳۴۵۶۷۸۹'[d]; }); }
 
   /* ---- Telegram fullscreen / chrome ---- */
   (function fullscreen() {
@@ -287,14 +294,37 @@
   // language locally (fall back to the raw server text for anything else).
   function localizedMsg(data) {
     if (!data || !data.message) return isPractice ? STR.practiceMsg : STR.submittedMsg;
-    if (LANG === 'en') return data.message;
     var m = String(data.message);
+    // Anti-cheat/validation notes get localized in BOTH languages (the en
+    // originals read raw-server; the STR copies are written for players).
+    var short = /too short.*?at least\s+(\d+)\s*seconds/i.exec(m) || /at least\s+(\d+)\s*seconds/i.exec(m);
+    if (short) return STR.tooShortMsg(short[1]);
+    if (/could not be verified/i.test(m)) return STR.notVerifiedMsg;
+    if (/could not be validated/i.test(m)) return STR.notValidatedMsg;
+    if (LANG === 'en') return m;
     if (data.practice || /practice/i.test(m)) return STR.practiceMsg;
     if (/daily limit/i.test(m)) return STR.dailyLimitMsg;
     var xp = /Earned\s+(\d+)\s*XP/i.exec(m);
     if (xp) return STR.earnedXp(xp[1]);
     return m;
   }
+
+  // The engine paints its own GAME OVER scene (black veil + pixel logo art)
+  // behind this overlay — Pasha: "use the game over screen of the game, it's
+  // pretty". So the overlay backdrop goes transparent, the card slides to the
+  // lower half (the pixel logo lives in the upper half of the canvas), and
+  // the card's own "GAME OVER" caption is dropped (the art already says it).
+  // Injected from bridge.js so the mid-edit index.html stays untouched.
+  (function overlayStyle() {
+    var s = document.createElement('style');
+    s.textContent =
+      '#ah-result { background: rgba(11,6,23,0.28) !important; backdrop-filter: none !important;' +
+      ' -webkit-backdrop-filter: none !important; align-items: flex-end !important;' +
+      ' padding-bottom: calc(7vh + env(safe-area-inset-bottom, 0px)); }' +
+      '#ah-result .ah-go { display: none; }' +
+      '#ah-result .ah-card { background: rgba(16,9,32,0.90); box-shadow: 0 18px 60px rgba(0,0,0,0.55), 0 0 0 1px rgba(192,77,255,0.22); }';
+    document.head.appendChild(s);
+  })();
 
   function showResult(score, data) {
     // remember that today's rewarded run is used, so the lobby button locks

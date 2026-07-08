@@ -118,7 +118,7 @@
    "kind": "image",
    "key": "day17",
    "name": "Violet Meadow",
-   "bg": "bg_day17.png"
+   "bg": "bg_day17.png?v=2"
   },
   {
    "day": 18,
@@ -209,7 +209,7 @@
    "kind": "image",
    "key": "day30",
    "name": "Orchid Mire",
-   "bg": "bg_day30.png"
+   "bg": "bg_day30.png?v=2"
   }
  ]
 }

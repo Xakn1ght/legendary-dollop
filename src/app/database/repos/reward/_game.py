@@ -190,6 +190,29 @@ class _GameMixin:
         return None, wallet.coins
 
     @staticmethod
+    async def admin_arcade_adjust(
+        db: AsyncSession, user_id: int,
+        coins_delta: int | None = None, difficulty: str | None = None,
+    ):
+        """ADMIN-ONLY wallet adjustment (2026-07-08): grant/remove coins and/or
+        set the per-user difficulty. Coins stay arcade-only (the seal holds —
+        this touches nothing but the wallet); the balance never goes below 0
+        and grants don't inflate the lifetime-earned analytics counter.
+        Returns (error_code | None, wallet | None)."""
+        from app.core.settings import ARCADE_DIFFICULTIES
+        from app.database.repos.reward import RewardRepository as _RR
+
+        if difficulty is not None and difficulty not in ARCADE_DIFFICULTIES:
+            return "unknown_difficulty", None
+        wallet = await _RR.get_or_create_arcade_wallet(db, user_id, for_update=True)
+        if coins_delta:
+            wallet.coins = max(0, (wallet.coins or 0) + int(coins_delta))
+        if difficulty is not None:
+            wallet.difficulty = difficulty
+        await db.commit()
+        return None, wallet
+
+    @staticmethod
     def wallet_public(wallet: ArcadeWallet) -> dict:
         """JSON-safe wallet view shared by status/shop/loadout responses."""
         try:
@@ -208,6 +231,7 @@ class _GameMixin:
             "owned_skins": skins,
             "owned_powers": powers,
             "extra_lives": wallet.extra_lives or 0,
+            "difficulty": wallet.difficulty or "normal",
         }
 
     @staticmethod

@@ -42,6 +42,10 @@ async def handle_dashboard_wallet_cashout(request: web.Request):
             if not user:
                 return web.json_response({"ok": False, "error": "user_not_found"}, status=404)
 
+            # Earnings card sends no destination — the saved payout card is it.
+            if not destination:
+                destination = getattr(user, "payout_card", None)
+
             try:
                 req = await create_cashout(session, user, amount=amount_int, destination=destination)
             except FlowError as e:

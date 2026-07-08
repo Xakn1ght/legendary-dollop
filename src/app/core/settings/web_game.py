@@ -80,14 +80,18 @@ GAME_REWARDS = {
 # coupons (existing wallet/checkout flow); traffic is the cheapest asset we
 # have, so the pool costs ~nothing while feeling substantial.
 ARCADE_MONTHLY_PRIZES = [
+    # coins (2026-07-08): arcade-only hangar currency on top of the coupon —
+    # the main faucet for the premium ability ships (daily cap stays 3/run).
     {"min_rank": 1, "max_rank": 1, "coupon_type": "free_gb",
-     "payload": {"gb": 50}, "name": "Arcade Champion — 50GB Free"},
+     "payload": {"gb": 50}, "name": "Arcade Champion — 50GB Free", "coins": 40},
     {"min_rank": 2, "max_rank": 2, "coupon_type": "free_gb",
-     "payload": {"gb": 25}, "name": "Arcade Runner-up — 25GB Free"},
+     "payload": {"gb": 25}, "name": "Arcade Runner-up — 25GB Free", "coins": 25},
     {"min_rank": 3, "max_rank": 3, "coupon_type": "free_gb",
-     "payload": {"gb": 10}, "name": "Arcade 3rd Place — 10GB Free"},
-    {"min_rank": 4, "max_rank": 4, "coupon_type": "discount_percent",
-     "payload": {"discount_percent": 10}, "name": "Arcade 4th Place — 10% Off"},
+     "payload": {"gb": 10}, "name": "Arcade 3rd Place — 10GB Free", "coins": 15},
+    # 2026-07-08: was max_rank 4 — drifted from the documented "#4-10 10% off";
+    # restored to 10 (also carries the rank 4-10 coin prize).
+    {"min_rank": 4, "max_rank": 10, "coupon_type": "discount_percent",
+     "payload": {"discount_percent": 10}, "name": "Arcade Top 10 — 10% Off", "coins": 8},
 ]
 ARCADE_PRIZE_COUPON_EXPIRY_DAYS = 45   # same shelf life as season coupons
 
@@ -105,19 +109,43 @@ ARCADE_COINS = {
 
 # The catalog is server truth: prices, item keys and skin tints live here.
 # skins: permanent, one equipped at a time ("default" is free and always owned).
-#   color = overlay tint composited onto the ship sprite (the client renders
-#   with a source-atop fill, which works on every WebKit — canvas hue-rotate
-#   doesn't; kept here so lobby preview and in-game tint can never drift).
+#   color  = overlay tint composited onto the base ship sprite (source-atop).
+#   sprite = a WHOLE different ship drawing (astrobugz2-relative path) —
+#            same 52x32 canvas as the original, so hitbox/feel are identical.
 # powers: permanent unlocks applied at the start of every run.
 # extra_life: permanent +1 starting life (single purchase).
 # retry: consumable — resets today's ranked run so it can be played again.
 ARCADE_SHOP = {
+    # SHIP CLASSES (2026-07-08): every skin carries a power now.
+    #   perk    = passive, applied silently at run start (tuning lives in
+    #             astrobugz2/config.js SHIPS.perks — client-side numbers,
+    #             bounded by the same score-plausibility caps as everything)
+    #   ability = ACTIVE, kill-charged, fired from the on-screen button
+    #             (tuning in config.js SHIPS.abilities)
+    # The server only says WHICH power a user has (via the loadout); prices
+    # and ownership stay server-truth here.
     "skins": {
         "default": {"price": 0,  "color": None},
-        "crimson": {"price": 18, "color": "#ff4d4d"},
-        "ice":     {"price": 18, "color": "#7be0ff"},
-        "void":    {"price": 24, "color": "#c04dff"},
-        "gold":    {"price": 30, "color": "#ffd23f"},
+        "crimson": {"price": 18, "color": "#ff4d4d", "perk": "speed"},
+        "ice":     {"price": 18, "color": "#7be0ff", "perk": "iframes"},
+        "void":    {"price": 24, "color": "#c04dff", "perk": "slow_tokens"},
+        "gold":    {"price": 30, "color": "#ffd23f", "perk": "coin_luck"},
+        # full ship redesigns (2026-07-07) — not tints
+        "falcon":  {"price": 40, "color": None, "sprite": "sprites/ship_falcon.png",
+                    "perk": "fire_rate"},
+        "comet":   {"price": 40, "color": None, "sprite": "sprites/ship_comet.png",
+                    "perk": "bullet_speed"},
+        "titan":   {"price": 50, "color": None, "sprite": "sprites/ship_titan.png",
+                    "perk": "shield_cap"},
+        "phantom": {"price": 60, "color": None, "sprite": "sprites/ship_phantom.png",
+                    "perk": "cheat_death"},
+        # premium ability ships (2026-07-08) — the long-term coin goals
+        "reaper":  {"price": 80,  "color": None, "sprite": "sprites/ship_reaper.png",
+                    "ability": "scythe"},
+        "vulcan":  {"price": 110, "color": None, "sprite": "sprites/ship_vulcan.png",
+                    "ability": "overdrive"},
+        "aegis":   {"price": 150, "color": None, "sprite": "sprites/ship_aegis.png",
+                    "ability": "bastion"},
     },
     "powers": {
         "shield_start": {"price": 40},   # start every run with 1 shield
@@ -126,3 +154,9 @@ ARCADE_SHOP = {
     "extra_life": {"price": 60},
     "retry": {"price": 12},
 }
+
+# Per-user difficulty (2026-07-08): admin-set on the wallet, delivered to the
+# game via the loadout. The game maps it to an enemy time-scale; boss_rush is
+# a QA mode that pulls every boss gate down to level 2 and unlocks all boss
+# variants (for testing late-game content without a 10-level grind).
+ARCADE_DIFFICULTIES = ("easy", "normal", "hard", "boss_rush")

@@ -43,6 +43,7 @@ export function SubscriptionSection({ t, fmt, subscriptions, subsLoaded, selecte
             type="search"
             autoComplete="off"
             spellCheck="false"
+            maxLength={64}
             placeholder={t('searchSubs')}
             value={searchQuery}
             onChange={(e) => onSearch(e.target.value)}

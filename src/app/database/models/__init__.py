@@ -5,6 +5,7 @@ from ._base import AsyncSessionLocal, Base, engine
 from ._referral import Referral, ReferralReward
 from ._reward import (
     Achievement,
+    AchievementClaim,
     ArcadeFlag,
     ArcadeWallet,
     Challenge,
@@ -66,6 +67,7 @@ __all__ = [
     "RewardHistory",
     "ArcadeFlag",
     "ArcadeWallet",
+    "AchievementClaim",
     "DailyGamePlay",
     "UserAnalytics",
     "RewardEffectiveness",

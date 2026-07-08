@@ -191,9 +191,18 @@ async def test_loadout_and_economy_seal():
         lo = build_loadout(crud.arcade_wallet_public(wallet))
         check("loadout carries the equipped skin + its color",
               lo["skin"] == "gold" and lo["skin_color"] == ARCADE_SHOP["skins"]["gold"]["color"])
+        check("tint skins carry no sprite", lo["skin_sprite"] is None)
         check("loadout flags spread, not shield",
               lo["spread_start"] is True and lo["shield_start"] is False)
         check("loadout carries extra life", lo["extra_lives"] == 1)
+
+        # sprite skins (full redesigns) ride the same pipeline
+        err, wallet = await crud.arcade_buy(db, u.id, "skin:falcon")
+        check("sprite skin purchase succeeds + auto-equips",
+              err is None and wallet.equipped_skin == "falcon")
+        lo = build_loadout(crud.arcade_wallet_public(wallet))
+        check("loadout carries the redesign sprite",
+              lo["skin_sprite"] == "sprites/ship_falcon.png" and lo["skin_color"] is None)
 
         # ECONOMY SEAL: all that shopping cannot have touched money fields
         user = (await db.execute(select(User).filter(User.id == u.id))).scalars().first()
@@ -201,11 +210,103 @@ async def test_loadout_and_economy_seal():
         check("stars untouched by coin economy", (user.stars or 0) == 0)
 
 
+async def test_admin_adjust():
+    print("-- admin adjust (coins + difficulty, 2026-07-08) --")
+    maker = await make_session()
+    async with maker() as db:
+        u = await seed_user(db, 5006, "adjusted")
+
+        err, wallet = await crud.admin_arcade_adjust(db, u.id, coins_delta=100)
+        check("admin grant credits coins", err is None and wallet.coins == 100)
+        check("grants don't inflate lifetime-earned", wallet.coins_earned_total == 0)
+
+        err, wallet = await crud.admin_arcade_adjust(db, u.id, coins_delta=-40)
+        check("admin removal deducts", err is None and wallet.coins == 60)
+        err, wallet = await crud.admin_arcade_adjust(db, u.id, coins_delta=-500)
+        check("balance floors at zero", err is None and wallet.coins == 0)
+
+        err, wallet = await crud.admin_arcade_adjust(db, u.id, difficulty="boss_rush")
+        check("difficulty set", err is None and wallet.difficulty == "boss_rush")
+        err, _ = await crud.admin_arcade_adjust(db, u.id, difficulty="nightmare")
+        check("unknown difficulty rejected", err == "unknown_difficulty")
+
+        # difficulty rides the loadout to the game
+        wallet = await crud.get_or_create_arcade_wallet(db, u.id)
+        lo = build_loadout(crud.arcade_wallet_public(wallet))
+        check("loadout carries the difficulty", lo["difficulty"] == "boss_rush")
+        err, wallet = await crud.admin_arcade_adjust(db, u.id, difficulty="normal")
+        lo = build_loadout(crud.arcade_wallet_public(wallet))
+        check("difficulty resets to normal", lo["difficulty"] == "normal")
+
+        # fresh wallets default to normal
+        u2 = await seed_user(db, 5007, "fresh")
+        wallet2 = await crud.get_or_create_arcade_wallet(db, u2.id)
+        check("fresh wallet difficulty is normal",
+              crud.arcade_wallet_public(wallet2)["difficulty"] == "normal")
+
+        # ECONOMY SEAL: admin coin grants touch nothing but the wallet
+        user = (await db.execute(select(User).filter(User.id == u.id))).scalars().first()
+        check("admin grants don't touch credit/stars",
+              (user.credit or 0) == 0 and (user.stars or 0) == 0)
+
+
+async def test_ship_classes():
+    """Ship classes (2026-07-08): every skin carries a perk/ability id that
+    rides the loadout; the client can only ever get the power of the skin
+    the SERVER says is equipped."""
+    print("-- ship classes (perks + abilities in the loadout) --")
+    maker = await make_session()
+    async with maker() as db:
+        u = await seed_user(db, 5008, "classes")
+        await crud.award_arcade_coins(db, u.id, 500)
+        await db.commit()
+
+        # catalog: every skin declares its power; premium trio is priced above
+        skins = ARCADE_SHOP["skins"]
+        check("all non-default skins carry a power",
+              all(("perk" in v or "ability" in v) for k, v in skins.items() if k != "default"))
+        check("premium trio priced 80/110/150",
+              (skins["reaper"]["price"], skins["vulcan"]["price"], skins["aegis"]["price"])
+              == (80, 110, 150))
+        check("premium trio carries abilities, not perks",
+              all("ability" in skins[k] and "perk" not in skins[k]
+                  for k in ("reaper", "vulcan", "aegis")))
+
+        # default ship: no powers
+        wallet = await crud.get_or_create_arcade_wallet(db, u.id)
+        lo = build_loadout(crud.arcade_wallet_public(wallet))
+        check("default loadout has no perk/ability",
+              lo["perk"] is None and lo["ability"] is None)
+
+        # perk skin: loadout names the perk
+        await crud.arcade_buy(db, u.id, "skin:phantom")
+        wallet = await crud.get_or_create_arcade_wallet(db, u.id)
+        lo = build_loadout(crud.arcade_wallet_public(wallet))
+        check("phantom loadout carries cheat_death perk",
+              lo["perk"] == "cheat_death" and lo["ability"] is None)
+
+        # ability skin: loadout names the ability
+        err, wallet = await crud.arcade_buy(db, u.id, "skin:reaper")
+        check("reaper purchase works", err is None)
+        lo = build_loadout(crud.arcade_wallet_public(wallet))
+        check("reaper loadout carries scythe ability",
+              lo["ability"] == "scythe" and lo["perk"] is None)
+
+        # equipping back to a tint swaps the power with it
+        await crud.arcade_equip(db, u.id, "default")
+        wallet = await crud.get_or_create_arcade_wallet(db, u.id)
+        lo = build_loadout(crud.arcade_wallet_public(wallet))
+        check("re-equipping default drops the power",
+              lo["perk"] is None and lo["ability"] is None)
+
+
 async def main():
     await test_wallet_and_awards()
     await test_buy_and_equip()
     await test_retry()
     await test_loadout_and_economy_seal()
+    await test_admin_adjust()
+    await test_ship_classes()
     print(f"\n{PASS} passed, {FAIL} failed")
     sys.exit(1 if FAIL else 0)
 

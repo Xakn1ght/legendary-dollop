@@ -4,6 +4,7 @@ import { getRawAuthHeaders, withUrlAuth } from '../../shared/auth.js';
 import { useBackClose } from '../../shared/backstack.js';
 import { parseTs } from '../translations.js';
 
+import { MAX_MESSAGE_LEN } from './CreateTicketModal.jsx';
 import { Lightbox } from './Lightbox.jsx';
 
 // file_name -> objectURL (persists across chat opens; photos are immutable)
@@ -354,6 +355,11 @@ export function ChatView({
         )}
         {!isClosed && (
         <div className="reply-area">
+          {draft.length >= MAX_MESSAGE_LEN * 0.9 && (
+            <div className={`composer-counter${draft.length >= MAX_MESSAGE_LEN ? ' at-limit' : ''}`} dir="ltr">
+              {draft.length.toLocaleString(lang === 'fa' ? 'fa-IR' : 'en-US')} / {MAX_MESSAGE_LEN.toLocaleString(lang === 'fa' ? 'fa-IR' : 'en-US')}
+            </div>
+          )}
           <button className="attach-btn" id="attachBtn" type="button" title="Send photo" onClick={() => photoInputRef.current?.click()}>
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
               <rect x="3" y="3" width="18" height="18" rx="3" /><circle cx="8.5" cy="8.5" r="1.5" /><path d="M21 15l-5-5L5 21" />
@@ -378,15 +384,17 @@ export function ChatView({
             ref={inputRef}
             rows={1}
             placeholder={t('typeMessage')}
+            maxLength={MAX_MESSAGE_LEN}
             value={draft}
-            onChange={(e) => { setDraft(e.target.value); autoResize(e.target); if (e.target.value.trim()) onTyping?.(); }}
+            onChange={(e) => { setDraft(e.target.value.slice(0, MAX_MESSAGE_LEN)); autoResize(e.target); if (e.target.value.trim()) onTyping?.(); }}
             onKeyDown={(e) => {
               // Enter inserts a newline (send is button-only, legacy parity)
               if (e.key === 'Enter' && !e.shiftKey) {
                 e.preventDefault();
+                if (draft.length >= MAX_MESSAGE_LEN) return;
                 const el = e.target;
                 const start = el.selectionStart, end = el.selectionEnd;
-                const next = draft.substring(0, start) + '\n' + draft.substring(end);
+                const next = (draft.substring(0, start) + '\n' + draft.substring(end)).slice(0, MAX_MESSAGE_LEN);
                 setDraft(next);
                 requestAnimationFrame(() => {
                   el.selectionStart = el.selectionEnd = start + 1;

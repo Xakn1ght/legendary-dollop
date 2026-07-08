@@ -25,6 +25,7 @@ from sqlalchemy import select
 from app.core.settings import ARCADE_MONTHLY_PRIZES, ARCADE_PRIZE_COUPON_EXPIRY_DAYS
 from app.database import crud
 from app.database.models import (
+    ArcadeWallet,
     AsyncSessionLocal,
     RewardCoupon,
     RewardHistory,
@@ -80,13 +81,33 @@ async def award_monthly_arcade_prizes(session, month_start, month_end, month_key
             expires_at=expires,
             status="active",
         ))
+        # race coins (2026-07-08): arcade-only hangar currency on top of the
+        # coupon. Credited INSIDE this transaction (not via award_arcade_coins,
+        # whose wallet auto-create commits mid-loop and would fracture the
+        # month guard's all-or-nothing semantics). Row locked so a submit
+        # landing at the same instant can't lost-update the balance.
+        coins = int(prize.get("coins") or 0)
+        if coins > 0:
+            wallet = (await session.execute(
+                select(ArcadeWallet)
+                .filter(ArcadeWallet.user_id == user_id)
+                .with_for_update()
+            )).scalars().first()
+            if not wallet:
+                wallet = ArcadeWallet(user_id=user_id)
+                session.add(wallet)
+                wallet.coins = 0
+                wallet.coins_earned_total = 0
+            wallet.coins = (wallet.coins or 0) + coins
+            wallet.coins_earned_total = (wallet.coins_earned_total or 0) + coins
         await crud.add_reward_history(
             session,
             user_id=user_id,
             reward_type=GUARD_SOURCE,
             reward_value=rank,
             source=GUARD_SOURCE,
-            notes=f"{month_key} rank {rank} (score {top_score}) → {prize['name']}",
+            notes=f"{month_key} rank {rank} (score {top_score}) → {prize['name']}"
+                  + (f" + {coins} coins" if coins else ""),
         )
         awarded += 1
 
@@ -96,12 +117,14 @@ async def award_monthly_arcade_prizes(session, month_start, month_end, month_key
                     select(User).filter(User.id == user_id)
                 )).scalars().first()
                 if user and user.chat_id:
+                    coin_line = f"🪙 <b>{coins} arcade coins</b> for the hangar\n" if coins else ""
                     await bot.send_message(
                         chat_id=user.chat_id,
                         text=(
                             f"🏆 <b>AstroBugz {month_key} — Rank #{rank}!</b>\n\n"
                             f"Your month total of <b>{top_score}</b> points earned you:\n"
-                            f"🎁 <b>{prize['name']}</b>\n\n"
+                            f"🎁 <b>{prize['name']}</b>\n"
+                            f"{coin_line}\n"
                             "The coupon is in your rewards wallet — use it on your next purchase. "
                             f"It expires in {ARCADE_PRIZE_COUPON_EXPIRY_DAYS} days."
                         ),

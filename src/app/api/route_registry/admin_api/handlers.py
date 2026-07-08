@@ -31,6 +31,8 @@ from app.api.routes.admin import (
     handle_admin_pending_receipts,
     handle_admin_receipt_detail,
     handle_admin_arcade_flags,
+    handle_admin_arcade_user_adjust,
+    handle_admin_arcade_user_get,
     handle_admin_recent_broadcasts,
     handle_admin_remove_vip,
     handle_admin_reset_arcade,

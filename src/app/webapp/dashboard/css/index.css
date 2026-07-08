@@ -1362,8 +1362,10 @@
     [data-theme="light"] .nav-item:not(.active):not(.nav-item-notch){
       background:transparent;
     }
-    [data-theme="light"] .nav-item:not(.active):not(.nav-item-notch):hover{
-      background:rgba(0, 0, 0, 0.03);
+    @media (hover: hover) and (pointer: fine) {
+      [data-theme="light"] .nav-item:not(.active):not(.nav-item-notch):hover{
+        background:rgba(0, 0, 0, 0.03);
+      }
     }
     .nav-item::before{
       content:'';
@@ -1418,9 +1420,11 @@
       color:#9ca3af;
       fill:currentColor;
     }
-    [data-theme="light"] .nav-item:not(.active):hover .nav-item-icon svg{
-      color:#6b7280;
-      fill:currentColor;
+    @media (hover: hover) and (pointer: fine) {
+      [data-theme="light"] .nav-item:not(.active):not(.nav-item-notch):hover .nav-item-icon svg{
+        color:#6b7280;
+        fill:currentColor;
+      }
     }
     [data-theme="light"] .nav-item.active:not(.nav-item-notch) .nav-item-icon svg{
       color:var(--brand);
@@ -1452,13 +1456,18 @@
     .nav-item-label{
       display:none;
     }
-    .nav-item:not(.active):hover .nav-item-icon{
-      transform:scale(1.08) translateY(-1px);
-    }
-    .nav-item:not(.active):hover .nav-item-icon svg{
-      color:var(--lightText);
-      fill:currentColor;
-      filter:drop-shadow(0 1px 4px rgba(var(--brandRgb), 0.3));
+    /* Nav hover: REAL pointers only, and never the game notch (Pasha: "this
+       shouldn't even have a hover"). On touch webviews :hover sticks to the
+       last tapped element, which froze the FAB float and recolored its icon. */
+    @media (hover: hover) and (pointer: fine) {
+      .nav-item:not(.active):not(.nav-item-notch):hover .nav-item-icon{
+        transform:scale(1.08) translateY(-1px);
+      }
+      .nav-item:not(.active):not(.nav-item-notch):hover .nav-item-icon svg{
+        color:var(--lightText);
+        fill:currentColor;
+        filter:drop-shadow(0 1px 4px rgba(var(--brandRgb), 0.3));
+      }
     }
     
     /* Content spacing for bottom nav — must include safe-area so footer clears the fixed nav on notched
@@ -1575,7 +1584,10 @@
     .sheet-handle{
       width:44px; height:4px; border-radius:2px; background:var(--line); margin:10px auto 0 auto;
     }
-    .sheet-content{padding:16px 16px calc(16px + env(safe-area-inset-bottom))}
+    /* Bottom padding must clear the Android system navbar too: env() reports 0
+       in several webviews (Orbit app, TG fullscreen) — --astro-safe-bottom-extra
+       carries the measured/floored inset there (head-boot). */
+    .sheet-content{padding:16px 16px calc(18px + env(safe-area-inset-bottom, 0px) + var(--astro-safe-bottom-extra, 0px))}
     .sheet-content h2{font-size:16px; font-weight:800; letter-spacing:.3px}
     .sheet-subtitle{margin-top:8px; color:var(--muted); font-size:13px; line-height:1.5}
     .sheet-field{margin-top:14px}
@@ -1587,10 +1599,61 @@
     [data-theme="light"] .sheet-field input{background:#f3f4f6}
     .sheet-field input:focus{border-color:var(--brand); box-shadow:0 0 0 3px rgba(var(--brandRgb),0.15)}
     .sheet-actions{display:flex; gap:10px; margin-top:14px; justify-content:flex-end}
+
+    /* ── Export/QR sheet (redesign 2026-07-08) ─────────────────────
+       Header row with a real ✕, one-line LTR link pill + copy button,
+       QR as a centered white card, primary action full-width. */
+    .exp-head{display:flex; align-items:center; justify-content:space-between; gap:10px}
+    .exp-head h2{margin:0}
+    .exp-close{
+      appearance:none; flex-shrink:0; width:38px; height:38px;
+      display:grid; place-items:center; border-radius:12px;
+      border:1px solid var(--line); background:var(--chip); color:var(--text);
+      cursor:pointer; -webkit-tap-highlight-color:transparent;
+      transition:transform .12s ease, opacity .12s ease;
+    }
+    .exp-close:active{transform:scale(0.92)}
+    .exp-link-row{display:flex; gap:8px; margin-top:14px; align-items:stretch}
+    .exp-link{
+      flex:1; min-width:0; display:flex; align-items:center;
+      padding:11px 12px; border-radius:12px;
+      background:rgba(0,0,0,0.25); border:1px solid var(--line);
+      font-family:ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      font-size:12px; color:var(--text-soft, var(--muted));
+      white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
+    }
+    [data-theme="light"] .exp-link{background:rgba(15,23,42,0.05)}
+    .exp-copy{
+      appearance:none; flex-shrink:0; width:42px; border-radius:12px;
+      display:grid; place-items:center; border:1px solid var(--line);
+      background:var(--chip); color:var(--text); cursor:pointer;
+      -webkit-tap-highlight-color:transparent;
+      transition:transform .12s ease, color .15s ease, border-color .15s ease, background .15s ease;
+    }
+    .exp-copy:active{transform:scale(0.92)}
+    .exp-copy.ok{color:var(--ok); border-color:rgba(var(--okRgb),0.45); background:rgba(var(--okRgb),0.12)}
+    .exp-qr-wrap{display:flex; justify-content:center; margin-top:16px}
+    .exp-qr{
+      width:min(260px, 68vw); height:auto; aspect-ratio:1;
+      border-radius:16px; background:#fff; padding:12px;
+      box-shadow:0 8px 28px rgba(0,0,0,0.30), 0 0 0 1px rgba(255,255,255,0.10);
+    }
+    [data-theme="light"] .exp-qr{box-shadow:0 8px 24px rgba(60,48,32,0.12), 0 0 0 1px rgba(45,38,30,0.08)}
+    .exp-qr-loading{background:linear-gradient(105deg, #f2f2f2 30%, #fff 50%, #f2f2f2 70%)}
+    .exp-apps{display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-top:14px}
+    .exp-apps .btn{justify-content:center}
+    .exp-apps-help{grid-column:1 / -1; font-size:12.5px; color:var(--muted)}
+    .exp-actions{margin-top:16px}
+    .exp-primary{width:100%; justify-content:center; font-weight:800; font-size:14.5px; padding:13px 16px}
+    .exp-actions-row{display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-top:8px}
+    .exp-actions-row .btn{justify-content:center}
     
     /* Toasts */
     .toasts{
-      position:fixed; left:50%; transform:translateX(-50%); bottom:calc(90px + env(safe-area-inset-bottom));
+      position:fixed; left:50%; transform:translateX(-50%);
+      /* var(): the bottom-nav grows by the same inset — without it toasts
+         landed inside the taller nav on navbar-overlay webviews */
+      bottom:calc(90px + env(safe-area-inset-bottom) + var(--astro-safe-bottom-extra, 0px));
       display:flex; flex-direction:column; gap:8px; z-index:1600; width:calc(100% - 24px); max-width:420px; padding:0 6px;
     }
     .toast{
@@ -1611,21 +1674,13 @@
     #notificationsList {
       scroll-behavior: smooth;
       position: relative;
+      /* scrollbar hidden — the 6px thumb sat glued to the bubble borders */
+      scrollbar-width: none;
     }
     #notificationsList::-webkit-scrollbar {
-      width: 6px;
+      display: none;
     }
-    #notificationsList::-webkit-scrollbar-track {
-      background: transparent;
-    }
-    #notificationsList::-webkit-scrollbar-thumb {
-      background: var(--line);
-      border-radius: 3px;
-    }
-    #notificationsList::-webkit-scrollbar-thumb:hover {
-      background: var(--muted);
-    }
-    /* Fade indicator at bottom when scrollable */
+    /* Fade indicator at bottom when scrollable (matches the SOLID sheet bg) */
     #notificationsList::after {
       content: '';
       position: sticky;
@@ -1633,10 +1688,13 @@
       left: 0;
       right: 0;
       height: 40px;
-      background: linear-gradient(to bottom, transparent, var(--panel));
+      background: linear-gradient(to bottom, transparent, rgba(9, 15, 26, 0.97));
       pointer-events: none;
       opacity: 0;
       transition: opacity 0.3s;
+    }
+    [data-theme="light"] #notificationsList::after {
+      background: linear-gradient(to bottom, transparent, rgba(252, 250, 246, 0.97));
     }
     #notificationsList.has-more::after {
       opacity: 1;

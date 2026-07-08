@@ -46,7 +46,11 @@ def _auth_chat_id(request: web.Request):
 def _catalog() -> dict:
     return {
         "skins": [
-            {"key": k, "price": v["price"], "color": v["color"]}
+            {"key": k, "price": v["price"], "color": v["color"],
+             "sprite": v.get("sprite"),
+             # ship classes (2026-07-08): the lobby maps these ids to
+             # localized power descriptions on the hangar cards
+             "perk": v.get("perk"), "ability": v.get("ability")}
             for k, v in ARCADE_SHOP["skins"].items()
         ],
         "powers": [
@@ -65,9 +69,17 @@ def build_loadout(wallet_pub: dict) -> dict:
     return {
         "skin": skin_key,
         "skin_color": skin["color"],
+        "skin_sprite": skin.get("sprite"),   # full redesign beats tint
+        # ship classes (2026-07-08): WHICH power rides the equipped skin —
+        # server-derived, so nobody can claim a ship they don't own. The
+        # power's numbers live in the game config (SHIPS block).
+        "perk": skin.get("perk"),
+        "ability": skin.get("ability"),
         "shield_start": "shield_start" in wallet_pub["owned_powers"],
         "spread_start": "spread_start" in wallet_pub["owned_powers"],
         "extra_lives": wallet_pub["extra_lives"],
+        # admin-set per-user difficulty (easy/normal/hard/boss_rush)
+        "difficulty": wallet_pub.get("difficulty", "normal"),
     }
 
 

@@ -6,12 +6,14 @@ import sys
 from app.core.settings.bootstrap import CORE_DIR
 
 # VIP Membership Plans (purchasable through webapp)
+# 2026-07-08 rework (Pasha-approved): heavy-user offer = exclusive big plans
+# + 20% off normal purchases/charges. Membership raised (the offer carries
+# it); LIFETIME KILLED — no forever-liability with 2,800 users incoming.
 VIP_PLANS = {
-    "1_month": {"days": 30, "price": 99_000, "label_fa": "۱ ماهه", "label_en": "1 Month"},
-    "3_months": {"days": 90, "price": 249_000, "label_fa": "۳ ماهه", "label_en": "3 Months"},
-    "6_months": {"days": 180, "price": 449_000, "label_fa": "۶ ماهه", "label_en": "6 Months"},
-    "1_year": {"days": 365, "price": 799_000, "label_fa": "۱ ساله", "label_en": "1 Year"},
-    "lifetime": {"days": None, "price": 1_499_000, "label_fa": "مادام‌العمر", "label_en": "Lifetime"},
+    "1_month": {"days": 30, "price": 139_000, "label_fa": "۱ ماهه", "label_en": "1 Month"},
+    "3_months": {"days": 90, "price": 329_000, "label_fa": "۳ ماهه", "label_en": "3 Months"},
+    "6_months": {"days": 180, "price": 549_000, "label_fa": "۶ ماهه", "label_en": "6 Months"},
+    "1_year": {"days": 365, "price": 899_000, "label_fa": "۱ ساله", "label_en": "1 Year"},
 }
 
 # -----------------------------
@@ -98,9 +100,15 @@ PLANS = {
     "۴۰ گیگابایت": {"price": 75_000, "gb": 40},
     "۶۰ گیگابایت": {"price": 110_000, "gb": 60},
     "۱۰۰ گیگابایت": {"price": 150_000, "gb": 100},
-    # VIP Exclusive Plans (better value)
-    "👑 ۱۵۰ گیگابایت VIP": {"price": 180_000, "gb": 150, "vip_only": True},
-    "👑 ۲۰۰ گیگابایت VIP": {"price": 220_000, "gb": 200, "vip_only": True},
+    # VIP Exclusive Plans — ~1.9-2.1k/GB vs ~3.8k retail, per-GB falls as the
+    # tier grows; the 20% VIP discount deliberately does NOT stack on these
+    # (see flows/pricing.py).
+    "👑 ۱۵۰ گیگ | یکماه VIP": {"price": 320_000, "gb": 150, "days": 35, "vip_only": True, "name_en": "150 GB | 30 D VIP"},
+    "👑 ۲۰۰ گیگ | یکماه VIP": {"price": 420_000, "gb": 200, "days": 35, "vip_only": True, "name_en": "200 GB | 30 D VIP"},
+    "👑 ۳۰۰ گیگ | یکماه VIP": {"price": 600_000, "gb": 300, "days": 35, "vip_only": True, "name_en": "300 GB | 30 D VIP"},
+    "👑 ۳۵۰ گیگ | یکماه VIP": {"price": 690_000, "gb": 350, "days": 35, "vip_only": True, "name_en": "350 GB | 30 D VIP"},
+    "👑 ۴۰۰ گیگ | یکماه VIP": {"price": 780_000, "gb": 400, "days": 35, "vip_only": True, "name_en": "400 GB | 30 D VIP"},
+    "👑 ۵۰۰ گیگ | یکماه VIP": {"price": 950_000, "gb": 500, "days": 35, "vip_only": True, "name_en": "500 GB | 30 D VIP"},
 }
 
 # Attempt to override PLANS from optional JSON file (created via admin settings)

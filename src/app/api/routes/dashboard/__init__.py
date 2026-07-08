@@ -38,15 +38,25 @@ from app.api.routes.dashboard.vip import (
     handle_vip_purchase,
     handle_vip_upload_receipt,
 )
+from app.api.routes.dashboard.achievements import (
+    handle_dashboard_achievements,
+    handle_dashboard_achievements_claim,
+)
 from app.api.routes.dashboard.wallet import (
+    handle_dashboard_earnings,
+    handle_dashboard_earnings_card,
     handle_dashboard_rewards_summary,
     handle_dashboard_wallet_cashout,
     handle_dashboard_wallet_convert_loyalty,
 )
 
 __all__ = [
+    "handle_dashboard_achievements",
+    "handle_dashboard_achievements_claim",
     "handle_dashboard_challenges",
     "handle_dashboard_challenges_claim",
+    "handle_dashboard_earnings",
+    "handle_dashboard_earnings_card",
     "handle_dashboard_index",
     "handle_dashboard_login",
     "handle_dashboard_notification_clear_history",

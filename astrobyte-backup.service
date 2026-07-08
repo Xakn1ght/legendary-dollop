@@ -1,0 +1,11 @@
+[Unit]
+Description=ASTROBYTE nightly DB backup (rotating, keeps 14)
+After=network-online.target postgresql.service
+
+[Service]
+Type=oneshot
+User=root
+WorkingDirectory=/opt/astrobyte
+ExecStart=/usr/bin/bash /opt/astrobyte/scripts/nightly_backup.sh
+Nice=10
+IOSchedulingClass=idle

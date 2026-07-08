@@ -49,6 +49,10 @@ from .handlers import (
     handle_dashboard_ticket_photo_get,
     handle_dashboard_ticket_photo_upload,
     handle_dashboard_tickets_reply,
+    handle_dashboard_achievements,
+    handle_dashboard_achievements_claim,
+    handle_dashboard_earnings,
+    handle_dashboard_earnings_card,
     handle_dashboard_wallet_cashout,
     handle_dashboard_wallet_convert_loyalty,
     handle_get_charge_packages,
@@ -117,6 +121,10 @@ def register_dashboard_api_routes(app: web.Application) -> None:
     app.router.add_get(DASHBOARD_API_BASE_PATH + "/rewards/summary", handle_dashboard_rewards_summary)
     app.router.add_post(DASHBOARD_API_BASE_PATH + "/wallet/convert-loyalty", handle_dashboard_wallet_convert_loyalty)
     app.router.add_post(DASHBOARD_API_BASE_PATH + "/wallet/cashout", handle_dashboard_wallet_cashout)
+    app.router.add_get(DASHBOARD_API_BASE_PATH + "/earnings", handle_dashboard_earnings)
+    app.router.add_post(DASHBOARD_API_BASE_PATH + "/earnings/card", handle_dashboard_earnings_card)
+    app.router.add_get(DASHBOARD_API_BASE_PATH + "/achievements", handle_dashboard_achievements)
+    app.router.add_post(DASHBOARD_API_BASE_PATH + "/achievements/claim", handle_dashboard_achievements_claim)
     app.router.add_get(DASHBOARD_API_BASE_PATH + "/season", handle_dashboard_season)
     app.router.add_post(DASHBOARD_API_BASE_PATH + "/coupons/{coupon_id}/redeem-vip", handle_dashboard_redeem_vip_days)
     app.router.add_get(DASHBOARD_API_BASE_PATH + "/star-tiers", handle_dashboard_star_tiers)

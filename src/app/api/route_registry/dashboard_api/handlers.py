@@ -2,6 +2,8 @@
 
 from app.api.routes.admin_ws import handle_user_support_ws
 from app.api.routes.dashboard import (
+    handle_dashboard_achievements,
+    handle_dashboard_achievements_claim,
     handle_dashboard_challenges,
     handle_dashboard_orbit_add_link,
     handle_dashboard_challenges_claim,
@@ -24,6 +26,8 @@ from app.api.routes.dashboard import (
     handle_dashboard_star_tiers,
     handle_dashboard_stats,
     handle_dashboard_submit_referral,
+    handle_dashboard_earnings,
+    handle_dashboard_earnings_card,
     handle_dashboard_wallet_cashout,
     handle_dashboard_wallet_convert_loyalty,
     handle_profile_photo,

@@ -101,14 +101,14 @@ export function NotificationsPanel({ t, lang, open, notifications, onClose, onMa
           </button>
           <button
             id="markAllReadBtn"
-            onClick={() => { onMarkAllRead(); onClose(); }}
+            onClick={onMarkAllRead}
             style={{ background: 'none', border: 'none', color: 'var(--brand)', fontSize: 13, fontWeight: 600, cursor: 'pointer' }}
           >
             {t('markAllAsRead')}
           </button>
         </div>
       </div>
-      <div id="notificationsList" ref={listRef} style={{ maxHeight: 400, overflowY: 'auto', overflowX: 'hidden' }}>
+      <div id="notificationsList" ref={listRef} data-sheet-scroll="true" style={{ maxHeight: 'min(400px, calc(100dvh - 240px))', overflowY: 'auto', overflowX: 'hidden' }}>
         {notifications.length === 0 ? (
           <div style={{ textAlign: 'center', padding: '40px 20px', color: 'var(--muted)' }}>
             <svg viewBox="0 0 24 24" style={{ width: 48, height: 48, opacity: 0.5, marginBottom: 12 }} fill="currentColor" xmlns="http://www.w3.org/2000/svg">

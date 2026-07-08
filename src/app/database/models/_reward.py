@@ -13,7 +13,7 @@ from sqlalchemy import (
     Text,
     UniqueConstraint,
 )
-from sqlalchemy.orm import backref, relationship
+from sqlalchemy.orm import relationship
 
 from ._base import Base
 
@@ -54,6 +54,24 @@ class UserAchievement(Base):
 
     user = relationship("User", back_populates="achievements")
     achievement = relationship("Achievement")
+
+
+class AchievementClaim(Base):
+    """One-time reward claims for the code-defined mission achievements
+    (services/achievements.py) — separate from the legacy seeded
+    Achievement/UserAchievement pair, which the old bot UI still reads."""
+    __tablename__ = "achievement_claims"
+    __table_args__ = (
+        UniqueConstraint("user_id", "achievement_key", name="uq_achievement_claim_user_key"),
+    )
+
+    id = Column(Integer, primary_key=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    achievement_key = Column(String(32), nullable=False)
+    coupon_id = Column(Integer, ForeignKey("reward_coupons.id"), nullable=True)
+    claimed_at = Column(DateTime, default=datetime.datetime.utcnow)
+
+    user = relationship("User")
 
 
 class Challenge(Base):
@@ -164,6 +182,9 @@ class ArcadeWallet(Base):
     owned_powers = Column(Text, default="[]", nullable=False)   # JSON list of power keys
     extra_lives = Column(Integer, default=0, nullable=False)    # permanent +N starting lives
     coins_earned_total = Column(Integer, default=0, nullable=False)  # lifetime, for analytics
+    # admin-set per-user difficulty (2026-07-08): easy | normal | hard |
+    # boss_rush (QA mode — bosses from level 2). Rides the loadout to the game.
+    difficulty = Column(String(16), default="normal", server_default="normal", nullable=False)
     created_at = Column(DateTime, default=datetime.datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.datetime.utcnow, onupdate=datetime.datetime.utcnow)
 

@@ -218,8 +218,12 @@ export function SupportInbox() {
 
   const view = useMemo(() => {
     let out = tickets;
-    if (filter === 'open') out = out.filter((t) => t.status === 'open' || t.status === 'pending');
-    else if (filter === 'closed') out = out.filter((t) => t.status === 'closed' || t.status === 'archived');
+    // Archived chats live ONLY in their own tab — archiving moves a ticket
+    // out of the working inbox instead of lingering under All/Closed.
+    if (filter === 'archived') out = out.filter((t) => t.status === 'archived');
+    else if (filter === 'open') out = out.filter((t) => t.status === 'open' || t.status === 'pending');
+    else if (filter === 'closed') out = out.filter((t) => t.status === 'closed');
+    else out = out.filter((t) => t.status !== 'archived');
     const query = q.trim().toLowerCase();
     if (query) out = out.filter((t) => [t.user_name, t.subject, t.last_message, String(t.user_ticket_number || t.id)].filter(Boolean).join(' ').toLowerCase().includes(query));
     return out;
@@ -362,18 +366,18 @@ export function SupportInbox() {
     <div className={'sup-inbox' + (selected ? ' chat-open' : '') + (ctxOpen ? ' ctx-open' : '')}>
       <aside className="sup-list glass-card">
         <div className="sup-list-head">
+          <a className="btn btn-secondary sup-home" href="/admin/dashboard" aria-label="Back to panel">‹ Panel</a>
           <div>
             <div className="sup-title">Support</div>
             <div className="sup-sub">{tickets.reduce((s, t) => s + (t.unread_count || 0), 0)} unread · {tickets.length} total</div>
           </div>
-          <a className="btn btn-secondary sup-home" href="/admin/dashboard">‹ Panel</a>
         </div>
         <div className="sup-search">
           <Icons.search width={16} height={16} />
           <input placeholder="Search tickets…" value={q} onChange={(e) => setQ(e.target.value)} />
         </div>
         <div className="sup-filters">
-          {['all', 'open', 'closed'].map((f) => (
+          {['all', 'open', 'closed', 'archived'].map((f) => (
             <button key={f} className={'sup-filter' + (filter === f ? ' active' : '')} onClick={() => setFilter(f)}>{f[0].toUpperCase() + f.slice(1)}</button>
           ))}
         </div>
