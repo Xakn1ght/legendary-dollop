@@ -103,13 +103,13 @@ async def _redeem_credit(
     await crud.spend_reward(session, reward.id)
     amount_fa = to_persian_digits(f"{reward.credit_amount:,}")
     if bucket == "cash":
-        await callback.answer("✅ به موجودی نقدی شما افزوده شد!", show_alert=True)
-        note = f"💵 {amount_fa} تومان به موجودی نقدی (قابل برداشت) شما افزوده شد."
+        await callback.answer("به موجودی نقدی شما افزوده شد.", show_alert=True)
+        note = f"{amount_fa} تومان به موجودی نقدی (قابل برداشت) شما افزوده شد."
     else:
-        await callback.answer("✅ اعتبار به کیف پول شما افزوده شد!", show_alert=True)
-        note = f"💰 {amount_fa} تومان به کیف پول شما افزوده شد."
+        await callback.answer("اعتبار به کیف پول شما افزوده شد.", show_alert=True)
+        note = f"{amount_fa} تومان به کیف پول شما افزوده شد."
     try:
-        await callback.message.edit_text(f"🎁 بن استفاده شد: {note}")
+        await callback.message.edit_text(f"بن استفاده شد: {note}")
     except Exception:
         pass
     await bot.send_message(user.chat_id, note)

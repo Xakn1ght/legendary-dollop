@@ -105,9 +105,9 @@ PLANS = {
     # GB, so they weren't actually exclusive). LIST prices are pre-discount:
     # the 20% VIP discount applies like everywhere else and nets the designed
     # member prices exactly (862.5k→690k, 975k→780k, 1187.5k→950k ≈ 1.9-2k/GB).
-    "👑 ۳۵۰ گیگ | یکماه VIP": {"price": 862_500, "gb": 350, "days": 35, "vip_only": True, "name_en": "350 GB | 30 D VIP"},
-    "👑 ۴۰۰ گیگ | یکماه VIP": {"price": 975_000, "gb": 400, "days": 35, "vip_only": True, "name_en": "400 GB | 30 D VIP"},
-    "👑 ۵۰۰ گیگ | یکماه VIP": {"price": 1_187_500, "gb": 500, "days": 35, "vip_only": True, "name_en": "500 GB | 30 D VIP"},
+    "۳۵۰ گیگ | یکماه VIP": {"price": 862_500, "gb": 350, "days": 35, "vip_only": True, "name_en": "350 GB | 30 D VIP"},
+    "۴۰۰ گیگ | یکماه VIP": {"price": 975_000, "gb": 400, "days": 35, "vip_only": True, "name_en": "400 GB | 30 D VIP"},
+    "۵۰۰ گیگ | یکماه VIP": {"price": 1_187_500, "gb": 500, "days": 35, "vip_only": True, "name_en": "500 GB | 30 D VIP"},
 }
 
 # Attempt to override PLANS from optional JSON file (created via admin settings)

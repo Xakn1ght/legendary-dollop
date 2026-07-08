@@ -26,7 +26,7 @@ function AutoBadges({ autoDiscounts, fmt, t, lang, vipOnly }) {
     return <div key={i} className="plan-badge event">{label} -{fmt(pct)}%</div>;
   }).filter(Boolean);
   // VIP-exclusive cards carry a members-only tag in front of the discounts.
-  if (vipOnly) badges.unshift(<div key="viptag" className="plan-badge vip-tag">👑 VIP</div>);
+  if (vipOnly) badges.unshift(<div key="viptag" className="plan-badge vip-tag">VIP</div>);
   if (!badges.length) return null;
   return <div className="plan-badges">{badges}</div>;
 }
