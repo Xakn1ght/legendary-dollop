@@ -308,11 +308,7 @@ export function TasksPage() {
 
   const needsSub = (type) => type === 'traffic' || type === 'days';
 
-  const openRedeemSheet = async (reward) => {
-    const opts = voucherOptions(reward);
-    const selectedType = opts.length === 1 ? opts[0].type : null;
-    setRedeem({ reward, options: opts, selectedType, selectedSubId: null, subs: null });
-    setAddToken('');
+  const loadSheetSubs = async () => {
     try {
       const r = await api('/api/dashboard/subscriptions');
       const subs = (r.ok && r.subscriptions) ? r.subscriptions : [];
@@ -326,6 +322,33 @@ export function TasksPage() {
     } catch (_) {
       setRedeem((cur) => (cur ? { ...cur, subs: [] } : cur));
     }
+  };
+
+  const openRedeemSheet = async (reward) => {
+    const opts = voucherOptions(reward);
+    const selectedType = opts.length === 1 ? opts[0].type : null;
+    setRedeem({ reward, options: opts, selectedType, selectedSubId: null, subs: null });
+    setAddToken('');
+    await loadSheetSubs();
+  };
+
+  // Wallet free_gb coupons: "use it now" — pick a subscription, GB lands on
+  // it immediately (the checkout attach-to-purchase path still exists too).
+  const openCouponSheet = async (c) => {
+    const gb = Number(c.payload?.gb || 0);
+    if (gb <= 0) return;
+    setRedeem({
+      couponMode: true,
+      coupon: c,
+      // reward-compatible shape so the sheet chips/sub-section just work
+      reward: { id: c.id, traffic_bytes: gb * (1024 ** 3) },
+      options: [{ type: 'traffic', label: `${tt('rewardTraffic')} +${faNum(gb, lang)}GB` }],
+      selectedType: 'traffic',
+      selectedSubId: null,
+      subs: null,
+    });
+    setAddToken('');
+    await loadSheetSubs();
   };
 
   // 50★ Legend prize: activate VIP straight from the wallet (never at checkout).
@@ -343,7 +366,7 @@ export function TasksPage() {
     try {
       const r = await api(`/api/dashboard/coupons/${c.id}/redeem-vip`, { method: 'POST' });
       if (r && r.ok) {
-        showToast(lang === 'fa' ? '🎖 VIP فعال شد!' : '🎖 VIP activated!', 'success', 2600);
+        showToast(lang === 'fa' ? 'VIP فعال شد!' : 'VIP activated!', 'success', 2600);
         hapticNotify('success');
         fetchSeason();
       } else {
@@ -356,6 +379,28 @@ export function TasksPage() {
 
   const confirmRedeem = async () => {
     if (!redeem) return;
+    if (redeem.couponMode) {
+      if (!redeem.selectedSubId) return;
+      try {
+        const r = await api(`/api/dashboard/coupons/${redeem.coupon.id}/apply-gb`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ subscription_id: Number(redeem.selectedSubId) }),
+        });
+        if (r && r.ok) {
+          showToast(tt('couponApplied').replace('{gb}', faNum(r.gb_added, lang)), 'success', 2600);
+          hapticNotify('success');
+          setRedeem(null);
+          fetchSeason();
+        } else {
+          showToast(String(r?.error || tt('failedToLoad')), 'error', 2600);
+          hapticNotify('error');
+        }
+      } catch (e) {
+        showToast(String(e?.message || tt('failedToLoad')), 'error', 2600);
+      }
+      return;
+    }
     if (redeem.options.length > 1 && !redeem.selectedType) {
       await astroConfirm({ title: 'Error', message: tt('rewardChoiceRequired'), okText: tt('close'), cancelText: ' ' });
       return;
@@ -756,6 +801,11 @@ export function TasksPage() {
                   {lang === 'fa' ? 'فعال‌سازی' : 'Activate'}
                 </button>
               )}
+              {c.coupon_type === 'free_gb' && (
+                <button className="rw-btn primary sm" type="button" onClick={() => openCouponSheet(c)}>
+                  {tt('useCoupon')}
+                </button>
+              )}
             </div>
           );
         })}
@@ -858,7 +908,7 @@ export function TasksPage() {
                 disabled={redeemConfirmDisabled}
                 onClick={confirmRedeem}
               >
-                {tt('redeem')}
+                {redeem?.couponMode ? tt('useCoupon') : tt('redeem')}
               </button>
             </div>
           </>

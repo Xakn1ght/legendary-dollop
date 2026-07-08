@@ -4,6 +4,7 @@ from app.api.routes.admin_ws import handle_user_support_ws
 from app.api.routes.dashboard import (
     handle_dashboard_achievements,
     handle_dashboard_achievements_claim,
+    handle_dashboard_coupon_apply_gb,
     handle_dashboard_challenges,
     handle_dashboard_orbit_add_link,
     handle_dashboard_challenges_claim,

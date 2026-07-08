@@ -51,6 +51,7 @@ from .handlers import (
     handle_dashboard_tickets_reply,
     handle_dashboard_achievements,
     handle_dashboard_achievements_claim,
+    handle_dashboard_coupon_apply_gb,
     handle_dashboard_earnings,
     handle_dashboard_earnings_card,
     handle_dashboard_wallet_cashout,
@@ -127,6 +128,7 @@ def register_dashboard_api_routes(app: web.Application) -> None:
     app.router.add_post(DASHBOARD_API_BASE_PATH + "/achievements/claim", handle_dashboard_achievements_claim)
     app.router.add_get(DASHBOARD_API_BASE_PATH + "/season", handle_dashboard_season)
     app.router.add_post(DASHBOARD_API_BASE_PATH + "/coupons/{coupon_id}/redeem-vip", handle_dashboard_redeem_vip_days)
+    app.router.add_post(DASHBOARD_API_BASE_PATH + "/coupons/{coupon_id}/apply-gb", handle_dashboard_coupon_apply_gb)
     app.router.add_get(DASHBOARD_API_BASE_PATH + "/star-tiers", handle_dashboard_star_tiers)
     app.router.add_get(DASHBOARD_API_BASE_PATH + "/star-claims", handle_dashboard_star_claims)
     app.router.add_post(

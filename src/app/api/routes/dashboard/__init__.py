@@ -21,6 +21,7 @@ from app.api.routes.dashboard.referrals import (
     handle_dashboard_referrals,
 )
 from app.api.routes.dashboard.star_rewards import (
+    handle_dashboard_coupon_apply_gb,
     handle_dashboard_season,
     handle_dashboard_redeem_vip_days,
     handle_dashboard_star_claim_apply,
@@ -70,6 +71,7 @@ __all__ = [
     "handle_dashboard_referral_rewards",
     "handle_dashboard_referrals",
     "handle_dashboard_rewards_summary",
+    "handle_dashboard_coupon_apply_gb",
     "handle_dashboard_redeem_vip_days",
     "handle_dashboard_season",
     "handle_dashboard_star_claim_apply",
