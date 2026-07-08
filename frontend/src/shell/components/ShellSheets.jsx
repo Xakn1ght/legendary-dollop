@@ -11,26 +11,35 @@ import { Sheet } from './Sheet.jsx';
 // webview to net::ERR_UNKNOWN_URL_SCHEME and KILLS the SPA (the mini app
 // stays dead until Telegram is force-closed) — never top-navigate.
 //
-// Per-OS ladder (2026-07-08, Pasha: "doesn't open the apps at all" on
-// Android): Android webviews silently BLOCK iframe navigations to custom
-// schemes, so the iframe was a no-op there. window.open() instead hands the
-// URL to the host app's handler (Telegram routes it into Android intent
-// resolution → the VPN app opens) while the current page never navigates;
-// a blocked popup returns null and we still try the iframe as a fallback.
-// iOS keeps the iframe path (WKWebView honors it).
+// Ladder (2026-07-08, second revision — Pasha: iPhone opened NOTHING):
+// 1. window.open on EVERY platform — Telegram hands the URL to the OS
+//    (Android intent resolution / iOS UIApplication.open). This is the only
+//    path that ever worked on Android, and iOS WKWebView silently blocks
+//    custom-scheme loads in SUBFRAMES, so the old iframe-first iOS path was
+//    a no-op.
+// 2. Popup blocked → synthesized <a target=_blank> tap (still counts as the
+//    same user gesture; goes through the same external-open policy).
+// 3. iframe only as a last resort if anchor creation itself threw.
 function launchScheme(url) {
-  const isAndroid = /android/i.test(navigator.userAgent || '');
-  if (isAndroid) {
-    try {
-      const w = window.open(url, '_blank');
-      if (w) {
-        // If the scheme resolved, the OS already switched apps; close the
-        // stray about:blank so it doesn't linger behind the webview.
-        setTimeout(() => { try { w.close(); } catch (_) { /* ignore */ } }, 1200);
-        return;
-      }
-    } catch (_) { /* ignore */ }
-  }
+  try {
+    const w = window.open(url, '_blank');
+    if (w) {
+      // If the scheme resolved, the OS already switched apps; close the
+      // stray about:blank so it doesn't linger behind the webview.
+      setTimeout(() => { try { w.close(); } catch (_) { /* ignore */ } }, 1200);
+      return;
+    }
+  } catch (_) { /* ignore */ }
+  try {
+    const a = document.createElement('a');
+    a.href = url;
+    a.target = '_blank';
+    a.rel = 'noopener';
+    document.body.appendChild(a);
+    a.click();
+    setTimeout(() => { try { a.remove(); } catch (_) { /* ignore */ } }, 0);
+    return;
+  } catch (_) { /* ignore */ }
   try {
     const f = document.createElement('iframe');
     f.style.display = 'none';
@@ -46,13 +55,18 @@ const PLATFORM = /android/i.test(navigator.userAgent || '') ? 'android'
 // Per-client formats come from PasarGuard: {link}/{client_type}.
 // Only apps that exist on the viewer's platform are shown (v2rayNG has no
 // iOS build, Streisand/V2Box have no Android build).
+//
+// SCHEME RULE (2026-07-08, Pasha: Karing opened Happ, Clash Meta opened
+// Exclave): generic schemes (sing-box://, clash://) are registered by every
+// client built on that core, and Android hands the intent to WHICHEVER app
+// grabbed it. Always use the app's OWN scheme so the right app answers.
 const ALL_APPS = [
   { key: 'v2rayng', label: 'v2rayNG', os: ['android'], url: (l) => 'v2rayng://install-config?url=' + encodeURIComponent(l) },
-  { key: 'karing', label: 'Karing', os: ['android', 'ios', 'any'], url: (l) => 'sing-box://import-remote-profile?url=' + encodeURIComponent(l + '/sing_box') + '#AstroByte' },
-  { key: 'hiddify', label: 'Hiddify', os: ['android', 'ios', 'any'], url: (l) => 'hiddify://import/' + l },
+  { key: 'karing', label: 'Karing', os: ['android', 'ios', 'any'], url: (l) => 'karing://install-config?url=' + encodeURIComponent(l + '/sing_box') + '&name=AstroByte' },
+  { key: 'hiddify', label: 'Hiddify', os: ['android', 'ios', 'any'], url: (l) => 'hiddify://install-config?url=' + encodeURIComponent(l) },
   { key: 'streisand', label: 'Streisand', os: ['ios'], url: (l) => 'streisand://import/' + l },
   { key: 'v2box', label: 'V2Box', os: ['ios'], url: (l) => 'v2box://install-sub?url=' + encodeURIComponent(l) + '&name=AstroByte' },
-  { key: 'clashmeta', label: 'Clash Meta', os: ['android'], url: (l) => 'clash://install-config?url=' + encodeURIComponent(l + '/clash_meta') + '&name=AstroByte' },
+  { key: 'clashmeta', label: 'Clash Meta', os: ['android'], url: (l) => 'clashmeta://install-config?url=' + encodeURIComponent(l + '/clash_meta') + '&name=AstroByte' },
 ];
 const appsForPlatform = () => ALL_APPS.filter((a) => PLATFORM === 'any' || a.os.includes(PLATFORM) || a.os.includes('any'));
 
