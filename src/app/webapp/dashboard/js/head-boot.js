@@ -283,6 +283,33 @@
         }
       }catch(_){}
 
+      // TOP DANGER ZONE: in fullscreen mini apps Telegram floats its native
+      // Back/close/menu controls OVER the page's top strip. Publish the
+      // measured overlap as --tg-safe-top so every surface (sheets, full
+      // views) can keep interactive UI out of it. Clients often report 0
+      // there, so fullscreen gets a per-OS floor (same lesson as the admin
+      // panel's admin-fx.js: iOS 100px / Android 84px).
+      try{
+        const applyTopSafe = () => {
+          try {
+            const sa = tg.safeAreaInset || {};
+            const csa = tg.contentSafeAreaInset || {};
+            let px = Math.max(0, Math.round((sa.top || 0) + (csa.top || 0)));
+            if (tg.isFullscreen && px < 60) {
+              px = (platform.indexOf('ios') === 0) ? 100 : 84;
+            }
+            document.documentElement.style.setProperty('--tg-safe-top', px + 'px');
+          } catch(_) {}
+        };
+        applyTopSafe();
+        if (typeof tg.onEvent === 'function') {
+          tg.onEvent('safeAreaChanged', applyTopSafe);
+          tg.onEvent('contentSafeAreaChanged', applyTopSafe);
+          tg.onEvent('fullscreenChanged', applyTopSafe);
+          tg.onEvent('viewportChanged', applyTopSafe);
+        }
+      }catch(_){}
+
       // Android fullscreen puts the webview UNDER the system nav buttons and
       // env(safe-area-inset-bottom) reports 0 there, so the bottom nav merged
       // with the phone's buttons. Telegram reports the real overlap via

@@ -357,6 +357,19 @@ header.scrolled {
     0 -12px 56px rgba(0,0,0,0.55),
     0 -4px 20px rgba(0,0,0,0.30),
     inset 0 1.5px 0 rgba(255,255,255,0.16) !important;
+  /* TOP DANGER ZONE: fullscreen mini apps have Telegram's native Back/close
+     controls floating over the top strip (--tg-safe-top, head-boot). A tall
+     sheet (export/QR) used to grow under them — its own header became
+     unclickable. Cap every sheet below the zone and scroll inside. */
+  display: flex;
+  flex-direction: column;
+  max-height: calc(100dvh - max(env(safe-area-inset-top, 0px), var(--tg-safe-top, 0px)) - 10px);
+}
+.sheet-panel .sheet-content {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
 }
 
 [data-theme="light"] .sheet-panel {
