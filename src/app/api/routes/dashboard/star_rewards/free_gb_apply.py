@@ -75,12 +75,19 @@ async def handle_dashboard_coupon_apply_gb(request: web.Request):
             if not info:
                 return web.json_response({"ok": False, "error": "panel_user_not_found"}, status=502)
 
+            # GB on an unlimited account is meaningless — reject BEFORE the
+            # coupon is consumed (client filters these subs out too; this is
+            # the server truth for direct POSTs).
+            current_limit = int(info.get("data_limit") or 0)
+            if current_limit <= 0:
+                return web.json_response({"ok": False, "error": "sub_unlimited"}, status=400)
+
             # Consume FIRST (idempotent active→used gate) so a double-tap can't
             # apply the GB twice; restore if the panel write fails.
             if not await crud.mark_coupon_used(session, coupon.id):
                 return web.json_response({"ok": False, "error": "coupon_not_active"}, status=400)
 
-            new_limit = int(info.get("data_limit") or 0) + gb * (1024 ** 3)
+            new_limit = current_limit + gb * (1024 ** 3)
             ok = await marzban_api.update_user(sub.marzban_username, {"data_limit": new_limit})
             if not ok:
                 await crud.restore_coupon(session, coupon.id)

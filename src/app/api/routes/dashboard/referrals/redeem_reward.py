@@ -91,6 +91,12 @@ async def handle_dashboard_redeem_referral_reward(request: web.Request):
                 if not info:
                     return web.json_response({"ok": False, "error": "marzban_user_not_found"}, status=502)
 
+                # Traffic onto an unlimited account is meaningless — reject
+                # before the voucher is spent. Days are fine (expiry applies
+                # to unlimited subs too).
+                if chosen_traffic > 0 and int(info.get("data_limit") or 0) <= 0:
+                    return web.json_response({"ok": False, "error": "sub_unlimited"}, status=400)
+
                 patch = {}
                 if chosen_traffic > 0:
                     patch["data_limit"] = int(info.get("data_limit") or 0) + chosen_traffic

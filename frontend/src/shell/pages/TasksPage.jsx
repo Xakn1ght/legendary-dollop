@@ -393,7 +393,7 @@ export function TasksPage() {
           setRedeem(null);
           fetchSeason();
         } else {
-          showToast(String(r?.error || tt('failedToLoad')), 'error', 2600);
+          showToast(r?.error === 'sub_unlimited' ? tt('noLimitedSubs') : String(r?.error || tt('failedToLoad')), 'error', 2600);
           hapticNotify('error');
         }
       } catch (e) {
@@ -425,6 +425,9 @@ export function TasksPage() {
       } else if (r?.error === 'credit_cap_reached') {
         showToast(tt('creditCapReachedToast'), 'error', 3600);
         hapticNotify('error');
+      } else if (r?.error === 'sub_unlimited') {
+        showToast(tt('noLimitedSubs'), 'error', 2600);
+        hapticNotify('error');
       } else {
         showToast(String(r?.error || tt('failedToLoad')), 'error', 2600);
       }
@@ -454,6 +457,30 @@ export function TasksPage() {
 
   const vouchersShown = (vouchers || []).slice(0, 8);
   const redeemNeedsSubSection = redeem && redeem.selectedType && needsSub(redeem.selectedType);
+  // GB can only land on a data-limited sub — unlimited accounts are filtered
+  // out whenever the applied thing is traffic (coupon sheet is always
+  // traffic; star vouchers only in the traffic option). Days keep the full
+  // list (expiry applies to unlimited subs too). Server enforces the same
+  // rule (sub_unlimited).
+  const redeemTrafficTarget = !!redeem && (redeem.couponMode || redeem.selectedType === 'traffic');
+  const redeemEligibleSubs = redeem && redeem.subs !== null
+    ? redeem.subs.filter((s) => !redeemTrafficTarget || Number(s.data_limit || 0) > 0)
+    : null;
+  const redeemAllUnlimited = !!(redeemEligibleSubs && redeemEligibleSubs.length === 0
+    && redeem.subs && redeem.subs.length > 0);
+  // Self-healing selection: switching to the traffic option (or loading the
+  // list) must never leave an unlimited sub selected.
+  useEffect(() => {
+    if (!redeem || !redeemEligibleSubs) return;
+    const stillEligible = redeemEligibleSubs.some((s) => String(s.id) === String(redeem.selectedSubId));
+    if (stillEligible) return;
+    const firstActive = redeemEligibleSubs.find((s) => String(s.status || '').toLowerCase() === 'active') || redeemEligibleSubs[0];
+    const nextId = firstActive ? String(firstActive.id) : null;
+    if (String(redeem.selectedSubId) !== String(nextId)) {
+      setRedeem((cur) => (cur ? { ...cur, selectedSubId: nextId } : cur));
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [redeem?.subs, redeemTrafficTarget, redeem?.selectedSubId]);
   const redeemConfirmDisabled = redeem
     ? (redeem.options.length > 1 && !redeem.selectedType) || (redeemNeedsSubSection && !redeem.selectedSubId)
     : true;
@@ -856,6 +883,9 @@ export function TasksPage() {
               <div id="redeemSubsSection">
                 <div className="rw-list-title">{tt('selectSubscription')}</div>
                 {redeem.subs === null && <p className="sheet-subtitle">{tt('loading')}…</p>}
+                {redeemAllUnlimited && (
+                  <p className="sheet-subtitle" id="redeemNoLimited">{tt('noLimitedSubs')}</p>
+                )}
                 {redeem.subs !== null && redeem.subs.length === 0 && (
                   <>
                     <p className="sheet-subtitle">{tt('noSubscriptions')}</p>
@@ -879,9 +909,9 @@ export function TasksPage() {
                     </div>
                   </>
                 )}
-                {redeem.subs !== null && redeem.subs.length > 0 && (
+                {redeemEligibleSubs !== null && redeemEligibleSubs.length > 0 && (
                   <div className="sheet-list" id="redeemSubsList">
-                    {redeem.subs.map((s) => (
+                    {redeemEligibleSubs.map((s) => (
                       <div
                         key={s.id}
                         className={`sheet-item${String(redeem.selectedSubId) === String(s.id) ? ' selected' : ''}`}
