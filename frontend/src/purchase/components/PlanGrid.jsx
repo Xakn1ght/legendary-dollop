@@ -6,18 +6,18 @@ import { isAndroidLike } from '../../shared/keyboard.js';
 import { hapticSelection } from '../../shared/telegram.js';
 
 // Aggregate auto-discount badges shown on every plan card (VIP + event promos).
-// VIP-exclusive plans never show/get the VIP % — they already carry the best
-// per-GB price and the server refuses to stack (flows/pricing.py).
-function applicableDiscounts(autoDiscounts, vipOnly) {
-  return (autoDiscounts || []).filter((d) => !(vipOnly && String(d?.type) === 'vip'));
+// The VIP % applies to VIP-exclusive plans too — their list prices are set
+// pre-discount in the catalog so the net stays the designed member price.
+function applicableDiscounts(autoDiscounts) {
+  return autoDiscounts || [];
 }
-function discountPctFor(autoDiscounts, vipOnly) {
-  const sum = applicableDiscounts(autoDiscounts, vipOnly)
+function discountPctFor(autoDiscounts) {
+  const sum = applicableDiscounts(autoDiscounts)
     .reduce((s, d) => s + (Number(d?.percent || 0) || 0), 0);
   return Math.max(0, Math.min(90, sum));
 }
 function AutoBadges({ autoDiscounts, fmt, t, lang, vipOnly }) {
-  const badges = applicableDiscounts(autoDiscounts, vipOnly).map((d, i) => {
+  const badges = applicableDiscounts(autoDiscounts).map((d, i) => {
     const type = d?.type ? String(d.type) : 'event';
     const pct = Number(d?.percent || 0) || 0;
     if (pct <= 0) return null;
@@ -25,6 +25,8 @@ function AutoBadges({ autoDiscounts, fmt, t, lang, vipOnly }) {
     const label = lang === 'fa' ? (d.label_fa || d.label_en || t('discount')) : (d.label_en || d.label_fa || t('discount'));
     return <div key={i} className="plan-badge event">{label} -{fmt(pct)}%</div>;
   }).filter(Boolean);
+  // VIP-exclusive cards carry a members-only tag in front of the discounts.
+  if (vipOnly) badges.unshift(<div key="viptag" className="plan-badge vip-tag">👑 VIP</div>);
   if (!badges.length) return null;
   return <div className="plan-badges">{badges}</div>;
 }
@@ -35,7 +37,7 @@ function AutoBadges({ autoDiscounts, fmt, t, lang, vipOnly }) {
 // the discounted price here exactly like the fixed cards (Pasha bug report:
 // "the VIP offer isn't applied on the custom").
 function CustomPlanCard({ t, fmt, selected, onSelect, autoOpen, autoDiscounts }) {
-  const customPct = discountPctFor(autoDiscounts, false);
+  const customPct = discountPctFor(autoDiscounts);
   const discounted = (price) => (customPct > 0 ? price - Math.floor(price * (customPct / 100)) : price);
   const [open, setOpen] = useState(autoOpen || (selected?.custom ?? false));
   const [gb, setGb] = useState(selected?.custom ? selected.gb : 50);
@@ -213,7 +215,7 @@ export function PlanGrid({ id, t, fmt, lang, plans, autoDiscounts, selectedPlan,
     <div className="plans-grid" id={id}>
       {plans.map((plan) => {
         const vipOnly = !!plan.vip_only;
-        const pct = discountPctFor(autoDiscounts, vipOnly);
+        const pct = discountPctFor(autoDiscounts);
         const totalPrice = Number(plan.price || 0);
         const discountAmount = pct > 0 ? Math.floor(totalPrice * (pct / 100)) : 0;
         const finalPrice = totalPrice - discountAmount;

@@ -370,6 +370,17 @@ html.kb-open .content {
   background: linear-gradient(135deg, rgba(16, 185, 129, 0.24), rgba(35, 210, 170, 0.18));
   box-shadow: 0 2px 8px rgba(16, 185, 129, 0.2);
 }
+/* Members-only tag on VIP-exclusive plan cards (platinum, matches the VIP look) */
+.plan-badge.vip-tag{
+  border-color: rgba(201, 214, 232, 0.65);
+  background: linear-gradient(135deg, rgba(201, 214, 232, 0.30), rgba(148, 163, 184, 0.16));
+  color: #eef2f8;
+  box-shadow: 0 2px 8px rgba(201, 214, 232, 0.22);
+}
+[data-theme="light"] .plan-badge.vip-tag{
+  color: #33415c;
+  background: linear-gradient(135deg, rgba(148, 163, 184, 0.28), rgba(201, 214, 232, 0.35));
+}
 
 /* Form inputs */
 .form-group {

@@ -955,7 +955,9 @@
       cursor:pointer; transition:transform 0.2s, box-shadow 0.2s;
       position:relative; display:flex; align-items:center; justify-content:center}
     .power-btn svg{width:48px; height:48px; fill:#fff; filter:drop-shadow(0 2px 4px rgba(0,0,0,0.3))}
-    .power-btn:active{transform:scale(0.95)}
+    /* NO :active transform here — the button is centered via
+       translate(-50%,-50%) (.power-wrap > .power-btn) and any :active
+       transform REPLACES it, teleporting the button off-center mid-tap. */
     .power-btn.inactive{background:linear-gradient(135deg, #4a5058, #3a3f47);
       box-shadow:0 4px 12px rgba(0,0,0,0.3)}
     .power-btn.inactive svg{fill:#7a8088}
@@ -2564,7 +2566,8 @@
 }
 @keyframes orbitSpin { to { transform: rotate(360deg); } }
 .power-btn.orbit-enabled { cursor: pointer; -webkit-tap-highlight-color: transparent; touch-action: manipulation; }
-.power-btn.orbit-enabled:active { transform: scale(0.96) !important; }
+/* (click animation removed — the scale replaced the centering transform and
+   made the rocket jump out of the ring on every tap) */
 /* Touch: no hover state may linger after a tap (sticky-hover eats the next tap) */
 @media (hover: none), (pointer: coarse) {
   .power-btn:hover { transform: none; }

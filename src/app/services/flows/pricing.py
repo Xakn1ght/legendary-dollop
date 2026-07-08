@@ -168,9 +168,9 @@ async def quote_purchase(
     base_total = plan_price + renewal_price
 
     # VIP-exclusive plans: money-path enforcement lives HERE (both surfaces
-    # quote through this function), and the 20% VIP discount deliberately
-    # does NOT stack on them — they already carry the best per-GB price
-    # (2026-07-08 VIP rework).
+    # quote through this function). The 20% VIP discount applies to them like
+    # everything else — their LIST prices are set pre-discount in the catalog
+    # so the net lands on the designed member prices (2026-07-08 evening).
     is_vip_user = await crud.is_user_vip(session, user.id)
     vip_only_order = bool(plan_info.get("vip_only")) or bool(renewal_info and renewal_info.get("vip_only"))
     if vip_only_order and not is_vip_user:
@@ -178,7 +178,7 @@ async def quote_purchase(
 
     total_discount_percent = 0
     if (
-        is_vip_user and not vip_only_order
+        is_vip_user
         and VIP_PURCHASE_DISCOUNT_ENABLED and VIP_PURCHASE_DISCOUNT_PERCENT > 0
     ):
         total_discount_percent += VIP_PURCHASE_DISCOUNT_PERCENT
