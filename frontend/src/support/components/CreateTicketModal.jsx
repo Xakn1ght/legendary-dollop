@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 
 import { useBackClose } from '../../shared/backstack.js';
+import { useScrollLock } from '../../shared/scrollLock.js';
 
 const CATEGORIES = ['connection', 'money', 'other'];
 export const MAX_MESSAGE_LEN = 2000;
@@ -26,6 +27,7 @@ function useDesignedPicker() {
 
 function PickerSheet({ t, type, subs, current, onPick, onClose }) {
   const [query, setQuery] = useState('');
+  useScrollLock(true); // mounted = open
   useEffect(() => {
     const onKey = (e) => { if (e.key === 'Escape') onClose(); };
     document.addEventListener('keydown', onKey);
@@ -97,6 +99,8 @@ export function CreateTicketModal({ t, active, subs, initialSubId, onSubmit, onC
 
   // Back closes the picker sheet before the modal itself.
   useBackClose(active && !!picker, () => setPicker(null));
+  // Tickets list behind the modal must not scroll while it's open.
+  useScrollLock(active);
 
   useEffect(() => { if (initialSubId) setSubId(String(initialSubId)); }, [initialSubId]);
 

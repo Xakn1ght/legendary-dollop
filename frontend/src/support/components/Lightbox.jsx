@@ -1,5 +1,7 @@
 import React, { useCallback, useEffect, useRef } from 'react';
 
+import { useScrollLock } from '../../shared/scrollLock.js';
+
 // Fullscreen photo viewer: pinch-zoom, double-tap zoom, pan, swipe-down to
 // dismiss — all pointer events + transform-only (no layout thrash). Tap the
 // backdrop or the X to close. The parent hands us an already-authorized
@@ -42,6 +44,7 @@ async function saveImage(src) {
 export function Lightbox({ src, onClose }) {
   const wrapRef = useRef(null);
   const imgRef = useRef(null);
+  useScrollLock(true); // mounted = open
   const st = useRef(null);
   if (!st.current) {
     st.current = {

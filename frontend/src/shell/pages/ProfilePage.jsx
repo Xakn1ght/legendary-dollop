@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { createPortal } from 'react-dom';
 
 import { useBackClose } from '../../shared/backstack.js';
+import { useScrollLock } from '../../shared/scrollLock.js';
 import { BOT_USERNAME, getTelegramPhotoUrl, getWebApp, hapticSelection } from '../../shared/telegram.js';
 import { api, getUrlAuthToken } from '../api.js';
 import { useShell } from '../ShellContext.js';
@@ -103,6 +104,8 @@ export function ProfilePage() {
   // in the VIP modal it steps payment→plans before closing.
   useBackClose(!!vip && vip.step !== 2, () => setVip(null));
   useBackClose(!!vip && vip.step === 2, () => setVip((cur) => (cur ? { ...cur, step: 1 } : cur)));
+  // Page behind the VIP modal must not scroll (same guard as Sheet).
+  useScrollLock(!!vip);
 
   const isVip = !!user?.is_vip;
 

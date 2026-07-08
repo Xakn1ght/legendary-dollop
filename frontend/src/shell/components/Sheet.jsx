@@ -1,5 +1,7 @@
 import React, { useEffect, useRef } from 'react';
 
+import { useScrollLock } from '../../shared/scrollLock.js';
+
 // Generic bottom sheet matching legacy .sheet-backdrop/.sheet-panel markup
 // (glass.css + index.css style these by class).
 //
@@ -14,6 +16,10 @@ import React, { useEffect, useRef } from 'react';
 export function Sheet({ open, onClose, labelledBy, children, panelId, backdropId }) {
   const panelRef = useRef(null);
   const drag = useRef(null); // { startY, startT, dy, active }
+
+  // The page behind a sheet must be inert: freeze body scroll while open
+  // (backdrop touchmove otherwise chains to the document in webviews).
+  useScrollLock(open);
 
   useEffect(() => {
     const panel = panelRef.current;

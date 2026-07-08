@@ -387,6 +387,15 @@ header.scrolled {
   -webkit-backdrop-filter: blur(6px) !important;
 }
 
+/* Overlay scroll guard (scrollLock.js): <body> is the page's scroll
+   container (html is viewport-height with overflow-x hidden), so hiding its
+   overflow while any sheet/modal is open stops touch/wheel scroll of the
+   page behind the overlay. scrollTop survives overflow:hidden — no jump. */
+html.overlay-lock,
+html.overlay-lock body {
+  overflow: hidden !important;
+}
+
 [data-theme="light"] .sheet-backdrop {
   background: rgba(60,80,120,0.22) !important;
 }
