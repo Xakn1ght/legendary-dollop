@@ -768,8 +768,10 @@
       width: min(360px, calc(100vw - 40px));
       background: var(--panel);
       border: 1px solid var(--line);
-      border-radius: 16px;
-      box-shadow: 0 18px 60px rgba(0,0,0,0.35);
+      border-radius: 18px;
+      /* Opaque slab (Pasha 2026-07-09: less transparency) — depth comes
+         from one deep shadow, not from see-through surfaces. */
+      box-shadow: 0 24px 70px rgba(0,0,0,0.5);
       overflow: hidden;
       z-index: 1300;
       transform-origin: top right;
@@ -798,22 +800,46 @@
     }
     .sub-actions-menu .menu-title{
       font-weight: 800;
-      font-size: 12px;
-      letter-spacing: .6px;
-      text-transform: uppercase;
-      color: var(--muted);
+      font-size: 12.5px;
+      letter-spacing: .4px;
+      color: var(--lightText);
       display:flex;
       align-items:center;
       gap: 8px;
     }
-    .sub-actions-menu .menu-list{ padding: 8px; display:grid; gap: 2px; }
+    /* V2 Promoted Grid: buy/charge as two accent hero tiles */
+    .sub-actions-menu .menu-tiles{
+      display:grid; grid-template-columns: 1fr 1fr; gap: 10px;
+      padding: 10px 12px 4px;
+    }
+    .sub-actions-menu .menu-tile{
+      border-radius: 16px;
+      padding: 14px 12px 12px;
+      display:flex; flex-direction:column; align-items:center; gap: 7px;
+      cursor:pointer; font-family: inherit;
+      color: var(--lightText);
+      background: linear-gradient(160deg, rgba(var(--brandRgb), 0.16), rgba(var(--brandRgb), 0.05));
+      border: 1px solid rgba(var(--brandRgb), 0.30);
+      transition: transform .12s ease, opacity .2s ease-out;
+    }
+    .sub-actions-menu .menu-tile svg{ color: var(--brand); }
+    .sub-actions-menu .menu-tile .tt{ font-size: 13.5px; font-weight: 800; }
+    .sub-actions-menu .menu-tile .hh{ font-size: 11px; color: var(--muted); }
+    .sub-actions-menu .menu-tile:active{ transform: scale(0.97); }
+    .sub-actions-menu .menu-tile{ opacity: 0; transform: translateY(7px); transition: transform .24s cubic-bezier(0.23, 1, 0.32, 1), opacity .2s ease-out; }
+    .sub-actions-menu.open .menu-tile{ opacity: 1; transform: translateY(0); }
+    .sub-actions-menu.open .menu-tile:nth-child(2){ transition-delay: 25ms; }
+    @media (prefers-reduced-motion: reduce){
+      .sub-actions-menu .menu-tile{ transform: none; transition: opacity .2s ease; }
+    }
+    .sub-actions-menu .menu-list{ padding: 4px 8px 8px; display:grid; }
     .sub-actions-menu .menu-item{
       width: 100%;
       border: none;
       background: transparent;
       color: var(--lightText);
-      border-radius: 13px;
-      padding: 11px 12px;
+      border-radius: 12px;
+      padding: 12px 10px;
       display:flex;
       align-items:center;
       gap: 12px;
@@ -842,37 +868,14 @@
       .sub-actions-menu .menu-item{ transform: none; transition: background .15s ease, opacity .2s ease; }
       .sub-actions-menu.open .menu-item{ transition-delay: 0ms !important; }
     }
-    .sub-actions-menu .mi-ic{
-      width: 36px;
-      height: 36px;
-      border-radius: 11px;
-      display:flex;
-      align-items:center;
-      justify-content:center;
-      flex: 0 0 36px;
-      color: var(--brand);
-      background: rgba(var(--brandRgb), 0.14);
-      border: 1px solid rgba(var(--brandRgb), 0.22);
-    }
-    .sub-actions-menu .mi-ic.secondary{
-      color: #10b981;
-      background: rgba(16,185,129,0.13);
-      border-color: rgba(16,185,129,0.22);
-    }
-    .sub-actions-menu .mi-ic.blue{
-      color: #60a5fa;
-      background: rgba(59,130,246,0.13);
-      border-color: rgba(59,130,246,0.22);
-    }
-    .sub-actions-menu .mi-ic.gray{
-      color: var(--muted);
-      background: rgba(148,163,184,0.13);
-      border-color: rgba(148,163,184,0.22);
-    }
-    [data-theme="light"] .sub-actions-menu .mi-ic.blue{ color: #2563eb; }
+    /* V2 quiet rows: inline muted icon, title only, chevron, hairline dividers */
+    .sub-actions-menu .mi-ic-inline{ display:flex; flex: none; color: var(--muted); }
+    .sub-actions-menu .menu-item + .menu-item{ border-top: 1px solid var(--line); border-radius: 0; }
+    .sub-actions-menu .menu-item:last-child{ border-radius: 0 0 12px 12px; }
+    .sub-actions-menu .mi-chev{ flex: none; color: var(--muted); opacity: .45; }
+    html[dir="ltr"] .sub-actions-menu .mi-chev{ transform: scaleX(-1); }
     .sub-actions-menu .mi-text{ display:flex; flex-direction:column; gap: 2px; flex:1; min-width: 0; }
     .sub-actions-menu .mi-text .title{ font-weight: 700; font-size: 13.5px; }
-    .sub-actions-menu .mi-text .sub{ font-size: 11.5px; color: var(--muted); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
     /* Subs dropdown */
     .subs-dd{
       position:relative; margin-top:8px; display:none;
@@ -2553,13 +2556,12 @@
       border-color: rgba(255,255,255,0.40);
     }
 
-    /* Sub actions menu */
+    /* Sub actions menu — V2 Promoted Grid: opaque in light too (the old
+       0.55-alpha frost was the "too transparent" Pasha complaint). */
     [data-theme="light"] .sub-actions-menu {
-      background: rgba(255,255,255,0.55);
-      backdrop-filter: blur(28px) saturate(160%);
-      -webkit-backdrop-filter: blur(28px) saturate(160%);
-      border-color: rgba(255,255,255,0.70);
-      box-shadow: 0 16px 48px rgba(15,23,42,0.12), inset 0 1px 0 rgba(255,255,255,0.85);
+      background: #fdfcf9;
+      border-color: rgba(28,24,19,0.10);
+      box-shadow: 0 24px 60px rgba(60,48,32,0.18);
     }
 
     /* Bottom nav — heavy frosted glass */

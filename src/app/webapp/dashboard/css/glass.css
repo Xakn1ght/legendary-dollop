@@ -4581,8 +4581,8 @@ html:not([data-perf="lite"]) #redeemBackdrop.visible {
   backdrop-filter: blur(6px) !important;
   -webkit-backdrop-filter: blur(6px) !important;
 }
+/* (.sub-actions-menu removed 2026-07-09 — the V2 opaque menu never blurs) */
 html:not([data-perf="lite"]) .sheet-panel.open,
-html:not([data-perf="lite"]) .sub-actions-menu.open,
 html:not([data-perf="lite"]) .subs-dd.visible .panel,
 html:not([data-perf="lite"]) #redeemPanel.open,
 html:not([data-perf="lite"]) #redeemPanel.visible {
@@ -4590,7 +4590,6 @@ html:not([data-perf="lite"]) #redeemPanel.visible {
   -webkit-backdrop-filter: blur(20px) saturate(160%) !important;
 }
 html[data-theme="light"]:not([data-perf="lite"]) .sheet-panel.open,
-html[data-theme="light"]:not([data-perf="lite"]) .sub-actions-menu.open,
 html[data-theme="light"]:not([data-perf="lite"]) .subs-dd.visible .panel,
 html[data-theme="light"]:not([data-perf="lite"]) #redeemPanel.open,
 html[data-theme="light"]:not([data-perf="lite"]) #redeemPanel.visible {
@@ -4745,4 +4744,42 @@ html[data-theme="dark"] .sheet-panel, html:not([data-theme="light"]) .sheet-pane
 }
 html[data-theme="light"] .sheet-panel, [data-theme="light"] .sheet-panel {
   background: rgba(252, 250, 247, 0.97) !important;
+}
+
+/* ── v64: ACTIONS MENU = V2 "Promoted Grid" (Pasha's pick 2026-07-09) ──
+   OPAQUE slab in both themes; every earlier glass era of this menu above
+   is retired here (keep this block LAST). Rows are quiet divided lines,
+   not glass tiles; the two hero tiles style themselves in index.css. */
+.sub-actions-menu,
+html[data-theme="dark"] .sub-actions-menu,
+html:not([data-theme="light"]) .sub-actions-menu {
+  background: var(--panel) !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+  border: 1px solid var(--line) !important;
+  box-shadow: 0 24px 70px rgba(0, 0, 0, 0.5) !important;
+}
+html[data-theme="light"] .sub-actions-menu,
+[data-theme="light"] .sub-actions-menu {
+  background: #fdfcf9 !important;
+  border: 1px solid rgba(28, 24, 19, 0.10) !important;
+  box-shadow: 0 24px 60px rgba(60, 48, 32, 0.18) !important;
+}
+.sub-actions-menu .menu-item,
+[data-theme="light"] .sub-actions-menu .menu-item,
+html[data-theme="light"] .sub-actions-menu .menu-item {
+  background: transparent !important;
+  border: none !important;
+  box-shadow: none !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+}
+.sub-actions-menu .menu-item + .menu-item,
+[data-theme="light"] .sub-actions-menu .menu-item + .menu-item {
+  border-top: 1px solid var(--line) !important;
+}
+.sub-actions-menu .menu-item:hover {
+  background: var(--chipHover) !important;
+  border-color: var(--line) !important;
+  box-shadow: none !important;
 }

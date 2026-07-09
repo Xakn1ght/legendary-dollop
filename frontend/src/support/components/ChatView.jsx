@@ -180,28 +180,44 @@ export function ChatView({
   // Android (Telegram WebView) keeps the layout viewport full-height when
   // the keyboard opens, leaving the fixed reply bar hidden behind it. Size
   // the fixed chat view to the *visual* viewport while the keyboard is up.
+  // iOS fires vv resize/scroll bursts during the keyboard animation and on
+  // every viewport pan — the old handler force-scrolled the message list to
+  // the bottom on EACH of those, so the list visibly jumped while composing
+  // and the user could not scroll history with the keyboard up. Now: DOM
+  // writes only when height/offset really changed, and stick-to-bottom only
+  // when the keyboard height changed AND the user was already at the bottom
+  // (or the keyboard just opened — the original "show newest" behavior).
   useEffect(() => {
     const vv = window.visualViewport;
     if (!vv) return undefined;
     let raf = 0;
+    let lastKb = 0;
+    let lastTop = -1;
     const apply = () => {
       raf = 0;
       const el = chatViewRef.current;
       if (!el) return;
       const kb = Math.max(0, Math.round((window.innerHeight || 0) - vv.height));
+      const top = Math.round(vv.offsetTop);
+      const kbChanged = Math.abs(kb - lastKb) > 8;
+      if (!kbChanged && top === lastTop) return;
       if (kb > 60) {
+        const m = messagesRef.current;
+        // Read scroll state BEFORE resizing the view (writes invalidate it).
+        const nearBottom = m ? (m.scrollHeight - m.scrollTop - m.clientHeight) < 120 : false;
         el.style.height = Math.round(vv.height) + 'px';
-        el.style.top = Math.round(vv.offsetTop) + 'px';
+        el.style.top = top + 'px';
         el.style.bottom = 'auto';
         el.classList.add('kb-open');
-        const m = messagesRef.current;
-        if (m) m.scrollTop = m.scrollHeight;
+        if (m && kbChanged && (nearBottom || lastKb <= 60)) m.scrollTop = m.scrollHeight;
       } else {
         el.style.height = '';
         el.style.top = '';
         el.style.bottom = '';
         el.classList.remove('kb-open');
       }
+      lastKb = kb;
+      lastTop = top;
     };
     const onChange = () => { if (!raf) raf = requestAnimationFrame(apply); };
     vv.addEventListener('resize', onChange);

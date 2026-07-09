@@ -123,9 +123,17 @@ export function SupportApp() {
       });
       const last = (res.ticket.messages || [])[res.ticket.messages.length - 1];
       if (last) {
-        setTickets((cur) => sortTickets(cur.map((tk) => (tk.id === ticketId
-          ? { ...tk, last_message: last.message || '', updated_at: last.created_at || tk.updated_at }
-          : tk))));
+        // Poll runs every 3s while the WS is down — bail with the same array
+        // when nothing changed so React skips the full re-render.
+        setTickets((cur) => {
+          const tk = cur.find((x) => x.id === ticketId);
+          const lm = last.message || '';
+          const ua = last.created_at || (tk ? tk.updated_at : undefined);
+          if (tk && tk.last_message === lm && tk.updated_at === ua) return cur;
+          return sortTickets(cur.map((x) => (x.id === ticketId
+            ? { ...x, last_message: lm, updated_at: ua }
+            : x)));
+        });
       }
     }
   }, []);

@@ -101,7 +101,15 @@ async function promptOfficialDownload(app, t) {
 // is still visible after a short grace (a real launch ALWAYS backgrounds
 // the webview) step down to the plain app-own scheme; still visible after
 // that → the app isn't installed → offer the official download page.
-// A webview cannot query installed apps; visibility is the only signal.
+// A webview cannot query installed apps — "did we get backgrounded?" is the
+// only signal, and on iOS Telegram it's unreliable: the webview often keeps
+// visibilityState 'visible' while the OS is already showing the target app
+// (round 5.1 — Pasha: false "not installed" prompt on iOS). So the ladder
+// listens to every backgrounding tell it can get: visibilitychange, pagehide,
+// window blur, timer throttling (a setTimeout that fires way past schedule
+// means the webview was frozen in between = an app took over), plus a final
+// document.hasFocus() check right before prompting. False negatives (app
+// missing but no prompt) are acceptable; false positives are what annoy.
 // The prompt never auto-navigates (desktop can stay visible on success).
 let _ladderToken = 0;
 function launchAppLadder(app, link, t) {
@@ -115,27 +123,39 @@ function launchAppLadder(app, link, t) {
   steps.push(raw);
 
   let opened = false;
-  const onVis = () => { if (document.hidden) { opened = true; cleanup(); } };
-  const onHide = () => { opened = true; cleanup(); };
+  const markOpened = () => { opened = true; cleanup(); };
+  const onVis = () => { if (document.hidden) markOpened(); };
   const cleanup = () => {
     document.removeEventListener('visibilitychange', onVis);
-    window.removeEventListener('pagehide', onHide);
+    window.removeEventListener('pagehide', markOpened);
+    window.removeEventListener('blur', markOpened);
   };
   document.addEventListener('visibilitychange', onVis);
-  window.addEventListener('pagehide', onHide);
+  window.addEventListener('pagehide', markOpened);
+  // Within this short window a window-blur ≈ the OS switching apps.
+  window.addEventListener('blur', markOpened);
 
   const next = (i) => {
     if (token !== _ladderToken) { cleanup(); return; } // superseded by a newer tap
     if (opened || document.hidden) { cleanup(); return; } // app opened — done
     if (i >= steps.length) {
       cleanup();
+      // Focus gone without any event having fired (seen on iOS Telegram):
+      // assume the app opened rather than false-prompting a download.
+      if (typeof document.hasFocus === 'function' && !document.hasFocus()) return;
       promptOfficialDownload(app, t);
       return;
     }
     launchScheme(steps[i]);
     // Short hop between ladder rungs; a longer grace before concluding
-    // "not installed" (slow phones take a beat to switch apps).
-    setTimeout(() => next(i + 1), i < steps.length - 1 ? 1200 : 1800);
+    // "not installed" (slow phones take a beat to switch apps, and iOS
+    // adds a full app-transition animation on top).
+    const wait = i < steps.length - 1 ? 1200 : (PLATFORM === 'ios' ? 2600 : 1800);
+    const t0 = Date.now();
+    setTimeout(() => {
+      if (Date.now() - t0 > wait + 1500) { markOpened(); return; } // we were frozen → app opened
+      next(i + 1);
+    }, wait);
   };
   next(0);
 }

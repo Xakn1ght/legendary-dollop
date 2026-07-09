@@ -245,12 +245,13 @@ html[dir="rtl"] .message.admin { align-self: flex-end; flex-direction: row-rever
 .chat-view.kb-open .reply-area { padding-bottom: 22px; }
 .chat-view.kb-open { transition: none; }
 /* Fallback path: when the keyboard is only detected via Telegram events or
-   focus heuristics (html.kb-open + --kb-height from shared/keyboard.js),
-   shrink the fixed chat view by the keyboard height. */
+   the Android focus guess (html.kb-open + --kb from head-boot.js — the single
+   keyboard writer on this page since 2026-07-09; shared/keyboard.js no longer
+   runs here), shrink the fixed chat view by the keyboard height. */
 html.kb-open .chat-view {
   top: 0;
   bottom: auto;
-  height: calc(100dvh - var(--kb-height, 0px));
+  height: calc(100dvh - var(--kb, 0px));
   transition: none;
 }
 html.kb-open .chat-view .reply-area { padding-bottom: 22px; }

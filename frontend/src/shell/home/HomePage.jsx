@@ -181,10 +181,50 @@ export function HomePage() {
     } catch (_) { showToast(t('copyFailed'), 'error'); }
   };
 
+  // Telegram webviews routinely reject navigator.clipboard.readText()
+  // (permission prompt never shown), so: Telegram's own reader first
+  // (works when launched from the attachment menu), then the web API,
+  // and when neither yields text — open the Add sheet for a manual
+  // paste instead of a dead-end "failed" toast.
+  const readClipboardText = () => new Promise((resolve) => {
+    const viaNavigator = () => {
+      if (navigator.clipboard && navigator.clipboard.readText) {
+        navigator.clipboard.readText()
+          .then((text) => resolve({ ok: true, text: text || '' }))
+          .catch(() => resolve({ ok: false, text: '' }));
+      } else resolve({ ok: false, text: '' });
+    };
+    const tg = window.Telegram && window.Telegram.WebApp;
+    if (tg && typeof tg.readTextFromClipboard === 'function'
+        && typeof tg.isVersionAtLeast === 'function' && tg.isVersionAtLeast('6.4')) {
+      let settled = false;
+      // The callback can be dropped by some clients — don't hang the button.
+      const timer = setTimeout(() => { if (!settled) { settled = true; viaNavigator(); } }, 1500);
+      try {
+        tg.readTextFromClipboard((text) => {
+          if (settled) return;
+          settled = true;
+          clearTimeout(timer);
+          // null = this launch type isn't allowed to read — try the web API.
+          if (text) resolve({ ok: true, text });
+          else viaNavigator();
+        });
+      } catch (_) {
+        if (!settled) { settled = true; clearTimeout(timer); viaNavigator(); }
+      }
+    } else viaNavigator();
+  });
+
   const importFromClipboard = async () => {
+    const { ok, text } = await readClipboardText();
+    const txt = (text || '').trim();
+    if (!ok) {
+      openAddSheet();
+      showToast(t('clipboardManualPaste'));
+      return;
+    }
+    if (txt.length < 4) { showToast(t('clipboardEmpty'), 'error'); return; }
     try {
-      const txt = await navigator.clipboard.readText();
-      if (!txt || txt.length < 4) { showToast(t('clipboardEmpty'), 'error'); return; }
       const r = await api('/api/dashboard/subscriptions/add', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ url: txt }) });
       if (r && r.ok) {
         showToast(t('addedSuccess'), 'success');
@@ -319,30 +359,35 @@ export function HomePage() {
                 <circle cx="12" cy="12" r="9" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
               </svg>
             </button>
+            {/* V2 "Promoted Grid" (Pasha's pick, 2026-07-09): money actions
+                as two hero tiles, the rest a quiet divided list. */}
             <div id="subActionsMenu" className={`sub-actions-menu${actionsOpen ? ' open' : ''}`} role="menu" aria-hidden={!actionsOpen}>
               <div className="menu-head">
-                <div className="menu-title">
-                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" width="14" height="14" aria-hidden="true">
-                    <path d="M13 2 3 14h9l-1 8 10-12h-9l1-8z" />
-                  </svg>
-                  <span>{t('actions')}</span>
-                </div>
-                <button className="mini-btn" type="button" onClick={() => setActionsOpen(false)}>×</button>
+                <div className="menu-title"><span>{t('actions')}</span></div>
+                <button className="mini-btn" type="button" aria-label={t('close')} onClick={() => setActionsOpen(false)}>×</button>
+              </div>
+              <div className="menu-tiles">
+                <button className="menu-tile" type="button" data-action="buy" onClick={() => { setActionsOpen(false); openPurchasePage(); }}>
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" width="22" height="22" aria-hidden="true"><path d="M6 2 3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z" /><path d="M3 6h18" /><path d="M16 10a4 4 0 0 1-8 0" /></svg>
+                  <span className="tt">{t('buyService')}</span>
+                  <span className="hh">{t('buyHint')}</span>
+                </button>
+                <button className="menu-tile" type="button" data-action="charge" onClick={() => { setActionsOpen(false); openChargePage(); }}>
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" width="22" height="22" aria-hidden="true"><path d="M13 2 3 14h9l-1 8 10-12h-9l1-8z" /></svg>
+                  <span className="tt">{t('chargeService')}</span>
+                  <span className="hh">{t('chargeHint')}</span>
+                </button>
               </div>
               <div className="menu-list">
                 {[
-                  { action: 'add', title: t('addSubscriptionTitle'), hint: t('pasteLinkHint'), cls: '', icon: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" width="18" height="18"><circle cx="12" cy="12" r="9" /><path d="M12 8v8M8 12h8" /></svg>, onClick: openAddSheet },
-                  { action: 'buy', title: t('buyService'), hint: t('buyHint'), cls: '', icon: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" width="18" height="18"><path d="M6 2 3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z" /><path d="M3 6h18" /><path d="M16 10a4 4 0 0 1-8 0" /></svg>, onClick: openPurchasePage },
-                  { action: 'charge', title: t('chargeService'), hint: t('chargeHint'), cls: 'secondary', icon: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" width="18" height="18"><path d="M13 2 3 14h9l-1 8 10-12h-9l1-8z" /></svg>, onClick: openChargePage },
-                  { action: 'support', title: t('support'), hint: t('supportHint'), cls: 'blue', icon: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" width="18" height="18"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" /></svg>, onClick: openSupportPage },
-                  { action: 'tutorial', title: t('tutorial'), hint: t('tutorialHint'), cls: 'gray', icon: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" width="18" height="18"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20" /><path d="M4 4.5A2.5 2.5 0 0 1 6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15Z" /><path d="M8 7h8" /><path d="M8 11h5" /></svg>, onClick: openTutorial },
+                  { action: 'add', title: t('addSubscriptionTitle'), icon: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" width="18" height="18" aria-hidden="true"><circle cx="12" cy="12" r="9" /><path d="M12 8v8M8 12h8" /></svg>, onClick: openAddSheet },
+                  { action: 'support', title: t('support'), icon: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" width="18" height="18" aria-hidden="true"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" /></svg>, onClick: openSupportPage },
+                  { action: 'tutorial', title: t('tutorial'), icon: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" width="18" height="18" aria-hidden="true"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20" /><path d="M4 4.5A2.5 2.5 0 0 1 6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15Z" /><path d="M8 7h8" /><path d="M8 11h5" /></svg>, onClick: openTutorial },
                 ].map((mi) => (
                   <button key={mi.action} className="menu-item" type="button" data-action={mi.action} onClick={() => { setActionsOpen(false); mi.onClick(); }}>
-                    <span className={`mi-ic${mi.cls ? ' ' + mi.cls : ''}`} aria-hidden="true">{mi.icon}</span>
-                    <span className="mi-text">
-                      <span className="title">{mi.title}</span>
-                      <span className="sub">{mi.hint}</span>
-                    </span>
+                    <span className="mi-ic-inline" aria-hidden="true">{mi.icon}</span>
+                    <span className="mi-text"><span className="title">{mi.title}</span></span>
+                    <svg className="mi-chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" width="14" height="14" aria-hidden="true"><path d="m15 18-6-6 6-6" /></svg>
                   </button>
                 ))}
               </div>

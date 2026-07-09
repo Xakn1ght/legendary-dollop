@@ -428,9 +428,14 @@
 // the bottom of the page, so scrollIntoView alone can't help short pages or
 // fixed-position modals. Measure the covered height (visualViewport primary,
 // Telegram viewportHeight as backup), publish it as --kb + html.kb-open, give
-// in-flow pages scroll room via body padding, then scroll the field into view.
-// Fixed containers (modals/sheets/chat) reposition themselves via CSS rules
-// keyed off html.kb-open. (No zoom: inputs are >=16px via glass.css.)
+// in-flow pages scroll room via body padding, then scroll the field into view
+// ONCE per focus (repeat applies are no-ops while the height is stable — see
+// the steady-state guard inside apply()). Fixed containers (modals/sheets/chat)
+// reposition themselves via CSS rules keyed off html.kb-open. This module is
+// the ONLY writer of html.kb-open + --kb; React pages must not run a second
+// keyboard watcher on top of it (dual writers disagreed on Samsung resize-mode
+// webviews and strobed the layout — support page, 2026-07-09).
+// (No zoom: inputs are >=16px via glass.css.)
 (function () {
   'use strict';
   var root = document.documentElement;
@@ -481,31 +486,58 @@
     }
     return false;
   }
+  // Steady-state guard: iOS fires visualViewport resize/scroll bursts while
+  // the keyboard animates AND whenever our own smooth scrollIntoView pans the
+  // visual viewport. Re-running the full apply() for each one re-yanked the
+  // chat list and re-issued scrollIntoView, which panned the viewport again —
+  // a feedback loop the user saw as flashing/jumping (Pasha, 2026-07-09).
+  // Rules: DOM writes only when the height really changed (>8px), and one
+  // scrollIntoView per focus session (re-armed if the keyboard grows >100px,
+  // e.g. a text-keyboard -> emoji-panel swap).
+  var lastKb = -1; // last applied height; -1 = nothing applied yet
+  var scrolledForFocus = false;
+  var kbAtScroll = 0;
   function apply() {
     var el = focusedField();
     var kb = el ? kbHeight() : 0;
-    try {
-      root.style.setProperty('--kb', kb + 'px');
-      root.classList.toggle('kb-open', kb > 0);
-    } catch (_) {}
+    if (!el) baseHeight = window.innerHeight; // keep the adjustResize baseline fresh
+    var kbChanged = (lastKb < 0) || Math.abs(kb - lastKb) > 8;
+    var needReveal = !!el && kb > 0 && (!scrolledForFocus || (kb - kbAtScroll) > 100);
+    if (!kbChanged && !needReveal) return;
+    if (kbChanged) {
+      lastKb = kb;
+      try {
+        root.style.setProperty('--kb', kb + 'px');
+        root.classList.toggle('kb-open', kb > 0);
+      } catch (_) {}
+    }
     if (!el || !kb) {
-      if (!el) baseHeight = window.innerHeight;
       if (document.body) document.body.style.paddingBottom = '';
       return;
     }
-    if (!inFixed(el) && document.body) document.body.style.paddingBottom = kb + 'px';
-    // Chat view shrinks around the reply bar — keep the newest messages visible.
-    var chat = el.closest && el.closest('.chat-view');
-    if (chat) {
-      var msgs = chat.querySelector('.chat-messages');
-      if (msgs) msgs.scrollTop = msgs.scrollHeight;
+    if (kbChanged) {
+      if (!inFixed(el) && document.body) document.body.style.paddingBottom = kb + 'px';
+      // Chat view shrinks around the reply bar — keep the newest messages visible.
+      var chat = el.closest && el.closest('.chat-view');
+      if (chat) {
+        var msgs = chat.querySelector('.chat-messages');
+        if (msgs) msgs.scrollTop = msgs.scrollHeight;
+      }
     }
+    if (!needReveal) return;
     var r = el.getBoundingClientRect();
     var visibleBottom = window.innerHeight - kb;
     if (r.bottom > visibleBottom - 12 || r.top < 0) {
+      scrolledForFocus = true;
+      kbAtScroll = kb;
       try { el.scrollIntoView({ block: 'center', behavior: 'smooth' }); } catch (_) {
         try { el.scrollIntoView(); } catch (_) {}
       }
+    } else {
+      // Already visible: mark this focus as revealed so steady-state viewport
+      // events stop re-measuring the field.
+      scrolledForFocus = true;
+      kbAtScroll = kb;
     }
   }
   var timer = null;
@@ -522,7 +554,13 @@
     staleTimer = setTimeout(function () { staleTimer = null; apply(); armStaleSweep(); }, KB_GUESS_STALE_MS + 500);
   }
   function touchKbActivity() { lastKbActivity = Date.now(); }
-  document.addEventListener('focusin', function () { touchKbActivity(); queue(320); setTimeout(armStaleSweep, 400); }, true);
+  document.addEventListener('focusin', function () {
+    touchKbActivity();
+    scrolledForFocus = false; // every focus session gets one fresh reveal
+    kbAtScroll = 0;
+    queue(320);
+    setTimeout(armStaleSweep, 400);
+  }, true);
   document.addEventListener('focusout', function () { queue(120); }, true);
   // Typing proves the keyboard is really up — keeps the guessed lift alive,
   // and re-lifts instantly if the stale sweep had dropped it mid-composition.
