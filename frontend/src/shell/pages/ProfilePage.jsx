@@ -65,8 +65,17 @@ function SettingsRow({ onClick, icon, title, desc, right }) {
   );
 }
 
-const Arrow = () => (
-  <svg className="settings-arrow" viewBox="0 0 24 24"><path d="M8.59 16.59L13.17 12 8.59 7.41 10 6l6 6-6 6-1.41-1.41z" /></svg>
+// `open` points the chevron DOWN for expandable rows (FAQ). Inline style
+// wins over the CSS rules that flip it in RTL / nudge it on hover — down
+// is down in both directions, so a plain 90° works everywhere.
+const Arrow = ({ open = false }) => (
+  <svg
+    className="settings-arrow"
+    viewBox="0 0 24 24"
+    style={open ? { transform: 'rotate(90deg)' } : undefined}
+  >
+    <path d="M8.59 16.59L13.17 12 8.59 7.41 10 6l6 6-6 6-1.41-1.41z" />
+  </svg>
 );
 
 export function ProfilePage() {
@@ -749,7 +758,7 @@ export function ProfilePage() {
             icon={<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" width="18" height="18"><circle cx="12" cy="12" r="10" /><path d="M9.1 9a3 3 0 1 1 5.8 1c0 2-3 2-3 4" /><path d="M12 18h.01" /></svg>}
             title={tt('faqTitle')}
             desc={tt('faqDesc')}
-            right={<Arrow />}
+            right={<Arrow open={faqOpen} />}
           />
           {faqOpen && (
             <div className="faq-list" style={{ padding: '4px 14px 12px' }}>
