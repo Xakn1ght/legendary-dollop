@@ -510,19 +510,10 @@ export function ProfilePage() {
         </div>
       </section>
 
-      <section className="profile-section">
-        <div className="profile-section-title">
-          <div className="icon-box">
-            <svg viewBox="0 0 24 24" fill="currentColor" width="15" height="15"><path d="M13 2 3 14h9l-1 8 10-12h-9l1-8z" /></svg>
-          </div>
-          <span>{tt('progressRewards')}</span>
-        </div>
-        <div className="profile-info-row">
-          <span className="profile-info-label">{tt('activeSubscriptions')}</span>
-          <span className="profile-info-value" id="infoSubs">{subsCount == null ? '—' : fmt(subsCount)}</span>
-        </div>
-      </section>
-
+      {/* «پیشرفت و جوایز» section removed 2026-07-09 (Pasha): it only ever
+          held the active-subs count — a one-row section reading as broken.
+          The row lives in Account information now; real progress content
+          is the achievements section below. */}
       <section className="profile-section">
         <div className="profile-section-title">
           <div className="icon-box">
@@ -629,6 +620,10 @@ export function ProfilePage() {
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" width="15" height="15"><circle cx="12" cy="12" r="10" /><path d="M12 8v4l3 3" /></svg>
           </div>
           <span>{tt('accountInformation')}</span>
+        </div>
+        <div className="profile-info-row">
+          <span className="profile-info-label">{tt('activeSubscriptions')}</span>
+          <span className="profile-info-value" id="infoSubs">{subsCount == null ? '—' : fmt(subsCount)}</span>
         </div>
         <div className="profile-info-row">
           <span className="profile-info-label">{tt('userId')}</span>
