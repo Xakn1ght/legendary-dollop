@@ -134,10 +134,11 @@ html[lang="fa"] .back-btn svg {
 }
 
 /* Keyboard up (Android pan-mode WebView): reserve scroll room equal to the
-   keyboard height so focused inputs can scroll above it. --kb-height is set
-   by the shared keyboard watcher. */
+   keyboard height so focused inputs can scroll above it. --kb is head-boot's
+   variable — the shared keyboard watcher (--kb-height) was retired on this
+   page 2026-07-09 (dual-writer flashing). */
 html.kb-open .content {
-  padding-bottom: calc(var(--kb-height, 0px) + 24px);
+  padding-bottom: calc(var(--kb, 0px) + 24px);
 }
 
 @media (min-width: 500px) {
