@@ -291,18 +291,72 @@ export function makeT(lang) {
   };
 }
 
+// ICU has every country name in Persian — use it instead of growing the
+// hand map country by country (Pasha: "Finland" rendered raw). The hand
+// maps stay as the first stop for aliases ICU doesn't know (USA, UAE…)
+// and as the fallback for ancient webviews without Intl.DisplayNames.
+let _faRegions;
+function faRegionByCode(code) {
+  try {
+    if (_faRegions === undefined) _faRegions = new Intl.DisplayNames(['fa'], { type: 'region' });
+    const out = _faRegions.of(code);
+    return out && out !== code ? out : null; // unknown codes echo back
+  } catch (_) {
+    _faRegions = null;
+    return null;
+  }
+}
+
+// Reverse lookup for label-only sources (panel location_guess has no code):
+// English name -> ISO code, built lazily ONCE by walking the alpha-2 space.
+let _enToCode = null;
+function codeFromEnglishName(name) {
+  if (_enToCode === null) {
+    _enToCode = {};
+    try {
+      const en = new Intl.DisplayNames(['en'], { type: 'region' });
+      const A = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
+      for (const a of A) {
+        for (const b of A) {
+          const c = a + b;
+          try {
+            const n = en.of(c);
+            if (n && n !== c) _enToCode[n.toLowerCase()] = c;
+          } catch (_) { /* not a region */ }
+        }
+      }
+    } catch (_) { /* no Intl — map stays empty, hand map still applies */ }
+  }
+  return _enToCode[String(name).trim().toLowerCase()] || null;
+}
+
+function faCountryName(label, code) {
+  const c = String(code || '').trim().toUpperCase();
+  if (c) {
+    const viaIntl = faRegionByCode(c);
+    if (viaIntl) return viaIntl;
+    if (COUNTRY_NAMES_BY_CODE_FA[c]) return COUNTRY_NAMES_BY_CODE_FA[c];
+  }
+  const raw = String(label || '').trim();
+  if (!raw) return null;
+  if (COUNTRY_NAMES_FA[raw]) return COUNTRY_NAMES_FA[raw];
+  const derived = codeFromEnglishName(raw);
+  if (derived) return faRegionByCode(derived);
+  return null;
+}
+
 export function localizeCountryDisplay(label, code, lang) {
   const raw = String(label || '').trim();
   if (!raw || raw === '—') return raw;
   if (lang !== 'fa') return raw;
-  const c = String(code || '').trim().toUpperCase();
-  if (c && COUNTRY_NAMES_BY_CODE_FA[c]) return COUNTRY_NAMES_BY_CODE_FA[c];
-  if (COUNTRY_NAMES_FA[raw]) return COUNTRY_NAMES_FA[raw];
+  const direct = faCountryName(raw, code);
+  if (direct) return direct;
+  // "City, Country" labels: keep the city, localize the country part.
   const comma = raw.lastIndexOf(',');
   if (comma > 0) {
     const city = raw.slice(0, comma).trim();
     const country = raw.slice(comma + 1).trim();
-    const faCountry = COUNTRY_NAMES_FA[country];
+    const faCountry = faCountryName(country, null);
     if (faCountry) return city ? (city + '، ' + faCountry) : faCountry;
   }
   return raw;
