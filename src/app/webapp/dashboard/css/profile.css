@@ -857,6 +857,9 @@
     .ach-grid {
       display: grid;
       grid-template-columns: repeat(2, 1fr);
+      /* Every card the same size: rows share the tallest card's height
+         (claim-button cards set the bar) — no more ragged bottoms. */
+      grid-auto-rows: 1fr;
       gap: 8px;
     }
     .ach-item {
@@ -867,8 +870,14 @@
       border-radius: 12px;
       background: var(--chip);
       border: 1px solid var(--line);
-      min-height: 58px;
+      min-height: 92px;
     }
+    /* Footer content (bar / claim button / claimed tag) pins to the card
+       bottom so equal-height cards read as designed, not stretched. */
+    .ach-item .ach-bar,
+    .ach-item .ach-claim,
+    .ach-item .ach-claimed-tag { margin-top: auto; }
+    .ach-claim { width: 100%; }
     .ach-item.done { border-color: rgba(var(--brandRgb), 0.35); }
     .ach-item:not(.done) { opacity: 0.72; }
     .ach-item-top { display: flex; align-items: center; gap: 9px; min-width: 0; }
