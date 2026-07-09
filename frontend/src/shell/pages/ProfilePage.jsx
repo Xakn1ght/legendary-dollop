@@ -342,7 +342,8 @@ export function ProfilePage() {
     } catch (_) { /* ignore */ }
   }, []);
 
-  // VIP promo copy (hardcoded fa/en, legacy parity)
+  // VIP promo copy (hardcoded fa/en, legacy parity). `meter` = % of the
+  // V4 footer bar (days remaining against a 30-day window, capped).
   const vipPromo = useMemo(() => {
     const fa = lang === 'fa';
     if (isVip) {
@@ -350,7 +351,7 @@ export function ProfilePage() {
       // Active members get an INFO button (see the perks; renewal still lives
       // inside the modal) — a "Renew" CTA nagged people who just bought it.
       if (!until) {
-        return { cls: ' is-vip', title: fa ? 'VIP مادام‌العمر' : 'Lifetime VIP', desc: fa ? 'از ۲۰٪ تخفیف لذت ببرید' : 'Enjoy 20% off everything', info: true };
+        return { cls: ' is-vip', title: fa ? 'VIP مادام‌العمر' : 'Lifetime VIP', desc: fa ? 'از ۲۰٪ تخفیف لذت ببرید' : 'Enjoy 20% off everything', info: true, meter: 100 };
       }
       const daysLeft = Math.max(0, Math.ceil((until.getTime() - Date.now()) / 86400000));
       return {
@@ -358,13 +359,15 @@ export function ProfilePage() {
         title: fa ? 'عضویت VIP فعال' : 'VIP Active',
         desc: fa ? `${fmt(daysLeft)} روز باقی‌مانده` : `${fmt(daysLeft)} days remaining`,
         info: true,
+        meter: Math.max(3, Math.min(100, Math.round((daysLeft / 30) * 100))),
       };
     }
     return {
       cls: '',
       title: fa ? 'ارتقا به VIP' : 'Upgrade to VIP',
-      desc: fa ? '۲۰٪ تخفیف روی همه خریدها + پلن‌های اختصاصی' : '20% discount on all purchases + exclusive plans',
+      desc: fa ? '۲۰٪ تخفیف + پلن‌های اختصاصی' : '20% off + exclusive plans',
       btn: fa ? 'خرید VIP' : 'Get VIP',
+      meter: null,
     };
   }, [isVip, user, lang, fmt]);
 
@@ -415,23 +418,20 @@ export function ProfilePage() {
 
   return (
     <>
-      <section className="profile-hero">
-        <div className="profile-header">
-          <div className="profile-avatar-wrapper">
-            <div className="profile-avatar-orbit">
-              <span className="orbit-icon" aria-hidden="true">
-                <svg viewBox="0 0 24 24" fill="currentColor" width="12" height="12"><path d="M12 2l1.8 6.2L20 10l-6.2 1.8L12 18l-1.8-6.2L4 10l6.2-1.8L12 2z" /></svg>
-              </span>
-            </div>
+      {/* V4 "Split Panel" (Pasha's pick, 2026-07-09): identity | stat
+          column grid, VIP footer with a days-remaining meter. */}
+      <section className="profile-hero ph4">
+        <div className="ph4-body">
+          <div className="ph4-id">
             <div className={`profile-avatar${avatarUrl ? ' has-photo' : ''}`} id="userAvatar">
               {avatarUrl
                 ? <img src={avatarUrl} alt="" onError={() => setAvatarBroken(true)} />
                 : (user?.full_name?.[0] || '?').toUpperCase()}
             </div>
-          </div>
-          <div className="profile-info">
-            <div className="profile-name" id="userName">{user ? (user.full_name || tt('astronaut')) : '...'}</div>
-            <div className="profile-username" id="userUsername">{user?.username ? '@' + user.username : ''}</div>
+            <div className="ph4-idt">
+              <div className="profile-name" id="userName">{user ? (user.full_name || tt('astronaut')) : '...'}</div>
+              <div className="profile-username" id="userUsername">{user?.username ? '@' + user.username : ''}</div>
+            </div>
             <div className="profile-badges" id="userBadges">
               <span className={`profile-badge${categoryBadge.cls}`} id="userCategory">
                 {isVip
@@ -463,60 +463,46 @@ export function ProfilePage() {
               )}
             </div>
           </div>
-        </div>
-        <div className="profile-stats-grid">
-          <div className="profile-stat-item">
-            <div className="profile-stat-icon" aria-hidden="true">
-              <svg viewBox="0 0 24 24" fill="currentColor" width="16" height="16"><path d="M21 18v1a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v1h-9a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h9zm-9-2h10V8H12v8zm4-2.5a1.5 1.5 0 1 1 0-3 1.5 1.5 0 0 1 0 3z" /></svg>
+          <div className="ph4-col">
+            <div className="ph4-st">
+              <div className="ph4-n" id="statCredit">{fmt(user?.credit || 0)}</div>
+              <div className="ph4-l">{tt('credit')}</div>
             </div>
-            <div className="profile-stat-value" id="statCredit">{fmt(user?.credit || 0)}</div>
-            <div className="profile-stat-label">{tt('credit')}</div>
-          </div>
-          <div className="profile-stat-item">
-            <div className="profile-stat-icon" aria-hidden="true">
-              <svg viewBox="0 0 24 24" fill="currentColor" width="16" height="16"><path d="M12 17.27 18.18 21l-1.64-7.03L22 9.24l-7.19-.61L12 2 9.19 8.63 2 9.24l5.46 4.73L5.82 21z" /></svg>
+            <div className="ph4-st">
+              <div className="ph4-n" id="statStars">{fmt(user?.stars || 0)}</div>
+              <div className="ph4-l">{tt('stars')}</div>
             </div>
-            <div className="profile-stat-value" id="statStars">{fmt(user?.stars || 0)}</div>
-            <div className="profile-stat-label">{tt('stars')}</div>
-          </div>
-          <div className="profile-stat-item">
-            <div className="profile-stat-icon" aria-hidden="true">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" width="16" height="16"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" /><circle cx="9" cy="7" r="4" /><path d="M23 21v-2a4 4 0 0 0-3-3.87" /><path d="M16 3.13a4 4 0 0 1 0 7.75" /></svg>
+            <div className="ph4-st">
+              <div className="ph4-n" id="statReferrals">{fmt(referrals?.total ?? user?.referral_count ?? 0)}</div>
+              <div className="ph4-l">{tt('referrals')}</div>
             </div>
-            <div className="profile-stat-value" id="statReferrals">{fmt(referrals?.total ?? user?.referral_count ?? 0)}</div>
-            <div className="profile-stat-label">{tt('referrals')}</div>
           </div>
         </div>
-        <div className={`vip-promo-section${vipPromo.cls}`} id="vipPromoSection">
-          <div className="vip-promo-content">
-            <div className="vip-promo-icon">
-              <svg viewBox="0 0 24 24" fill="currentColor" width="22" height="22"><path d="M5 16 3 5l5.5 5L12 4l3.5 6L21 5l-2 11H5zm14 3H5v-2h14v2z" /></svg>
-            </div>
-            <div className="vip-promo-text">
-              <div className="vip-promo-title" id="vipPromoTitle">{vipPromo.title}</div>
-              <div className="vip-promo-desc" id="vipPromoDesc">{vipPromo.desc}</div>
-            </div>
-          </div>
-          <button
-            className={`vip-promo-btn${vipPromo.info ? ' info' : ''}`}
-            id="vipPromoBtn"
-            aria-label={vipPromo.info ? (lang === 'fa' ? 'مشاهده مزایای VIP' : 'View VIP perks') : undefined}
-            onClick={openVipPurchase}
-          >
+        <button
+          type="button"
+          className={`ph4-vip${vipPromo.cls}`}
+          id="vipPromoSection"
+          aria-label={vipPromo.info ? (lang === 'fa' ? 'مشاهده مزایای VIP' : 'View VIP perks') : undefined}
+          onClick={openVipPurchase}
+        >
+          <div className="ph4-vip-row">
+            <svg viewBox="0 0 24 24" fill="currentColor" width="17" height="17" aria-hidden="true"><path d="M5 16 3 5l5.5 5L12 4l3.5 6L21 5l-2 11H5zm14 3H5v-2h14v2z" /></svg>
+            <div className="ph4-vip-t" id="vipPromoTitle">{vipPromo.title}</div>
+            <div className="ph4-vip-d" id="vipPromoDesc">{vipPromo.desc}</div>
             {vipPromo.info
               ? (
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" width="19" height="19" aria-hidden="true">
+                <svg className="ph4-vip-go" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" width="15" height="15" aria-hidden="true">
                   <circle cx="12" cy="12" r="10" /><path d="M12 16v-4" /><path d="M12 8h.01" />
                 </svg>
               )
               : (
-                <>
-                  <span id="vipBtnText">{vipPromo.btn}</span>
-                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" width="14" height="14"><path d="M5 12h14M12 5l7 7-7 7" /></svg>
-                </>
+                <svg className="ph4-vip-go flip-rtl" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" width="15" height="15" aria-hidden="true"><path d="M5 12h14M12 5l7 7-7 7" /></svg>
               )}
-          </button>
-        </div>
+          </div>
+          {vipPromo.meter != null && (
+            <div className="ph4-meter" aria-hidden="true"><i style={{ width: vipPromo.meter + '%' }} /></div>
+          )}
+        </button>
       </section>
 
       {/* «پیشرفت و جوایز» section removed 2026-07-09 (Pasha): it only ever

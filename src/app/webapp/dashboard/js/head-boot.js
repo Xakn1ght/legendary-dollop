@@ -502,7 +502,11 @@
     var kb = el ? kbHeight() : 0;
     if (!el) baseHeight = window.innerHeight; // keep the adjustResize baseline fresh
     var kbChanged = (lastKb < 0) || Math.abs(kb - lastKb) > 8;
-    var needReveal = !!el && kb > 0 && (!scrolledForFocus || (kb - kbAtScroll) > 100);
+    // Reveal once per focus; re-arm when the keyboard grows >100px (emoji
+    // panel swap) or when the lift returns from an explicit drop (stale-decay
+    // re-lift moved the scroll geometry under the field).
+    var relift = kb > 0 && lastKb === 0;
+    var needReveal = !!el && kb > 0 && (!scrolledForFocus || relift || (kb - kbAtScroll) > 100);
     if (!kbChanged && !needReveal) return;
     if (kbChanged) {
       lastKb = kb;

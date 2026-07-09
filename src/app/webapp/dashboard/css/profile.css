@@ -1931,3 +1931,106 @@ body.platform-ios .vip-modal-overlay { padding-top: calc(env(safe-area-inset-top
   color: #8a6508 !important;
   border-color: rgba(184,134,11,0.36) !important;
 }
+
+/* ═══ PROFILE HERO V4 "Split Panel" (Pasha's pick 2026-07-09) ═══════
+   Identity (1.5fr) | stat column (1fr, divided rows), VIP footer with a
+   days-remaining meter. Calm, structured card — retires the old lava
+   hero decor. Keep this block LAST so it wins the earlier hero rules. */
+.profile-hero.ph4 {
+  --ph-gold: #e8c15a;
+  --ph-gold-deep: #b8923a;
+  --ph-gold-bg: rgba(232, 193, 90, 0.10);
+  --ph-gold-ln: rgba(232, 193, 90, 0.35);
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 20px;
+  padding: 0;
+  overflow: hidden;
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.22);
+}
+[data-theme="light"] .profile-hero.ph4 {
+  --ph-gold: #9a7420;
+  --ph-gold-deep: #7c5c15;
+  --ph-gold-bg: rgba(154, 116, 32, 0.08);
+  --ph-gold-ln: rgba(154, 116, 32, 0.30);
+  box-shadow: 0 12px 36px rgba(60, 48, 32, 0.10);
+}
+.profile-hero.ph4::before, .profile-hero.ph4::after { content: none; }
+.ph4-body { display: grid; grid-template-columns: 1.5fr 1fr; position: relative; z-index: 1; }
+.ph4-id {
+  padding: 18px 16px;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 8px;
+  min-width: 0;
+}
+.profile-hero.ph4 .profile-avatar {
+  width: 60px;
+  height: 60px;
+  border-radius: 20px;
+  font-size: 24px;
+  box-shadow: 0 6px 20px rgba(var(--brandRgb), 0.30);
+  animation: none;
+}
+.ph4-idt { min-width: 0; }
+.profile-hero.ph4 .profile-name { font-size: 17px; margin: 2px 0 0; }
+.profile-hero.ph4 .profile-username { font-size: 12px; margin-bottom: 0; direction: ltr; text-align: start; }
+.profile-hero.ph4 .profile-badges { margin-top: 2px; }
+.ph4-col { border-inline-start: 1px solid var(--line); display: flex; flex-direction: column; }
+.ph4-st {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  padding: 8px 14px;
+  min-width: 0;
+}
+.ph4-st + .ph4-st { border-top: 1px solid var(--line); }
+.ph4-n {
+  font-size: 17px;
+  font-weight: 800;
+  color: var(--text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.ph4-l { font-size: 10.5px; color: var(--muted); margin-top: 1px; }
+.ph4-vip {
+  width: 100%;
+  display: block;
+  border: none;
+  border-top: 1px solid var(--ph-gold-ln);
+  background: var(--ph-gold-bg);
+  padding: 11px 16px 13px;
+  cursor: pointer;
+  font-family: inherit;
+  text-align: start;
+  position: relative;
+  z-index: 1;
+}
+.ph4-vip:active { opacity: .82; }
+.ph4-vip-row { display: flex; align-items: center; gap: 8px; }
+.ph4-vip-row > svg:first-child { color: var(--ph-gold); flex: none; }
+.ph4-vip-t { flex: 1; min-width: 0; font-size: 12.5px; font-weight: 800; color: var(--ph-gold); }
+.ph4-vip-d { font-size: 11px; color: var(--muted); flex: none; }
+.ph4-vip-go { color: var(--ph-gold); flex: none; opacity: .85; }
+html[dir="rtl"] .ph4-vip-go.flip-rtl { transform: scaleX(-1); }
+.ph4-meter {
+  height: 4px;
+  border-radius: 4px;
+  margin-top: 9px;
+  background: rgba(128, 128, 128, 0.18);
+  overflow: hidden;
+}
+.ph4-meter i {
+  display: block;
+  height: 100%;
+  border-radius: 4px;
+  background: linear-gradient(90deg, var(--ph-gold-deep), var(--ph-gold));
+}
+/* Non-VIP footer: accent CTA arrow, gold reserved for members */
+.ph4-vip:not(.is-vip) { background: rgba(var(--brandRgb), 0.08); border-top-color: rgba(var(--brandRgb), 0.25); }
+.ph4-vip:not(.is-vip) .ph4-vip-row > svg:first-child,
+.ph4-vip:not(.is-vip) .ph4-vip-t,
+.ph4-vip:not(.is-vip) .ph4-vip-go { color: var(--brand); }
