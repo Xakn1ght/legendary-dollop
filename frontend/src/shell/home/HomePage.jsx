@@ -181,38 +181,17 @@ export function HomePage() {
     } catch (_) { showToast(t('copyFailed'), 'error'); }
   };
 
-  // Telegram webviews routinely reject navigator.clipboard.readText()
-  // (permission prompt never shown), so: Telegram's own reader first
-  // (works when launched from the attachment menu), then the web API,
-  // and when neither yields text — open the Add sheet for a manual
-  // paste instead of a dead-end "failed" toast.
+  // Web clipboard API ONLY. Telegram's readTextFromClipboard is banned here:
+  // it is attachment-menu-apps-only, and calling it from our menu-button
+  // launch made Telegram Android RELOAD the whole webview (2026-07-09,
+  // Pasha: tapping import "reloaded the app"). It could never return text
+  // for our launch type anyway.
   const readClipboardText = () => new Promise((resolve) => {
-    const viaNavigator = () => {
-      if (navigator.clipboard && navigator.clipboard.readText) {
-        navigator.clipboard.readText()
-          .then((text) => resolve({ ok: true, text: text || '' }))
-          .catch(() => resolve({ ok: false, text: '' }));
-      } else resolve({ ok: false, text: '' });
-    };
-    const tg = window.Telegram && window.Telegram.WebApp;
-    if (tg && typeof tg.readTextFromClipboard === 'function'
-        && typeof tg.isVersionAtLeast === 'function' && tg.isVersionAtLeast('6.4')) {
-      let settled = false;
-      // The callback can be dropped by some clients — don't hang the button.
-      const timer = setTimeout(() => { if (!settled) { settled = true; viaNavigator(); } }, 1500);
-      try {
-        tg.readTextFromClipboard((text) => {
-          if (settled) return;
-          settled = true;
-          clearTimeout(timer);
-          // null = this launch type isn't allowed to read — try the web API.
-          if (text) resolve({ ok: true, text });
-          else viaNavigator();
-        });
-      } catch (_) {
-        if (!settled) { settled = true; clearTimeout(timer); viaNavigator(); }
-      }
-    } else viaNavigator();
+    if (navigator.clipboard && navigator.clipboard.readText) {
+      navigator.clipboard.readText()
+        .then((text) => resolve({ ok: true, text: text || '' }))
+        .catch(() => resolve({ ok: false, text: '' }));
+    } else resolve({ ok: false, text: '' });
   });
 
   // Round 2 (2026-07-09, Pasha: "still not working at all"): auto-reading
