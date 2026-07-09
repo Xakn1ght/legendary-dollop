@@ -5351,6 +5351,14 @@ body.admin-panel .lightbox-close {
   width: 44px; height: 44px; border-radius: 12px; display: flex; align-items: center; justify-content: center;
   background: rgba(10,16,25,0.8); border: 1px solid rgba(255,255,255,0.15); color: var(--text); cursor: pointer;
 }
+/* Save-to-gallery — mirrors the close button on the opposite corner (2026-07-09) */
+body.admin-panel .lightbox-save {
+  position: fixed; top: max(14px, var(--tg-safe-top, env(safe-area-inset-top, 0px))); left: 14px;
+  z-index: 2;
+  width: 44px; height: 44px; border-radius: 12px; display: flex; align-items: center; justify-content: center;
+  background: rgba(10,16,25,0.8); border: 1px solid rgba(255,255,255,0.15); color: var(--text); cursor: pointer;
+}
+body.admin-panel .lightbox-save:active { transform: scale(0.94); }
 
 /* ---- command palette ---- */
 body.admin-panel .cmdk-backdrop {

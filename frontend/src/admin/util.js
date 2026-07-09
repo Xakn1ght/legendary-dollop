@@ -64,3 +64,27 @@ export function debounce(fn, ms = 300) {
     t = setTimeout(() => fn(...args), ms);
   };
 }
+
+// Save an image shown in a lightbox to the device (ported from the user-side
+// support Lightbox): blob-anchor download works on Android/desktop; iOS
+// Telegram suppresses programmatic downloads — there we open the blob in a
+// new tab so the native long-press "Save to Photos" takes over. Same-origin
+// cookie auth rides along for /api/... photo URLs.
+export async function saveImageLocally(src) {
+  try {
+    const blob = await (await fetch(src, src.startsWith('blob:') || src.startsWith('data:') ? undefined : { credentials: 'include' })).blob();
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    const tail = (src.split('/').pop() || '').split('?')[0];
+    a.download = /\.\w{3,4}$/.test(tail) ? tail : `astrobyte-${Date.now()}.jpg`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 30000);
+    return true;
+  } catch (_) {
+    try { window.open(src, '_blank'); } catch (_2) { /* ignore */ }
+    return false;
+  }
+}

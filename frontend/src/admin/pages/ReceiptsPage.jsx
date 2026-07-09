@@ -5,7 +5,7 @@ import { useModal } from '../components/Modal.jsx';
 import { useToast } from '../components/Toast.jsx';
 import { Icons } from '../icons.jsx';
 import { useShell } from '../ShellContext.js';
-import { fmtNum, parseTs } from '../util.js';
+import { fmtNum, parseTs, saveImageLocally } from '../util.js';
 
 // Purchase / charge / VIP receipt approvals. Money-critical — approve/deny
 // endpoints and their accepted response messages are ported 1:1 from
@@ -292,6 +292,9 @@ export function ReceiptsPage() {
             onClick={(e) => { e.stopPropagation(); setLightbox((l) => ({ ...l, zoom: !l.zoom })); }}
           />
           <button className="lightbox-close" onClick={() => setLightbox(null)}><Icons.close width={18} height={18} /></button>
+          <button className="lightbox-save" title="Save image" aria-label="Save image" onClick={(e) => { e.stopPropagation(); saveImageLocally(lightbox.url); }}>
+            <Icons.download width={18} height={18} />
+          </button>
         </div>
       )}
     </>

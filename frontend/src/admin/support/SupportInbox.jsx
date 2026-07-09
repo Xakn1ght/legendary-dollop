@@ -4,7 +4,7 @@ import { apiFetch, apiJson, verifySession } from '../api.js';
 import { useModal } from '../components/Modal.jsx';
 import { useToast } from '../components/Toast.jsx';
 import { Icons } from '../icons.jsx';
-import { fmtDateTime, parseTs, timeAgo } from '../util.js';
+import { fmtDateTime, parseTs, saveImageLocally, timeAgo } from '../util.js';
 import { createAdminSupportRealtime } from './realtime.js';
 
 let seq = 0;
@@ -630,6 +630,9 @@ export function SupportInbox() {
           <button type="button" className="lightbox-scrim" aria-label="Close photo" onClick={() => setLightbox(null)} />
           <img src={lightbox} alt="attachment zoom" className="lightbox-img" onClick={(e) => e.stopPropagation()} />
           <button className="lightbox-close" onClick={() => setLightbox(null)}><Icons.close width={18} height={18} /></button>
+          <button className="lightbox-save" title="Save image" aria-label="Save image" onClick={(e) => { e.stopPropagation(); saveImageLocally(lightbox); }}>
+            <Icons.download width={18} height={18} />
+          </button>
         </div>
       )}
 
