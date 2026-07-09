@@ -3,6 +3,7 @@ import React from 'react';
 function formatDataUsage(sub, fmt, t) {
   const usedGB = (sub.used_traffic || 0) / (1024 * 1024 * 1024);
   const limitGB = (sub.data_limit || 0) / (1024 * 1024 * 1024);
+  if (!sub.data_limit) return `${fmt(usedGB.toFixed(1))} ${t('GB')}`;
   return `${fmt(usedGB.toFixed(1))}/${fmt(limitGB.toFixed(0))} ${t('GB')}`;
 }
 
@@ -64,15 +65,19 @@ export function SubscriptionSection({ t, fmt, subscriptions, subsLoaded, selecte
                   const daysLeft = formatDaysLeft(sub, fmt, t);
                   const initial = (String(name).trim()[0] || 'S').toUpperCase();
                   const selected = String(sub.id) === String(selectedSubId);
+                  // Unlimited subs can't be charged — the approve path would
+                  // set a finite limit and downgrade them (server rejects too).
+                  const unlimited = !sub.data_limit;
                   return (
                     <div
                       key={sub.id}
-                      className={`sub-card${selected ? ' selected' : ''}`}
+                      className={`sub-card${selected ? ' selected' : ''}${unlimited ? ' unchargeable' : ''}`}
                       data-sub-id={sub.id}
                       role="button"
-                      tabIndex={0}
-                      onClick={() => onSelect(sub.id)}
-                      onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onSelect(sub.id); } }}
+                      tabIndex={unlimited ? -1 : 0}
+                      aria-disabled={unlimited || undefined}
+                      onClick={unlimited ? undefined : () => onSelect(sub.id)}
+                      onKeyDown={unlimited ? undefined : (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onSelect(sub.id); } }}
                     >
                       <div className="sub-avatar" aria-hidden="true">{initial}</div>
                       <div className="sub-main">
@@ -91,6 +96,7 @@ export function SubscriptionSection({ t, fmt, subscriptions, subsLoaded, selecte
                             </span>
                           )}
                         </div>
+                        {unlimited && <div className="sub-unlimited-note">{t('unlimitedNoCharge')}</div>}
                       </div>
                       <div className="sub-check" aria-hidden="true">
                         <svg viewBox="0 0 24 24"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z" /></svg>

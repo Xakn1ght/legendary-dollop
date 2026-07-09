@@ -1202,3 +1202,46 @@ html:has(.custom-plan-pop.kb-float) :is(.card, .section, .content, .container) {
   cursor: pointer; z-index: 3;
 }
 .receipt-remove-btn:active { opacity: 0.7; }
+
+/* ── Coupon listbox (2026-07-09 — replaces the native <select>) ──────── */
+.cpk { position: relative; margin-top: 10px; }
+.cpk-trigger {
+  width: 100%; display: flex; align-items: center; justify-content: space-between; gap: 10px;
+  cursor: pointer; text-align: start; font-family: inherit;
+}
+.cpk-trigger-txt { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 700; }
+.cpk-chev { flex: none; color: var(--muted, #8a93a3); transition: transform .18s ease; }
+.cpk.open .cpk-chev { transform: rotate(180deg); }
+.cpk-list {
+  position: absolute; top: calc(100% + 6px); inset-inline: 0; z-index: 60;
+  background: var(--panel, #10202a);
+  border: 1px solid var(--line, rgba(255,255,255,0.12));
+  border-radius: 14px;
+  box-shadow: 0 18px 50px rgba(0, 0, 0, 0.45);
+  padding: 5px;
+  max-height: 300px; overflow-y: auto; overscroll-behavior: contain;
+  display: flex; flex-direction: column; gap: 2px;
+}
+[data-theme="light"] .cpk-list { background: #ffffff; }
+.cpk-row {
+  display: flex; align-items: flex-start; gap: 10px; width: 100%; min-width: 0;
+  padding: 10px 11px; border-radius: 10px; cursor: pointer;
+  background: transparent; border: 1px solid transparent;
+  color: var(--lightText, inherit); font-family: inherit; text-align: start;
+}
+.cpk-row.on { background: rgba(var(--brandRgb), 0.12); border-color: rgba(var(--brandRgb), 0.35); }
+.cpk-dot {
+  flex: none; width: 15px; height: 15px; border-radius: 50%; margin-top: 2px;
+  border: 1.5px solid var(--line, rgba(255,255,255,0.25));
+}
+.cpk-dot.on {
+  border-color: var(--brand);
+  background: radial-gradient(circle, var(--brand) 0 4px, transparent 4.5px);
+}
+.cpk-txt { min-width: 0; display: flex; flex-direction: column; gap: 3px; }
+.cpk-label { font-size: 13.5px; font-weight: 800; }
+.cpk-desc { font-size: 11.5px; line-height: 1.6; color: var(--muted, #8a93a3); }
+.summary-cap-note {
+  margin: 2px 0 6px; font-size: 11px; line-height: 1.6;
+  color: var(--warning, #fbbf24); text-align: start;
+}

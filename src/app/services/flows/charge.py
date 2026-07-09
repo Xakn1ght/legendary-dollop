@@ -111,13 +111,18 @@ async def start_charge_order(
     the bot attaches its Telegram receipt immediately and passes ``status="pending"``
     via :func:`submit_charge_receipt` instead.
     """
-    if package_name not in CHARGE_PRESET_PACKAGES:
+    from app.services.flows.pricing import get_plan_info as _gpi
+    from app.services.flows.pricing import parse_custom_plan as _parse_custom
+
+    # "custom:<gb>" top-ups (2026-07-09): priced by the same shared curve as
+    # custom purchase plans — get_plan_info resolves price/gb/days for them.
+    custom_gb = _parse_custom(package_name)
+    if package_name not in CHARGE_PRESET_PACKAGES and custom_gb is None:
         raise FlowError("invalid_package", "Selected package does not exist")
     # VIP-exclusive top-ups (the 350-500GB monthly quotas as 2-3 month
     # bundles): money-path gate — both surfaces order through here.
-    if CHARGE_PRESET_PACKAGES[package_name].get("vip_only") and not await crud.is_user_vip(session, user.id):
+    if custom_gb is None and CHARGE_PRESET_PACKAGES[package_name].get("vip_only") and not await crud.is_user_vip(session, user.id):
         raise FlowError("vip_only_package", "This package is exclusive to VIP members")
-    from app.services.flows.pricing import get_plan_info as _gpi
     if renewal_template is not None and not _gpi(renewal_template, PLANS):
         raise FlowError("invalid_renewal_plan", "Invalid renewal plan selected")
 
@@ -135,6 +140,13 @@ async def start_charge_order(
 
     data_limit = user_info.get("data_limit", 0) or 0
     used_traffic = user_info.get("used_traffic", 0) or 0
+
+    # Unlimited subs (panel data_limit 0/None) must not be chargeable: the
+    # approve path would SET a finite limit and silently downgrade them
+    # (2026-07-09, Pasha could start a charge on AstroAdmin).
+    if not data_limit:
+        raise FlowError("sub_unlimited", "Unlimited subscriptions cannot be charged")
+
     remaining_gb = max(data_limit - used_traffic, 0) / GB
 
     if remaining_gb > TRAFFIC_GATE_GB and charge_type == "normal":
@@ -142,7 +154,13 @@ async def start_charge_order(
         err.remaining_gb = remaining_gb
         raise err
 
-    pkg = CHARGE_PRESET_PACKAGES[package_name]
+    if custom_gb is not None:
+        info = _gpi(package_name, PLANS)
+        if not info:
+            raise FlowError("invalid_package", "Selected package does not exist")
+        pkg = {"price": info["price"], "gb": info["gb"], "days": info["days"]}
+    else:
+        pkg = CHARGE_PRESET_PACKAGES[package_name]
     total_price = int(pkg.get("price", 0) or 0)
     traffic_bytes = int(pkg.get("gb", 0) or 0) * GB
     extra_days = pkg.get("days", 0) or None

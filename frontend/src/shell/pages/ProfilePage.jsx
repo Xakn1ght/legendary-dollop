@@ -657,25 +657,8 @@ export function ProfilePage() {
         </div>
       </section>
 
-      <section className="profile-section">
-        <div className="profile-section-title">
-          <div className="icon-box" style={{ background: 'linear-gradient(135deg, #60a5fa, #2563eb)' }}>
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" width="15" height="15"><circle cx="12" cy="12" r="10" /><path d="M12 6v6l4 2" /></svg>
-          </div>
-          <span>{tt('recentActivity')}</span>
-        </div>
-        <div className="activity-timeline" id="activityTimeline">
-          <div className="activity-item success">
-            <div className="activity-icon">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" width="14" height="14"><path d="M20 6L9 17l-5-5" /></svg>
-            </div>
-            <div className="activity-content">
-              <div className="activity-title">{tt('accountCreated')}</div>
-              <div className="activity-time" id="activityJoinDate">{joinDate}</div>
-            </div>
-          </div>
-        </div>
-      </section>
+      {/* «فعالیت اخیر» section removed 2026-07-09 (Pasha) — it only ever
+          showed the account-creation date, already in Account Information. */}
 
       <section className="profile-section">
         <div className="profile-section-title">

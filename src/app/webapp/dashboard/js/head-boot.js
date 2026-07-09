@@ -612,6 +612,46 @@
   document.addEventListener('scroll', function () {
     if (root.classList.contains('kb-open') && !focusedField()) queue(80);
   }, { capture: true, passive: true });
+
+  // iOS: Telegram's webview keyboard has NO native dismiss bar and Android's
+  // back-button trick doesn't exist — give it an explicit one (2026-07-09,
+  // Pasha: "no way to close it now"). A small chevron button floats just
+  // above the keyboard while the lift is active; tapping it blurs the field.
+  if (/iphone|ipad|ipod/i.test(navigator.userAgent || '')) {
+    var kbDismiss = null;
+    var ensureDismiss = function () {
+      if (kbDismiss) return kbDismiss;
+      kbDismiss = document.createElement('button');
+      kbDismiss.type = 'button';
+      kbDismiss.id = 'kbDismissBtn';
+      kbDismiss.setAttribute('aria-label', 'Close keyboard');
+      kbDismiss.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" width="18" height="18"><path d="m6 9 6 6 6-6"/></svg>';
+      kbDismiss.style.cssText =
+        'position:fixed;inset-inline-end:10px;bottom:calc(var(--kb, 0px) + 10px);' +
+        'width:38px;height:38px;border-radius:12px;display:none;align-items:center;justify-content:center;' +
+        'background:rgba(13,21,33,0.88);color:#e8ecf3;border:1px solid rgba(255,255,255,0.18);' +
+        'box-shadow:0 6px 20px rgba(0,0,0,0.35);z-index:2147483000;padding:0;cursor:pointer;';
+      // touchstart (not click): fires before the blur re-layout can move it.
+      kbDismiss.addEventListener('touchstart', function (ev) {
+        ev.preventDefault();
+        ev.stopPropagation();
+        var el = focusedField();
+        try { if (el) el.blur(); } catch (_) {}
+        suppressClickUntil = Date.now() + 700;
+        queue(40);
+      }, { passive: false });
+      document.body.appendChild(kbDismiss);
+      return kbDismiss;
+    };
+    var syncDismiss = function () {
+      var on = root.classList.contains('kb-open') && !!focusedField();
+      var btn = ensureDismiss();
+      btn.style.display = on ? 'flex' : 'none';
+    };
+    new MutationObserver(syncDismiss).observe(root, { attributes: true, attributeFilter: ['class'] });
+    document.addEventListener('focusin', function () { setTimeout(syncDismiss, 80); });
+    document.addEventListener('focusout', function () { setTimeout(syncDismiss, 120); });
+  }
   if (vv) {
     try { vv.addEventListener('resize', function () { touchKbActivity(); queue(60); }); } catch (_) {}
   }

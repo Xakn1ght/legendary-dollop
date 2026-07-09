@@ -2647,3 +2647,39 @@
   .power-btn:hover { transform: none; }
   .power-btn:focus { outline: none; }
 }
+
+    /* ── App launch sheet v2 (2026-07-09): accent-aware tiles, inline
+       "didn't open" fallback replaces the timed popup ─────────────── */
+    .app-hero{
+      width:100%; justify-content:center; margin-top:12px;
+      font-weight:800; font-size:15px; padding:13px 16px;
+    }
+    .app-grid{ display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-top:10px; }
+    .btn.app-tile{
+      justify-content:center; font-weight:700; padding:12px 10px;
+      background: rgba(var(--brandRgb), 0.07);
+      border: 1px solid rgba(var(--brandRgb), 0.22);
+      color: var(--lightText);
+    }
+    .btn.app-tile:active{ background: rgba(var(--brandRgb), 0.16); }
+    .app-fallback{
+      width:100%; display:flex; align-items:center; justify-content:center; gap:8px;
+      margin-top:10px; padding:11px 12px; border-radius:12px; cursor:pointer;
+      font-family:inherit; font-size:12.5px; font-weight:700; line-height:1.6;
+      color: var(--brand);
+      background: rgba(var(--brandRgb), 0.10);
+      border: 1px dashed rgba(var(--brandRgb), 0.45);
+    }
+    .app-fallback svg{ flex:none; }
+    .app-fallback:active{ opacity:.8; }
+    .btn.app-help-link{
+      width:100%; justify-content:center; margin-top:8px; font-size:12.5px;
+      color: var(--muted);
+    }
+
+    /* Byte-unit equivalent under the Mbps figure (Ookla-in-MB/s confusion) */
+    .speed-chip .value-alt{
+      margin-top:2px; font-size:10.5px; font-weight:700;
+      color: var(--muted); font-variant-numeric: tabular-nums;
+      unicode-bidi: isolate;
+    }

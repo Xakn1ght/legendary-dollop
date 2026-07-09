@@ -387,6 +387,54 @@ async def test_vip_only_package_gate():
     print("PASS test_vip_only_package_gate")
 
 
+async def test_unlimited_sub_not_chargeable():
+    """Unlimited subs (panel data_limit 0/None) are rejected outright —
+    approving a GB top-up would SET a finite limit and downgrade them
+    (2026-07-09, Pasha could start a charge on an unlimited admin sub)."""
+    for dl in (0, None):
+        Session, fake = await _setup(
+            marzban_info={"data_limit": dl, "used_traffic": 5221 * GB, "expire": 0}
+        )
+        async with Session() as db:
+            user = await crud.get_user(db, CHAT)
+            try:
+                await start_charge_order(db, user, subscription_id=10, package_name="pkg30", status="draft")
+                raise AssertionError("expected sub_unlimited")
+            except FlowError as e:
+                assert e.code == "sub_unlimited", (dl, e.code)
+    print("PASS test_unlimited_sub_not_chargeable")
+
+
+async def test_custom_gb_package():
+    """custom:<gb> top-ups price through the shared plan curve and reject
+    out-of-range / malformed names."""
+    from app.services.flows.pricing import get_plan_info
+
+    Session, fake = await _setup(
+        marzban_info={"data_limit": 10 * GB, "used_traffic": 9 * GB, "expire": 0}
+    )
+    async with Session() as db:
+        user = await crud.get_user(db, CHAT)
+        user.credit = 0
+        await db.commit()
+
+        info = get_plan_info("custom:55")
+        assert info and info["price"] > 0, "custom plan curve must resolve"
+        res = await start_charge_order(db, user, subscription_id=10, package_name="custom:55", status="draft")
+        req = res.charge_request
+        assert res.final_price == info["price"], (res.final_price, info["price"])
+        assert req.traffic_bytes == 55 * GB, req.traffic_bytes
+        assert req.extra_days == info["days"], (req.extra_days, info["days"])
+
+        for bad in ("custom:0", "custom:9999", "custom:abc", "custom:"):
+            try:
+                await start_charge_order(db, user, subscription_id=10, package_name=bad, status="draft")
+                raise AssertionError(f"expected invalid_package for {bad}")
+            except FlowError as e:
+                assert e.code == "invalid_package", (bad, e.code)
+    print("PASS test_custom_gb_package")
+
+
 async def main():
     await test_start_cancel_deny_credit()
     await test_full_credit_charge_goes_to_admin_queue()
@@ -396,6 +444,8 @@ async def main():
     await test_referral_reward_granted_without_bot()
     await test_custom_charge_days_only_and_gate()
     await test_vip_only_package_gate()
+    await test_unlimited_sub_not_chargeable()
+    await test_custom_gb_package()
     print("\nAll charge-service tests passed.")
 
 

@@ -1,9 +1,67 @@
-import React from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 
-import { couponLabel } from '../coupons.js';
+import { couponDescription, couponLabel } from '../coupons.js';
+
+// Custom coupon listbox (2026-07-09 — replaces the unstyled native <select>):
+// each option carries a one-line explainer, incl. the discount cap that used
+// to make "50% off" look broken on big plans.
+function CouponPicker({ t, lang, plans, shownCoupons, selectedCouponId, onSelectCoupon }) {
+  const [open, setOpen] = useState(false);
+  const wrapRef = useRef(null);
+
+  useEffect(() => {
+    if (!open) return undefined;
+    const onDoc = (e) => { if (wrapRef.current && !wrapRef.current.contains(e.target)) setOpen(false); };
+    document.addEventListener('pointerdown', onDoc);
+    return () => document.removeEventListener('pointerdown', onDoc);
+  }, [open]);
+
+  const current = shownCoupons.find((c) => c.id === selectedCouponId) || null;
+
+  const pick = (id) => { onSelectCoupon(id); setOpen(false); };
+
+  const Row = ({ id, label, desc, on }) => (
+    <button type="button" className={'cpk-row' + (on ? ' on' : '')} role="option" aria-selected={on} onClick={() => pick(id)}>
+      <span className={'cpk-dot' + (on ? ' on' : '')} aria-hidden="true" />
+      <span className="cpk-txt">
+        <span className="cpk-label">{label}</span>
+        {desc && <span className="cpk-desc">{desc}</span>}
+      </span>
+    </button>
+  );
+
+  return (
+    <div className={'cpk' + (open ? ' open' : '')} ref={wrapRef}>
+      <button
+        type="button"
+        className="form-input cpk-trigger"
+        aria-haspopup="listbox"
+        aria-expanded={open}
+        onClick={() => setOpen((v) => !v)}
+      >
+        <span className="cpk-trigger-txt">{current ? couponLabel(current, lang) : t('couponNone')}</span>
+        <svg className="cpk-chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" width="15" height="15" aria-hidden="true"><path d="m6 9 6 6 6-6" /></svg>
+      </button>
+      {open && (
+        <div className="cpk-list" role="listbox">
+          <Row id={null} label={t('couponNone')} desc={t('couponNoneDesc')} on={selectedCouponId === null} />
+          {shownCoupons.map((c) => (
+            <Row
+              key={c.id}
+              id={c.id}
+              label={couponLabel(c, lang)}
+              desc={couponDescription(c, lang, plans)}
+              on={selectedCouponId === c.id}
+            />
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
 
 export function PaymentSection({
-  t, fmt, fmtPrice, lang, userInfo,
+  t, fmt, fmtPrice, lang, userInfo, plans,
   useCredit, onUseCreditChange,
   selectedDiscountIds, onToggleDiscount,
   shownCoupons, selectedCouponId, onSelectCoupon,
@@ -80,49 +138,15 @@ export function PaymentSection({
 
         {shownCoupons.length > 0 && (
           <div id="couponInfo" style={{ marginBottom: 20 }}>
-            <label className="form-label" htmlFor={shownCoupons.length > 2 ? 'couponSelect' : undefined}>{t('rewardCoupon')}</label>
-            {shownCoupons.length > 2 ? (
-              /* Many coupons → native dropdown keeps the step compact (owner request). */
-              <select
-                id="couponSelect"
-                className="form-input coupon-select"
-                style={{ marginTop: 10 }}
-                value={selectedCouponId == null ? '' : String(selectedCouponId)}
-                onChange={(e) => onSelectCoupon(e.target.value === '' ? null : Number(e.target.value))}
-              >
-                <option value="">{t('couponNone')}</option>
-                {shownCoupons.map((c) => (
-                  <option key={c.id} value={String(c.id)}>{couponLabel(c, lang)}</option>
-                ))}
-              </select>
-            ) : (
-              <div id="couponList" style={{ marginTop: 10 }}>
-                <label className={`coupon-option${selectedCouponId === null ? ' selected' : ''}`}>
-                  <input
-                    type="radio"
-                    name="couponPick"
-                    value=""
-                    checked={selectedCouponId === null}
-                    onChange={() => onSelectCoupon(null)}
-                  />
-                  <span className="coupon-radio" />
-                  <span className="coupon-text">{t('couponNone')}</span>
-                </label>
-                {shownCoupons.map((c) => (
-                  <label key={c.id} className={`coupon-option${selectedCouponId === c.id ? ' selected' : ''}`}>
-                    <input
-                      type="radio"
-                      name="couponPick"
-                      value={c.id}
-                      checked={selectedCouponId === c.id}
-                      onChange={() => onSelectCoupon(c.id)}
-                    />
-                    <span className="coupon-radio" />
-                    <span className="coupon-text">{couponLabel(c, lang)}</span>
-                  </label>
-                ))}
-              </div>
-            )}
+            <label className="form-label">{t('rewardCoupon')}</label>
+            <CouponPicker
+              t={t}
+              lang={lang}
+              plans={plans}
+              shownCoupons={shownCoupons}
+              selectedCouponId={selectedCouponId}
+              onSelectCoupon={onSelectCoupon}
+            />
           </div>
         )}
 
@@ -145,6 +169,11 @@ export function PaymentSection({
             <div className="summary-row discount" id="summaryDiscountRow">
               <span className="label">{t('discount')}</span>
               <span className="value" id="summaryDiscount">-{fmtPrice(summary.discountAmount)}</span>
+            </div>
+          )}
+          {summary.couponCapApplied && (
+            <div className="summary-cap-note" id="summaryCapNote">
+              {t('couponCapNote').replace('{cap}', fmtPrice(summary.couponCapBase))}
             </div>
           )}
           {summary.creditUsed > 0 && (

@@ -43,15 +43,55 @@ export function couponLabel(c, lang) {
   return c.coupon_type;
 }
 
-// Returns { extraDiscount, bonusGb } this coupon adds on top of percent discounts.
+// One-line explainer for the coupon picker — says what the coupon actually
+// does, including the 100GB price cap that used to surprise people on big
+// custom plans ("50% off" quietly meant "50% of a 100GB plan's price").
+export function couponDescription(c, lang, plans) {
+  const fa = lang === 'fa';
+  const p = c.payload || {};
+  const fmtT = (n) => Number(n || 0).toLocaleString(fa ? 'fa-IR' : 'en-US');
+  if (c.coupon_type === 'discount_percent') {
+    const pct = Number(p.discount_percent || 0);
+    const cap = couponPriceCap(plans);
+    if (cap > 0) {
+      const maxOff = Math.floor(cap * (pct / 100));
+      return fa
+        ? `حداکثر ${fmtT(maxOff)} تومان تخفیف (${pct}٪ تا سقف ارزش پلن ${COUPON_DISCOUNT_MAX_PLAN_GB} گیگ)`
+        : `Up to ${fmtT(maxOff)} T off (${pct}% capped at the ${COUPON_DISCOUNT_MAX_PLAN_GB}GB plan value)`;
+    }
+    return fa ? `${pct}٪ از مبلغ سفارش کم می‌شود` : `${pct}% off the order total`;
+  }
+  if (c.coupon_type === 'free_gb') {
+    const n = Number(p.gb || 0);
+    return fa ? `${fmtT(n)} گیگ به حجم همین خرید اضافه می‌شود` : `Adds ${n}GB of traffic to this purchase`;
+  }
+  if (c.coupon_type === 'free_plan') {
+    const v = couponPlanValue(plans, p.plan_gb);
+    return fa
+      ? `تا ارزش پلن ${fmtT(p.plan_gb || 0)} گیگ${v ? ` (${fmtT(v)} تومان)` : ''} از مبلغ کم می‌شود`
+      : `Deducts up to the ${p.plan_gb || 0}GB plan value${v ? ` (${fmtT(v)} T)` : ''}`;
+  }
+  if (c.coupon_type === 'free_autorenew') {
+    return fa ? 'پلن تمدید خودکار انتخابی رایگان می‌شود' : 'Makes the selected auto-renewal plan free';
+  }
+  return '';
+}
+
+// Returns { extraDiscount, bonusGb, capApplied, capBase } this coupon adds on
+// top of percent discounts. capApplied = the 100GB price cap actually reduced
+// what the raw percent would have given (summary shows an honest hint then).
 export function couponEffect(coupon, { plans, totalPrice, planPrice, autoRenewal, renewalPlan }) {
-  if (!coupon) return { extraDiscount: 0, bonusGb: 0 };
+  if (!coupon) return { extraDiscount: 0, bonusGb: 0, capApplied: false, capBase: 0 };
   let extraDiscount = 0;
   let bonusGb = 0;
+  let capApplied = false;
+  let capBase = 0;
   if (coupon.coupon_type === 'discount_percent') {
     const pct = Number(coupon.payload?.discount_percent || 0);
     const cap = couponPriceCap(plans);
     const base = cap > 0 ? Math.min(totalPrice, cap) : totalPrice;
+    capApplied = cap > 0 && totalPrice > cap;
+    capBase = cap;
     extraDiscount += Math.floor(base * (pct / 100));
   } else if (coupon.coupon_type === 'free_gb') {
     bonusGb = Number(coupon.payload?.gb || 0);
@@ -62,5 +102,5 @@ export function couponEffect(coupon, { plans, totalPrice, planPrice, autoRenewal
       extraDiscount += Math.min(couponPlanValue(plans, coupon.payload?.max_plan_gb) || renewalPlan.price, renewalPlan.price);
     }
   }
-  return { extraDiscount, bonusGb };
+  return { extraDiscount, bonusGb, capApplied, capBase };
 }

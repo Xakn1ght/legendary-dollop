@@ -1,7 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 
 import { getWebApp } from '../../shared/telegram.js';
-import { astroConfirm } from '../../shared/ui.js';
 import { api } from '../api.js';
 import { showToast } from '../toast.js';
 
@@ -77,42 +76,22 @@ const ALL_APPS = [
 ];
 const appsForPlatform = () => ALL_APPS.filter((a) => PLATFORM === 'any' || a.os.includes(PLATFORM) || a.os.includes('any'));
 
-async function promptOfficialDownload(app, t) {
-  const dl = app.dl && (app.dl[PLATFORM] || app.dl.any);
-  if (!dl) return;
-  const name = '\u2068' + app.label + '\u2069';
-  const yes = await astroConfirm({
-    title: app.label,
-    message: t('appNotInstalled').replace('{app}', name),
-    okText: t('getAppDownload'),
-    cancelText: t('close'),
-  });
-  if (!yes) return;
-  const tg = getWebApp();
-  if (tg?.openLink) tg.openLink(dl); else window.open(dl, '_blank');
+export function appDownloadUrl(app) {
+  return (app.dl && (app.dl[PLATFORM] || app.dl.any)) || null;
 }
 
-// Launch ladder (round 5 — Pasha: "v2rayng exists but its not opening").
-// Telegram's Android webview does NOT parse intent:// URLs (it fires a plain
-// VIEW intent on the raw URI, which can't resolve them) — so the round-4
-// package-locked intent silently killed launches that used to work. But
-// intent:// is still the only squatter-proof form where it IS supported
-// (Chrome/Custom-Tab webviews). So: fire intent:// first, and if the page
-// is still visible after a short grace (a real launch ALWAYS backgrounds
-// the webview) step down to the plain app-own scheme; still visible after
-// that → the app isn't installed → offer the official download page.
-// A webview cannot query installed apps — "did we get backgrounded?" is the
-// only signal, and on iOS Telegram it's unreliable: the webview often keeps
-// visibilityState 'visible' while the OS is already showing the target app
-// (round 5.1 — Pasha: false "not installed" prompt on iOS). So the ladder
-// listens to every backgrounding tell it can get: visibilitychange, pagehide,
-// window blur, timer throttling (a setTimeout that fires way past schedule
-// means the webview was frozen in between = an app took over), plus a final
-// document.hasFocus() check right before prompting. False negatives (app
-// missing but no prompt) are acceptable; false positives are what annoy.
-// The prompt never auto-navigates (desktop can stay visible on success).
+// Launch (round 6 — Pasha: the timed "not installed" popup opened BEHIND
+// Telegram's own "Open link?" confirm, because while that native dialog is
+// up the webview stays visible and un-blurred, so every visibility heuristic
+// reads "launch failed"). A webview fundamentally cannot know whether a
+// scheme resolved — every timer/visibility guess has a false-positive mode.
+// New approach: NO detection, NO popups. Fire the launch (Android still gets
+// the package-locked intent:// first with a plain-scheme follow-up — TG's
+// Android webview can't parse intent://), and the SHEET shows a quiet inline
+// "didn't open? get it from …" link for the tapped app. Deterministic on
+// both OSes; nothing can appear behind native dialogs.
 let _ladderToken = 0;
-function launchAppLadder(app, link, t) {
+function launchApp(app, link) {
   const token = ++_ladderToken;
   const raw = app.url(link);
   const steps = [];
@@ -121,50 +100,46 @@ function launchAppLadder(app, link, t) {
     if (m) steps.push('intent://' + m[2] + '#Intent;scheme=' + m[1] + ';package=' + app.apkg + ';end');
   }
   steps.push(raw);
-
-  let opened = false;
-  const markOpened = () => { opened = true; cleanup(); };
-  const onVis = () => { if (document.hidden) markOpened(); };
-  const cleanup = () => {
-    document.removeEventListener('visibilitychange', onVis);
-    window.removeEventListener('pagehide', markOpened);
-    window.removeEventListener('blur', markOpened);
-  };
-  document.addEventListener('visibilitychange', onVis);
-  window.addEventListener('pagehide', markOpened);
-  // Within this short window a window-blur ≈ the OS switching apps.
-  window.addEventListener('blur', markOpened);
-
-  const next = (i) => {
-    if (token !== _ladderToken) { cleanup(); return; } // superseded by a newer tap
-    if (opened || document.hidden) { cleanup(); return; } // app opened — done
-    if (i >= steps.length) {
-      cleanup();
-      // Focus gone without any event having fired (seen on iOS Telegram):
-      // assume the app opened rather than false-prompting a download.
-      if (typeof document.hasFocus === 'function' && !document.hasFocus()) return;
-      promptOfficialDownload(app, t);
-      return;
-    }
-    launchScheme(steps[i]);
-    // Short hop between ladder rungs; a longer grace before concluding
-    // "not installed" (slow phones take a beat to switch apps, and iOS
-    // adds a full app-transition animation on top).
-    const wait = i < steps.length - 1 ? 1200 : (PLATFORM === 'ios' ? 2600 : 1800);
-    const t0 = Date.now();
+  launchScheme(steps[0]);
+  if (steps.length > 1) {
     setTimeout(() => {
-      if (Date.now() - t0 > wait + 1500) { markOpened(); return; } // we were frozen → app opened
-      next(i + 1);
-    }, wait);
+      // Skip the follow-up when we were clearly backgrounded (app opened).
+      if (token !== _ladderToken || document.hidden) return;
+      launchScheme(steps[1]);
+    }, 1200);
+  }
+}
+
+// Inline "didn't open? get it from …" row shown after a launch attempt —
+// replaces the old timed popup (see launchApp above).
+export function AppFallbackRow({ t, app }) {
+  if (!app) return null;
+  const dl = appDownloadUrl(app);
+  if (!dl) return null;
+  const openDl = () => {
+    const tg = getWebApp();
+    if (tg?.openLink) tg.openLink(dl); else window.open(dl, '_blank');
   };
-  next(0);
+  return (
+    <button type="button" className="app-fallback" onClick={openDl}>
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" width="14" height="14" aria-hidden="true">
+        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" /><polyline points="7 10 12 15 17 10" /><line x1="12" y1="15" x2="12" y2="3" />
+      </svg>
+      <span>{t('appDidntOpen').replace('{app}', '\u2068' + app.label + '\u2069')}</span>
+    </button>
+  );
 }
 
 // Choose-your-app sheet, opened from the big ring button on Home. Orbit
 // (the house app) sits on top as the hero choice; its add-link is an https
 // URL minted server-side, so it opens through Telegram's own openLink.
+// Orbit is Android-only for now — hidden on iOS until the iOS build ships.
 export function AppLaunchSheet({ t, open, link, currentSubId, onClose }) {
   const [orbitBusy, setOrbitBusy] = useState(false);
+  const [lastTried, setLastTried] = useState(null);
+  const showOrbit = PLATFORM !== 'ios';
+
+  useEffect(() => { if (!open) setLastTried(null); }, [open]);
 
   const openOrbit = async () => {
     if (orbitBusy) return;
@@ -187,30 +162,33 @@ export function AppLaunchSheet({ t, open, link, currentSubId, onClose }) {
     if (!link) { showToast(t('noSubOpen'), 'error'); return; }
     // \u2068…\u2069 isolates the Latin app name inside the RTL sentence.
     showToast(t('appLaunchHint').replace('{app}', '\u2068' + app.label + '\u2069'), 'success');
-    launchAppLadder(app, link, t);
+    launchApp(app, link);
+    setLastTried(app);
   };
 
   return (
     <Sheet open={open} onClose={onClose} panelId="appLaunchSheet" backdropId="appLaunchBackdrop" labelledBy="appLaunchTitle">
       <h2 id="appLaunchTitle">{t('appLaunchTitle')}</h2>
       <p className="sheet-subtitle">{t('appLaunchSub')}</p>
-      <button
-        type="button"
-        className="btn btn-primary"
-        style={{ width: '100%', justifyContent: 'center', marginTop: 12, fontWeight: 800, fontSize: 15, padding: '13px 16px' }}
-        disabled={orbitBusy}
-        onClick={openOrbit}
-      >
-        {orbitBusy ? '…' : 'Orbit ' + t('appOrbitTag')}
-      </button>
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginTop: 10 }}>
+      {showOrbit && (
+        <button
+          type="button"
+          className="btn btn-primary app-hero"
+          disabled={orbitBusy}
+          onClick={openOrbit}
+        >
+          {orbitBusy ? '…' : 'Orbit ' + t('appOrbitTag')}
+        </button>
+      )}
+      <div className="app-grid">
         {appsForPlatform().map((app) => (
-          <button key={app.key} type="button" className="btn" style={{ justifyContent: 'center', fontWeight: 700 }} onClick={() => openApp(app)}>
+          <button key={app.key} type="button" className="btn app-tile" onClick={() => openApp(app)}>
             {app.label}
           </button>
         ))}
       </div>
-      <a className="btn" style={{ width: '100%', justifyContent: 'center', marginTop: 8, fontSize: 12.5 }} href="/webapp/dashboard/apps.html">
+      <AppFallbackRow t={t} app={lastTried} />
+      <a className="btn app-help-link" href="/webapp/dashboard/apps.html">
         {t('appGridHelp')}
       </a>
       <div className="sheet-actions" style={{ marginTop: 12, justifyContent: 'center' }}>
@@ -230,6 +208,18 @@ export function AddSubSheet({ t, open, onClose, onSubmit }) {
       setValue('');
       setTimeout(() => { try { inputRef.current?.focus(); } catch (_) { /* ignore */ } }, 80);
     }
+  }, [open]);
+
+  // Import-from-clipboard prefill: the home button opens this sheet right
+  // away and pushes the clipboard text here when the read succeeds.
+  useEffect(() => {
+    if (!open) return undefined;
+    const onPrefill = (e) => {
+      const txt = String(e.detail?.text || '');
+      if (txt) setValue(txt);
+    };
+    window.addEventListener('astro:addsheet-prefill', onPrefill);
+    return () => window.removeEventListener('astro:addsheet-prefill', onPrefill);
   }, [open]);
 
   const submit = async () => {
@@ -310,13 +300,15 @@ export function ExportModal({ t, open, link, showQRFirst, onClose }) {
   }, [qrVisible, link, t]);
 
   const [appsVisible, setAppsVisible] = useState(false);
-  useEffect(() => { if (!open) setAppsVisible(false); }, [open]);
+  const [lastTried, setLastTried] = useState(null);
+  useEffect(() => { if (!open) { setAppsVisible(false); setLastTried(null); } }, [open]);
 
   const openApp = (app) => {
     if (!link) { showToast(t('noSubOpen'), 'error'); return; }
     // window.open launches — never navigates the webview (see launchScheme above)
     showToast(t('appLaunchHint').replace('{app}', '\u2068' + app.label + '\u2069'), 'success');
-    launchAppLadder(app, link, t);
+    launchApp(app, link);
+    setLastTried(app);
   };
 
   const copyLink = async () => {
@@ -360,10 +352,11 @@ export function ExportModal({ t, open, link, showQRFirst, onClose }) {
       {appsVisible && (
         <div id="exportAppGrid" className="exp-apps">
           {appsForPlatform().map((app) => (
-            <button key={app.key} className="btn" style={{ justifyContent: 'center', fontWeight: 700 }} onClick={() => openApp(app)}>
+            <button key={app.key} className="btn app-tile" onClick={() => openApp(app)}>
               {app.label}
             </button>
           ))}
+          <AppFallbackRow t={t} app={lastTried} />
           <a className="btn exp-apps-help" href="/webapp/dashboard/apps.html">
             {t('appGridHelp')}
           </a>

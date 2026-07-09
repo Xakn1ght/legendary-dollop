@@ -215,24 +215,21 @@ export function HomePage() {
     } else viaNavigator();
   });
 
-  const importFromClipboard = async () => {
-    const { ok, text } = await readClipboardText();
-    const txt = (text || '').trim();
-    if (!ok) {
-      openAddSheet();
-      showToast(t('clipboardManualPaste'));
-      return;
-    }
-    if (txt.length < 4) { showToast(t('clipboardEmpty'), 'error'); return; }
-    try {
-      const r = await api('/api/dashboard/subscriptions/add', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ url: txt }) });
-      if (r && r.ok) {
-        showToast(t('addedSuccess'), 'success');
-        await loadSubscriptions(r.subscription_id || null);
-      } else {
-        showToast((r && (r.message || r.error)) ? String(r.message || r.error) : t('addFailed'), 'error');
-      }
-    } catch (_) { showToast(t('addFailed'), 'error'); }
+  // Round 2 (2026-07-09, Pasha: "still not working at all"): auto-reading
+  // the clipboard is a lost cause across Telegram webviews — permission is
+  // silently denied more often than not, and the old flow just looked dead
+  // for ~2s before giving up. New approach is deterministic: the Add sheet
+  // opens IMMEDIATELY (paste always works into a focused input), and the
+  // clipboard read runs in the background — if it yields a link, the input
+  // is prefilled so the user only has to hit Add.
+  const importFromClipboard = () => {
+    openAddSheet();
+    readClipboardText().then(({ ok, text }) => {
+      const txt = (text || '').trim();
+      if (!ok || txt.length < 4) return;
+      window.dispatchEvent(new CustomEvent('astro:addsheet-prefill', { detail: { text: txt } }));
+      showToast(t('clipboardPrefilled'), 'success');
+    }).catch(() => { /* manual paste path stays */ });
   };
 
   const status = (overview?.status || 'disabled').toLowerCase();
@@ -656,6 +653,11 @@ export function HomePage() {
                     ? (speedStats.phase === 'down' ? '…' : '—')
                     : <><bdi>{fmt(speedStats.down, speedStats.down >= 10 ? 0 : 1)}</bdi> <span style={{ fontSize: '0.75em', opacity: 0.8 }}>{t('mbps')}</span></>}
                 </div>
+                {/* Mbps vs MB/s tripped people (Ookla set to MB/s reads 8x
+                    smaller) — show the byte figure too. */}
+                {speedStats.down != null && (
+                  <div className="value-alt" dir="ltr">≈ {fmt(speedStats.down / 8, 1)} MB/s</div>
+                )}
               </div>
               <div className={`speed-chip${speedStats.phase === 'up' ? ' measuring' : ''}`}>
                 <div className="label" id="labelUpload">{t('upload')}</div>
@@ -664,6 +666,9 @@ export function HomePage() {
                     ? (speedStats.phase === 'up' ? '…' : '—')
                     : <><bdi>{fmt(speedStats.up, speedStats.up >= 10 ? 0 : 1)}</bdi> <span style={{ fontSize: '0.75em', opacity: 0.8 }}>{t('mbps')}</span></>}
                 </div>
+                {speedStats.up != null && (
+                  <div className="value-alt" dir="ltr">≈ {fmt(speedStats.up / 8, 1)} MB/s</div>
+                )}
               </div>
               <div className={`speed-chip${speedStats.phase === 'ping' ? ' measuring' : ''}`}>
                 <div className="label" id="labelPing">{t('ping')}</div>

@@ -883,3 +883,23 @@ body[data-charge-step="1"] .bottom-actions .btn {
   cursor: pointer; z-index: 3;
 }
 .receipt-remove-btn:active { opacity: 0.7; }
+
+/* Unlimited subs are visible but not chargeable (2026-07-09) */
+.sub-card.unchargeable { opacity: 0.55; cursor: not-allowed; }
+.sub-card.unchargeable .sub-check { visibility: hidden; }
+.sub-unlimited-note { margin-top: 5px; font-size: 11px; font-weight: 700; color: var(--warning, #fbbf24); }
+
+/* ── Build-your-own top-up card (2026-07-09) ─────────────────────── */
+.plan-card-custom .custom-mark{ display:flex; align-items:center; justify-content:center; color: var(--brand); }
+.plan-card-custom .custom-hint{ opacity:.75; }
+.custom-editor{ margin-top:8px; }
+.custom-row{ display:flex; align-items:center; gap:10px; margin-bottom:8px; }
+.custom-row input[type="range"]{ flex:1; accent-color: var(--brand); min-width:0; }
+.custom-num{
+  width:64px; padding:8px 6px; border-radius:10px; text-align:center;
+  border:1px solid var(--line, rgba(255,255,255,0.14));
+  background: rgba(0,0,0,0.22); color: inherit;
+  font-size:16px; font-weight:800; font-family:inherit;
+}
+.custom-num::-webkit-outer-spin-button, .custom-num::-webkit-inner-spin-button{ -webkit-appearance:none; }
+.custom-unit{ font-weight:800; font-size:12px; opacity:.75; }

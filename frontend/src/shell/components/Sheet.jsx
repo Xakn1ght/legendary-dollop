@@ -1,4 +1,5 @@
 import React, { useEffect, useRef } from 'react';
+import { createPortal } from 'react-dom';
 
 import { useScrollLock } from '../../shared/scrollLock.js';
 
@@ -107,7 +108,11 @@ export function Sheet({ open, onClose, labelledBy, children, panelId, backdropId
     if (panel && open) { panel.style.transform = ''; panel.style.transition = ''; }
   }, [open]);
 
-  return (
+  // Portal to <body>: rendered inside the page tree, any transformed/filtered
+  // ancestor (page-transition containers) traps the sheet's z-index in its own
+  // stacking context and the fixed bottom-nav paints OVER the sheet
+  // (2026-07-09, Pasha: redeem/claim sheets "hidden behind navbar").
+  return createPortal(
     <>
       <div
         className={`sheet-backdrop${open ? ' visible' : ''}`}
@@ -127,6 +132,7 @@ export function Sheet({ open, onClose, labelledBy, children, panelId, backdropId
         <div className="sheet-handle" />
         <div className="sheet-content" data-sheet-scroll="true">{children}</div>
       </div>
-    </>
+    </>,
+    document.body,
   );
 }

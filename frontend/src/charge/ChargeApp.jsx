@@ -81,9 +81,13 @@ export function ChargeApp() {
     () => subscriptions.find((s) => String(s.id) === String(selectedSubId)) || null,
     [subscriptions, selectedSubId],
   );
+  // "custom:<gb>" builder selections live outside the fixed packages list.
+  const [customPackage, setCustomPackage] = useState(null);
   const selectedPackage = useMemo(
-    () => packages.find((p) => p.name === selectedPackageName) || null,
-    [packages, selectedPackageName],
+    () => (customPackage && customPackage.name === selectedPackageName
+      ? customPackage
+      : packages.find((p) => p.name === selectedPackageName) || null),
+    [packages, selectedPackageName, customPackage],
   );
   selectedSubRef.current = selectedSubscription;
   selectedPkgRef.current = selectedPackage;
@@ -175,6 +179,14 @@ export function ChargeApp() {
   const selectPackage = useCallback((pkgName) => {
     setSelectedPackageName(pkgName);
     hapticSelection();
+  }, []);
+
+  // Build-your-own top-up: the card hands us a full pseudo-package
+  // ({name:"custom:<gb>", gb, price, days}) priced by the server curve.
+  const selectCustomPackage = useCallback((pkg) => {
+    setCustomPackage(pkg);
+    setSelectedPackageName(pkg ? pkg.name : null);
+    if (pkg) hapticSelection();
   }, []);
 
   const selectRenewalPlan = useCallback((planName) => {
@@ -468,6 +480,7 @@ export function ChargeApp() {
             isVip={!!userInfo?.is_vip}
             vipDiscountPercent={vipDiscountPercent}
             onSelect={selectPackage}
+            onSelectCustom={selectCustomPackage}
             onBack={() => goToStep(1)}
             onContinue={() => goToStep(3)}
           />

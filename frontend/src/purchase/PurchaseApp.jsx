@@ -164,7 +164,7 @@ export function PurchaseApp() {
     let discountAmount = discountPercent > 0 ? Math.floor(totalPrice * (discountPercent / 100)) : 0;
 
     const coupon = activeCoupons.find((c) => c.id === selectedCouponId) || null;
-    const { extraDiscount, bonusGb } = couponEffect(coupon, {
+    const { extraDiscount, bonusGb, capApplied, capBase } = couponEffect(coupon, {
       plans,
       totalPrice,
       planPrice: selectedPlan.price,
@@ -187,6 +187,8 @@ export function PurchaseApp() {
       discountAmount,
       creditUsed,
       finalPrice: priceAfterDiscount - creditUsed,
+      couponCapApplied: capApplied,
+      couponCapBase: capBase,
     };
   }, [selectedPlan, selectedRenewalPlan, autoRenewal, userInfo, selectedDiscountIds, activeCoupons, selectedCouponId, useCredit, plans, fmt, fmtPrice, t, getPlanDisplayName]);
 
@@ -535,6 +537,7 @@ export function PurchaseApp() {
           <PaymentSection
             t={t} fmt={fmt} fmtPrice={fmtPrice} lang={lang}
             userInfo={userInfo}
+            plans={plans}
             useCredit={useCredit}
             onUseCreditChange={setUseCredit}
             selectedDiscountIds={selectedDiscountIds}
