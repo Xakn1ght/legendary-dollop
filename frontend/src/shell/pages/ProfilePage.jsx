@@ -17,8 +17,9 @@ const ACCENTS = [
   { key: 'violet', swatch: '#a78bfa' },
   { key: 'amber', swatch: '#fbbf24' },
   { key: 'vip', swatch: '#c9d6e8', locked: true },
-  { key: 'champion', swatch: '#e8a300', locked: true },
-  { key: 'legend', swatch: '#c026d3', locked: true },
+  // Earned accents render as metal-gradient chips (premium finish, 2026-07-09)
+  { key: 'champion', swatch: 'linear-gradient(135deg, #f8cc57, #e8a300 55%, #8a5c00)', locked: true },
+  { key: 'legend', swatch: 'linear-gradient(135deg, #e766f2, #c026d3 55%, #6d0b8f)', locked: true },
 ];
 
 // Server-driven mission achievements (GET /api/dashboard/achievements).
