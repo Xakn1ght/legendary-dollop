@@ -347,9 +347,9 @@
         color: #fff;
       }
       .astro-ui-btn.danger{
-        background: rgba(239, 68, 68, 0.12);
-        border-color: rgba(239, 68, 68, 0.35);
-        color: var(--text, #fff);
+        background: var(--bad, #ef4444);
+        border-color: var(--bad, #ef4444);
+        color: #fff;
       }
       .astro-ui-toast{
         position: fixed;

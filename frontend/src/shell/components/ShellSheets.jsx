@@ -260,7 +260,7 @@ export function ConfirmRemoveSheet({ t, open, label, onClose, onConfirm }) {
         <button id="confirmRemoveCancel" className="btn" onClick={onClose}>{t('cancel')}</button>
         <button
           id="confirmRemoveConfirm"
-          className="btn btn-primary"
+          className="btn btn-danger"
           disabled={busy}
           onClick={async () => { setBusy(true); try { await onConfirm(); } finally { setBusy(false); } }}
         >

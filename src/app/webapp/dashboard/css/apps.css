@@ -212,7 +212,7 @@ html[lang="en"] .chip-reco{ direction: ltr; }
    light ui.js stack — so re-assert the resting look under coarse pointers.
    The html prefix out-specifies glass.css's .btn:hover (both !important). */
 @media (hover: none), (pointer: coarse) {
-  html .btn:not(.btn-primary):not(.nav-item):not(.btn-remove):hover{
+  html .btn:not(.btn-primary):not(.nav-item):not(.btn-remove):not(.btn-danger):hover{
     background: var(--glass-bg-mid) !important;
     border-color: var(--glass-edge) !important;
     border-top-color: var(--glass-edge-bright) !important;
