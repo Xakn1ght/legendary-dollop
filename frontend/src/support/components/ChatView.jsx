@@ -163,6 +163,9 @@ export function ChatView({
 }) {
   const [draft, setDraft] = useState('');
   const [lightboxSrc, setLightboxSrc] = useState('');
+  // Picked-but-not-sent photo: {file, url}. The confirm popup guards against
+  // fat-finger sends straight from the OS picker (2026-07-09).
+  const [pendingPhoto, setPendingPhoto] = useState(null);
   const myAvatar = useMyAvatar();
   // Reacts LIVE to a status_change pushed over the WS (admin closed/reopened
   // the ticket): banner + disabled composer, no refresh needed.
@@ -176,6 +179,25 @@ export function ChatView({
 
   // Hardware/gesture back closes the lightbox before the chat.
   useBackClose(!!lightboxSrc, () => setLightboxSrc(''));
+
+  const cancelPendingPhoto = () => {
+    setPendingPhoto((cur) => {
+      if (cur) { try { URL.revokeObjectURL(cur.url); } catch (_) { /* ignore */ } }
+      return null;
+    });
+  };
+  const approvePendingPhoto = () => {
+    setPendingPhoto((cur) => {
+      if (cur) {
+        onSendPhoto(cur.file);
+        // The optimistic bubble makes its own object URL; this one can go.
+        try { URL.revokeObjectURL(cur.url); } catch (_) { /* ignore */ }
+      }
+      return null;
+    });
+  };
+  // Back cancels the photo confirm before touching lightbox/chat.
+  useBackClose(!!pendingPhoto, cancelPendingPhoto);
 
   // Android (Telegram WebView) keeps the layout viewport full-height when
   // the keyboard opens, leaving the fixed reply bar hidden behind it. Size
@@ -391,7 +413,7 @@ export function ChatView({
               const f = e.target.files && e.target.files[0];
               // Reset so picking the same file again still fires a change event.
               e.target.value = '';
-              if (f) onSendPhoto(f);
+              if (f) setPendingPhoto({ file: f, url: URL.createObjectURL(f) });
             }}
           />
           <textarea
@@ -440,6 +462,24 @@ export function ChatView({
       </div>
 
       {lightboxSrc && <Lightbox src={lightboxSrc} onClose={() => setLightboxSrc('')} />}
+
+      {pendingPhoto && (
+        <div className="photo-confirm-backdrop" onClick={(e) => { if (e.target === e.currentTarget) cancelPendingPhoto(); }}>
+          <div className="photo-confirm" role="dialog" aria-modal="true" aria-label={t('photoConfirmTitle')}>
+            <div className="photo-confirm-title">{t('photoConfirmTitle')}</div>
+            <div className="photo-confirm-frame">
+              <img src={pendingPhoto.url} alt="" />
+            </div>
+            <div className="photo-confirm-meta" dir="ltr">
+              {(pendingPhoto.file.size / (1024 * 1024)).toFixed(1)} MB
+            </div>
+            <div className="photo-confirm-actions">
+              <button type="button" className="pc-btn" onClick={cancelPendingPhoto}>{t('photoConfirmCancel')}</button>
+              <button type="button" className="pc-btn primary" onClick={approvePendingPhoto}>{t('photoConfirmSend')}</button>
+            </div>
+          </div>
+        </div>
+      )}
     </>
   );
 }

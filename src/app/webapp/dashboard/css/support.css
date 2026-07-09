@@ -582,3 +582,45 @@ body.platform-ios .lightbox-save { top: calc(env(safe-area-inset-top) + 60px); }
   0%, 60%, 100% { transform: translateY(0); opacity: 0.45; }
   30% { transform: translateY(-4px); opacity: 1; }
 }
+
+/* ── Photo send confirmation (2026-07-09) — preview before it leaves ── */
+.photo-confirm-backdrop {
+  position: fixed; inset: 0; z-index: 1500;
+  background: rgba(0, 0, 0, 0.62);
+  display: flex; align-items: center; justify-content: center;
+  padding: 20px;
+}
+.photo-confirm {
+  width: min(360px, 100%);
+  background: var(--panel, #10202a);
+  border: 1px solid var(--line, rgba(255,255,255,0.10));
+  border-radius: 18px;
+  padding: 16px;
+  box-shadow: 0 24px 70px rgba(0, 0, 0, 0.55);
+}
+[data-theme="light"] .photo-confirm { background: #ffffff; }
+.photo-confirm-title { font-size: 14.5px; font-weight: 800; margin-bottom: 12px; }
+.photo-confirm-frame {
+  border-radius: 12px; overflow: hidden;
+  border: 1px solid var(--line, rgba(255,255,255,0.10));
+  background: rgba(0, 0, 0, 0.25);
+  display: flex; align-items: center; justify-content: center;
+}
+.photo-confirm-frame img {
+  /* width 100% (not max-width) so even tiny images render a visible preview */
+  display: block; width: 100%; max-height: 48vh; object-fit: contain;
+}
+.photo-confirm-meta { margin-top: 8px; font-size: 11px; color: var(--muted, #8a93a3); text-align: start; }
+.photo-confirm-actions { display: grid; grid-template-columns: 1fr 1.4fr; gap: 10px; margin-top: 14px; }
+.pc-btn {
+  padding: 12px 10px; border-radius: 12px; font-family: inherit;
+  font-size: 14px; font-weight: 800; cursor: pointer;
+  background: var(--chip, rgba(255,255,255,0.06));
+  border: 1px solid var(--line, rgba(255,255,255,0.12));
+  color: var(--lightText, #e8ecf3);
+}
+.pc-btn.primary {
+  background: linear-gradient(135deg, var(--brand, #ec5652), var(--brandDark, #d43f3b));
+  border-color: transparent; color: #fff;
+}
+.pc-btn:active { opacity: 0.85; }

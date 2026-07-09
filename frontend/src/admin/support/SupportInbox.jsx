@@ -63,6 +63,8 @@ export function SupportInbox() {
   const [msgLoading, setMsgLoading] = useState(false);
   const [draft, setDraft] = useState('');
   const [sending, setSending] = useState(false);
+  // Picked-but-not-sent photo: {file, url} — confirmed via popup before upload.
+  const [pendingPhoto, setPendingPhoto] = useState(null);
   const [canned, setCanned] = useState(loadCanned);
   const [cannedOpen, setCannedOpen] = useState(false);
   const [ctxUser, setCtxUser] = useState(null);      // user-context sidebar data
@@ -257,6 +259,20 @@ export function SupportInbox() {
       setMessages((cur) => cur.filter((m) => m.key !== key));
       setDraft(msg);
     } finally { setSending(false); }
+  }
+
+  function cancelPendingPhoto() {
+    setPendingPhoto((cur) => {
+      if (cur) { try { URL.revokeObjectURL(cur.url); } catch (_) { /* ignore */ } }
+      return null;
+    });
+  }
+  function approvePendingPhoto() {
+    setPendingPhoto((cur) => {
+      // sendPhoto mints its own object URL for the optimistic bubble.
+      if (cur) { sendPhoto(cur.file); try { URL.revokeObjectURL(cur.url); } catch (_) { /* ignore */ } }
+      return null;
+    });
   }
 
   async function sendPhoto(file) {
@@ -510,7 +526,7 @@ export function SupportInbox() {
                 <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2"><path d="M13 2 3 14h9l-1 8 10-12h-9l1-8z" /></svg>
               </button>
               <label className="sup-attach" title="Attach photo">
-                <input type="file" accept="image/*" hidden disabled={isClosed} onChange={(e) => { const f = e.target.files?.[0]; if (f) sendPhoto(f); e.target.value = ''; }} />
+                <input type="file" accept="image/*" hidden disabled={isClosed} onChange={(e) => { const f = e.target.files?.[0]; if (f) setPendingPhoto({ file: f, url: URL.createObjectURL(f) }); e.target.value = ''; }} />
                 <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48" /></svg>
               </label>
               <textarea
@@ -614,6 +630,36 @@ export function SupportInbox() {
           <button type="button" className="lightbox-scrim" aria-label="Close photo" onClick={() => setLightbox(null)} />
           <img src={lightbox} alt="attachment zoom" className="lightbox-img" onClick={(e) => e.stopPropagation()} />
           <button className="lightbox-close" onClick={() => setLightbox(null)}><Icons.close width={18} height={18} /></button>
+        </div>
+      )}
+
+      {pendingPhoto && (
+        <div className="v3-modal-backdrop open" onClick={(e) => { if (e.target === e.currentTarget) cancelPendingPhoto(); }}>
+          <div className="v3-modal" role="dialog" aria-modal="true" style={{ maxWidth: 420 }}>
+            <div className="v3-modal-head">
+              <div>
+                <div className="v3-modal-title">Send this photo?</div>
+                <div className="v3-modal-sub">
+                  {selected ? `To ${selected.user_name || 'user'} · ticket #${selected.user_ticket_number || selected.id}` : ''}
+                </div>
+              </div>
+              <button className="mini-close" type="button" aria-label="Cancel" onClick={cancelPendingPhoto}>✕</button>
+            </div>
+            <div className="v3-modal-body">
+              <img
+                src={pendingPhoto.url}
+                alt="photo preview"
+                style={{ display: 'block', width: '100%', maxHeight: '48vh', objectFit: 'contain', borderRadius: 12, border: '1px solid var(--border-subtle)', background: 'rgba(0,0,0,0.25)' }}
+              />
+              <div style={{ marginTop: 8, fontSize: 11, color: 'var(--text-muted)' }}>
+                {(pendingPhoto.file.size / (1024 * 1024)).toFixed(1)} MB
+              </div>
+            </div>
+            <div className="v3-modal-actions">
+              <button className="btn btn-secondary" onClick={cancelPendingPhoto}>Cancel</button>
+              <button className="btn btn-primary" onClick={approvePendingPhoto}>Send photo</button>
+            </div>
+          </div>
         </div>
       )}
     </div>
