@@ -102,9 +102,10 @@ async def proceed_with_5gb_limit(message: Message, state: FSMContext, session: A
     lang = await _get_lang(message.chat.id, session)
     await state.update_data(charge_type='normal_5gb_limit')
     await state.set_state(ChargeState.package)
+    from app.handlers.user.charge.common import _is_vip_chat
     await message.answer(
         t(lang, "charge_immediate_title"),
-        reply_markup=await _build_package_keyboard(state, lang)
+        reply_markup=await _build_package_keyboard(state, lang, is_vip=await _is_vip_chat(session, message.chat.id))
     )
 
 

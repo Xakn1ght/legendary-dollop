@@ -29,6 +29,16 @@ CHARGE_PRESET_PACKAGES = {
     "۵۰ گیگابایت": {"gb": 50, "price": 80_000},
     "۸۰ گیگابایت": {"gb": 80, "price": 120_000},
     "۱۰۰ گیگابایت": {"gb": 100, "price": 140_000},
+    # VIP top-ups mirror the VIP-exclusive plans (2026-07-09): the same
+    # 350/400/500 GB monthly quotas as 2- and 3-month bundles at the plan
+    # list prices (no VIP percent — the offer is removed there). vip_only
+    # is enforced in flows/charge.py + filtered from non-VIP shop windows.
+    "۷۰۰ گیگ VIP | ۲ ماهه": {"gb": 700, "days": 70, "price": 1_725_000, "vip_only": True, "badge_label": "VIP", "badge_type": "vip-tag"},
+    "۸۰۰ گیگ VIP | ۲ ماهه": {"gb": 800, "days": 70, "price": 1_950_000, "vip_only": True, "badge_label": "VIP", "badge_type": "vip-tag"},
+    "۱۰۰۰ گیگ VIP | ۲ ماهه": {"gb": 1000, "days": 70, "price": 2_375_000, "vip_only": True, "badge_label": "VIP", "badge_type": "vip-tag"},
+    "۱۰۵۰ گیگ VIP | ۳ ماهه": {"gb": 1050, "days": 105, "price": 2_587_500, "vip_only": True, "badge_label": "VIP", "badge_type": "vip-tag"},
+    "۱۲۰۰ گیگ VIP | ۳ ماهه": {"gb": 1200, "days": 105, "price": 2_925_000, "vip_only": True, "badge_label": "VIP", "badge_type": "vip-tag"},
+    "۱۵۰۰ گیگ VIP | ۳ ماهه": {"gb": 1500, "days": 105, "price": 3_562_500, "vip_only": True, "badge_label": "VIP", "badge_type": "vip-tag"},
 }
 
 # Rate per day extension (Toman per day) - used for custom day charging

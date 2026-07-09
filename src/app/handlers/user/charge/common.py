@@ -78,8 +78,21 @@ async def _build_subscription_keyboard(state: FSMContext, subscriptions, lang: s
     return await ikb(state, rows)
 
 
-async def _build_package_keyboard(state: FSMContext, lang: str = "fa") -> InlineKeyboardMarkup:
+async def _is_vip_chat(session, chat_id: int) -> bool:
+    try:
+        user = await crud.get_user(session, chat_id)
+        return bool(user and await crud.is_user_vip(session, user.id))
+    except Exception:
+        return False
+
+
+async def _build_package_keyboard(state: FSMContext, lang: str = "fa", is_vip: bool = False) -> InlineKeyboardMarkup:
+    from app.core.settings import CHARGE_PRESET_PACKAGES
+
     keys = get_ordered_charge_plans()
+    # VIP-exclusive top-ups hidden for non-VIP users (flows/charge.py
+    # enforces the same rule on the money path).
+    keys = [k for k in keys if is_vip or not CHARGE_PRESET_PACKAGES.get(k, {}).get("vip_only")]
     button_grid = []
     for i in range(0, len(keys), CHARGE_PLANS_BUTTON_COLUMNS):
         button_grid.append(keys[i:i + CHARGE_PLANS_BUTTON_COLUMNS])
@@ -139,7 +152,7 @@ async def check_subscription_traffic(message: Message, state: FSMContext, sessio
         await state.set_state(ChargeState.package)
         await message.answer(
             t(lang, "charge_remaining").format(gb=gb_str) + "\n\n" + t(lang, "charge_choose_package"),
-            reply_markup=await _build_package_keyboard(state, lang)
+            reply_markup=await _build_package_keyboard(state, lang, is_vip=await _is_vip_chat(session, message.chat.id))
         )
     else:
         # Show options for >5GB

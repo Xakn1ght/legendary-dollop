@@ -113,6 +113,10 @@ async def start_charge_order(
     """
     if package_name not in CHARGE_PRESET_PACKAGES:
         raise FlowError("invalid_package", "Selected package does not exist")
+    # VIP-exclusive top-ups (the 350-500GB monthly quotas as 2-3 month
+    # bundles): money-path gate — both surfaces order through here.
+    if CHARGE_PRESET_PACKAGES[package_name].get("vip_only") and not await crud.is_user_vip(session, user.id):
+        raise FlowError("vip_only_package", "This package is exclusive to VIP members")
     from app.services.flows.pricing import get_plan_info as _gpi
     if renewal_template is not None and not _gpi(renewal_template, PLANS):
         raise FlowError("invalid_renewal_plan", "Invalid renewal plan selected")

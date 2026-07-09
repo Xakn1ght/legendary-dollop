@@ -351,6 +351,42 @@ async def test_custom_charge_days_only_and_gate():
     print("PASS test_custom_charge_days_only_and_gate")
 
 
+async def test_vip_only_package_gate():
+    """VIP-exclusive charge packages (2026-07-09) are rejected for non-VIP
+    users at the money path and priced flat (no discounts) for VIPs."""
+    Session, fake = await _setup(
+        marzban_info={"data_limit": 10 * GB, "used_traffic": 9 * GB, "expire": 0}
+    )
+    charge_mod.CHARGE_PRESET_PACKAGES = {
+        **PACKAGES,
+        "vip700": {"gb": 700, "days": 70, "price": 1_725_000, "vip_only": True},
+    }
+    async with Session() as db:
+        user = await crud.get_user(db, CHAT)
+        # non-VIP → rejected before any state is created
+        try:
+            await start_charge_order(db, user, subscription_id=10, package_name="vip700", status="draft")
+            raise AssertionError("expected vip_only_package")
+        except FlowError as e:
+            assert e.code == "vip_only_package", e.code
+
+        # VIP → order created at the flat list price
+        orig_is_vip = crud.is_user_vip
+
+        async def yes_vip(session, uid):
+            return True
+        crud.is_user_vip = yes_vip
+        try:
+            res = await start_charge_order(db, user, subscription_id=10, package_name="vip700", status="draft")
+            req = res.charge_request
+            assert res.final_price == 1_725_000, res.final_price
+            assert req.traffic_bytes == 700 * GB and req.extra_days == 70, (req.traffic_bytes, req.extra_days)
+        finally:
+            crud.is_user_vip = orig_is_vip
+    charge_mod.CHARGE_PRESET_PACKAGES = PACKAGES
+    print("PASS test_vip_only_package_gate")
+
+
 async def main():
     await test_start_cancel_deny_credit()
     await test_full_credit_charge_goes_to_admin_queue()
@@ -359,6 +395,7 @@ async def main():
     await test_booking_renewal_only_at_approval()
     await test_referral_reward_granted_without_bot()
     await test_custom_charge_days_only_and_gate()
+    await test_vip_only_package_gate()
     print("\nAll charge-service tests passed.")
 
 

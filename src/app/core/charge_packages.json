@@ -28,5 +28,53 @@
     "price": 300000,
     "gb": 100,
     "days": 35
+  },
+  "۷۰۰ گیگ VIP | ۲ ماهه": {
+    "price": 1725000,
+    "gb": 700,
+    "days": 70,
+    "vip_only": true,
+    "badge_label": "VIP",
+    "badge_type": "vip-tag"
+  },
+  "۸۰۰ گیگ VIP | ۲ ماهه": {
+    "price": 1950000,
+    "gb": 800,
+    "days": 70,
+    "vip_only": true,
+    "badge_label": "VIP",
+    "badge_type": "vip-tag"
+  },
+  "۱۰۰۰ گیگ VIP | ۲ ماهه": {
+    "price": 2375000,
+    "gb": 1000,
+    "days": 70,
+    "vip_only": true,
+    "badge_label": "VIP",
+    "badge_type": "vip-tag"
+  },
+  "۱۰۵۰ گیگ VIP | ۳ ماهه": {
+    "price": 2587500,
+    "gb": 1050,
+    "days": 105,
+    "vip_only": true,
+    "badge_label": "VIP",
+    "badge_type": "vip-tag"
+  },
+  "۱۲۰۰ گیگ VIP | ۳ ماهه": {
+    "price": 2925000,
+    "gb": 1200,
+    "days": 105,
+    "vip_only": true,
+    "badge_label": "VIP",
+    "badge_type": "vip-tag"
+  },
+  "۱۵۰۰ گیگ VIP | ۳ ماهه": {
+    "price": 3562500,
+    "gb": 1500,
+    "days": 105,
+    "vip_only": true,
+    "badge_label": "VIP",
+    "badge_type": "vip-tag"
   }
 }

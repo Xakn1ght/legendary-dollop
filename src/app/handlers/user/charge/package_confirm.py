@@ -248,7 +248,13 @@ async def cancel_confirm(message: Message, state: FSMContext, session: AsyncSess
     lang = await _get_lang(message.chat.id, session)
     # Return to package selection to allow changing choice
     await state.set_state(ChargeState.package)
-    await message.answer(t(lang, "charge_back_to_packages"), reply_markup=_build_package_keyboard(lang))
+    # (was `_build_package_keyboard(lang)` — unawaited + wrong args, this
+    # back-path always crashed; fixed while adding the VIP filter)
+    from app.handlers.user.charge.common import _is_vip_chat
+    await message.answer(
+        t(lang, "charge_back_to_packages"),
+        reply_markup=await _build_package_keyboard(state, lang, is_vip=await _is_vip_chat(session, message.chat.id)),
+    )
 
 
 @router.message(ChargeState.confirmation)
