@@ -1,6 +1,8 @@
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 
-import { apiJson } from '../api.js';
+import { apiJson, postJson } from '../api.js';
+import { useModal } from './Modal.jsx';
+import { useToast } from './Toast.jsx';
 import { Icons } from '../icons.jsx';
 
 function Dot({ ok }) {
@@ -16,25 +18,50 @@ function ago(ts) {
 }
 
 export function HealthCard() {
+  const modal = useModal();
+  const toast = useToast();
   const [h, setH] = useState(null);
   const [nodes, setNodes] = useState(null);
+  const [smsBusy, setSmsBusy] = useState(false);
+
+  const load = useCallback(async () => {
+    try {
+      const { data } = await apiJson('/api/admin/system-health');
+      if (data.ok !== false) setH(data);
+    } catch (_) { /* ignore */ }
+    try {
+      const { data } = await apiJson('/api/admin/nodes');
+      if (data.ok) setNodes(data);
+    } catch (_) { /* ignore */ }
+  }, []);
 
   useEffect(() => {
-    let alive = true;
-    const load = async () => {
-      try {
-        const { data } = await apiJson('/api/admin/system-health');
-        if (alive && data.ok !== false) setH(data);
-      } catch (_) { /* ignore */ }
-      try {
-        const { data } = await apiJson('/api/admin/nodes');
-        if (alive && data.ok) setNodes(data);
-      } catch (_) { /* ignore */ }
-    };
     load();
     const id = setInterval(() => { if (!document.hidden) load(); }, 60000);
-    return () => { alive = false; clearInterval(id); };
-  }, []);
+    return () => clearInterval(id);
+  }, [load]);
+
+  // Same confirm copy + endpoint as Settings ▸ SMS Auto-Approve — the pill
+  // is a live switch, not just a status readout (Pasha 2026-07-09).
+  async function toggleSms() {
+    if (!h?.sms_auto_approve || smsBusy) return;
+    const arming = !h.sms_auto_approve.enabled;
+    const ok = await modal.confirm(
+      arming ? 'ARM SMS auto-approve?' : 'Disarm SMS auto-approve?',
+      arming
+        ? 'Incoming PARSIANBANK deposit SMS will auto-approve the one unambiguous matching pending order (exact amount + time window). Ambiguous cases always stay manual.'
+        : 'Auto-approval stops immediately; every receipt goes back to manual review.',
+      { okText: arming ? 'ARM' : 'Disarm', danger: arming },
+    );
+    if (!ok) return;
+    setSmsBusy(true);
+    try {
+      const { data } = await postJson('/api/admin/sms-control', { enabled: arming });
+      if (data.ok) { toast(arming ? 'SMS auto-approve ARMED' : 'SMS auto-approve disarmed', 'success'); await load(); }
+      else toast(data.error === 'source_chat_not_configured' ? 'SMS_SOURCE_CHAT_ID is not configured on the server' : 'Failed', 'error');
+    } catch (_) { toast('Request failed', 'error'); }
+    setSmsBusy(false);
+  }
 
   const chips = [
     { name: 'Database', s: h?.db },
@@ -47,9 +74,15 @@ export function HealthCard() {
       <div className="rev-head">
         <div className="rev-title"><Icons.wifi width={16} height={16} /> System Health</div>
         {h?.sms_auto_approve && (
-          <span className={'sms-pill' + (h.sms_auto_approve.enabled ? ' armed' : '')}>
-            SMS auto-approve {h.sms_auto_approve.enabled ? 'ARMED' : 'off'}
-          </span>
+          <button
+            type="button"
+            className={'sms-pill sms-pill-btn' + (h.sms_auto_approve.enabled ? ' armed' : '')}
+            onClick={toggleSms}
+            disabled={smsBusy}
+            title={h.sms_auto_approve.enabled ? 'Tap to disarm' : 'Tap to arm'}
+          >
+            SMS auto-approve {smsBusy ? '…' : h.sms_auto_approve.enabled ? 'ARMED' : 'off'}
+          </button>
         )}
       </div>
 
