@@ -14,10 +14,35 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { api, getInitData } from '../api.js';
 
 const MAX_POINTS = 60;
-const DL_BYTES = 2 * 1024 * 1024;
-const DL_BYTES_BIG = 8 * 1024 * 1024;
-const UL_BYTES = 2 * 1024 * 1024;
-const RUN_COOLDOWN_S = 30; // a full run moves ~4-12MB; don't let it be spammed
+// Parallel streams (2026-07-09 accuracy pass — Pasha vs Ookla): one TCP
+// connection over a high-RTT path (~300ms to this box) is window-limited
+// and never approaches line rate within a few MB. Ookla saturates with
+// many parallel streams to nearby servers; we do the same toward OUR
+// server (which is the number that matters for the VPN) and report the
+// PEAK 1s window instead of the ramp-diluted average.
+const DL_STREAMS = 3;
+const DL_BYTES_PER_STREAM = 2 * 1024 * 1024;       // probe round: 6MB total
+const DL_BYTES_PER_STREAM_BIG = 4 * 1024 * 1024;   // escalation: 12MB total
+const UL_STREAMS = 2;
+const UL_BYTES_PER_STREAM = 1024 * 1024;           // 2MB total upload
+const PEAK_WINDOW_MS = 900;
+const RUN_COOLDOWN_S = 30; // a full run can move ~10-35MB; don't let it be spammed
+
+// Peak sustained throughput over any >=windowMs span of the aggregated
+// byte-count samples [{t(ms), b(bytes)}] — two-pointer scan.
+function peakWindowMbps(samples, windowMs = PEAK_WINDOW_MS) {
+  let best = 0;
+  let i = 0;
+  for (let j = 1; j < samples.length; j++) {
+    while (samples[j].t - samples[i + 1]?.t >= windowMs && i + 1 < j) i++;
+    const dt = samples[j].t - samples[i].t;
+    if (dt >= windowMs) {
+      const mbps = ((samples[j].b - samples[i].b) * 8 / 1e6) / (dt / 1000);
+      if (mbps > best) best = mbps;
+    }
+  }
+  return best > 0 ? best : null;
+}
 
 function smoothSeries(arr, alpha = 0.35) {
   if (!arr || arr.length === 0) return [];
@@ -105,76 +130,106 @@ export function useSpeedTest(open) {
     return rest[Math.floor(rest.length / 2)];
   }, []);
 
-  const measureDL = useCallback(async (signal, bytes) => {
-    const r = await api('/api/dashboard/speed-dl?bytes=' + bytes, { raw: true, signal });
-    if (!r.body || !r.body.getReader) {
-      // Ancient webview without response streaming: whole-body timing.
-      const t0 = performance.now();
-      const buf = await r.arrayBuffer();
-      const dt = Math.max((performance.now() - t0) / 1000, 0.05);
-      return { mbps: (buf.byteLength * 8 / 1e6) / dt, dt };
-    }
-    const reader = r.body.getReader();
-    const t0 = performance.now(); // headers done — transfer clock starts here
-    let got = 0;
-    let lastSample = t0;
-    for (;;) {
-      const { done, value } = await reader.read();
-      if (done) break;
-      got += value.byteLength;
-      const now = performance.now();
-      if (now - lastSample > 120 && now - t0 > 80) {
-        pushSample('down', (got * 8 / 1e6) / ((now - t0) / 1000));
-        lastSample = now;
-      }
-    }
-    const dt = Math.max((performance.now() - t0) / 1000, 0.05);
-    return { mbps: (got * 8 / 1e6) / dt, dt };
-  }, [pushSample]);
-
-  const measureUL = useCallback((signal, pingMs) => new Promise((resolve, reject) => {
-    const body = randomBytes(UL_BYTES);
-    const xhr = new XMLHttpRequest();
-    // Same auth surface as api(): initData header when present, bearer + cookies otherwise.
-    xhr.open('POST', '/api/dashboard/speed-ul?v=' + Date.now());
-    xhr.withCredentials = true;
-    try {
-      const init = getInitData();
-      if (init) xhr.setRequestHeader('X-Telegram-Init', init);
-      const bearer = localStorage.getItem('tma_bearer_token') || '';
-      if (bearer) xhr.setRequestHeader('Authorization', 'Bearer ' + bearer);
-    } catch (_) { /* ignore */ }
-
-    const tSend = performance.now();
-    let t0 = 0;
-    let base = 0;
-    let lastLoaded = 0;
-    let lastT = 0;
-    const onAbort = () => { try { xhr.abort(); } catch (_) { /* ignore */ } };
-    if (signal) signal.addEventListener('abort', onAbort, { once: true });
-
-    xhr.upload.onprogress = (e) => {
-      const now = performance.now();
-      if (t0 === 0) { t0 = now; base = e.loaded; return; } // clock starts at first progress
-      lastLoaded = e.loaded; lastT = now;
-      if (e.loaded > base && now - t0 > 80) {
-        pushSample('up', ((e.loaded - base) * 8 / 1e6) / ((now - t0) / 1000));
+  const measureDL = useCallback(async (signal, bytesPerStream, streams = DL_STREAMS) => {
+    const t0 = performance.now();
+    let total = 0;
+    const samples = [{ t: 0, b: 0 }];
+    let lastChart = 0;
+    const note = () => {
+      const now = performance.now() - t0;
+      samples.push({ t: now, b: total });
+      if (now - lastChart > 130) {
+        lastChart = now;
+        // live line: current best sustained window (falls back to avg early on)
+        const cur = peakWindowMbps(samples, Math.min(PEAK_WINDOW_MS, Math.max(200, now / 2)))
+          || (total * 8 / 1e6) / (now / 1000);
+        pushSample('down', cur);
       }
     };
-    xhr.onload = () => {
-      if (signal) signal.removeEventListener('abort', onAbort);
-      if (t0 && lastLoaded > base && lastT > t0) {
-        resolve(((lastLoaded - base) * 8 / 1e6) / ((lastT - t0) / 1000));
+
+    const one = async () => {
+      // unique query param defeats any HTTP-level connection coalescing cache
+      const r = await api(`/api/dashboard/speed-dl?bytes=${bytesPerStream}&s=${Math.random().toString(36).slice(2)}`, { raw: true, signal });
+      if (!r.body || !r.body.getReader) {
+        // Ancient webview without streaming: count the body when it lands.
+        const buf = await r.arrayBuffer();
+        total += buf.byteLength;
+        note();
         return;
+      }
+      const reader = r.body.getReader();
+      for (;;) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        total += value.byteLength;
+        note();
+      }
+    };
+    await Promise.all(Array.from({ length: streams }, one));
+
+    const dt = Math.max((performance.now() - t0) / 1000, 0.05);
+    const avg = (total * 8 / 1e6) / dt;
+    return { mbps: peakWindowMbps(samples) || avg, dt };
+  }, [pushSample]);
+
+  const measureUL = useCallback((signal, pingMs) => {
+    // Parallel XHR uploads; progress events aggregated across streams and
+    // reported as the peak sustained window, mirroring the download side.
+    const tSend = performance.now();
+    let t0 = 0; // first progress event across ALL streams — transfer clock
+    const loaded = new Array(UL_STREAMS).fill(0);
+    const samples = [];
+    let lastChart = 0;
+
+    const note = () => {
+      const now = performance.now();
+      if (t0 === 0) { t0 = now; samples.push({ t: 0, b: 0 }); return; }
+      const total = loaded.reduce((a, b) => a + b, 0);
+      const t = now - t0;
+      samples.push({ t, b: total });
+      if (t - lastChart > 130) {
+        lastChart = t;
+        const cur = peakWindowMbps(samples, Math.min(PEAK_WINDOW_MS, Math.max(200, t / 2)))
+          || (total * 8 / 1e6) / (t / 1000);
+        pushSample('up', cur);
+      }
+    };
+
+    const oneUpload = (idx) => new Promise((resolve, reject) => {
+      const body = randomBytes(UL_BYTES_PER_STREAM);
+      const xhr = new XMLHttpRequest();
+      // Same auth surface as api(): initData header when present, bearer + cookies otherwise.
+      xhr.open('POST', '/api/dashboard/speed-ul?v=' + Date.now() + '-' + idx);
+      xhr.withCredentials = true;
+      try {
+        const init = getInitData();
+        if (init) xhr.setRequestHeader('X-Telegram-Init', init);
+        const bearer = localStorage.getItem('tma_bearer_token') || '';
+        if (bearer) xhr.setRequestHeader('Authorization', 'Bearer ' + bearer);
+      } catch (_) { /* ignore */ }
+      const onAbort = () => { try { xhr.abort(); } catch (_) { /* ignore */ } };
+      if (signal) signal.addEventListener('abort', onAbort, { once: true });
+      const detach = () => { if (signal) signal.removeEventListener('abort', onAbort); };
+      xhr.upload.onprogress = (e) => { loaded[idx] = e.loaded; note(); };
+      xhr.onload = () => { detach(); loaded[idx] = UL_BYTES_PER_STREAM; note(); resolve(); };
+      xhr.onerror = () => { detach(); reject(new Error('ul_failed')); };
+      xhr.onabort = () => { detach(); reject(new Error('aborted')); };
+      xhr.send(body);
+    });
+
+    return Promise.all(Array.from({ length: UL_STREAMS }, (_, i) => oneUpload(i))).then(() => {
+      const peak = peakWindowMbps(samples);
+      if (peak) return peak;
+      const totalBytes = UL_STREAMS * UL_BYTES_PER_STREAM;
+      if (t0 && samples.length > 1) {
+        const last = samples[samples.length - 1];
+        if (last.t > 0 && last.b > 0) return (last.b * 8 / 1e6) / (last.t / 1000);
       }
       // No usable progress events: total time minus the known round-trip.
       const dt = Math.max((performance.now() - tSend - (pingMs || 0)) / 1000, 0.05);
-      resolve((UL_BYTES * 8 / 1e6) / dt);
-    };
-    xhr.onerror = () => { if (signal) signal.removeEventListener('abort', onAbort); reject(new Error('ul_failed')); };
-    xhr.onabort = () => { if (signal) signal.removeEventListener('abort', onAbort); reject(new Error('aborted')); };
-    xhr.send(body);
-  }), [pushSample]);
+      return (totalBytes * 8 / 1e6) / dt;
+    });
+  }, [pushSample]);
 
   // ── run orchestration ──────────────────────────────────────────────
   const startCooldown = useCallback(() => {
@@ -205,11 +260,11 @@ export function useSpeedTest(open) {
       const ping = await measurePing(ctrl.signal);
       setStats((s) => ({ ...s, ping: Math.round(ping), phase: 'down' }));
 
-      let dl = await measureDL(ctrl.signal, DL_BYTES);
-      // Finished too fast to trust (slow-start still ramping) → one big round.
-      if (dl.dt < 2.0) dl = await measureDL(ctrl.signal, DL_BYTES_BIG);
+      let dl = await measureDL(ctrl.signal, DL_BYTES_PER_STREAM);
+      // Finished too fast for a trustworthy peak window → one big round.
+      if (dl.dt < 2.0) dl = await measureDL(ctrl.signal, DL_BYTES_PER_STREAM_BIG);
       // Fast connections can finish before 2 live samples land — backfill a
-      // flat line at the final average so the chart never renders empty.
+      // flat line at the final figure so the chart never renders empty.
       while (chartRef.current.down.length < 2) pushSample('down', dl.mbps);
       setStats((s) => ({ ...s, down: dl.mbps, phase: 'up' }));
 

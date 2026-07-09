@@ -11,8 +11,11 @@ import { Flag, FLAG_PIN } from './flags.jsx';
 import { useSpeedTest } from './useSpeedTest.js';
 
 // Status → power button / badge / ring styling (legacy setPowerState config).
+// ACTIVE follows the user's accent (--brand tokens — Pasha 2026-07-09, "match
+// the accent color"); non-active states keep their semantic colors (expired
+// red, limited amber…) so a dead sub never wears the accent.
 const STATUS_CONFIG = {
-  active: { btnActive: true, bg: 'rgba(34, 197, 94, 0.45)', border: 'rgba(74, 222, 128, 0.85)', textColor: 'rgba(236, 253, 245, 1)', btnGradient: 'linear-gradient(135deg, #22c55e, #4ade80)', btnShadow: '0 12px 32px rgba(34, 197, 94, 0.4), inset 0 3px 10px rgba(255, 255, 255, 0.22)', iconColor: '#ffffff', badgeShadow: '0 6px 16px rgba(34, 197, 94, 0.4)', accent: '#22c55e' },
+  active: { btnActive: true, bg: 'rgba(var(--brandRgb), 0.45)', border: 'rgba(var(--brandRgb), 0.85)', textColor: 'rgba(236, 253, 245, 1)', btnGradient: 'linear-gradient(135deg, var(--brand), var(--brandDark, var(--brand)))', btnShadow: '0 12px 32px rgba(var(--brandRgb), 0.4), inset 0 3px 10px rgba(255, 255, 255, 0.22)', iconColor: '#ffffff', badgeShadow: '0 6px 16px rgba(var(--brandRgb), 0.4)', accent: 'var(--brand)' },
   disabled: { btnActive: false, bg: 'rgba(82, 91, 104, 0.45)', border: 'rgba(156, 163, 175, 0.75)', textColor: 'rgba(229, 231, 235, 0.95)', btnGradient: 'linear-gradient(135deg, #4b5563, #6b7280)', btnShadow: '0 10px 28px rgba(75, 85, 99, 0.35), inset 0 2px 8px rgba(255, 255, 255, 0.12)', iconColor: '#e5e7eb', badgeShadow: '0 5px 14px rgba(75, 85, 99, 0.35)', accent: '#6b7280' },
   limited: { btnActive: false, bg: 'rgba(234, 179, 8, 0.45)', border: 'rgba(251, 191, 36, 0.85)', textColor: 'rgba(255, 247, 210, 1)', btnGradient: 'linear-gradient(135deg, #d97706, #facc15)', btnShadow: '0 12px 30px rgba(217, 119, 6, 0.4), inset 0 3px 10px rgba(255, 255, 255, 0.2)', iconColor: '#fff7d4', badgeShadow: '0 6px 16px rgba(234, 179, 8, 0.4)', accent: '#f59e0b' },
   expired: { btnActive: false, bg: 'rgba(239, 68, 68, 0.78)', border: 'rgba(254, 202, 202, 0.95)', textColor: '#fff', btnGradient: 'linear-gradient(135deg, #b91c1c, #ef4444)', btnShadow: '0 14px 34px rgba(185, 28, 28, 0.58), inset 0 4px 12px rgba(255, 255, 255, 0.22)', iconColor: '#fff7f7', badgeShadow: '0 8px 18px rgba(239, 68, 68, 0.55)', accent: '#ef4444' },
@@ -599,12 +602,14 @@ export function HomePage() {
           </div>
           <div id="speedPanel" className="speed-panel" hidden={!speedOpen}>
             <div className="speed-chips">
+              {/* ≥10 shows a whole number (the fa decimal ٫ read as "18/1");
+                  bdi isolates the digit run so RTL can't reorder value/unit. */}
               <div className={`speed-chip${speedStats.phase === 'down' ? ' measuring' : ''}`}>
                 <div className="label" id="labelDownload">{t('download')}</div>
                 <div className="value" id="downv">
                   {speedStats.down == null
                     ? (speedStats.phase === 'down' ? '…' : '—')
-                    : <>{fmt(speedStats.down, 1)} <span style={{ fontSize: '0.75em', opacity: 0.8 }}>{t('mbps')}</span></>}
+                    : <><bdi>{fmt(speedStats.down, speedStats.down >= 10 ? 0 : 1)}</bdi> <span style={{ fontSize: '0.75em', opacity: 0.8 }}>{t('mbps')}</span></>}
                 </div>
               </div>
               <div className={`speed-chip${speedStats.phase === 'up' ? ' measuring' : ''}`}>
@@ -612,13 +617,15 @@ export function HomePage() {
                 <div className="value" id="upv">
                   {speedStats.up == null
                     ? (speedStats.phase === 'up' ? '…' : '—')
-                    : <>{fmt(speedStats.up, 1)} <span style={{ fontSize: '0.75em', opacity: 0.8 }}>{t('mbps')}</span></>}
+                    : <><bdi>{fmt(speedStats.up, speedStats.up >= 10 ? 0 : 1)}</bdi> <span style={{ fontSize: '0.75em', opacity: 0.8 }}>{t('mbps')}</span></>}
                 </div>
               </div>
               <div className={`speed-chip${speedStats.phase === 'ping' ? ' measuring' : ''}`}>
                 <div className="label" id="labelPing">{t('ping')}</div>
                 <div className="value" id="pingv">
-                  {speedStats.ping == null ? (speedStats.phase === 'ping' ? '…' : '—') : fmt(speedStats.ping, 0) + ' ms'}
+                  {speedStats.ping == null
+                    ? (speedStats.phase === 'ping' ? '…' : '—')
+                    : <span dir="ltr">{fmt(speedStats.ping, 0)} ms</span>}
                 </div>
               </div>
             </div>
