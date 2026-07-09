@@ -952,6 +952,106 @@ html[dir="rtl"] .friend-code-btn svg { transform: scaleX(-1); }
   color: var(--text);
 }
 
+/* ── Redeem sheet v2 (2026-07-09 UX pass) ──────────────────────────
+   Payout choice = icon CARDS (radio), destination subs = radio rows
+   with a localized status pill, and a "why is confirm dead" hint. */
+.rd-opts {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 8px;
+  margin: 10px 0 4px;
+}
+.rd-opts .rd-opt:last-child:nth-child(odd) { grid-column: span 2; }
+.rd-opt {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+  padding: 13px 10px 11px;
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid var(--rw-stroke-hi);
+  color: var(--text);
+  font-family: inherit;
+  cursor: pointer;
+  transition: border-color .16s var(--rw-ease), background .16s var(--rw-ease);
+}
+.rd-opt.single { cursor: default; }
+.rd-opt:disabled { opacity: 1; }
+.rd-opt.selected {
+  border-color: rgba(var(--brandRgb), 0.55);
+  background: rgba(var(--brandRgb), 0.12);
+  box-shadow: 0 0 0 1px rgba(var(--brandRgb), 0.25);
+}
+.rd-opt-ic { color: var(--rw-text-soft); display: flex; }
+.rd-opt.selected .rd-opt-ic { color: var(--brand); }
+.rd-opt-v { font-size: 17px; font-weight: 800; letter-spacing: -0.2px; }
+.rd-opt-l { font-size: 10.5px; font-weight: 700; color: var(--rw-text-soft); }
+.rd-opt-dot {
+  position: absolute;
+  top: 8px;
+  inset-inline-end: 8px;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  border: 1.5px solid var(--rw-stroke-hi);
+}
+.rd-opt.selected .rd-opt-dot {
+  border-color: var(--brand);
+  background: radial-gradient(circle, var(--brand) 0 4px, transparent 4.5px);
+}
+.rd-meta {
+  margin: 6px 2px 2px;
+  font-size: 10.5px;
+  font-weight: 700;
+  color: var(--rw-text-soft);
+  opacity: .8;
+}
+#redeemPanel .rd-sub { width: 100%; text-align: start; font-family: inherit; }
+.rd-sub-dot {
+  flex: none;
+  width: 15px;
+  height: 15px;
+  border-radius: 50%;
+  border: 1.5px solid var(--rw-stroke-hi);
+}
+.rd-sub-dot.on {
+  border-color: var(--brand);
+  background: radial-gradient(circle, var(--brand) 0 4px, transparent 4.5px);
+}
+.rd-sub-st {
+  flex: none;
+  font-size: 10px;
+  font-weight: 800;
+  padding: 3px 8px;
+  border-radius: 99px;
+  color: var(--rw-text-soft);
+  background: rgba(148, 163, 184, 0.12);
+  border: 1px solid rgba(148, 163, 184, 0.20);
+}
+.rd-sub-st.active {
+  color: #34d399;
+  background: rgba(52, 211, 153, 0.10);
+  border-color: rgba(52, 211, 153, 0.25);
+}
+[data-theme="light"] .rd-sub-st.active { color: #059669; }
+.rd-why {
+  margin: 8px 2px 0;
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--rw-text-soft);
+  text-align: center;
+}
+[data-theme="light"] .rd-opt {
+  background: rgba(15, 23, 42, 0.03);
+  border-color: rgba(15, 23, 42, 0.10);
+}
+[data-theme="light"] .rd-opt.selected {
+  border-color: rgba(var(--brandRgb), 0.55);
+  background: rgba(var(--brandRgb), 0.10);
+}
+
 /* ── Small screens ─────────────────────────────────────────────── */
 @media (max-width: 380px) {
   .rw-card { padding: 15px; }

@@ -4739,10 +4739,12 @@ header, .header {
    Old Android webviews (Orbit app, Samsung) don't render backdrop-filter,
    so the sheet's alpha channel must carry it alone — 0.88 let the page
    ghost through the panel. Blur stays as progressive enhancement. */
-html[data-theme="dark"] .sheet-panel, html:not([data-theme="light"]) .sheet-panel {
+html[data-theme="dark"] .sheet-panel, html:not([data-theme="light"]) .sheet-panel,
+html[data-theme="dark"] #redeemPanel, html:not([data-theme="light"]) #redeemPanel {
   background: rgba(9, 15, 26, 0.97) !important;
 }
-html[data-theme="light"] .sheet-panel, [data-theme="light"] .sheet-panel {
+html[data-theme="light"] .sheet-panel, [data-theme="light"] .sheet-panel,
+html[data-theme="light"] #redeemPanel, [data-theme="light"] #redeemPanel {
   background: rgba(252, 250, 247, 0.97) !important;
 }
 

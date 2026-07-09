@@ -318,11 +318,25 @@ export function TasksPage() {
   const voucherOptions = (reward) => {
     const opts = [];
     const gb = Math.round((reward.traffic_bytes || 0) / (1024 ** 3));
-    if (gb >= 1) opts.push({ type: 'traffic', label: `${tt('rewardTraffic')} +${faNum(gb, lang)}GB` });
-    if (reward.extra_days > 0) opts.push({ type: 'days', label: `${tt('rewardDays')} +${faNum(reward.extra_days, lang)}` });
-    if (reward.credit_amount > 0) opts.push({ type: 'credit', label: `${tt('rewardCredit')} +${fmt(reward.credit_amount)}` });
-    if (reward.star_increment > 0) opts.push({ type: 'stars', label: `${tt('rewardStars')} +${faNum(reward.star_increment, lang)}` });
+    if (gb >= 1) opts.push({ type: 'traffic', value: `+${faNum(gb, lang)}`, unit: lang === 'fa' ? 'گیگابایت' : 'GB', label: `${tt('rewardTraffic')} +${faNum(gb, lang)}GB` });
+    if (reward.extra_days > 0) opts.push({ type: 'days', value: `+${faNum(reward.extra_days, lang)}`, unit: lang === 'fa' ? 'روز اعتبار' : 'days', label: `${tt('rewardDays')} +${faNum(reward.extra_days, lang)}` });
+    if (reward.credit_amount > 0) opts.push({ type: 'credit', value: `+${fmt(reward.credit_amount)}`, unit: lang === 'fa' ? 'تومان اعتبار' : 'toman credit', label: `${tt('rewardCredit')} +${fmt(reward.credit_amount)}` });
+    if (reward.star_increment > 0) opts.push({ type: 'stars', value: `+${faNum(reward.star_increment, lang)}`, unit: tt('rewardStars'), label: `${tt('rewardStars')} +${faNum(reward.star_increment, lang)}` });
     return opts;
+  };
+
+  // Redeem-sheet option card icons (one per voucher payout type).
+  const REDEEM_ICONS = {
+    traffic: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" width="18" height="18" aria-hidden="true"><ellipse cx="12" cy="5" rx="9" ry="3" /><path d="M3 5v14a9 3 0 0 0 18 0V5" /><path d="M3 12a9 3 0 0 0 18 0" /></svg>,
+    days: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" width="18" height="18" aria-hidden="true"><rect x="3" y="4" width="18" height="18" rx="2" /><path d="M16 2v4M8 2v4M3 10h18" /></svg>,
+    credit: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" width="18" height="18" aria-hidden="true"><rect x="2" y="5" width="20" height="14" rx="2" /><path d="M2 10h20" /></svg>,
+    stars: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" width="18" height="18" aria-hidden="true"><path d="M12 2l2.9 6.3 6.9.8-5.1 4.7 1.4 6.8L12 17.2 5.9 20.6l1.4-6.8L2.2 9.1l6.9-.8z" /></svg>,
+  };
+
+  const subStatusLabel = (st) => {
+    const k = 'st_' + String(st || '').toLowerCase();
+    const v = tt(k);
+    return v === k ? String(st || '').toUpperCase() : v;
   };
 
   const needsSub = (type) => type === 'traffic' || type === 'days';
@@ -882,41 +896,39 @@ export function TasksPage() {
         <p className="sheet-subtitle">{tt('redeemSubtitle')}</p>
         {redeem && (
           <>
-            <div className="rw-row rw-sheet-meta">
-              <div className="rw-chips">
-                {(redeem.reward.traffic_bytes || 0) / (1024 ** 3) >= 0.5 && (
-                  <span className="rw-chip">+{faNum(Math.round(redeem.reward.traffic_bytes / (1024 ** 3)), lang)}GB</span>
-                )}
-                {redeem.reward.extra_days > 0 && <span className="rw-chip">+{faNum(redeem.reward.extra_days, lang)} {lang === 'fa' ? 'روز' : 'd'}</span>}
-                {redeem.reward.credit_amount > 0 && <span className="rw-chip">+{fmt(redeem.reward.credit_amount)}</span>}
-                {redeem.reward.star_increment > 0 && <span className="rw-chip star">+{faNum(redeem.reward.star_increment, lang)} <StarIcon size={10} /></span>}
-              </div>
-              <div className="rw-row-meta">#{faNum(redeem.reward.id, lang)}</div>
-            </div>
-
-            {redeem.options.length > 1 && (
-              <div id="redeemChoiceSection">
-                <div className="rw-list-title">{tt('redeemChoiceLabel')}</div>
-                <div className="sheet-list" id="redeemChoiceList">
-                  {redeem.options.map((o) => (
-                    <div
+            {/* Reward payout: option CARDS (pick one) or a single summary card.
+                Replaces the old chips row + bare list, which showed the same
+                values twice and never explained the choice. */}
+            <div id="redeemChoiceSection">
+              {redeem.options.length > 1 && <div className="rw-list-title">{tt('redeemChoiceLabel')}</div>}
+              <div className="rd-opts" id="redeemChoiceList" role={redeem.options.length > 1 ? 'radiogroup' : undefined}>
+                {redeem.options.map((o) => {
+                  const multi = redeem.options.length > 1;
+                  const sel = redeem.selectedType === o.type;
+                  return (
+                    <button
                       key={o.type}
-                      className={`sheet-item${redeem.selectedType === o.type ? ' selected' : ''}`}
-                      role="button"
-                      tabIndex={0}
-                      onClick={() => setRedeem((cur) => ({ ...cur, selectedType: o.type }))}
-                      onKeyDown={(e) => { if (e.key === 'Enter') setRedeem((cur) => ({ ...cur, selectedType: o.type })); }}
+                      type="button"
+                      className={`rd-opt${sel ? ' selected' : ''}${multi ? '' : ' single'}`}
+                      role={multi ? 'radio' : undefined}
+                      aria-checked={multi ? sel : undefined}
+                      disabled={!multi}
+                      onClick={multi ? () => setRedeem((cur) => ({ ...cur, selectedType: o.type })) : undefined}
                     >
-                      <div className="sheet-item-main"><div className="sheet-item-title">{o.label}</div></div>
-                    </div>
-                  ))}
-                </div>
+                      <span className="rd-opt-ic" aria-hidden="true">{REDEEM_ICONS[o.type]}</span>
+                      <span className="rd-opt-v">{o.value}</span>
+                      <span className="rd-opt-l">{o.unit}</span>
+                      {multi && <span className="rd-opt-dot" aria-hidden="true" />}
+                    </button>
+                  );
+                })}
               </div>
-            )}
+              <div className="rd-meta">{tt('voucherNo')} {faNum(redeem.reward.id, lang)}</div>
+            </div>
 
             {redeemNeedsSubSection && (
               <div id="redeemSubsSection">
-                <div className="rw-list-title">{tt('selectSubscription')}</div>
+                <div className="rw-list-title">{tt('redeemPickSub')}</div>
                 {redeem.subs === null && <p className="sheet-subtitle">{tt('loading')}…</p>}
                 {redeemAllUnlimited && (
                   <p className="sheet-subtitle" id="redeemNoLimited">{tt('noLimitedSubs')}</p>
@@ -945,22 +957,28 @@ export function TasksPage() {
                   </>
                 )}
                 {redeemEligibleSubs !== null && redeemEligibleSubs.length > 0 && (
-                  <div className="sheet-list" id="redeemSubsList">
-                    {redeemEligibleSubs.map((s) => (
-                      <div
-                        key={s.id}
-                        className={`sheet-item${String(redeem.selectedSubId) === String(s.id) ? ' selected' : ''}`}
-                        role="button"
-                        tabIndex={0}
-                        onClick={() => setRedeem((cur) => ({ ...cur, selectedSubId: String(s.id) }))}
-                        onKeyDown={(e) => { if (e.key === 'Enter') setRedeem((cur) => ({ ...cur, selectedSubId: String(s.id) })); }}
-                      >
-                        <div className="sheet-item-main">
-                          <div className="sheet-item-title">{s.name || s.marzban_username || s.username || ('#' + s.id)}</div>
-                          <div className="sheet-item-sub">{[s.plan_name, String(s.status || '').toUpperCase()].filter(Boolean).join(' · ')}</div>
-                        </div>
-                      </div>
-                    ))}
+                  <div className="sheet-list rd-subs" id="redeemSubsList" role="radiogroup">
+                    {redeemEligibleSubs.map((s) => {
+                      const sel = String(redeem.selectedSubId) === String(s.id);
+                      const st = String(s.status || '').toLowerCase();
+                      return (
+                        <button
+                          key={s.id}
+                          type="button"
+                          className={`sheet-item rd-sub${sel ? ' selected' : ''}`}
+                          role="radio"
+                          aria-checked={sel}
+                          onClick={() => setRedeem((cur) => ({ ...cur, selectedSubId: String(s.id) }))}
+                        >
+                          <span className={`rd-sub-dot${sel ? ' on' : ''}`} aria-hidden="true" />
+                          <div className="sheet-item-main">
+                            <div className="sheet-item-title">{s.name || s.marzban_username || s.username || ('#' + s.id)}</div>
+                            <div className="sheet-item-sub">{s.plan_name || ''}</div>
+                          </div>
+                          <span className={`rd-sub-st ${st}`}>{subStatusLabel(s.status)}</span>
+                        </button>
+                      );
+                    })}
                   </div>
                 )}
               </div>
@@ -975,6 +993,11 @@ export function TasksPage() {
               >
                 {redeem?.couponMode ? tt('useCoupon') : tt('redeem')}
               </button>
+              {redeemConfirmDisabled && (
+                <p className="rd-why" aria-live="polite">
+                  {redeem.options.length > 1 && !redeem.selectedType ? tt('redeemPickOne') : tt('redeemPickSubHint')}
+                </p>
+              )}
             </div>
           </>
         )}
