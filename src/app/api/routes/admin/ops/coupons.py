@@ -27,7 +27,9 @@ def _coupon_json(c: RewardCoupon, user: User | None = None) -> dict:
     return {
         "id": c.id,
         "user_id": c.user_id,
-        "user_name": (user.first_name or user.username) if user else None,
+        # User has full_name, NOT first_name — the old attr 500'd the whole
+        # list as soon as a coupon joined to a user (caught 2026-07-09).
+        "user_name": (user.full_name or user.username) if user else None,
         "chat_id": user.chat_id if user else None,
         "source": c.source,
         "coupon_type": c.coupon_type,
@@ -62,7 +64,7 @@ async def handle_admin_coupons_list(request: web.Request):
                 like = f"%{q}%"
                 stmt = stmt.filter(or_(
                     User.username.ilike(like),
-                    User.first_name.ilike(like),
+                    User.full_name.ilike(like),
                     RewardCoupon.payload.ilike(like),
                 ))
 
@@ -192,7 +194,7 @@ async def handle_admin_coupon_create(request: web.Request):
                 else:
                     what = f"پلن هدیه {payload['plan_gb']} گیگ"
                 text = (
-                    f"🎁 یک {label} برای شما فعال شد: <b>{what}</b>\n"
+                    f"یک {label} برای شما فعال شد: <b>{what}</b>\n"
                     f"تا {expires_days} روز در سبد خرید قابل استفاده است."
                 )
                 for u in targets[:2000]:

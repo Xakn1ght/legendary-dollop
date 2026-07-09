@@ -1,17 +1,26 @@
 import React, { useCallback, useEffect, useState } from 'react';
 
 import { apiJson, postJson } from '../api.js';
+import { useModal } from '../components/Modal.jsx';
 import { useToast } from '../components/Toast.jsx';
 import { Icons } from '../icons.jsx';
 import { parseTs } from '../util.js';
+
+// "expires in 9d" / "expired 3d ago" — full date lives in the title attr.
+function expiresLabel(v) {
+  const d = parseTs(v);
+  if (!d) return { text: '—', soon: false };
+  const days = Math.ceil((d.getTime() - Date.now()) / 86400e3);
+  if (days < 0) return { text: `expired ${-days}d ago`, soon: false };
+  if (days === 0) return { text: 'expires today', soon: true };
+  return { text: `in ${days}d`, soon: days <= 3 };
+}
 
 const TYPES = [
   { id: 'discount_percent', label: 'Percent discount', hint: '% off at checkout (capped to a ~100GB plan value)' },
   { id: 'free_gb', label: 'Bonus GB', hint: 'extra traffic added to the purchased plan' },
   { id: 'free_plan', label: 'Free plan', hint: 'zeroes a plan up to the granted plan\'s value' },
 ];
-
-const STATUS_COLORS = { active: 'var(--success)', used: 'var(--brand)', expired: 'var(--text-muted)', revoked: 'var(--danger)' };
 
 function IssueForm({ onIssued }) {
   const toast = useToast();
@@ -113,6 +122,7 @@ function IssueForm({ onIssued }) {
 }
 
 export function CouponsPage() {
+  const modal = useModal();
   const toast = useToast();
   const [data, setData] = useState(null);
   const [status, setStatus] = useState('');
@@ -132,7 +142,12 @@ export function CouponsPage() {
   useEffect(() => { load(); }, [load]);
 
   async function revoke(c) {
-    if (!window.confirm(`Revoke coupon #${c.id} (${c.coupon_type}) from ${c.user_name || c.chat_id}?`)) return;
+    const ok = await modal.confirm(
+      'Revoke coupon?',
+      `#${c.id} (${c.coupon_type}) from ${c.user_name || c.chat_id} will stop working immediately.`,
+      { okText: 'Revoke', danger: true },
+    );
+    if (!ok) return;
     const { data: d } = await postJson('/api/admin/coupons/revoke', { coupon_id: c.id });
     if (d.ok) { toast('Coupon revoked', 'success'); load(); }
     else toast('Revoke failed', 'error');
@@ -153,49 +168,58 @@ export function CouponsPage() {
     <>
       <IssueForm onIssued={load} />
 
-      <div className="glass-card" style={{ marginTop: 20 }}>
-        <div className="table-header" style={{ padding: '16px 20px', display: 'flex', gap: 12, flexWrap: 'wrap', alignItems: 'center' }}>
-          <h3 style={{ margin: 0, fontSize: 16, flex: 1 }}>Issued coupons</h3>
-          <div className="rev-controls">
+      <div className="glass-card cpn-card">
+        <div className="cpn-head">
+          <h3>Issued coupons</h3>
+          <input type="text" className="coupon-user-input cpn-search" placeholder="Search user / campaign…"
+                 value={q} onChange={(e) => { setQ(e.target.value); setPage(1); }} />
+          <div className="rev-controls cpn-filters">
             {['', 'active', 'used', 'expired', 'revoked'].map((s) => (
               <button key={s || 'all'} className={'chip-btn' + (status === s ? ' on' : '')}
                       onClick={() => { setStatus(s); setPage(1); }}>
-                {s || 'all'}{s && counts[s] != null ? ` (${counts[s]})` : ''}
+                {s || 'all'}{s && counts[s] != null ? ` · ${counts[s]}` : ''}
               </button>
             ))}
           </div>
-          <input type="text" className="coupon-user-input" placeholder="search user / campaign"
-                 value={q} onChange={(e) => { setQ(e.target.value); setPage(1); }} style={{ maxWidth: 220 }} />
         </div>
-        <div className="table-responsive">
-          <table>
-            <thead><tr><th>ID</th><th>User</th><th>Coupon</th><th>Campaign</th><th>Status</th><th>Expires</th><th></th></tr></thead>
-            <tbody>
-              {!data && <tr><td colSpan={7} style={{ textAlign: 'center', color: 'var(--text-muted)', padding: 32 }}>Loading…</td></tr>}
-              {data && data.coupons.length === 0 && <tr><td colSpan={7} style={{ textAlign: 'center', color: 'var(--text-muted)', padding: 32 }}>No coupons yet — issue one above.</td></tr>}
-              {data && data.coupons.map((c) => (
-                <tr key={c.id}>
-                  <td style={{ fontVariantNumeric: 'tabular-nums' }}>#{c.id}</td>
-                  <td>{c.user_name || c.chat_id || `user ${c.user_id}`}</td>
-                  <td>{describe(c)}<span style={{ color: 'var(--text-muted)', fontSize: 11 }}> · {c.source}</span></td>
-                  <td>{c.campaign || '—'}</td>
-                  <td><span style={{ color: STATUS_COLORS[c.status] || 'var(--text)', fontWeight: 700 }}>{c.status}</span></td>
-                  <td>{parseTs(c.expires_at)?.toLocaleDateString() || '—'}</td>
-                  <td>
-                    {c.status === 'active' && (
-                      <button className="btn btn-secondary btn-sm" onClick={() => revoke(c)}>Revoke</button>
-                    )}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+
+        <div className="cpn-feed">
+          {!data && <div className="act-state">Loading…</div>}
+          {data && data.coupons.length === 0 && <div className="act-state">No coupons yet — issue one above.</div>}
+          {data && data.coupons.map((c) => {
+            const exp = expiresLabel(c.expires_at);
+            return (
+              <div className={'cpn-row' + (c.status !== 'active' ? ' dim' : '')} key={c.id}>
+                <span className={'cpn-ic ' + c.coupon_type} aria-hidden="true"><Icons.coupon width={15} height={15} /></span>
+                <div className="cpn-main">
+                  <div className="cpn-top">
+                    <b className="cpn-what">{describe(c)}</b>
+                    <span className={'cpn-st ' + c.status}>{c.status}</span>
+                    {c.campaign && <span className="cpn-camp" title="Campaign">{c.campaign}</span>}
+                  </div>
+                  <div className="cpn-sub">
+                    <bdi className="cpn-user">{c.user_name || c.chat_id || `user ${c.user_id}`}</bdi>
+                    <span className="rcp-dot" aria-hidden="true" />
+                    <span>#{c.id}</span>
+                    <span className="rcp-dot" aria-hidden="true" />
+                    <span>{c.source}</span>
+                    <span className="rcp-dot" aria-hidden="true" />
+                    <time className={exp.soon ? 'soon' : ''} title={parseTs(c.expires_at)?.toLocaleString() || ''}>{exp.text}</time>
+                  </div>
+                </div>
+                {c.status === 'active' && (
+                  <button className="btn btn-secondary btn-sm cpn-revoke" onClick={() => revoke(c)}>Revoke</button>
+                )}
+              </div>
+            );
+          })}
         </div>
+
         {pages > 1 && (
-          <div style={{ display: 'flex', gap: 8, justifyContent: 'center', padding: 14 }}>
-            <button className="chip-btn" disabled={page <= 1} onClick={() => setPage((p) => p - 1)}>‹ prev</button>
-            <span style={{ alignSelf: 'center', fontSize: 12, color: 'var(--text-muted)' }}>{page} / {pages}</span>
-            <button className="chip-btn" disabled={page >= pages} onClick={() => setPage((p) => p + 1)}>next ›</button>
+          <div className="cpn-pager">
+            <button className="chip-btn" disabled={page <= 1} onClick={() => setPage((p) => p - 1)}>Prev</button>
+            <span>{page} / {pages}</span>
+            <button className="chip-btn" disabled={page >= pages} onClick={() => setPage((p) => p + 1)}>Next</button>
           </div>
         )}
       </div>
