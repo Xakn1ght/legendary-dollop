@@ -3,7 +3,16 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { apiJson, postJson } from '../api.js';
 import { useModal } from '../components/Modal.jsx';
 import { useToast } from '../components/Toast.jsx';
+import { Icons } from '../icons.jsx';
 import { fmtDateTime } from '../util.js';
+
+function Check({ on }) {
+  return (
+    <span className={'bc-check' + (on ? ' on' : '')} aria-hidden="true">
+      {on && <Icons.check width={11} height={11} />}
+    </span>
+  );
+}
 
 export function NotificationsPage() {
   const modal = useModal();
@@ -81,51 +90,72 @@ export function NotificationsPage() {
 
   return (
     <div className="page-two-col aside-right">
-      <form className="glass-card" style={{ padding: 20 }} onSubmit={send}>
-        <h3 style={{ marginTop: 0, fontSize: 15 }}>New Broadcast</h3>
+      <form className="glass-card bc-form" onSubmit={send}>
+        <h3 className="bc-h">New Broadcast</h3>
         <input className="input-field" placeholder="Title" value={title} onChange={(e) => setTitle(e.target.value)} style={{ marginBottom: 12 }} />
         <textarea className="input-field" placeholder="Message" value={message} onChange={(e) => setMessage(e.target.value)} style={{ marginBottom: 12, minHeight: 120 }} />
 
-        <div style={{ display: 'flex', gap: 10, marginBottom: 12, flexWrap: 'wrap' }}>
-          <label style={{ display: 'flex', gap: 6, alignItems: 'center' }}><input type="checkbox" checked={toWebApp} onChange={(e) => setToWebApp(e.target.checked)} /> Dashboard</label>
-          <label style={{ display: 'flex', gap: 6, alignItems: 'center' }}><input type="checkbox" checked={toBot} onChange={(e) => setToBot(e.target.checked)} /> Telegram</label>
+        <div className="bc-label">Send via</div>
+        <div className="bc-chips">
+          <button type="button" className={'bc-chip' + (toWebApp ? ' on' : '')} aria-pressed={toWebApp} onClick={() => setToWebApp((v) => !v)}>
+            <Check on={toWebApp} /> Dashboard
+          </button>
+          <button type="button" className={'bc-chip' + (toBot ? ' on' : '')} aria-pressed={toBot} onClick={() => setToBot((v) => !v)}>
+            <Check on={toBot} /> Telegram
+          </button>
         </div>
 
-        <div style={{ display: 'flex', gap: 10, marginBottom: 12 }}>
-          <button type="button" className={'btn ' + (target === 'all' ? 'btn-primary' : 'btn-secondary')} onClick={() => pickTarget('all')}>All users</button>
-          <button type="button" className={'btn ' + (target === 'specific' ? 'btn-primary' : 'btn-secondary')} onClick={() => pickTarget('specific')}>Specific</button>
+        <div className="bc-label">Audience</div>
+        <div className="bc-chips">
+          <button type="button" className={'bc-chip' + (target === 'all' ? ' on' : '')} aria-pressed={target === 'all'} onClick={() => pickTarget('all')}>All users</button>
+          <button type="button" className={'bc-chip' + (target === 'specific' ? ' on' : '')} aria-pressed={target === 'specific'} onClick={() => pickTarget('specific')}>
+            Specific{selectedIds.size > 0 ? ` · ${selectedIds.size}` : ''}
+          </button>
         </div>
 
         {target === 'specific' && (
-          <div style={{ marginBottom: 12 }}>
-            <input className="input-field" placeholder="Filter users…" value={userQuery} onChange={(e) => setUserQuery(e.target.value)} style={{ marginBottom: 8 }} />
-            <div style={{ maxHeight: 220, overflow: 'auto', border: '1px solid var(--border-subtle)', borderRadius: 10, padding: 8 }}>
-              {filteredUsers.map((u) => (
-                <label key={u.id} className="user-list-item" style={{ display: 'flex', gap: 8, alignItems: 'center', padding: '6px 4px' }}>
-                  <input type="checkbox" checked={selectedIds.has(u.id)} onChange={() => toggleUser(u.id)} />
-                  <span>{u.full_name || u.username || u.chat_id}</span>
-                </label>
-              ))}
-              {filteredUsers.length === 0 && <div style={{ color: 'var(--text-muted)', padding: 8 }}>No users</div>}
+          <div className="bc-picker">
+            <input className="input-field" placeholder="Filter users…" value={userQuery} onChange={(e) => setUserQuery(e.target.value)} />
+            <div className="bc-picker-tools">
+              <span className="bc-count">{selectedIds.size} selected</span>
+              <button type="button" className="chip-btn" onClick={() => setSelectedIds(new Set([...selectedIds, ...filteredUsers.map((u) => u.id)]))}>
+                Select shown
+              </button>
+              <button type="button" className="chip-btn" disabled={!selectedIds.size} onClick={() => setSelectedIds(new Set())}>Clear</button>
             </div>
-            <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 6 }}>{selectedIds.size} selected</div>
+            <div className="bc-user-list">
+              {users.length === 0 && <div className="bc-empty">Loading users…</div>}
+              {users.length > 0 && filteredUsers.length === 0 && <div className="bc-empty">No users match</div>}
+              {filteredUsers.map((u) => {
+                const on = selectedIds.has(u.id);
+                return (
+                  <button type="button" key={u.id} className={'bc-user' + (on ? ' on' : '')} role="checkbox" aria-checked={on} onClick={() => toggleUser(u.id)}>
+                    <Check on={on} />
+                    <span className="bc-user-name"><bdi>{u.full_name || u.username || u.chat_id}</bdi></span>
+                    {u.username && <span className="bc-user-handle">@{u.username}</span>}
+                  </button>
+                );
+              })}
+            </div>
           </div>
         )}
 
-        <button type="submit" className="btn btn-primary" disabled={busy} style={{ width: '100%' }}>{busy ? 'Sending…' : 'Send Broadcast'}</button>
+        <button type="submit" className="btn btn-primary bc-send" disabled={busy}>{busy ? 'Sending…' : 'Send Broadcast'}</button>
       </form>
 
-      <div className="glass-card" style={{ padding: 20 }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
-          <h3 style={{ margin: 0, fontSize: 15 }}>Recent</h3>
-          <button className="refresh-btn" onClick={loadBroadcasts} title="Refresh">⟳</button>
+      <div className="glass-card bc-recent">
+        <div className="bc-recent-head">
+          <h3 className="bc-h">Recent</h3>
+          <button className="refresh-btn" type="button" onClick={loadBroadcasts} title="Refresh">
+            <Icons.refresh width={15} height={15} />
+          </button>
         </div>
-        {broadcasts.length === 0 && <div style={{ color: 'var(--text-muted)' }}>No broadcasts yet</div>}
+        {broadcasts.length === 0 && <div className="bc-empty">No broadcasts yet</div>}
         {broadcasts.map((b, i) => (
-          <div key={i} className="broadcast-item" style={{ padding: '10px 0', borderBottom: '1px solid var(--divider, rgba(255,255,255,0.06))' }}>
-            <div style={{ fontWeight: 600 }}>{b.title}</div>
-            <div style={{ fontSize: 13, color: 'var(--text-muted)', margin: '4px 0' }}>{b.message}</div>
-            <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>{fmtDateTime(b.last_sent)} · {b.recipient_count} users</div>
+          <div key={i} className="bc-item">
+            <div className="bc-item-title"><bdi>{b.title}</bdi></div>
+            <div className="bc-item-msg" dir="auto">{b.message}</div>
+            <div className="bc-item-meta">{fmtDateTime(b.last_sent)} · {b.recipient_count} users</div>
           </div>
         ))}
       </div>
