@@ -126,7 +126,7 @@ export function SupportInbox() {
     if (data.type === 'new_message') {
       const id = data.ticket_id; const p = data.data || {};
       const isPhoto = p.content_type === 'photo';
-      const text = isPhoto ? '\u25a3 Photo' : (p.text || '');
+      const text = isPhoto ? 'Photo' : (p.text || '');
       const viewing = selRef.current && id === selRef.current.id;
       setTickets((cur) => {
         const i = cur.findIndex((x) => x.id === id);
