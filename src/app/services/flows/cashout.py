@@ -11,7 +11,7 @@ from sqlalchemy.future import select
 
 from app.core.rewards_config import CASHOUT_MIN_AMOUNT_TOMAN, PROMOTER_REFERRAL_CUT
 from app.database import crud
-from app.database.models import CashoutRequest, Referral, User
+from app.database.models import CashoutRequest, Referral
 from app.services.flows.errors import FlowError
 
 # Cash payout is a VIP-Promoter-only perk (final reward map §6): normal users stay
@@ -31,20 +31,44 @@ def promoter_credit_percent(active_referrals: int) -> float:
     return pct * 100
 
 
+# A referral counts as ACTIVE only while the referee keeps buying (Pasha
+# 2026-07-09: "a good referee is one that has bought at least one sub in one
+# month"): at least one provisioned subscription purchase OR one approved
+# top-up inside the trailing window. Purchase recency is what counts — a
+# recently-bought sub that already ran out still qualifies; an old sub that
+# merely stays active does not.
+ACTIVE_REFEREE_WINDOW_DAYS = 30
+# Rows that were never approved/provisioned are not purchases.
+_UNPAID_SUB_STATUSES = ("draft", "pending", "cancelled")
+
+
 async def count_active_referrals(session: AsyncSession, user_id: int) -> int:
-    referees = (
+    import datetime as _dt
+
+    from app.database.models import ChargeRequest, Subscription
+
+    cutoff = _dt.datetime.utcnow() - _dt.timedelta(days=ACTIVE_REFEREE_WINDOW_DAYS)
+    referee_ids = select(Referral.referee_id).where(Referral.referrer_id == user_id)
+
+    recent_sub_buyers = (
         await session.execute(
-            select(User).join(Referral, Referral.referee_id == User.id).filter(Referral.referrer_id == user_id)
+            select(Subscription.user_id).where(
+                Subscription.user_id.in_(referee_ids),
+                Subscription.status.notin_(_UNPAID_SUB_STATUSES),
+                Subscription.created_at >= cutoff,
+            )
         )
     ).scalars().all()
-    active = 0
-    for referee in referees:
-        # Owned active subscriptions only — a shared/linked subscription shouldn't
-        # qualify someone as an "active referral" for cash-out purposes.
-        subs = await crud.get_user_active_subscriptions(session, referee.id)
-        if subs:
-            active += 1
-    return active
+    recent_chargers = (
+        await session.execute(
+            select(ChargeRequest.user_id).where(
+                ChargeRequest.user_id.in_(referee_ids),
+                ChargeRequest.status == "approved",
+                ChargeRequest.created_at >= cutoff,
+            )
+        )
+    ).scalars().all()
+    return len(set(recent_sub_buyers) | set(recent_chargers))
 
 
 async def create_cashout(
@@ -72,17 +96,18 @@ async def create_cashout(
     if destination and len(destination) < 8:
         raise FlowError("invalid_destination")
 
-    # Permanent unlock: once crossed, the gate never re-closes (a referee's
-    # sub expiring later must not strand already-earned cash).
-    if not getattr(user, "promoter_unlocked_at", None):
-        from app.services.flows.earnings import ensure_promoter_unlock
+    # LIVE gate (2026-07-09, replaces the permanent unlock): withdrawals
+    # require >=20 active referrals RIGHT NOW. Dropping under the gate keeps
+    # the earned cashback balance but pauses withdrawals until the account
+    # is back above it.
+    from app.services.flows.earnings import is_promoter_active
 
-        if not await ensure_promoter_unlock(session, user):
-            active_referrals = await count_active_referrals(session, user.id)
-            err = FlowError("requires_vip_promoter")
-            err.active_referrals = active_referrals
-            err.min_active_referrals = CASHOUT_MIN_ACTIVE_REFERRALS
-            raise err
+    if not await is_promoter_active(session, user):
+        active_referrals = await count_active_referrals(session, user.id)
+        err = FlowError("requires_vip_promoter")
+        err.active_referrals = active_referrals
+        err.min_active_referrals = CASHOUT_MIN_ACTIVE_REFERRALS
+        raise err
 
     req = await crud.create_cashout_request(session, user.id, int(amount), destination)
     if req:

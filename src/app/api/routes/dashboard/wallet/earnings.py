@@ -43,8 +43,8 @@ async def handle_dashboard_earnings(request: web.Request):
             if not user:
                 return web.json_response({"ok": False, "error": "user_not_found"}, status=404)
 
-            # Stamps promoter_unlocked_at the first time the gate is met —
-            # opening the earnings card is enough to flip cash-back mode on.
+            # LIVE gate (2026-07-09): `unlocked` reflects the CURRENT count —
+            # it re-closes when active referrals drop under the gate.
             unlocked = await ensure_promoter_unlock(session, user)
             active = await count_active_referrals(session, user.id)
             credit_earned = await referral_store_credit_earned(session, user.id)

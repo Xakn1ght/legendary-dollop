@@ -1,16 +1,23 @@
-"""Two-stage referral earnings routing (Pasha's cash-back model, 2026-07-08).
+"""Two-stage referral earnings routing (Pasha's cash-back model, 2026-07-08;
+LIVE gate since 2026-07-09).
 
 The 10–15% promoter cut lands differently depending on the account stage:
 
-- PRE-GATE (fewer than 20 active referrals, never unlocked): the cut pays
-  STORE CREDIT (`User.credit`), capped at REFERRAL_STORE_CREDIT_CAP_TOMAN
+- BELOW THE GATE (fewer than 20 active referrals): the cut pays STORE
+  CREDIT (`User.credit`), capped at REFERRAL_STORE_CREDIT_CAP_TOMAN
   lifetime. A voucher that would bust the cap is rejected so the user can
   pick a non-credit option instead of silently losing the excess.
-- UNLOCK: the first time the account is seen with >=20 active referrals,
-  `promoter_unlocked_at` is stamped — permanently.
-- POST-GATE: the cut pays the withdrawable CASH balance
-  (`User.cashback_balance`). Store credit earned before the gate stays
+- AT/ABOVE THE GATE: the cut pays the withdrawable CASH balance
+  (`User.cashback_balance`). Store credit earned below the gate stays
   in-app spendable and never converts.
+- THE GATE IS LIVE (2026-07-09 — replaces the permanent unlock): dropping
+  under 20 active referrals re-closes cash mode (new earnings go back to
+  store credit, withdrawals pause) until the account is back above it.
+  Already-earned cashback_balance is kept, just not extendable/withdrawable
+  while under. An "active referral" is a referee who BOUGHT something
+  (provisioned sub or approved top-up) within the last 30 days — see
+  cashout.count_active_referrals. `promoter_unlocked_at` remains as a
+  first-crossing historical marker only.
 
 Every credit-landing surface (dashboard redeem, bot redeem) must call
 `credit_referral_payout` instead of `crud.add_credit` so the routing and the
@@ -31,17 +38,21 @@ from app.services.flows.cashout import CASHOUT_MIN_ACTIVE_REFERRALS, count_activ
 from app.services.flows.errors import FlowError
 
 
-async def ensure_promoter_unlock(session: AsyncSession, user: User) -> bool:
-    """Stamp the permanent unlock the first time the gate is met. Returns
-    True when the account is (now) unlocked."""
-    if user.promoter_unlocked_at:
-        return True
+async def is_promoter_active(session: AsyncSession, user: User) -> bool:
+    """LIVE stage-2 check: cash mode holds only while active referrals meet
+    the gate right now. First crossing still stamps `promoter_unlocked_at`
+    as a historical marker (it no longer grants anything by itself)."""
     active = await count_active_referrals(session, user.id)
     if active >= CASHOUT_MIN_ACTIVE_REFERRALS:
-        user.promoter_unlocked_at = datetime.datetime.utcnow()
-        await session.commit()
+        if not user.promoter_unlocked_at:
+            user.promoter_unlocked_at = datetime.datetime.utcnow()
+            await session.commit()
         return True
     return False
+
+
+# Old name kept for existing callers; semantics are the LIVE gate now.
+ensure_promoter_unlock = is_promoter_active
 
 
 async def referral_store_credit_earned(session: AsyncSession, user_id: int) -> int:
@@ -67,7 +78,9 @@ async def credit_referral_payout(session: AsyncSession, user: User, amount: int,
     if amount <= 0:
         raise FlowError("invalid_amount")
 
-    if await ensure_promoter_unlock(session, user):
+    # LIVE gate: >=20 active referrals RIGHT NOW pays cash; below it the
+    # payout falls back to store credit even for previously-unlocked users.
+    if await is_promoter_active(session, user):
         user.cashback_balance = int(user.cashback_balance or 0) + amount
         await session.commit()
         await crud.add_reward_history(session, user.id, "cashback", amount, "referral_voucher", source_id)
