@@ -4948,6 +4948,83 @@ body.admin-panel button.sms-pill-btn.armed:hover {
 body.admin-panel button.sms-pill-btn:active { opacity: 0.75; }
 body.admin-panel button.sms-pill-btn:disabled { opacity: 0.55; cursor: default; }
 
+/* ---- receipts v2 (2026-07-09 — compact triage cards; the old 3 boxed
+   KV rows made one receipt fill a whole phone screen) ---- */
+body.admin-panel .rcp-bar { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
+body.admin-panel .rcp-search { flex: 1; min-width: 200px; }
+body.admin-panel .rcp-bar-row { display: flex; gap: 10px; align-items: center; flex-wrap: nowrap; min-width: 0; }
+body.admin-panel .rcp-bar-row .input-field { width: auto; min-width: 0; }
+body.admin-panel .rcp-count {
+  flex: none; font-size: 12px; font-weight: 700; color: var(--text-muted);
+  padding: 5px 11px; border-radius: 999px;
+  background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.10);
+  white-space: nowrap;
+}
+@media (max-width: 640px) {
+  body.admin-panel .rcp-search { flex-basis: 100%; }
+  body.admin-panel .rcp-bar-row { width: 100%; }
+  body.admin-panel .rcp-bar-row .input-field { flex: 1; }
+}
+body.admin-panel .rcp-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(310px, 1fr));
+  gap: 14px;
+  padding-top: 18px;
+}
+/* grid children default to min-width:auto — one long service code would
+   blow the whole column past the viewport */
+body.admin-panel .rcp-grid > * { min-width: 0; }
+@media (max-width: 700px) {
+  body.admin-panel .rcp-grid { grid-template-columns: 1fr; gap: 12px; }
+}
+body.admin-panel .rcp-head { display: flex; align-items: center; gap: 12px; min-width: 0; }
+body.admin-panel .rcp-who { flex: 1; min-width: 0; }
+body.admin-panel .rcp-who .receipt-name {
+  display: flex; align-items: center; gap: 6px; min-width: 0;
+}
+body.admin-panel .rcp-who .receipt-name bdi { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+body.admin-panel .rcp-src { flex: none; }
+body.admin-panel .rcp-meta {
+  display: flex; align-items: center; justify-content: space-between; gap: 12px;
+  margin-top: 12px; padding: 10px 12px;
+  border-radius: 14px;
+  border: 1px solid rgba(255,255,255,0.08);
+  background: rgba(0,0,0,0.18);
+  min-width: 0;
+}
+body.admin-panel .rcp-meta-l { flex: 1; min-width: 0; }
+body.admin-panel .rcp-plan {
+  font-size: 13px; font-weight: 800; color: rgba(232,238,252,0.92);
+  display: flex; align-items: center; gap: 7px; min-width: 0;
+  unicode-bidi: plaintext; text-align: start;
+}
+body.admin-panel .rcp-plan bdi { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+body.admin-panel .rcp-gb {
+  flex: none; font-size: 10px; font-weight: 800; letter-spacing: 0.03em;
+  padding: 2px 7px; border-radius: 999px;
+  color: rgba(var(--brandRgb),0.95); background: rgba(var(--brandRgb),0.10);
+  border: 1px solid rgba(var(--brandRgb),0.25);
+}
+body.admin-panel .rcp-sub {
+  margin-top: 4px; display: flex; align-items: center; gap: 7px;
+  font-size: 11.5px; color: rgba(232,238,252,0.60); min-width: 0;
+}
+body.admin-panel .rcp-service { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+body.admin-panel .rcp-dot { flex: none; width: 3px; height: 3px; border-radius: 50%; background: rgba(232,238,252,0.35); }
+body.admin-panel .rcp-sub time { flex: none; }
+body.admin-panel .rcp-price {
+  flex: none; font-size: 19px; font-weight: 900; letter-spacing: -0.02em;
+  color: rgba(var(--brandRgb),0.95); font-variant-numeric: tabular-nums;
+}
+body.admin-panel .rcp-price span { font-size: 11px; font-weight: 800; opacity: 0.8; }
+body.admin-panel .rcp-flags { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
+body.admin-panel button.rcp-photo { cursor: pointer; font-family: inherit; }
+body.admin-panel button.rcp-photo:hover { border-color: rgba(var(--brandRgb),0.45); color: rgba(var(--brandRgb),0.95); }
+body.admin-panel .rcp-actions {
+  display: grid; grid-template-columns: 1fr 1.4fr; gap: 10px; margin-top: 12px;
+}
+body.admin-panel .rcp-actions .btn { min-width: 0; width: 100%; }
+
 /* ---- recent activity feed (2026-07-09 — replaces the sideways-scrolling table) ---- */
 body.admin-panel .act-card { margin-top: 20px; padding: 0; overflow: hidden; }
 body.admin-panel .act-head {

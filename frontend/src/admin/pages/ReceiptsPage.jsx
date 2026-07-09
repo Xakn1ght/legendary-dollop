@@ -10,6 +10,16 @@ import { fmtNum, parseTs } from '../util.js';
 // Purchase / charge / VIP receipt approvals. Money-critical — approve/deny
 // endpoints and their accepted response messages are ported 1:1 from
 // index-main.js approveReceipt/denyReceipt.
+
+function agoShort(d) {
+  if (!d) return '—';
+  const s = Math.max(0, Math.floor((Date.now() - d.getTime()) / 1000));
+  if (s < 60) return 'now';
+  if (s < 3600) return `${Math.floor(s / 60)}m ago`;
+  if (s < 86400) return `${Math.floor(s / 3600)}h ago`;
+  return `${Math.floor(s / 86400)}d ago`;
+}
+
 export function ReceiptsPage() {
   const { receipts: rc } = useShell();
   const modal = useModal();
@@ -138,26 +148,30 @@ export function ReceiptsPage() {
 
   return (
     <>
-      <div className="filter-bar glass-card" style={{ display: 'flex', gap: 12, flexWrap: 'wrap', alignItems: 'center' }}>
-        <div className="search-wrapper" style={{ flex: 1, minWidth: 180 }}>
+      <div className="filter-bar glass-card rcp-bar">
+        <div className="search-wrapper rcp-search">
           <input className="search-input input-field" placeholder="Search receipts…" value={q} onChange={(e) => setQ(e.target.value)} />
         </div>
-        <select className="input-field" style={{ width: 'auto' }} value={source} onChange={(e) => setSource(e.target.value)}>
-          <option value="all">All sources</option>
-          <option value="web">Web</option>
-          <option value="telegram">Telegram</option>
-        </select>
-        <select className="input-field" style={{ width: 'auto' }} value={sort} onChange={(e) => setSort(e.target.value)}>
-          <option value="newest">Newest</option>
-          <option value="oldest">Oldest</option>
-          <option value="price_high">Price ↓</option>
-          <option value="price_low">Price ↑</option>
-        </select>
-        <span style={{ fontSize: 13, color: 'var(--text-muted)' }}>{list.length} pending</span>
-        <button className="refresh-btn" onClick={() => rc.reload()} title="Refresh" disabled={rc.loading}>⟳</button>
+        <div className="rcp-bar-row">
+          <select className="input-field" value={source} onChange={(e) => setSource(e.target.value)}>
+            <option value="all">All sources</option>
+            <option value="web">Web</option>
+            <option value="telegram">Telegram</option>
+          </select>
+          <select className="input-field" value={sort} onChange={(e) => setSort(e.target.value)}>
+            <option value="newest">Newest</option>
+            <option value="oldest">Oldest</option>
+            <option value="price_high">Price: high first</option>
+            <option value="price_low">Price: low first</option>
+          </select>
+          <span className="rcp-count">{list.length} pending</span>
+          <button className="refresh-btn" onClick={() => rc.reload()} title="Refresh" disabled={rc.loading}>
+            <Icons.refresh width={15} height={15} />
+          </button>
+        </div>
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: 16, paddingTop: 20 }}>
+      <div className="rcp-grid">
         {list.length === 0 && (
           <div className="receipts-empty" style={{ gridColumn: '1/-1', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 10, color: 'var(--text-muted)', padding: 48 }}>
             <span className="fx-sparkle" style={{ color: 'var(--success)' }}><Icons.check width={30} height={30} /></span>
@@ -169,31 +183,55 @@ export function ReceiptsPage() {
           const isVip = type === 'vip';
           const isCharge = type === 'charge';
           const sourceLabel = isVip ? 'VIP' : isCharge ? 'CHARGE' : (r.is_web_receipt ? 'WEB' : 'TELEGRAM');
+          const service = isVip ? 'VIP Membership' : isCharge ? `Charge: ${r.service_name || '—'}` : (r.service_name || '—');
+          const when = parseTs(r.created_at);
           return (
             <div className="glass-card receipt-card fx-tilt" key={`${type}-${r.id}`} onClick={() => setDrawer(r)}>
-              <div className="receipt-top">
-                <div className="receipt-ident">
-                  <div className="receipt-avatar">{(r.user_name || 'U').trim().charAt(0).toUpperCase()}</div>
-                  <div className="receipt-who">
-                    <div className="receipt-name">{r.user_name || 'Unknown User'}{r.is_vip ? <span className="receipt-vip" title="VIP"><Icons.crown width={14} height={14} /></span> : null}</div>
-                    <div className="receipt-handle">{r.username ? '@' + r.username : '—'}</div>
+              <div className="rcp-head">
+                <div className="receipt-avatar">{(r.user_name || 'U').trim().charAt(0).toUpperCase()}</div>
+                <div className="rcp-who">
+                  <div className="receipt-name">
+                    <bdi>{r.user_name || 'Unknown User'}</bdi>
+                    {r.is_vip ? <span className="receipt-vip" title="VIP"><Icons.crown width={14} height={14} /></span> : null}
+                  </div>
+                  <div className="receipt-handle">{r.username ? '@' + r.username : '—'}</div>
+                </div>
+                <span className={'receipt-chip rcp-src' + (isVip ? ' receipt-chip-vip' : '')}>{sourceLabel}</span>
+              </div>
+
+              <div className="rcp-meta">
+                <div className="rcp-meta-l">
+                  {/* bdi keeps Persian plan names from garbling against the GB suffix */}
+                  <div className="rcp-plan"><bdi>{r.plan_name || 'Plan'}</bdi>{Number(r.plan_gb) ? <span className="rcp-gb">{Number(r.plan_gb)}GB</span> : null}</div>
+                  <div className="rcp-sub">
+                    <span className="rcp-service" dir="ltr">{service}</span>
+                    <span className="rcp-dot" aria-hidden="true" />
+                    <time title={when ? when.toLocaleString() : ''}>{agoShort(when)}</time>
                   </div>
                 </div>
-                <div className="receipt-chips">
-                  <span className="receipt-chip">{sourceLabel}</span>
-                  <span className="receipt-chip">{r.plan_name || 'Plan'}{Number(r.plan_gb) ? ` • ${Number(r.plan_gb)}GB` : ''}</span>
+                <div className="rcp-price" title="Total">{fmtNum(r.price)}<span> T</span></div>
+              </div>
+
+              {(dupes.img(r) || dupes.user(r) || r.receipt_image_url) && (
+                <div className="rcp-flags">
+                  {r.receipt_image_url && (
+                    <button
+                      type="button"
+                      className="receipt-chip rcp-photo"
+                      title="View receipt photo"
+                      onClick={(e) => { e.stopPropagation(); setLightbox({ url: r.receipt_image_url, zoom: false }); }}
+                    >
+                      <Icons.camera width={11} height={11} /> Receipt
+                    </button>
+                  )}
                   {dupes.img(r) && <span className="receipt-chip flag-hard" title="Same receipt image attached to multiple orders"><Icons.alert width={11} height={11} /> DUPE IMAGE</span>}
                   {!dupes.img(r) && dupes.user(r) && <span className="receipt-chip flag-soft" title="This user has multiple pending orders">multi-pending</span>}
                 </div>
-              </div>
-              <div className="receipt-mid">
-                <div className="receipt-kv"><div className="receipt-k">Service</div><div className="receipt-v">{isVip ? 'VIP Membership' : isCharge ? `Charge: ${r.service_name || '—'}` : (r.service_name || '—')}</div></div>
-                <div className="receipt-kv"><div className="receipt-k">Total</div><div className="receipt-v receipt-price">{fmtNum(r.price)} T</div></div>
-                <div className="receipt-kv"><div className="receipt-k">Submitted</div><div className="receipt-v">{parseTs(r.created_at)?.toLocaleString() || '—'}</div></div>
-              </div>
-              <div className="receipt-actions">
-                <button onClick={(e) => { e.stopPropagation(); act(r, 'approve'); }} className="btn btn-primary">Approve</button>
+              )}
+
+              <div className="receipt-actions rcp-actions">
                 <button onClick={(e) => { e.stopPropagation(); act(r, 'deny'); }} className="btn btn-secondary receipt-deny">Deny</button>
+                <button onClick={(e) => { e.stopPropagation(); act(r, 'approve'); }} className="btn btn-primary">Approve</button>
               </div>
             </div>
           );
@@ -211,7 +249,8 @@ export function ReceiptsPage() {
               <button className="mini-close" type="button" onClick={() => setDrawer(null)}>✕</button>
             </div>
             <div className="v3-modal-body">
-              <div className="receipt-kv"><div className="receipt-k">Plan</div><div className="receipt-v">{drawer.plan_name || '—'}{Number(drawer.plan_gb) ? ` • ${Number(drawer.plan_gb)}GB` : ''}</div></div>
+              <div className="receipt-kv"><div className="receipt-k">Plan</div><div className="receipt-v"><bdi>{drawer.plan_name || '—'}</bdi>{Number(drawer.plan_gb) ? ` • ${Number(drawer.plan_gb)}GB` : ''}</div></div>
+              <div className="receipt-kv"><div className="receipt-k">Service</div><div className="receipt-v" dir="ltr">{drawer.service_name || '—'}</div></div>
               <div className="receipt-kv"><div className="receipt-k">Total</div><div className="receipt-v receipt-price">{fmtNum(drawer.price)} T</div></div>
               {Number(drawer.credit_used) > 0 && <div className="receipt-kv"><div className="receipt-k">Credit used</div><div className="receipt-v">−{fmtNum(drawer.credit_used)}</div></div>}
               <div className="receipt-kv"><div className="receipt-k">Submitted</div><div className="receipt-v">{parseTs(drawer.created_at)?.toLocaleString() || '—'}</div></div>
