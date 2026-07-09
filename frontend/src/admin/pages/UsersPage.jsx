@@ -140,6 +140,16 @@ function ArcadeModal({ user, onClose }) {
   );
 }
 
+function agoShort(v) {
+  const d = v ? new Date(v) : null;
+  if (!d || isNaN(d)) return '—';
+  const s = Math.max(0, Math.floor((Date.now() - d.getTime()) / 1000));
+  if (s < 3600) return `${Math.max(1, Math.floor(s / 60))}m`;
+  if (s < 86400) return `${Math.floor(s / 3600)}h`;
+  if (s < 86400 * 30) return `${Math.floor(s / 86400)}d`;
+  return `${Math.floor(s / (86400 * 30))}mo`;
+}
+
 export function UsersPage() {
   const modal = useModal();
   const toast = useToast();
@@ -209,66 +219,95 @@ export function UsersPage() {
   }
   // gamepad button → full arcade panel (coins / difficulty / daily reset)
 
+  // Overview stats like the VIP page header (computed client-side — the
+  // page already holds the full user list).
+  const overview = useMemo(() => {
+    const banned = users.filter((u) => u.banned).length;
+    const week = Date.now() - 7 * 86400e3;
+    const fresh = users.filter((u) => new Date(u.created_at || 0).getTime() >= week).length;
+    return { total: users.length, active: users.length - banned, banned, fresh };
+  }, [users]);
+
   return (
     <>
-      <div className="filter-bar glass-card" style={{ display: 'flex', gap: 12, alignItems: 'center', flexWrap: 'wrap' }}>
-        <div className="search-wrapper" style={{ flex: 1, minWidth: 180 }}>
-          <input className="search-input input-field" placeholder="Search users…" value={q} onChange={(e) => { setQ(e.target.value); setPage(0); }} />
-        </div>
-        <select className="input-field" style={{ width: 'auto' }} value={sortBy} onChange={(e) => { setSortBy(e.target.value); setPage(0); }}>
-          <option value="created">Newest</option>
-          <option value="credit">Credit ↓</option>
-          <option value="credit_asc">Credit ↑</option>
-          <option value="username">Username</option>
-          <option value="level">Level</option>
-        </select>
-        <button className="refresh-btn" onClick={load} title="Refresh" disabled={loading}>⟳</button>
+      <div className="stats-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: 12, marginBottom: 16 }}>
+        <div className="glass-card stat-card" style={{ padding: 16 }}><div className="stat-label">Total Users</div><div className="stat-value">{loading ? '…' : fmtNum(overview.total)}</div></div>
+        <div className="glass-card stat-card" style={{ padding: 16 }}><div className="stat-label">Active</div><div className="stat-value" style={{ color: 'var(--success)' }}>{loading ? '…' : fmtNum(overview.active)}</div></div>
+        <div className="glass-card stat-card" style={{ padding: 16 }}><div className="stat-label">Banned</div><div className="stat-value" style={{ color: 'var(--danger)' }}>{loading ? '…' : fmtNum(overview.banned)}</div></div>
+        <div className="glass-card stat-card" style={{ padding: 16 }}><div className="stat-label">New (7d)</div><div className="stat-value" style={{ color: 'var(--brand)' }}>{loading ? '…' : fmtNum(overview.fresh)}</div></div>
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: 16, paddingTop: 20 }}>
+      <div className="filter-bar glass-card rcp-bar">
+        <div className="search-wrapper rcp-search">
+          <input className="search-input input-field" placeholder="Search users…" value={q} onChange={(e) => { setQ(e.target.value); setPage(0); }} />
+        </div>
+        <div className="rcp-bar-row">
+          <select className="input-field" value={sortBy} onChange={(e) => { setSortBy(e.target.value); setPage(0); }}>
+            <option value="created">Newest</option>
+            <option value="credit">Credit: high first</option>
+            <option value="credit_asc">Credit: low first</option>
+            <option value="username">Username</option>
+            <option value="level">Level</option>
+          </select>
+          <span className="rcp-count">{fmtNum(view.length)} shown</span>
+          <button className="refresh-btn" onClick={load} title="Refresh" disabled={loading}>
+            <Icons.refresh width={15} height={15} />
+          </button>
+        </div>
+      </div>
+
+      <div className="rcp-grid usr-grid">
         {loading && <div style={{ gridColumn: '1/-1', textAlign: 'center', color: 'var(--text-muted)', padding: 40 }}>Loading…</div>}
         {!loading && pageUsers.length === 0 && <div style={{ gridColumn: '1/-1', textAlign: 'center', color: 'var(--text-muted)', padding: 40 }}>No users found</div>}
         {pageUsers.map((u) => (
-          <div className="glass-card fx-tilt" key={u.id} style={{ padding: 20 }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 12 }}>
-              <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
-                <div style={{ width: 40, height: 40, background: 'rgba(255,255,255,0.1)', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700 }}>{(u.full_name || 'U')[0].toUpperCase()}</div>
-                <div>
-                  <div style={{ fontWeight: 600 }}>{u.full_name || 'Unknown'}</div>
-                  <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>@{u.username || '—'}</div>
-                </div>
+          <div className="glass-card receipt-card fx-tilt" key={u.id}>
+            <div className="rcp-head">
+              <div className="receipt-avatar">{(u.full_name || u.username || 'U').trim().charAt(0).toUpperCase()}</div>
+              <div className="rcp-who">
+                <div className="receipt-name"><bdi>{u.full_name || 'Unknown'}</bdi></div>
+                <div className="receipt-handle">@{u.username || '—'}</div>
               </div>
               <span className={'badge ' + (u.banned ? 'badge-danger' : 'badge-success')}>{u.banned ? 'BANNED' : 'ACTIVE'}</span>
             </div>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 16 }}>
-              <div style={{ background: 'rgba(0,0,0,0.2)', padding: 8, borderRadius: 8 }}>
-                <div style={{ fontSize: 10, color: 'var(--text-muted)' }}>CREDIT</div>
-                <div style={{ fontWeight: 600 }}>{fmtNum(u.credit)}</div>
+
+            <div className="rcp-meta">
+              <div className="rcp-meta-l">
+                <div className="rcp-plan">
+                  <span className="rcp-gb">LVL {u.level || 1}</span>
+                  {Number(u.stars) > 0 && <span className="usr-stars"><Icons.star width={10} height={10} /> {fmtNum(u.stars)}</span>}
+                </div>
+                <div className="rcp-sub">
+                  <span className="rcp-service" dir="ltr">{u.chat_id}</span>
+                  <span className="rcp-dot" aria-hidden="true" />
+                  <time title={u.created_at ? new Date(u.created_at).toLocaleString() : ''}>joined {agoShort(u.created_at)}</time>
+                </div>
               </div>
-              <div style={{ background: 'rgba(0,0,0,0.2)', padding: 8, borderRadius: 8 }}>
-                <div style={{ fontSize: 10, color: 'var(--text-muted)' }}>LEVEL</div>
-                <div style={{ fontWeight: 600 }}>{u.level || 1}</div>
-              </div>
+              <div className="rcp-price" title="Store credit">{fmtNum(u.credit)}<span> T</span></div>
             </div>
-            <div style={{ display: 'flex', gap: 8 }}>
-              <button onClick={() => editCredit(u)} className="btn btn-secondary" style={{ flex: 1, padding: 8, fontSize: 12 }}>Edit</button>
-              <button onClick={() => setArcadeUser(u)} className="btn btn-secondary" style={{ flex: 1, padding: 8, display: 'flex', alignItems: 'center', justifyContent: 'center' }} title="Arcade: coins / difficulty / daily reset"><Icons.gamepad width={16} height={16} /></button>
-              <button onClick={() => toggleBan(u)} className="btn" style={{ flex: 1, padding: 8, fontSize: 12, background: 'rgba(248,113,113,0.12)', color: 'var(--danger)' }}>{u.banned ? 'Unban' : 'Ban'}</button>
+
+            <div className="usr-actions">
+              <button onClick={() => editCredit(u)} className="btn btn-secondary">Credit</button>
+              <button onClick={() => setArcadeUser(u)} className="btn btn-secondary usr-arcade" title="Arcade: coins / difficulty / daily reset">
+                <Icons.gamepad width={15} height={15} /> Arcade
+              </button>
+              <button onClick={() => toggleBan(u)} className={'btn usr-ban' + (u.banned ? ' unban' : '')}>{u.banned ? 'Unban' : 'Ban'}</button>
             </div>
           </div>
         ))}
       </div>
 
-      <div className="pagination-bar glass-card" style={{ marginTop: 24, padding: '12px 16px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 12 }}>
-        <span style={{ fontSize: 13, color: 'var(--text-muted)' }}>Showing {view.length ? start + 1 : 0}-{Math.min(start + PER_PAGE, view.length)} of {view.length}</span>
-        <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
-          <button className="btn btn-secondary" disabled={curPage === 0} onClick={() => setPage(curPage - 1)}>← Prev</button>
-          <select className="input-field" style={{ width: 'auto' }} value={curPage} onChange={(e) => setPage(Number(e.target.value))}>
-            {Array.from({ length: totalPages }, (_, i) => <option key={i} value={i}>Page {i + 1}</option>)}
-          </select>
-          <button className="btn btn-secondary" disabled={start + PER_PAGE >= view.length} onClick={() => setPage(curPage + 1)}>Next →</button>
+      {totalPages > 1 && (
+        <div className="pagination-bar glass-card usr-pager">
+          <span className="usr-pager-info">{view.length ? start + 1 : 0}–{Math.min(start + PER_PAGE, view.length)} of {fmtNum(view.length)}</span>
+          <div className="usr-pager-nav">
+            <button className="btn btn-secondary" disabled={curPage === 0} onClick={() => setPage(curPage - 1)}>Prev</button>
+            <select className="input-field" value={curPage} onChange={(e) => setPage(Number(e.target.value))}>
+              {Array.from({ length: totalPages }, (_, i) => <option key={i} value={i}>Page {i + 1}</option>)}
+            </select>
+            <button className="btn btn-secondary" disabled={start + PER_PAGE >= view.length} onClick={() => setPage(curPage + 1)}>Next</button>
+          </div>
         </div>
-      </div>
+      )}
 
       {arcadeUser && <ArcadeModal user={arcadeUser} onClose={() => setArcadeUser(null)} />}
     </>
