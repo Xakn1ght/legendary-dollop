@@ -181,34 +181,44 @@ export function HomePage() {
     } catch (_) { showToast(t('copyFailed'), 'error'); }
   };
 
-  // Web clipboard API ONLY. Telegram's readTextFromClipboard is banned here:
-  // it is attachment-menu-apps-only, and calling it from our menu-button
-  // launch made Telegram Android RELOAD the whole webview (2026-07-09,
-  // Pasha: tapping import "reloaded the app"). It could never return text
-  // for our launch type anyway.
-  const readClipboardText = () => new Promise((resolve) => {
-    if (navigator.clipboard && navigator.clipboard.readText) {
-      navigator.clipboard.readText()
-        .then((text) => resolve({ ok: true, text: text || '' }))
-        .catch(() => resolve({ ok: false, text: '' }));
-    } else resolve({ ok: false, text: '' });
-  });
-
-  // Round 2 (2026-07-09, Pasha: "still not working at all"): auto-reading
-  // the clipboard is a lost cause across Telegram webviews — permission is
-  // silently denied more often than not, and the old flow just looked dead
-  // for ~2s before giving up. New approach is deterministic: the Add sheet
-  // opens IMMEDIATELY (paste always works into a focused input), and the
-  // clipboard read runs in the background — if it yields a link, the input
-  // is prefilled so the user only has to hit Add.
+  // Round 3 (2026-07-10, Pasha: "extract it and add it straightaway").
+  // Rules learned the hard way:
+  //  - Telegram's readTextFromClipboard is BANNED: attachment-menu-apps
+  //    only; calling it from our menu-button launch made Telegram Android
+  //    reload the whole webview.
+  //  - navigator.clipboard.readText() only has a chance while the tap's
+  //    transient user activation is alive — it must be called SYNCHRONOUSLY
+  //    in the handler (any await/timeout first = guaranteed NotAllowedError;
+  //    that's why earlier rounds always "failed").
+  // Success path adds the subscription immediately, no sheet, no typing.
+  // Only when the webview denies clipboard access (iOS Telegram mostly)
+  // does the Add sheet open as the manual fallback.
   const importFromClipboard = () => {
-    openAddSheet();
-    readClipboardText().then(({ ok, text }) => {
+    const addNow = async (txt) => {
+      try {
+        const r = await api('/api/dashboard/subscriptions/add', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ url: txt }) });
+        if (r && r.ok) {
+          showToast(t('addedSuccess'), 'success');
+          await loadSubscriptions(r.subscription_id || null);
+        } else {
+          showToast((r && (r.message || r.error)) ? String(r.message || r.error) : t('addFailed'), 'error');
+        }
+      } catch (_) { showToast(t('addFailed'), 'error'); }
+    };
+
+    if (!(navigator.clipboard && navigator.clipboard.readText)) {
+      openAddSheet();
+      showToast(t('clipboardManualPaste'));
+      return;
+    }
+    navigator.clipboard.readText().then((text) => {
       const txt = (text || '').trim();
-      if (!ok || txt.length < 4) return;
-      window.dispatchEvent(new CustomEvent('astro:addsheet-prefill', { detail: { text: txt } }));
-      showToast(t('clipboardPrefilled'), 'success');
-    }).catch(() => { /* manual paste path stays */ });
+      if (txt.length < 4) { showToast(t('clipboardEmpty'), 'error'); return; }
+      addNow(txt);
+    }).catch(() => {
+      openAddSheet();
+      showToast(t('clipboardManualPaste'));
+    });
   };
 
   const status = (overview?.status || 'disabled').toLowerCase();
