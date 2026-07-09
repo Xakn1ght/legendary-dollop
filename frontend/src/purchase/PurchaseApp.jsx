@@ -13,7 +13,7 @@ import { useReceipt } from '../shared/useReceipt.js';
 
 import { DetailsSection, useReferralCheck, useServiceNameCheck } from './components/DetailsSection.jsx';
 import { PaymentSection } from './components/PaymentSection.jsx';
-import { PlanGrid } from './components/PlanGrid.jsx';
+import { MonthsTabs, PlanGrid, scaledPlanSelection } from './components/PlanGrid.jsx';
 import { COUPON_SUPPORTED, couponEffect } from './coupons.js';
 import { makeT } from './translations.js';
 import { NotRegisteredOverlay } from './components/NotRegisteredOverlay.jsx';
@@ -45,6 +45,7 @@ export function PurchaseApp() {
   const [step, setStep] = useState(1);
   const [plans, setPlans] = useState([]);
   const [plansStatus, setPlansStatus] = useState('loading'); // loading | ready | empty | error
+  const [months, setMonths] = useState(1); // duration tab: 1 | 2 | 3
   const [autoOpenCustom, setAutoOpenCustom] = useState(false);
   const [userInfo, setUserInfo] = useState(null);
   const [paymentInfo, setPaymentInfo] = useState({ card_number: '6037-xxxx-xxxx-xxxx', card_holder: '' });
@@ -96,11 +97,35 @@ export function PurchaseApp() {
     if (plan.custom) {
       return langRef.current === 'en' ? `${plan.gb} GB | Custom` : `${formatNumberExt(plan.gb, 'fa')} گیگ | سفارشی`;
     }
+    const monthsN = Math.max(1, Number(plan.months || 1));
     const en = String(plan.name_en || '').trim();
-    const fa = String(plan.name || '').trim();
-    if (langRef.current === 'en' && en) return en;
-    return fa;
+    const fa = String(plan.base_name || plan.name || '').replace(/@\d+m$/, '').trim();
+    if (monthsN <= 1) {
+      if (langRef.current === 'en' && en) return en;
+      return fa;
+    }
+    // «| یکماه» / "| 30 D" segments are stale on a multi-month package.
+    if (langRef.current === 'en' && en) {
+      return `${en.replace(/\|\s*30\s*D/i, '').replace(/\s{2,}/g, ' ').trim()} | ${monthsN} Months`;
+    }
+    const base = fa.replace('| یکماه', '').replace(/\s{2,}/g, ' ').trim();
+    return `${base} | ${formatNumberExt(monthsN, 'fa')} ماهه`;
   }, []);
+
+  // Duration tab change: carry the selection over by re-scaling its base
+  // plan for the new months; drop it when it doesn't exist there (custom is
+  // 1-month only, VIP packages start at 2).
+  const changeMonths = useCallback((n) => {
+    setMonths(n);
+    setSelectedPlan((prev) => {
+      if (!prev) return prev;
+      if (prev.custom) return n === 1 ? prev : null;
+      const base = plans.find((p) => p.name === (prev.base_name || prev.name));
+      if (!base) return null;
+      if (n < Math.max(1, Number(base.min_months || 1))) return null;
+      return scaledPlanSelection(base, n);
+    });
+  }, [plans]);
 
   // free_autorenew coupons only apply when a renewal plan is chosen.
   const shownCoupons = useMemo(() => {
@@ -123,10 +148,12 @@ export function PurchaseApp() {
     const withRenewal = autoRenewal && selectedRenewalPlan;
     if (withRenewal) totalPrice += selectedRenewalPlan.price;
 
-    // The VIP % applies to VIP-exclusive plans too (list prices are set
-    // pre-discount in the catalog; server math in flows/pricing.py matches).
+    // VIP-exclusive orders carry NO vip percent (offer removed 2026-07-09);
+    // mirrors the wholesale exemption in flows/pricing.py.
+    const vipOnlyOrder = !!selectedPlan.vip_only || !!(withRenewal && selectedRenewalPlan.vip_only);
     let discountPercent = 0;
     (userInfo?.auto_discounts || []).forEach((d) => {
+      if (vipOnlyOrder && String(d?.type) === 'vip') return;
       const pct = Number(d?.percent || 0) || 0;
       if (pct > 0) discountPercent += pct;
     });
@@ -464,15 +491,19 @@ export function PurchaseApp() {
                 </div>
               )}
               {plansStatus === 'ready' && (
-                <PlanGrid
-                  id="plansGrid"
-                  t={t} fmt={fmt} lang={lang}
-                  plans={plans}
-                  autoDiscounts={userInfo?.auto_discounts}
-                  selectedPlan={selectedPlan}
-                  onSelect={setSelectedPlan}
-                  autoOpenCustom={autoOpenCustom}
-                />
+                <>
+                  <MonthsTabs t={t} fmt={fmt} months={months} onChange={changeMonths} />
+                  <PlanGrid
+                    id="plansGrid"
+                    t={t} fmt={fmt} lang={lang}
+                    plans={plans}
+                    autoDiscounts={userInfo?.auto_discounts}
+                    selectedPlan={selectedPlan}
+                    onSelect={setSelectedPlan}
+                    autoOpenCustom={autoOpenCustom}
+                    months={months}
+                  />
+                </>
               )}
             </div>
 

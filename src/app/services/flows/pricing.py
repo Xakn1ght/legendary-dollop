@@ -16,6 +16,7 @@ Rules (canonical, from the webapp implementation):
 from __future__ import annotations
 
 import json
+import re
 from dataclasses import dataclass, field
 from datetime import datetime
 
@@ -66,38 +67,93 @@ def custom_plan_price(gb: int) -> int:
         raise QuoteError("invalid_plan", str(e))
 
 
+# ── multi-month plans (2026-07-09) ───────────────────────────────────────────
+# A plan can be bought for 1-3 months via a "@<n>m" name suffix
+# ("۲۰ گیگ | یکماه@2m"): price / gb / days all scale linearly (a 2-month
+# purchase = two monthly quotas prepaid). Catalog entries may set
+# "min_months" (VIP-exclusive plans use 2 — they are NOT sold as 1-month);
+# bare names resolve to the plan's minimum, so bot flows that send bare
+# names stay correct without changes. Custom plans stay 1-month only.
+MAX_PLAN_MONTHS = 3
+_MONTHS_SUFFIX_RE = re.compile(r"^(?P<base>.+)@(?P<months>\d{1,2})m$")
+
+
+def parse_plan_months(plan_name: str) -> tuple[str, int | None]:
+    """Split "<base>@<n>m" → (base, n). Names without a suffix → (name, None)."""
+    if isinstance(plan_name, str):
+        m = _MONTHS_SUFFIX_RE.match(plan_name)
+        if m:
+            return m.group("base"), int(m.group("months"))
+    return plan_name, None
+
+
+def plan_min_months(plan_info: dict) -> int:
+    try:
+        return max(1, int(plan_info.get("min_months") or 1))
+    except Exception:
+        return 1
+
+
 def get_plan_info(plan_name: str, plans: dict | None = None) -> dict | None:
-    """PLANS lookup that also resolves "custom:<gb>" virtual plans.
+    """PLANS lookup that also resolves "custom:<gb>" virtual plans and
+    "@<n>m" multi-month variants.
 
     ``plans`` lets callers (and tests) supply their own catalog for the fixed
     lookup; custom pricing always interpolates from the live PLANS anchors.
     """
     catalog = plans if plans is not None else PLANS
-    if plan_name in catalog:
-        return catalog[plan_name]
-    gb = parse_custom_plan(plan_name)
-    if gb is None:
+    base_name, months = parse_plan_months(plan_name)
+
+    base = None
+    if base_name in catalog:
+        base = dict(catalog[base_name])
+    else:
+        gb = parse_custom_plan(base_name)
+        if gb is not None:
+            if months is not None:
+                return None  # custom plans are 1-month only (GB-only by design)
+            base = {
+                "price": custom_plan_price(gb),
+                "gb": gb,
+                "days": PLAN_DURATION_DAYS,
+                "custom": True,
+                "name_en": f"{gb} GB | Custom",
+            }
+    if base is None:
         return None
-    return {
-        "price": custom_plan_price(gb),
-        "gb": gb,
-        "days": PLAN_DURATION_DAYS,
-        "custom": True,
-        "name_en": f"{gb} GB | Custom",
-    }
+
+    min_months = plan_min_months(base)
+    resolved_months = months if months is not None else min_months
+    if resolved_months < min_months or resolved_months > MAX_PLAN_MONTHS:
+        return None
+
+    if resolved_months > 1:
+        base["price"] = int(base.get("price") or 0) * resolved_months
+        base["gb"] = int(base.get("gb") or 0) * resolved_months
+        base["days"] = int(base.get("days") or PLAN_DURATION_DAYS) * resolved_months
+    base["months"] = resolved_months
+    return base
 
 
 _FA_DIGITS = str.maketrans("0123456789", "۰۱۲۳۴۵۶۷۸۹")
 
 
 def plan_display_name(plan_name: str, lang: str = "fa") -> str:
-    """User-facing label; fixed plans keep their configured name."""
-    gb = parse_custom_plan(plan_name)
-    if gb is None:
+    """User-facing label; fixed plans keep their configured name.
+
+    Multi-month variants read as «<plan> | ۲ ماهه» / "<plan> | 2 Months",
+    with a stale «| یکماه» segment dropped from the base label.
+    """
+    base_name, months = parse_plan_months(plan_name)
+    gb = parse_custom_plan(base_name)
+    if gb is not None:
+        return f"{gb} گیگ | سفارشی".translate(_FA_DIGITS) if lang == "fa" else f"{gb} GB | Custom"
+    if not months or months <= 1:
         return plan_name
+    label = base_name.replace("| یکماه", "").replace("  ", " ").strip()
     if lang == "fa":
-        return f"{gb} گیگ | سفارشی".translate(_FA_DIGITS)
-    return f"{gb} GB | Custom"
+        return f"{label} | {months} ماهه".translate(_FA_DIGITS)
+    return f"{label} | {months} Months"
 
 # Coupon types spendable at checkout. Other types must be rejected, never silently
 # consumed. free_plan/free_autorenew are valued via the pricing curve and applied as a
@@ -158,6 +214,12 @@ async def quote_purchase(
     """
     plan_info = get_plan_info(plan_name)
     if not plan_info:
+        # Distinguish "asked for a 1-month VIP package" from a garbage name —
+        # the client shows a specific message for the former.
+        base_name, months = parse_plan_months(plan_name)
+        base = get_plan_info(base_name)
+        if base and months is not None and months < plan_min_months(base):
+            raise QuoteError("plan_min_months", "This plan is only sold as a 2-3 month package")
         raise QuoteError("invalid_plan", "Selected plan does not exist")
     renewal_info = get_plan_info(renewal_plan) if renewal_plan is not None else None
     if renewal_plan is not None and not renewal_info:
@@ -168,9 +230,11 @@ async def quote_purchase(
     base_total = plan_price + renewal_price
 
     # VIP-exclusive plans: money-path enforcement lives HERE (both surfaces
-    # quote through this function). The 20% VIP discount applies to them like
-    # everything else — their LIST prices are set pre-discount in the catalog
-    # so the net lands on the designed member prices (2026-07-08 evening).
+    # quote through this function). Since 2026-07-09 they carry NO VIP percent
+    # (Pasha killed the -20% offer on them — list price IS the price, and they
+    # are only sold as 2-3 month packages via min_months). The VIP % still
+    # applies to regular plans; an order touching any VIP-exclusive plan is
+    # exempted wholesale to keep the math simple and un-gameable.
     is_vip_user = await crud.is_user_vip(session, user.id)
     vip_only_order = bool(plan_info.get("vip_only")) or bool(renewal_info and renewal_info.get("vip_only"))
     if vip_only_order and not is_vip_user:
@@ -179,6 +243,7 @@ async def quote_purchase(
     total_discount_percent = 0
     if (
         is_vip_user
+        and not vip_only_order
         and VIP_PURCHASE_DISCOUNT_ENABLED and VIP_PURCHASE_DISCOUNT_PERCENT > 0
     ):
         total_discount_percent += VIP_PURCHASE_DISCOUNT_PERCENT

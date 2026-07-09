@@ -30,13 +30,22 @@ async def handle_get_plans(request: web.Request):
         vip_only = bool(info.get("vip_only"))
         if vip_only and not is_vip:
             continue
+        try:
+            min_months = max(1, int(info.get("min_months") or 1))
+        except Exception:
+            min_months = 1
         plans_list.append(
             {
                 "name": name,
                 "name_en": info.get("name_en"),
+                # Monthly figures — the client scales ×months for the 2/3-month
+                # tabs and appends "@<n>m" to the plan name at checkout
+                # (flows/pricing.py resolves and re-prices authoritatively).
                 "price": info["price"],
                 "gb": info["gb"],
+                "days": int(info.get("days") or 35),
                 "vip_only": vip_only,
+                "min_months": min_months,
             }
         )
 

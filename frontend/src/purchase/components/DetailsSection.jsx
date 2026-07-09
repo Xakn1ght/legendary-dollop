@@ -169,6 +169,8 @@ export function DetailsSection({
         {autoRenewal && (
           <div id="renewalPlanGroup" style={{ marginTop: 16 }}>
             <label className="form-label">{t('renewalPlan')}</label>
+            {/* months=null → every plan at its own minimum duration (base
+                plans monthly, VIP packages as 2-month); no custom builder. */}
             <PlanGrid
               id="renewalPlansGrid"
               t={t} fmt={fmt} lang={lang}
@@ -176,6 +178,7 @@ export function DetailsSection({
               autoDiscounts={autoDiscounts}
               selectedPlan={selectedRenewalPlan}
               onSelect={onSelectRenewalPlan}
+              months={null}
             />
           </div>
         )}

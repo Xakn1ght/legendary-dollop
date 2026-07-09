@@ -102,12 +102,12 @@ PLANS = {
     "۱۰۰ گیگابایت": {"price": 150_000, "gb": 100},
     # VIP Exclusive Plans — tiers start ABOVE the custom slider's 300GB max
     # (150/200/300 were cut 2026-07-08 — anyone could build those via custom
-    # GB, so they weren't actually exclusive). LIST prices are pre-discount:
-    # the 20% VIP discount applies like everywhere else and nets the designed
-    # member prices exactly (862.5k→690k, 975k→780k, 1187.5k→950k ≈ 1.9-2k/GB).
-    "۳۵۰ گیگ | یکماه VIP": {"price": 862_500, "gb": 350, "days": 35, "vip_only": True, "name_en": "350 GB | 30 D VIP"},
-    "۴۰۰ گیگ | یکماه VIP": {"price": 975_000, "gb": 400, "days": 35, "vip_only": True, "name_en": "400 GB | 30 D VIP"},
-    "۵۰۰ گیگ | یکماه VIP": {"price": 1_187_500, "gb": 500, "days": 35, "vip_only": True, "name_en": "500 GB | 30 D VIP"},
+    # GB, so they weren't actually exclusive). Since 2026-07-09 these carry NO
+    # VIP percent (list price is the price) and are sold ONLY as 2-3 month
+    # packages (min_months; price/gb/days scale ×months in flows/pricing.py).
+    "۳۵۰ گیگ VIP": {"price": 862_500, "gb": 350, "days": 35, "vip_only": True, "min_months": 2, "name_en": "350 GB VIP"},
+    "۴۰۰ گیگ VIP": {"price": 975_000, "gb": 400, "days": 35, "vip_only": True, "min_months": 2, "name_en": "400 GB VIP"},
+    "۵۰۰ گیگ VIP": {"price": 1_187_500, "gb": 500, "days": 35, "vip_only": True, "min_months": 2, "name_en": "500 GB VIP"},
 }
 
 # Attempt to override PLANS from optional JSON file (created via admin settings)

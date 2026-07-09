@@ -5,19 +5,19 @@ import { PackageIcon } from '../../shared/icons.jsx';
 import { isAndroidLike } from '../../shared/keyboard.js';
 import { hapticSelection } from '../../shared/telegram.js';
 
-// Aggregate auto-discount badges shown on every plan card (VIP + event promos).
-// The VIP % applies to VIP-exclusive plans too — their list prices are set
-// pre-discount in the catalog so the net stays the designed member price.
-function applicableDiscounts(autoDiscounts) {
-  return autoDiscounts || [];
+// Aggregate auto-discount badges shown on plan cards (VIP + event promos).
+// The VIP % does NOT apply to VIP-exclusive plans (offer removed 2026-07-09 —
+// list price is the price; flows/pricing.py enforces the same exemption).
+function applicableDiscounts(autoDiscounts, vipOnly = false) {
+  return (autoDiscounts || []).filter((d) => !(vipOnly && String(d?.type) === 'vip'));
 }
-function discountPctFor(autoDiscounts) {
-  const sum = applicableDiscounts(autoDiscounts)
+function discountPctFor(autoDiscounts, vipOnly = false) {
+  const sum = applicableDiscounts(autoDiscounts, vipOnly)
     .reduce((s, d) => s + (Number(d?.percent || 0) || 0), 0);
   return Math.max(0, Math.min(90, sum));
 }
 function AutoBadges({ autoDiscounts, fmt, t, lang, vipOnly }) {
-  const badges = applicableDiscounts(autoDiscounts).map((d, i) => {
+  const badges = applicableDiscounts(autoDiscounts, vipOnly).map((d, i) => {
     const type = d?.type ? String(d.type) : 'event';
     const pct = Number(d?.percent || 0) || 0;
     if (pct <= 0) return null;
@@ -29,6 +29,33 @@ function AutoBadges({ autoDiscounts, fmt, t, lang, vipOnly }) {
   if (vipOnly) badges.unshift(<div key="viptag" className="plan-badge vip-tag">VIP</div>);
   if (!badges.length) return null;
   return <div className="plan-badges">{badges}</div>;
+}
+
+// ── multi-month variants (2026-07-09) ────────────────────────────────────
+// months prop: 1/2/3 = the duration tab (plans below their min_months are
+// hidden; custom card only on 1-month). months=null = "auto" (renewal grid):
+// every plan renders at its own minimum — base plans monthly, VIP plans as
+// their 2-month package. Checkout names carry "@<n>m" when scaled; the
+// server re-resolves and re-prices authoritatively (flows/pricing.py).
+export function planFactor(plan, months) {
+  const min = Math.max(1, Number(plan.min_months || 1));
+  if (months == null) return min;
+  return Math.max(min, months);
+}
+export function scaledPlanSelection(plan, months) {
+  const factor = planFactor(plan, months);
+  return {
+    ...plan,
+    base_name: plan.name,
+    name: factor > 1 ? `${plan.name}@${factor}m` : plan.name,
+    price: Number(plan.price || 0) * factor,
+    gb: Number(plan.gb || 0) * factor,
+    days: Number(plan.days || 35) * factor,
+    months: factor,
+  };
+}
+export function monthsLabel(n, t, fmt) {
+  return t('monthsN').replace('{n}', fmt(n));
 }
 
 // "Build your own" card + slider/number pop. Quote comes from the server;
@@ -210,29 +237,38 @@ function CustomPlanCard({ t, fmt, selected, onSelect, autoOpen, autoDiscounts })
   );
 }
 
-export function PlanGrid({ id, t, fmt, lang, plans, autoDiscounts, selectedPlan, onSelect, autoOpenCustom }) {
+export function PlanGrid({ id, t, fmt, lang, plans, autoDiscounts, selectedPlan, onSelect, autoOpenCustom, months = 1 }) {
+  // months=1: base plans + custom builder (VIP packages start at 2 months).
+  // months=2/3: everything scaled ×months, no custom builder.
+  // months=null (renewal grid): all plans, each at its own minimum duration.
+  const showCustom = months === 1;
+  const visiblePlans = plans.filter((p) => months == null || months >= Math.max(1, Number(p.min_months || 1)));
   return (
     <div className="plans-grid" id={id}>
-      {plans.map((plan) => {
+      {visiblePlans.map((plan) => {
         const vipOnly = !!plan.vip_only;
-        const pct = discountPctFor(autoDiscounts);
-        const totalPrice = Number(plan.price || 0);
+        const factor = planFactor(plan, months);
+        const pct = discountPctFor(autoDiscounts, vipOnly);
+        const totalPrice = Number(plan.price || 0) * factor;
         const discountAmount = pct > 0 ? Math.floor(totalPrice * (pct / 100)) : 0;
         const finalPrice = totalPrice - discountAmount;
-        const isSelected = !!selectedPlan && !selectedPlan.custom && selectedPlan.name === plan.name;
+        const scaledName = factor > 1 ? `${plan.name}@${factor}m` : plan.name;
+        const isSelected = !!selectedPlan && !selectedPlan.custom
+          && (selectedPlan.name === scaledName || selectedPlan.base_name === plan.name);
         return (
           <div
             key={plan.name}
             className={`plan-card${isSelected ? ' selected' : ''}`}
-            data-plan={plan.name}
+            data-plan={scaledName}
             role="button"
             tabIndex={0}
-            onClick={() => { onSelect(plan); hapticSelection(); }}
-            onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onSelect(plan); hapticSelection(); } }}
+            onClick={() => { onSelect(scaledPlanSelection(plan, months)); hapticSelection(); }}
+            onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onSelect(scaledPlanSelection(plan, months)); hapticSelection(); } }}
           >
             <AutoBadges autoDiscounts={autoDiscounts} fmt={fmt} t={t} lang={lang} vipOnly={vipOnly} />
-            <div className="plan-gb">{fmt(plan.gb)}</div>
+            <div className="plan-gb">{fmt(Number(plan.gb || 0) * factor)}</div>
             <div className="plan-gb-label">{t('GB')}</div>
+            {factor > 1 && <div className="plan-months-tag">{monthsLabel(factor, t, fmt)}</div>}
             <div className="plan-price">
               {discountAmount > 0 && <div className="old">{fmt(totalPrice)} <span>{t('currency')}</span></div>}
               <div className="new">{fmt(finalPrice)} <span>{t('currency')}</span></div>
@@ -240,7 +276,29 @@ export function PlanGrid({ id, t, fmt, lang, plans, autoDiscounts, selectedPlan,
           </div>
         );
       })}
-      <CustomPlanCard t={t} fmt={fmt} selected={selectedPlan} onSelect={onSelect} autoOpen={autoOpenCustom} autoDiscounts={autoDiscounts} />
+      {showCustom && (
+        <CustomPlanCard t={t} fmt={fmt} selected={selectedPlan} onSelect={onSelect} autoOpen={autoOpenCustom} autoDiscounts={autoDiscounts} />
+      )}
+    </div>
+  );
+}
+
+// Segmented duration control for the plan step.
+export function MonthsTabs({ t, fmt, months, onChange }) {
+  return (
+    <div className="months-tabs" role="tablist" aria-label={t('durationLabel')}>
+      {[1, 2, 3].map((n) => (
+        <button
+          key={n}
+          type="button"
+          role="tab"
+          aria-selected={months === n}
+          className={`months-tab${months === n ? ' active' : ''}`}
+          onClick={() => { if (months !== n) { onChange(n); hapticSelection(); } }}
+        >
+          {monthsLabel(n, t, fmt)}
+        </button>
+      ))}
     </div>
   );
 }

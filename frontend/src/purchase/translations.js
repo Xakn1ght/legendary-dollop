@@ -2,6 +2,8 @@ export const translations = {
   en: {
     purchaseTitle: 'Buy Service',
     selectPlan: 'Select Plan',
+    durationLabel: 'Duration',
+    monthsN: '{n}-Month',
     customPlan: 'Custom Plan',
     customPlanTap: 'Tap to build',
     customPlanHint: 'Enter GB (1-300)',
@@ -65,6 +67,8 @@ export const translations = {
   fa: {
     purchaseTitle: 'خرید سرویس',
     selectPlan: 'انتخاب پلن',
+    durationLabel: 'مدت اشتراک',
+    monthsN: '{n} ماهه',
     customPlan: 'پلن دلخواه',
     customPlanTap: 'برای ساخت بزنید',
     customPlanHint: 'حجم دلخواه (۱ تا ۳۰۰ گیگ)',

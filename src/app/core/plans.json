@@ -23,25 +23,28 @@
     "days": 35,
     "name_en": "100 GB | 30 D"
   },
-  "۳۵۰ گیگ | یکماه VIP": {
+  "۳۵۰ گیگ VIP": {
     "price": 862500,
     "gb": 350,
     "days": 35,
     "vip_only": true,
-    "name_en": "350 GB | 30 D VIP"
+    "min_months": 2,
+    "name_en": "350 GB VIP"
   },
-  "۴۰۰ گیگ | یکماه VIP": {
+  "۴۰۰ گیگ VIP": {
     "price": 975000,
     "gb": 400,
     "days": 35,
     "vip_only": true,
-    "name_en": "400 GB | 30 D VIP"
+    "min_months": 2,
+    "name_en": "400 GB VIP"
   },
-  "۵۰۰ گیگ | یکماه VIP": {
+  "۵۰۰ گیگ VIP": {
     "price": 1187500,
     "gb": 500,
     "days": 35,
     "vip_only": true,
-    "name_en": "500 GB | 30 D VIP"
+    "min_months": 2,
+    "name_en": "500 GB VIP"
   }
 }
