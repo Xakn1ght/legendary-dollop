@@ -757,6 +757,33 @@ export function ProfilePage() {
                 <details key={n} className="faq-item" style={{ padding: '8px 0', borderBottom: i < arr.length - 1 ? '1px solid var(--line, rgba(255,255,255,0.08))' : 'none' }}>
                   <summary style={{ cursor: 'pointer', fontWeight: 700, fontSize: 13.5, listStyle: 'none' }}>{tt('faqQ' + n)}</summary>
                   <p style={{ margin: '8px 0 0', fontSize: 12.5, lineHeight: 1.7, color: 'var(--muted)' }}>{tt('faqA' + n)}</p>
+                  {n === 9 && (
+                    <button
+                      id="faqSupportBtn"
+                      type="button"
+                      onClick={() => openSupportPage()}
+                      style={{
+                        marginTop: 10,
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: 7,
+                        padding: '9px 14px',
+                        borderRadius: 11,
+                        border: '1px solid rgba(var(--brandRgb), 0.35)',
+                        background: 'rgba(var(--brandRgb), 0.14)',
+                        color: 'var(--brand)',
+                        fontFamily: 'inherit',
+                        fontSize: 12.5,
+                        fontWeight: 800,
+                        cursor: 'pointer',
+                      }}
+                    >
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" width="15" height="15" aria-hidden="true">
+                        <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
+                      </svg>
+                      {tt('faqAskSupport')}
+                    </button>
+                  )}
                 </details>
               ))}
             </div>
