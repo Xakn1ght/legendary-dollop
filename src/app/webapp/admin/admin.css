@@ -5025,6 +5025,68 @@ body.admin-panel .rcp-actions {
 }
 body.admin-panel .rcp-actions .btn { min-width: 0; width: 100%; }
 
+/* ---- subscriptions v2 (2026-07-09 — dense triage grid, phone-safe) ---- */
+body.admin-panel .sb-select.on { border-color: rgba(var(--brandRgb),0.55); color: #fff; background: rgba(var(--brandRgb),0.15); }
+body.admin-panel .sb-bulkbar {
+  margin-top: 12px; padding: 10px 14px;
+  display: flex; gap: 8px; align-items: center; flex-wrap: wrap;
+}
+body.admin-panel .sb-bulk-count { font-weight: 800; font-size: 13px; margin-inline-end: 4px; }
+body.admin-panel .sb-bulkbar .btn { padding: 7px 12px; font-size: 12px; }
+body.admin-panel .sb-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  gap: 12px;
+  padding-top: 16px;
+}
+body.admin-panel .sb-grid > * { min-width: 0; }
+@media (max-width: 560px) { body.admin-panel .sb-grid { grid-template-columns: 1fr; } }
+body.admin-panel .sb-card { padding: 13px 14px; cursor: pointer; }
+body.admin-panel .sb-card.sel { outline: 2px solid rgba(var(--brandRgb),0.8); outline-offset: -1px; }
+body.admin-panel .sb-head { display: flex; align-items: center; gap: 8px; min-width: 0; }
+body.admin-panel .sb-check {
+  flex: none; width: 17px; height: 17px; border-radius: 6px;
+  border: 1.5px solid rgba(255,255,255,0.25);
+  display: inline-flex; align-items: center; justify-content: center;
+  color: #fff;
+}
+body.admin-panel .sb-check.on { background: rgba(var(--brandRgb),0.9); border-color: transparent; }
+body.admin-panel .sb-online {
+  flex: none; width: 7px; height: 7px; border-radius: 50%;
+  background: var(--success); box-shadow: 0 0 6px var(--success);
+}
+body.admin-panel .sb-name {
+  flex: 1; min-width: 0; font-weight: 700; font-size: 13.5px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+body.admin-panel .sb-st {
+  flex: none; font-size: 9.5px; font-weight: 800; letter-spacing: 0.05em; text-transform: uppercase;
+  padding: 2px 8px; border-radius: 999px;
+  color: var(--text-muted); background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.10);
+}
+body.admin-panel .sb-st.active { color: var(--success); background: color-mix(in srgb, var(--success) 13%, transparent); border-color: color-mix(in srgb, var(--success) 30%, transparent); }
+body.admin-panel .sb-st.disabled { color: var(--danger); background: color-mix(in srgb, var(--danger) 12%, transparent); border-color: color-mix(in srgb, var(--danger) 28%, transparent); }
+body.admin-panel .sb-st.limited, body.admin-panel .sb-st.on_hold { color: var(--warning); background: color-mix(in srgb, var(--warning) 12%, transparent); border-color: color-mix(in srgb, var(--warning) 28%, transparent); }
+body.admin-panel .sb-stats {
+  display: flex; align-items: baseline; justify-content: space-between; gap: 10px;
+  margin: 10px 0 7px; min-width: 0;
+}
+body.admin-panel .sb-gb { font-size: 12px; color: var(--text-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+body.admin-panel .sb-gb b { font-size: 14px; color: var(--text); font-variant-numeric: tabular-nums; }
+body.admin-panel .sb-exp { flex: none; font-size: 11.5px; font-weight: 700; color: var(--text-muted); }
+body.admin-panel .sb-exp.warn { color: var(--warning); }
+body.admin-panel .sb-exp.bad { color: var(--danger); }
+body.admin-panel .sb-bar { height: 6px; border-radius: 3px; background: rgba(255,255,255,0.08); overflow: hidden; }
+body.admin-panel .sb-bar i { display: block; height: 100%; border-radius: 3px; background: var(--success); }
+body.admin-panel .sb-bar i.warn { background: var(--warning); }
+body.admin-panel .sb-bar i.bad { background: var(--danger); }
+body.admin-panel .sb-note {
+  margin-top: 8px; font-size: 11px; color: var(--text-muted);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  unicode-bidi: plaintext; text-align: start;
+}
+
 /* ---- issued coupons v2 (2026-07-09 — feed rows instead of the sideways table) ---- */
 body.admin-panel .cpn-card { margin-top: 20px; padding: 0; overflow: hidden; }
 body.admin-panel .cpn-head {

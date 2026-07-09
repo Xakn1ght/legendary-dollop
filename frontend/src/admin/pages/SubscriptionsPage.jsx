@@ -3,6 +3,7 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { apiFetch, apiJson, postJson } from '../api.js';
 import { useModal } from '../components/Modal.jsx';
 import { useToast } from '../components/Toast.jsx';
+import { Icons } from '../icons.jsx';
 import { STATUS_COLORS } from '../util.js';
 
 const PER_PAGE = 50;
@@ -98,40 +99,46 @@ export function SubscriptionsPage() {
 
   return (
     <>
-      <div className="filter-bar glass-card" style={{ display: 'flex', gap: 12, alignItems: 'center', flexWrap: 'wrap' }}>
-        <div className="search-wrapper" style={{ flex: 1, minWidth: 180 }}>
-          <input className="search-input input-field" placeholder="Search subscriptions…" value={q} onChange={(e) => onSearch(e.target.value)} />
-        </div>
-        <button className={'bulk-select-btn btn btn-secondary' + (bulkMode ? ' active' : '')} onClick={() => { setBulkMode((v) => !v); setSelected(new Set()); }}>{bulkMode ? 'Cancel' : 'Select'}</button>
-        <select className="input-field" style={{ width: 'auto' }} value={sortBy} onChange={(e) => { setSortBy(e.target.value); setPage(0); }}>
-          <option value="created">Created (new)</option>
-          <option value="created_asc">Created (old)</option>
-          <option value="expire">Expiry (soon)</option>
-          <option value="expire_desc">Expiry (later)</option>
-          <option value="used">Traffic ↓</option>
-          <option value="used_asc">Traffic ↑</option>
-          <option value="username">Username</option>
-        </select>
-        <button className="refresh-btn" onClick={() => load(q.trim())} title="Refresh" disabled={loading}>⟳</button>
+      <div className="stats-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(110px, 1fr))', gap: 12, marginBottom: 16 }}>
+        <div className="glass-card stat-card" style={{ padding: 16 }}><div className="stat-label">Total</div><div className="stat-value">{loading ? '…' : stats.total}</div></div>
+        <div className="glass-card stat-card" style={{ padding: 16 }}><div className="stat-label">Active</div><div className="stat-value" style={{ color: 'var(--success)' }}>{loading ? '…' : stats.active}</div></div>
+        <div className="glass-card stat-card" style={{ padding: 16 }}><div className="stat-label">Online</div><div className="stat-value" style={{ color: 'var(--brand)' }}>{loading ? '…' : stats.online}</div></div>
       </div>
 
-      {bulkMode && selected.size > 0 && (
-        <div className="glass-card" style={{ marginTop: 16, padding: '12px 16px', display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
-          <span style={{ fontWeight: 700 }}>{selected.size} selected</span>
-          <button className="btn btn-secondary" onClick={() => bulk('enable')}>Enable</button>
-          <button className="btn btn-secondary" onClick={() => bulk('disable')}>Disable</button>
-          <button className="btn btn-secondary" onClick={() => bulk('reset')}>Reset traffic</button>
-          <button className="btn btn-secondary btn-danger" onClick={() => bulk('delete')}>Delete</button>
+      <div className="filter-bar glass-card rcp-bar">
+        <div className="search-wrapper rcp-search">
+          <input className="search-input input-field" placeholder="Search subscriptions…" value={q} onChange={(e) => onSearch(e.target.value)} />
+        </div>
+        <div className="rcp-bar-row">
+          <button className={'btn btn-secondary sb-select' + (bulkMode ? ' on' : '')} onClick={() => { setBulkMode((v) => !v); setSelected(new Set()); }}>{bulkMode ? 'Cancel' : 'Select'}</button>
+          <select className="input-field" value={sortBy} onChange={(e) => { setSortBy(e.target.value); setPage(0); }}>
+            <option value="created">Created (new)</option>
+            <option value="created_asc">Created (old)</option>
+            <option value="expire">Expiry (soon)</option>
+            <option value="expire_desc">Expiry (later)</option>
+            <option value="used">Traffic: high first</option>
+            <option value="used_asc">Traffic: low first</option>
+            <option value="username">Username</option>
+          </select>
+          <span className="rcp-count">{view.length}</span>
+          <button className="refresh-btn" onClick={() => load(q.trim())} title="Refresh" disabled={loading}>
+            <Icons.refresh width={15} height={15} />
+          </button>
+        </div>
+      </div>
+
+      {bulkMode && (
+        <div className="glass-card sb-bulkbar">
+          <span className="sb-bulk-count">{selected.size} selected</span>
+          <button className="btn btn-secondary" onClick={() => setSelected(new Set(pageSubs.map((s) => s.username)))}>Page</button>
+          <button className="btn btn-secondary" disabled={!selected.size} onClick={() => bulk('enable')}>Enable</button>
+          <button className="btn btn-secondary" disabled={!selected.size} onClick={() => bulk('disable')}>Disable</button>
+          <button className="btn btn-secondary" disabled={!selected.size} onClick={() => bulk('reset')}>Reset traffic</button>
+          <button className="btn btn-secondary btn-danger" disabled={!selected.size} onClick={() => bulk('delete')}>Delete</button>
         </div>
       )}
 
-      <div className="stats-grid" style={{ display: 'flex', gap: 12, marginTop: 20, marginBottom: 20 }}>
-        <div className="glass-card stat-card" style={{ padding: 16, flex: 1 }}><div className="stat-value" style={{ fontSize: 22 }}>{stats.total}</div><div className="stat-label">Total</div></div>
-        <div className="glass-card stat-card" style={{ padding: 16, flex: 1 }}><div className="stat-value" style={{ fontSize: 22, color: 'var(--success)' }}>{stats.active}</div><div className="stat-label">Active</div></div>
-        <div className="glass-card stat-card" style={{ padding: 16, flex: 1 }}><div className="stat-value" style={{ fontSize: 22, color: 'var(--brand)' }}>{stats.online}</div><div className="stat-label">Online</div></div>
-      </div>
-
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: 12 }}>
+      <div className="sb-grid">
         {loading && <div style={{ gridColumn: '1/-1', textAlign: 'center', color: 'var(--text-muted)', padding: 40 }}>Loading…</div>}
         {!loading && pageSubs.length === 0 && <div style={{ gridColumn: '1/-1', textAlign: 'center', color: 'var(--text-muted)', padding: 40 }}>No subscriptions found</div>}
         {pageSubs.map((s) => {
@@ -140,47 +147,53 @@ export function SubscriptionsPage() {
           const pct = limit > 0 ? Math.min((used / limit) * 100, 100) : 0;
           const status = s.status || 'active';
           const dl = s.days_left;
-          let expiryText = '∞'; let expiryColor = 'var(--text-muted)';
+          let expiryText = 'no expiry'; let expiryCls = '';
           if (dl !== null && dl !== undefined) {
-            if (dl < 0) { expiryText = 'Expired'; expiryColor = 'var(--danger)'; }
-            else if (dl === 0) { expiryText = 'Today'; expiryColor = 'var(--danger)'; }
-            else if (dl <= 3) { expiryText = `${dl}d`; expiryColor = 'var(--danger)'; }
-            else if (dl <= 7) { expiryText = `${dl}d`; expiryColor = 'var(--warning)'; }
-            else expiryText = `${dl}d`;
+            if (dl < 0) { expiryText = 'Expired'; expiryCls = ' bad'; }
+            else if (dl === 0) { expiryText = 'Today'; expiryCls = ' bad'; }
+            else if (dl <= 3) { expiryText = `${dl}d left`; expiryCls = ' bad'; }
+            else if (dl <= 7) { expiryText = `${dl}d left`; expiryCls = ' warn'; }
+            else expiryText = `${dl}d left`;
           }
           const sel = selected.has(s.username);
           return (
-            <div className="sub-card glass-card fx-tilt" key={s.username} style={{ padding: 14, cursor: 'pointer', outline: sel ? '2px solid var(--brand)' : 'none' }}
-              onClick={() => (bulkMode ? toggleSel(s.username) : setDetail(s))}>
-              <div className="sub-card-header" style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 10 }}>
-                <div className="sub-card-user" style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                  {s.is_online && <span style={{ width: 6, height: 6, background: 'var(--success)', borderRadius: '50%', boxShadow: '0 0 6px var(--success)' }} />}
-                  <span className="sub-card-name" style={{ fontWeight: 600 }}>{s.username}</span>
-                </div>
-                <span className="sub-card-status" style={{ color: STATUS_COLORS[status] || 'var(--text-muted)', fontSize: 11, fontWeight: 700 }}>{status.toUpperCase()}</span>
+            <div
+              className={'sb-card glass-card fx-tilt' + (sel ? ' sel' : '')}
+              key={s.username}
+              role="button"
+              tabIndex={0}
+              onClick={() => (bulkMode ? toggleSel(s.username) : setDetail(s))}
+              onKeyDown={(e) => { if (e.key === 'Enter') (bulkMode ? toggleSel(s.username) : setDetail(s)); }}
+            >
+              <div className="sb-head">
+                {bulkMode && <span className={'sb-check' + (sel ? ' on' : '')} aria-hidden="true">{sel && <Icons.check width={11} height={11} />}</span>}
+                {s.is_online && <span className="sb-online" title="Online now" />}
+                <span className="sb-name" dir="ltr">{s.username}</span>
+                <span className={'sb-st ' + status}>{status}</span>
               </div>
-              <div className="sub-card-stats" style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}>
-                <div><span style={{ fontWeight: 700 }}>{used.toFixed(1)}/{limit > 0 ? limit.toFixed(0) : '∞'}</span> <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>GB</span></div>
-                <div><span style={{ fontWeight: 700, color: expiryColor }}>{expiryText}</span> <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>left</span></div>
+              <div className="sb-stats">
+                <span className="sb-gb"><b>{used.toFixed(1)}</b> / {limit > 0 ? limit.toFixed(0) : '∞'} GB</span>
+                <span className={'sb-exp' + expiryCls}>{expiryText}</span>
               </div>
-              <div style={{ height: 6, background: 'rgba(255,255,255,0.08)', borderRadius: 3, overflow: 'hidden' }}>
-                <div style={{ width: pct + '%', height: '100%', background: pct > 90 ? 'var(--danger)' : pct > 70 ? 'var(--warning)' : 'var(--success)' }} />
-              </div>
+              <div className="sb-bar"><i style={{ width: pct + '%' }} className={pct > 90 ? 'bad' : pct > 70 ? 'warn' : ''} /></div>
+              {s.note && <div className="sb-note" title={s.note}>{s.note}</div>}
             </div>
           );
         })}
       </div>
 
-      <div className="pagination-bar glass-card" style={{ marginTop: 24, padding: '12px 16px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 12 }}>
-        <span style={{ fontSize: 13, color: 'var(--text-muted)' }}>Showing {view.length ? start + 1 : 0}-{Math.min(start + PER_PAGE, view.length)} of {view.length}</span>
-        <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
-          <button className="btn btn-secondary" disabled={curPage === 0} onClick={() => setPage(curPage - 1)}>← Prev</button>
-          <select className="input-field" style={{ width: 'auto' }} value={curPage} onChange={(e) => setPage(Number(e.target.value))}>
-            {Array.from({ length: totalPages }, (_, i) => <option key={i} value={i}>Page {i + 1}</option>)}
-          </select>
-          <button className="btn btn-secondary" disabled={start + PER_PAGE >= view.length} onClick={() => setPage(curPage + 1)}>Next →</button>
+      {totalPages > 1 && (
+        <div className="pagination-bar glass-card usr-pager">
+          <span className="usr-pager-info">{view.length ? start + 1 : 0}–{Math.min(start + PER_PAGE, view.length)} of {view.length}</span>
+          <div className="usr-pager-nav">
+            <button className="btn btn-secondary" disabled={curPage === 0} onClick={() => setPage(curPage - 1)}>Prev</button>
+            <select className="input-field" value={curPage} onChange={(e) => setPage(Number(e.target.value))}>
+              {Array.from({ length: totalPages }, (_, i) => <option key={i} value={i}>Page {i + 1}</option>)}
+            </select>
+            <button className="btn btn-secondary" disabled={start + PER_PAGE >= view.length} onClick={() => setPage(curPage + 1)}>Next</button>
+          </div>
         </div>
-      </div>
+      )}
 
       {detail && <SubDetail sub={detail} onClose={() => setDetail(null)} onChanged={() => { setDetail(null); load(q.trim()); }} />}
     </>
