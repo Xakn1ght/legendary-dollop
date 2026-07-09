@@ -6,42 +6,88 @@ import { fmtNum } from '../util.js';
 
 const fmtT = (n) => `${Number(n || 0).toLocaleString('en-US')}`;
 
+const W = 720, H = 180, PAD = 4;
+const COLORS = { subs: 'var(--brand)', charges: 'rgba(122,162,255,0.85)', vip: 'rgba(255,196,87,0.9)' };
+const SERIES_KEYS = ['subs', 'charges', 'vip'];
+
+const gridLines = [0.25, 0.5, 0.75].map((f) => (
+  <line key={f} x1={PAD} x2={W - PAD} y1={H - 18 - f * (H - 30)} y2={H - 18 - f * (H - 30)} stroke="rgba(255,255,255,0.05)" strokeWidth="1" />
+));
+
+const dateLabel = (series, d, i, cx) => series.length <= 32 && (i % Math.ceil(series.length / 8) === 0) && (
+  <text x={cx} y={H - 5} fontSize="9" fill="rgba(255,255,255,0.4)" textAnchor="middle">
+    {d.date.slice(5)}
+  </text>
+);
+
+const dayTitle = (d) => `${d.date}\n${fmtT(d.total)} toman — ${d.orders} orders${d.new_users ? `\n${d.new_users} new users` : ''}`;
+
 // Hand-rolled SVG stacked-bar chart — no chart lib, ~free to render.
-function Chart({ series }) {
-  const W = 720, H = 180, PAD = 4;
+function BarChart({ series }) {
   const max = Math.max(1, ...series.map((d) => d.total));
   const bw = (W - PAD * 2) / Math.max(series.length, 1);
-  const colors = { subs: 'var(--brand)', charges: 'rgba(122,162,255,0.85)', vip: 'rgba(255,196,87,0.9)' };
 
   return (
-    <svg viewBox={`0 0 ${W} ${H}`} className="rev-chart" preserveAspectRatio="none" role="img" aria-label="Daily revenue">
-      {[0.25, 0.5, 0.75].map((f) => (
-        <line key={f} x1={PAD} x2={W - PAD} y1={H - 18 - f * (H - 30)} y2={H - 18 - f * (H - 30)} stroke="rgba(255,255,255,0.05)" strokeWidth="1" />
-      ))}
+    <svg viewBox={`0 0 ${W} ${H}`} className="rev-chart" preserveAspectRatio="none" role="img" aria-label="Daily revenue (bars)">
+      {gridLines}
       {series.map((d, i) => {
         const x = PAD + i * bw;
         const scale = (H - 30) / max;
         let y = H - 18;
-        const segs = ['subs', 'charges', 'vip'].map((k) => {
+        const segs = SERIES_KEYS.map((k) => {
           const h = (d[k] || 0) * scale;
           y -= h;
           return { k, y, h };
         });
         return (
           <g key={d.date}>
-            <title>{`${d.date}\n${fmtT(d.total)} toman — ${d.orders} orders${d.new_users ? `\n${d.new_users} new users` : ''}`}</title>
+            <title>{dayTitle(d)}</title>
             <rect x={x + 1} y={0} width={Math.max(bw - 2, 1)} height={H - 18} fill="transparent" />
             {segs.map((s) => s.h > 0.5 && (
-              <rect key={s.k} x={x + 1.5} y={s.y} width={Math.max(bw - 3, 1)} height={s.h} rx="2" fill={colors[s.k]} />
+              <rect key={s.k} x={x + 1.5} y={s.y} width={Math.max(bw - 3, 1)} height={s.h} rx="2" fill={COLORS[s.k]} />
             ))}
-            {series.length <= 32 && (i % Math.ceil(series.length / 8) === 0) && (
-              <text x={x + bw / 2} y={H - 5} fontSize="9" fill="rgba(255,255,255,0.4)" textAnchor="middle">
-                {d.date.slice(5)}
-              </text>
-            )}
+            {dateLabel(series, d, i, x + bw / 2)}
           </g>
         );
       })}
+    </svg>
+  );
+}
+
+// Line-graph mode (2026-07-09, Pasha): one line per revenue stream. Unlike
+// the stacked bars this is NOT cumulative — each line is that stream's own
+// daily figure, so trends are comparable at a glance.
+function LineChart({ series }) {
+  const n = series.length;
+  const step = (W - PAD * 2) / Math.max(n, 1);
+  const cx = (i) => (n === 1 ? W / 2 : PAD + i * step + step / 2);
+  const max = Math.max(1, ...series.flatMap((d) => SERIES_KEYS.map((k) => d[k] || 0)));
+  const cy = (v) => H - 18 - ((v || 0) * (H - 30)) / max;
+
+  return (
+    <svg viewBox={`0 0 ${W} ${H}`} className="rev-chart" preserveAspectRatio="none" role="img" aria-label="Daily revenue (lines)">
+      {gridLines}
+      {SERIES_KEYS.map((k) => {
+        // Skip a stream with no revenue in the window — a flat zero line
+        // over the others is just noise.
+        if (!series.some((d) => (d[k] || 0) > 0)) return null;
+        const pts = series.map((d, i) => `${cx(i)},${cy(d[k])}`).join(' ');
+        return (
+          <g key={k}>
+            <polyline points={pts} fill="none" stroke={COLORS[k]} strokeWidth="2" strokeLinejoin="round" strokeLinecap="round" />
+            {n <= 32 && series.map((d, i) => (d[k] || 0) > 0 && (
+              <circle key={d.date} cx={cx(i)} cy={cy(d[k])} r="2.5" fill={COLORS[k]} />
+            ))}
+          </g>
+        );
+      })}
+      {series.map((d, i) => (
+        <g key={d.date}>
+          <title>{dayTitle(d)}</title>
+          <rect x={cx(i) - step / 2} y={0} width={Math.max(step, 1)} height={H - 18} fill="transparent" />
+          {dateLabel(series, d, i, cx(i))}
+        </g>
+      ))}
     </svg>
   );
 }
@@ -50,6 +96,13 @@ export function RevenueCard() {
   const [data, setData] = useState(null);
   const [days, setDays] = useState(30);
   const [err, setErr] = useState(false);
+  const [mode, setMode] = useState(() => {
+    try { return localStorage.getItem('admin_rev_chart') === 'line' ? 'line' : 'bars'; } catch (_) { return 'bars'; }
+  });
+  const pickMode = (m) => {
+    setMode(m);
+    try { localStorage.setItem('admin_rev_chart', m); } catch (_) { /* ignore */ }
+  };
 
   useEffect(() => {
     let alive = true;
@@ -84,6 +137,27 @@ export function RevenueCard() {
           {[14, 30, 90].map((d) => (
             <button key={d} className={'chip-btn' + (days === d ? ' on' : '')} onClick={() => setDays(d)}>{d}d</button>
           ))}
+          <button
+            className={'chip-btn' + (mode === 'bars' ? ' on' : '')}
+            onClick={() => pickMode('bars')}
+            title="Stacked bars"
+            aria-pressed={mode === 'bars'}
+          >
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" width="13" height="13" aria-hidden="true">
+              <path d="M5 20V10M12 20V4M19 20v-8" />
+            </svg>
+          </button>
+          <button
+            className={'chip-btn' + (mode === 'line' ? ' on' : '')}
+            onClick={() => pickMode('line')}
+            title="Line graph"
+            aria-pressed={mode === 'line'}
+          >
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" width="13" height="13" aria-hidden="true">
+              <path d="M3 17l6-6 4 4 8-8" />
+              <path d="M15 7h6v6" />
+            </svg>
+          </button>
           <button className="chip-btn" onClick={exportCsv} title="Export CSV for this window">
             <Icons.download width={13} height={13} /> CSV
           </button>
@@ -104,7 +178,7 @@ export function RevenueCard() {
       {!err && data && data.series.every((d) => d.total === 0) && (
         <div className="rev-empty">No revenue in this window yet.</div>
       )}
-      {!err && data && <Chart series={data.series} />}
+      {!err && data && (mode === 'line' ? <LineChart series={data.series} /> : <BarChart series={data.series} />)}
 
       <div className="rev-legend">
         <span><i style={{ background: 'var(--brand)' }} /> Purchases</span>
