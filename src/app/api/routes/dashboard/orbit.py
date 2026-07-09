@@ -12,12 +12,11 @@ import os
 import re
 from pathlib import Path
 
-import aiohttp
 from aiohttp import web
 
 from app.api.deps import _verify_webapp_auth, set_tma_session_cookie
 from app.database import crud
-from app.database.models import AsyncSessionLocal, Subscription
+from app.database.models import AsyncSessionLocal
 from app.services.marzban import marzban_api
 
 logger = logging.getLogger(__name__)
@@ -66,16 +65,21 @@ async def handle_dashboard_orbit_add_link(request: web.Request):
         if not user:
             return web.json_response({"ok": False, "error": "not_registered"}, status=403)
 
+        # get_user_subscriptions includes subs SHARED via subscription_links —
+        # the strict owner check here 404'd linked subs while every other
+        # dashboard surface (overview/export/app grid) serves them
+        # (2026-07-09, Pasha couldn't add a shared sub to Orbit).
+        subs = await crud.get_user_subscriptions(session, user.id)
         sub = None
         if want_sub_id is not None:
             try:
-                sub = await session.get(Subscription, int(want_sub_id))
+                want = int(want_sub_id)
             except (TypeError, ValueError):
-                sub = None
-            if not sub or sub.user_id != user.id:
+                want = None
+            sub = next((s for s in subs if s.id == want), None)
+            if not sub:
                 return web.json_response({"ok": False, "error": "not_found"}, status=404)
         else:
-            subs = await crud.get_user_subscriptions(session, user.id)
             active = [s for s in subs if (s.status or "").lower() == "active" and s.marzban_username]
             sub = active[0] if active else (subs[0] if subs else None)
         if not sub:
