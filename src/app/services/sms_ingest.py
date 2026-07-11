@@ -47,6 +47,10 @@ def _clean(name: str, default: str = '') -> str:
 SMS_SOURCE_CHAT_ID = _clean('SMS_SOURCE_CHAT_ID')
 SMS_MATCH_WINDOW_SEC = int(_clean('SMS_MATCH_WINDOW_SEC', '2700') or '2700')
 SMS_DEPOSIT_TTL_SEC = int(_clean('SMS_DEPOSIT_TTL_SEC', '21600') or '21600')
+# Evidence-veto grace: an amount-only match whose evidence CONTRADICTS the
+# deposit (wrong payer card / disagreeing refs) is deferred this long so the
+# true owner's order can appear and win by card/ref instead (bakbot #2277).
+SMS_VETO_GRACE_SEC = int(_clean('SMS_VETO_GRACE_SEC', '600') or '600')
 SMS_DEST_CARD_LAST4 = set(x for x in _clean('SMS_DEST_CARD_LAST4').replace(' ', '').split(',') if x)
 # Shared across bakbot + ASTROBYTE so one deposit is claimed by exactly one system.
 SMS_CLAIM_DB = _clean('SMS_CLAIM_DB', '/root/5a06b8e65bdb/sms_claims.sqlite3')
@@ -147,8 +151,18 @@ def _allowed_dest_last4() -> set:
     return allowed
 
 
-# One AI read per order per process: typed id -> {'receipt_last4':…, 'refs':[…]}
-# ({} = tried and got nothing usable, so we don't burn quota again).
+# One AI read per order per process: typed id -> cache entry.
+#   {'receipt_last4':…, 'refs':[…]}          trusted evidence (amount agrees)
+#   {'receipt_mismatch_card_last4':…,
+#    'receipt_mismatch_refs':[…]}            VETO-ONLY: receipt amount != order
+#       (split payment / wrong screenshot — bakbot #2277). Never a positive
+#       join or tie-break; only blocks/defers a contradicted pairing.
+#   {'receipt_unreadable': True}             AI READ COMPLETED and the image is
+#       not a readable successful transfer (bakbot #2292 garbage screenshot).
+#       Such an order must NEVER auto-approve on an amount-only match.
+#   {}                                       read attempt failed (AI outage /
+#       missing file): degrade to plain amount matching, do NOT poison the
+#       order, do not burn quota again this process.
 _ai_read_cache: dict = {}
 
 
@@ -196,13 +210,27 @@ async def _candidates(session) -> list:
         cached = _ai_read_cache.get(c['order_id']) or {}
         c['receipt_last4'] = cached.get('receipt_last4')
         c['refs'] = cached.get('refs') or []
+        # Veto-only evidence from an amount-mismatched receipt read: never
+        # matches positively, only blocks contradicted amount-only matches.
+        c['veto_card_last4'] = cached.get('receipt_mismatch_card_last4')
+        c['veto_refs'] = cached.get('receipt_mismatch_refs') or []
+        # Completed AI read said the image is not a successful transfer —
+        # this order may never auto-approve on an amount-only match.
+        c['receipt_unreadable'] = bool(cached.get('receipt_unreadable'))
     return out
 
 
 async def _ai_enrich(cands: list) -> bool:
     """AI-read receipt images of the given candidates (once per order). Returns
-    True if anything new was learned. Fields with an amount that contradicts
-    the order are discarded (wrong screenshot -> human)."""
+    True if anything new was learned. Classification of a COMPLETED read:
+      - success=false OR nothing extractable (no amount, no card, no refs)
+        -> receipt_unreadable flag (bakbot #2292: garbage screenshot must not
+        behave like clean evidence);
+      - readable amount that != the order total -> veto-only fields (bakbot
+        #2277: split payment / wrong screenshot still tells us who paid);
+      - otherwise -> trusted evidence.
+    A FAILED read (AI outage, unreadable file) caches {} — never the
+    unreadable flag — so a quota outage cannot poison orders."""
     if not sms_ai.ai_available():
         return False
     learned = False
@@ -219,11 +247,24 @@ async def _ai_enrich(cands: list) -> bool:
         mime = 'image/png' if c['image'].lower().endswith('.png') else 'image/jpeg'
         fields = await sms_ai.extract_receipt_fields(blob, mime)
         entry: dict = {}
-        if fields:
+        if fields is None:
+            bot_logger.info(f'[SMS] receipt of {oid}: AI read failed — degrading to plain amount matching')
+        else:
             rec_toman = sms_ai.receipt_amount_toman(fields)
-            if rec_toman is not None and rec_toman != int(c.get('amount', -1)):
+            extracted_any = bool(fields.get('amount') or fields.get('source_card_last4')
+                                 or fields.get('ref_numbers'))
+            if not fields.get('success') or not extracted_any:
+                entry = {'receipt_unreadable': True}
+                bot_logger.info(f'[SMS] receipt of {oid}: not a readable successful-transfer image '
+                                f'(success={fields.get("success")}, extracted_any={extracted_any}) '
+                                f'— flagged unreadable; amount-only auto-approval blocked')
+            elif rec_toman is not None and rec_toman != int(c.get('amount', -1)):
+                entry = {'receipt_mismatch_card_last4': fields.get('source_card_last4'),
+                         'receipt_mismatch_refs': fields.get('ref_numbers') or []}
                 bot_logger.info(f'[SMS] receipt of {oid}: amount {rec_toman} toman != order '
-                                f'{c.get("amount")} — ignoring extracted fields')
+                                f'{c.get("amount")} — fields kept as veto-only evidence '
+                                f"(card …{entry.get('receipt_mismatch_card_last4') or '—'} "
+                                f"refs {entry.get('receipt_mismatch_refs') or '—'})")
             else:
                 entry = {'receipt_last4': fields.get('source_card_last4'),
                          'refs': fields.get('ref_numbers') or []}
@@ -239,6 +280,114 @@ def _epoch(dt) -> int:
         return int(dt.timestamp())
     except Exception:
         return 0
+
+
+# ── evidence veto + unreadable gate (bakbot #2277 + #2292, 2026-07-11) ──────
+def _dep_refs(dep: dict) -> set:
+    return {str(r) for r in (dep.get('tracking'), dep.get('retrieval')) if r}
+
+
+def _ref_joined(dep: dict, cand: dict) -> bool:
+    """True when the deposit's SMS refs agree with the candidate's TRUSTED
+    receipt refs — the definitive join; never vetoed, never gated."""
+    return bool(_dep_refs(dep) & {str(r) for r in (cand.get('refs') or ()) if r})
+
+
+def _card_joined(dep: dict, cand: dict) -> bool:
+    """True when the deposit's payer card equals the candidate's TRUSTED
+    receipt card — the tie-break evidence; stays instant, never gated.
+    (Veto-only card can never card-join: it is block-only by definition.)"""
+    src4 = dep.get('source_last4')
+    return bool(src4 and cand.get('receipt_last4') == src4)
+
+
+def _has_receipt_evidence(cand: dict) -> bool:
+    return bool(cand.get('refs') or cand.get('receipt_last4')
+                or cand.get('veto_refs') or cand.get('veto_card_last4')
+                or cand.get('receipt_unreadable'))
+
+
+def _evidence_contradiction(dep: dict, cand: dict) -> str | None:
+    """Reason string when the deposit's evidence CONTRADICTS the candidate's
+    receipt evidence (trusted or veto-only), else None. Spec order:
+      a. deposit refs agree with trusted receipt refs -> ref join, NEVER a
+         contradiction;
+      b. both sides have refs and none agree -> contradiction;
+      c. payer card != receipt card (trusted OR veto-only) -> contradiction;
+      d. deposit refs vs veto-only refs, none agree -> contradiction.
+    """
+    dep_refs = _dep_refs(dep)
+    trusted_refs = {str(r) for r in (cand.get('refs') or ()) if r}
+    if dep_refs & trusted_refs:
+        return None  # ref join — definitive, never vetoed
+    if dep_refs and trusted_refs:
+        return f'sms refs {sorted(dep_refs)} disagree with receipt refs {sorted(trusted_refs)}'
+    src4 = dep.get('source_last4')
+    if src4:
+        for key in ('receipt_last4', 'veto_card_last4'):
+            rc = cand.get(key)
+            if rc and rc != src4:
+                return f'payer card …{src4} != receipt card …{rc} ({key})'
+    veto_refs = {str(r) for r in (cand.get('veto_refs') or ()) if r}
+    if dep_refs and veto_refs and not (dep_refs & veto_refs):
+        return f'sms refs {sorted(dep_refs)} disagree with mismatched-receipt refs {sorted(veto_refs)}'
+    return None
+
+
+def _update_deposit(dedup_id: str, **fields) -> None:
+    with _lock:
+        deps = _load_deposits()
+        for d in deps:
+            if d.get('dedup_id') == dedup_id:
+                d.update(fields)
+        _save_deposits(deps)
+
+
+def _veto_defer(dep: dict, order_id: str, reason: str) -> bool:
+    """Contradicted amount-only pairing: defer, don't hard-reject.
+
+    Returns True while the pairing must stay deferred (grace running — the true
+    owner's order usually appears and wins by ref/card on a later sweep), and
+    False once the grace has expired with no better owner — the caller may then
+    approve (AI misreads happen; the unreadable gate is the only hard block).
+    The grace clock is per deposit+order pair and persisted on the deposit."""
+    now = int(time.time())
+    since = int(dep.get('veto_since') or 0)
+    if not since or dep.get('veto_order') != order_id:
+        dep['veto_since'] = now
+        dep['veto_order'] = order_id
+        _update_deposit(dep['dedup_id'], veto_since=now, veto_order=order_id)
+        bot_logger.info(f"[SMS] evidence veto: deposit {dep['dedup_id']} vs {order_id} — "
+                        f"{reason}; deferring up to {SMS_VETO_GRACE_SEC}s")
+        return True
+    if now - since < SMS_VETO_GRACE_SEC:
+        bot_logger.debug(f"[SMS] evidence veto holding: {dep['dedup_id']} vs {order_id} "
+                         f"({now - since}s of {SMS_VETO_GRACE_SEC}s)")
+        return True
+    bot_logger.info(f"[SMS] evidence veto grace expired with no better owner: "
+                    f"{dep['dedup_id']} -> {order_id} approving despite: {reason}")
+    return False
+
+
+async def _block_unreadable(bot, dep: dict, order_id: str) -> None:
+    """Rule 5b: an order whose receipt is a non-receipt image NEVER auto-approves
+    on an amount-only match — not even after the grace. Tell the admin once per
+    deposit+order pair; the deposit stays unmatched so a better-owning order
+    can still take it later."""
+    if dep.get('unreadable_notified') == order_id:
+        return
+    dep['unreadable_notified'] = order_id
+    _update_deposit(dep['dedup_id'], unreadable_notified=order_id)
+    bot_logger.info(f"[SMS] unreadable-receipt gate: deposit {dep['dedup_id']} amount-matches "
+                    f"{order_id} but its receipt is not a readable transfer image — manual only")
+    await _notify_admin(
+        bot,
+        'واریز بانکی با یک سفارش هم‌مبلغ است اما رسید مشتری تصویر یک انتقال موفق قابل‌خواندن نیست — '
+        'تایید خودکار انجام نشد. اگر پرداخت را تایید می‌کنید دستی تایید کنید.\n'
+        f'مبلغ: {sms_autoapprove.deposit_amount_toman(dep) or 0:,} تومان'
+        f' · پیگیری: {dep.get("tracking") or "—"}'
+        f' · کارت مبدا: …{dep.get("source_last4") or "—"}\n'
+        f'سفارش: {order_id}')
 
 
 # ── admin notify ────────────────────────────────────────────────────────────
@@ -312,6 +461,34 @@ async def _sweep(bot) -> None:
                 if await _ai_enrich([c for c in cands if c['order_id'] in res]):
                     cands = await _candidates(session)
                 kind, res = sms_autoapprove.pick_match(dep, cands, int(dep['ts']), SMS_MATCH_WINDOW_SEC)
+            if kind == 'approve':
+                cand = next((c for c in cands if c['order_id'] == res), None)
+                # Hard gate for amount-only approvals (both entry points — the
+                # incoming-SMS path and the 60s order sweep — funnel through
+                # here, so a fresh order can never approve un-inspected; that
+                # was bakbot incident #2292). Ref joins and card tie-breaks
+                # stay instant and unchanged.
+                if cand is not None and not _ref_joined(dep, cand) and not _card_joined(dep, cand):
+                    # 5a. The winner's receipt has never been AI-read: read it
+                    # NOW, then re-evaluate the pick with the new evidence.
+                    if (cand['order_id'] not in _ai_read_cache
+                            and sms_ai.ai_available() and cand.get('image')):
+                        if await _ai_enrich([cand]):
+                            cands = await _candidates(session)
+                            kind, res = sms_autoapprove.pick_match(
+                                dep, cands, int(dep['ts']), SMS_MATCH_WINDOW_SEC)
+                            cand = next((c for c in cands if c['order_id'] == res), None)
+                    if kind == 'approve' and cand is not None \
+                            and not _ref_joined(dep, cand) and not _card_joined(dep, cand):
+                        # 5b. A garbage/non-receipt image never auto-approves.
+                        if cand.get('receipt_unreadable'):
+                            await _block_unreadable(bot, dep, res)
+                            continue
+                        # 5c. Contradicting evidence defers for the grace, then
+                        # (no better owner having appeared) approves.
+                        reason = _evidence_contradiction(dep, cand)
+                        if reason and _veto_defer(dep, res, reason):
+                            continue
             if kind == 'approve':
                 ok = await _approve(bot, session, res, dep)
                 if ok:
