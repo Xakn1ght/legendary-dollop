@@ -17,10 +17,11 @@ async def handle_dashboard_list_subs(request: web.Request):
         subs = [s for s in subs if _is_dashboard_visible_subscription(s)]
 
         results = []
+        tokens_persisted = False
         for s in subs:
             info = None
             try:
-                info = await marzban_api.get_fast_user_info(s.marzban_username, getattr(s, 'sub_token', None))
+                info = await pasarguard_api.get_fast_user_info(s.marzban_username, getattr(s, 'sub_token', None))
             except Exception:
                 info = None
             # Normalize
@@ -38,6 +39,9 @@ async def handle_dashboard_list_subs(request: web.Request):
                         m = re.search(r"/sub/([^/]+)/?", sub_url_candidate)
                         if m:
                             token = m.group(1)
+                            # Persist so future reads ride the share-link fast path.
+                            s.sub_token = token
+                            tokens_persisted = True
                 except Exception:
                     token = None
             # Build public subscription URL using configured SUBLINK host
@@ -60,6 +64,12 @@ async def handle_dashboard_list_subs(request: web.Request):
                 "subscription_token": token,
                 "subscription_url": public_url,
             })
+
+        if tokens_persisted:
+            try:
+                await session.commit()
+            except Exception:
+                pass
 
         resp = web.json_response({"ok": True, "subscriptions": results})
         if new_session_token:

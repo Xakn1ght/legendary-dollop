@@ -250,8 +250,8 @@ class ValidationError(Exception):
     """Custom validation error."""
     pass
 
-class MarzbanError(Exception):
-    """Custom Marzban API error."""
+class PasarGuardError(Exception):
+    """Custom PasarGuard API error."""
     pass
 
 

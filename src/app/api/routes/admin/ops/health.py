@@ -16,7 +16,7 @@ async def _timed(coro):
 
 
 async def handle_admin_system_health(request: web.Request):
-    """GET /api/admin/system-health — DB / Redis / Marzban reachability plus the
+    """GET /api/admin/system-health — DB / Redis / PasarGuard reachability plus the
     last run of every scheduled job and the SMS auto-approve arm state."""
     try:
         out: dict = {"ok": True}
@@ -40,13 +40,13 @@ async def handle_admin_system_health(request: web.Request):
             out["redis"] = {"ok": False, "latency_ms": 0, "error": str(e)[:120]}
 
         try:
-            from app.services.marzban import marzban_api
+            from app.services.pasarguard import pasarguard_api
 
             t0 = time.monotonic()
-            stats = await marzban_api.get_system_stats()
+            stats = await pasarguard_api.get_system_stats()
             ms = int((time.monotonic() - t0) * 1000)
             if stats:
-                out["marzban"] = {
+                out["pasarguard"] = {
                     "ok": True, "latency_ms": ms,
                     "version": stats.get("version"),
                     "total_users": stats.get("total_user"),
@@ -55,9 +55,9 @@ async def handle_admin_system_health(request: web.Request):
                     "outgoing_bandwidth": stats.get("outgoing_bandwidth"),
                 }
             else:
-                out["marzban"] = {"ok": False, "latency_ms": ms, "error": "no_response"}
+                out["pasarguard"] = {"ok": False, "latency_ms": ms, "error": "no_response"}
         except Exception as e:
-            out["marzban"] = {"ok": False, "latency_ms": 0, "error": str(e)[:120]}
+            out["pasarguard"] = {"ok": False, "latency_ms": 0, "error": str(e)[:120]}
 
         try:
             from app.core.settings import JOB_SCHEDULES

@@ -186,7 +186,7 @@ async def _run():
 
     async def _fake_activate(db, sub_id):
         return None
-    crud.create_subscription_on_marzban = _fake_marzban
+    crud.create_subscription_on_pasarguard = _fake_marzban
     crud.activate_subscription = _fake_activate
 
     # 7) fresh 30% marketing coupon for the buyer → checkout applies it

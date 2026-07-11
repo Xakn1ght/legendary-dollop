@@ -58,7 +58,7 @@ class AddSubscriptionRequest(BaseModel):
     username: Optional[str] = Field(
         default=None,
         max_length=100,
-        description="Marzban username"
+        description="PasarGuard username"
     )
     token: Optional[str] = Field(
         default=None,

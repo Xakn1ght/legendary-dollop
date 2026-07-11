@@ -17,7 +17,7 @@ from aiohttp import web
 from app.api.deps import _verify_webapp_auth, set_tma_session_cookie
 from app.database import crud
 from app.database.models import AsyncSessionLocal
-from app.services.marzban import marzban_api
+from app.services.pasarguard import pasarguard_api
 
 logger = logging.getLogger(__name__)
 
@@ -90,7 +90,7 @@ async def handle_dashboard_orbit_add_link(request: web.Request):
         # Resolve the public sub URL + expiry server-side (never from the client).
         info = None
         try:
-            info = await marzban_api.get_fast_user_info(sub.marzban_username, getattr(sub, "sub_token", None))
+            info = await pasarguard_api.get_fast_user_info(sub.marzban_username, getattr(sub, "sub_token", None))
         except Exception:
             info = None
         from app.core.settings import SUBLINK

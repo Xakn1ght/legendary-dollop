@@ -16,9 +16,9 @@ except ImportError:
 _ERROR_STATUS = {
     "not_found_or_handled": 404,
     "user_missing": 404,
-    "marzban_fetch_failed": 500,
-    "marzban_reset_failed": 500,
-    "marzban_update_failed": 500,
+    "panel_fetch_failed": 500,
+    "panel_reset_failed": 500,
+    "panel_update_failed": 500,
 }
 
 

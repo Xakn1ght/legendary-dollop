@@ -18,9 +18,9 @@ _ERROR_KEYS = {
     "sub_invalid": "admin_charge_sub_invalid",
     "user_missing": "admin_charge_user_missing",
     "sub_inactive": "admin_charge_sub_inactive",
-    "marzban_fetch_failed": "admin_charge_fetch_marzban_failed",
-    "marzban_reset_failed": "admin_charge_marzban_reset_failed",
-    "marzban_update_failed": "admin_charge_marzban_update_failed",
+    "panel_fetch_failed": "admin_charge_fetch_panel_failed",
+    "panel_reset_failed": "admin_charge_panel_reset_failed",
+    "panel_update_failed": "admin_charge_panel_update_failed",
 }
 
 

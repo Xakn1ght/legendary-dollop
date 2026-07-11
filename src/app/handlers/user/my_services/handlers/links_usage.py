@@ -10,7 +10,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import crud
 from app.database.models import Subscription
-from app.services.marzban import marzban_api
+from app.services.pasarguard import pasarguard_api
 from app.utils.bot_i18n import get_cached_lang, t
 
 from ..constants import COUNTRY_COLORS, COUNTRY_ORDER
@@ -39,13 +39,13 @@ async def send_subscription_links(callback: CallbackQuery, session: AsyncSession
 
     _last_link_click[key] = now
 
-    # Load subscription & fetch links from Marzban
+    # Load subscription & fetch links from PasarGuard
     sub = await crud.activate_subscription(session, sub_id)
     if not sub:
         await callback.answer(t(lang, "service_not_found"), show_alert=True)
         return
 
-    user_info = await marzban_api.get_fast_user_info(sub.marzban_username, getattr(sub, 'sub_token', None))
+    user_info = await pasarguard_api.get_fast_user_info(sub.marzban_username, getattr(sub, 'sub_token', None))
     if not user_info:
         await callback.answer(t(lang, "failed_fetch_links"), show_alert=True)
         return
@@ -98,7 +98,7 @@ async def send_usage(callback: CallbackQuery, session: AsyncSession):
         await callback.answer(t(lang, "service_not_found"), show_alert=True)
         return
 
-    usage_list = await marzban_api.get_user_usage(sub.marzban_username, days=7)
+    usage_list = await pasarguard_api.get_user_usage(sub.marzban_username, days=7)
     if usage_list is None:
         await callback.answer(t(lang, "failed_fetch_usage"), show_alert=True)
         return

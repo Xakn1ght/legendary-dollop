@@ -5,11 +5,11 @@ from aiogram.types import CallbackQuery, InlineKeyboardButton, InlineKeyboardMar
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import crud
-from app.services.marzban import marzban_api
+from app.services.pasarguard import pasarguard_api
 from app.utils.logger import bot_logger
 from app.utils.text_format import to_persian_digits
 
-from .common import _patch_marzban_user, router
+from .common import _patch_panel_user, router
 
 
 @router.callback_query(F.data.startswith("starchoice_"))
@@ -78,11 +78,11 @@ async def handle_star_choice(callback: CallbackQuery, session: AsyncSession):
             return
 
         sub = active_subs[0]
-        user_info = await marzban_api.get_user_info(sub.marzban_username)
+        user_info = await pasarguard_api.get_user_info(sub.marzban_username)
         if user_info:
             current_expire = user_info.get("expire") or 0
             new_expire = current_expire + (days * 24 * 60 * 60)
-            if await _patch_marzban_user(sub.marzban_username, {"expire": new_expire}):
+            if await _patch_panel_user(sub.marzban_username, {"expire": new_expire}):
                 await crud.add_reward_history(
                     session,
                     user.id,
@@ -233,7 +233,7 @@ async def _apply_star_reward(callback: CallbackQuery, session: AsyncSession, cla
 
             if len(active_subs) == 1:
                 sub = active_subs[0]
-                user_info = await marzban_api.get_user_info(sub.marzban_username)
+                user_info = await pasarguard_api.get_user_info(sub.marzban_username)
                 if not user_info:
                     await callback.answer("خطا در دریافت اطلاعات سرویس.", show_alert=True)
                     return False
@@ -241,7 +241,7 @@ async def _apply_star_reward(callback: CallbackQuery, session: AsyncSession, cla
                 current_expire_ts = user_info.get("expire") or 0
                 new_expire = current_expire_ts + days_to_add * 24 * 60 * 60
 
-                if not await _patch_marzban_user(
+                if not await _patch_panel_user(
                     sub.marzban_username, {"expire": new_expire}
                 ):
                     await callback.answer("خطا در افزایش زمان اعتبار.", show_alert=True)
@@ -469,7 +469,7 @@ async def apply_days_to_subscription(callback: CallbackQuery, session: AsyncSess
 
     try:
         days_to_add = int(tier.reward_value)
-        user_info = await marzban_api.get_user_info(sub.marzban_username)
+        user_info = await pasarguard_api.get_user_info(sub.marzban_username)
         if not user_info:
             await callback.answer("خطا در دریافت اطلاعات سرویس.", show_alert=True)
             return
@@ -477,7 +477,7 @@ async def apply_days_to_subscription(callback: CallbackQuery, session: AsyncSess
         current_expire_ts = user_info.get("expire") or 0
         new_expire = current_expire_ts + days_to_add * 24 * 60 * 60
 
-        if not await _patch_marzban_user(
+        if not await _patch_panel_user(
             sub.marzban_username, {"expire": new_expire}
         ):
             await callback.answer("خطا در افزایش زمان اعتبار.", show_alert=True)

@@ -9,7 +9,7 @@ from aiohttp import web
 from .checks import (
     check_bot_health,
     check_database_health,
-    check_marzban_health,
+    check_pasarguard_health,
     check_redis_health,
     check_scheduler_health,
 )
@@ -24,9 +24,9 @@ async def handle_health_check(request: web.Request) -> web.Response:
     start_time = time.time()
 
     # Run all health checks concurrently
-    database_check, marzban_check, redis_check, bot_check, scheduler_check = await asyncio.gather(
+    database_check, pasarguard_check, redis_check, bot_check, scheduler_check = await asyncio.gather(
         check_database_health(),
-        check_marzban_health(),
+        check_pasarguard_health(),
         check_redis_health(),
         check_bot_health(request),
         check_scheduler_health(request),
@@ -43,13 +43,13 @@ async def handle_health_check(request: web.Request) -> web.Response:
         return check_result
 
     database_check = process_check(database_check)
-    marzban_check = process_check(marzban_check)
+    pasarguard_check = process_check(pasarguard_check)
     redis_check = process_check(redis_check, "unavailable")
     bot_check = process_check(bot_check)
     scheduler_check = process_check(scheduler_check)
 
     # Determine overall system status
-    critical_services = [database_check, marzban_check, bot_check]
+    critical_services = [database_check, pasarguard_check, bot_check]
     optional_services = [redis_check, scheduler_check]
 
     overall_status = "healthy"
@@ -75,7 +75,7 @@ async def handle_health_check(request: web.Request) -> web.Response:
         "timestamp": datetime.utcnow().isoformat() + "Z",
         "checks": {
             "database": database_check,
-            "marzban": marzban_check,
+            "pasarguard": pasarguard_check,
             "redis": redis_check,
             "bot": bot_check,
             "scheduler": scheduler_check

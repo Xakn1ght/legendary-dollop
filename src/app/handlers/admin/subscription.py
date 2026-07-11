@@ -144,9 +144,9 @@ async def approve_subscription(callback: CallbackQuery, session: AsyncSession, b
     else:
         fail_msg = t(lang, "admin_sub_process_failed")
         if lang == "fa":
-            fail_msg += "\n\nسرور VPN (Marzban) کاربر را نساخت. لاگ admin_bot_error.log را ببینید."
+            fail_msg += "\n\nسرور VPN (پنل) کاربر را نساخت. لاگ admin_bot_error.log را ببینید."
         else:
-            fail_msg += "\n\nMarzban did not create the user. See admin_bot_error.log."
+            fail_msg += "\n\nPasarGuard did not create the user. See admin_bot_error.log."
         await callback.answer(fail_msg, show_alert=True)
         try:
             await callback.message.delete()

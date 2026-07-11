@@ -7,7 +7,7 @@ Replaces the duplicated implementations in ``handlers/user/add_subscription.py``
 Canonical rules (stricter of the two old surfaces):
 - subscription links must come from an allowed domain when
   ``DASHBOARD_SUBSCRIPTION_DOMAIN_ENFORCE`` is on (previously webapp-only);
-- the account must actually exist on Marzban before a row is created
+- the account must actually exist on PasarGuard before a row is created
   (previously bot-only — the webapp would create an active row from a bare name);
 - revoke / remove require ownership (the bot's revoke button previously accepted
   ANY subscription id with no ownership check).
@@ -30,7 +30,7 @@ from app.core.settings import (
 from app.database import crud
 from app.database.models import Subscription
 from app.services.flows.errors import FlowError
-from app.services.marzban import marzban_api
+from app.services.pasarguard import pasarguard_api
 
 logger = logging.getLogger(__name__)
 
@@ -108,10 +108,10 @@ async def add_subscription_by_link(
     token: str | None = None,
     username: str | None = None,
 ) -> AddSubResult:
-    """Attach an existing Marzban account to this user's panel.
+    """Attach an existing PasarGuard account to this user's panel.
 
     Accepts a subscription URL (preferred), a bare token, or a username. In every
-    case the account must resolve on Marzban before anything is persisted.
+    case the account must resolve on PasarGuard before anything is persisted.
     """
     if url:
         token = extract_token_from_link(url)
@@ -121,21 +121,48 @@ async def add_subscription_by_link(
         raise FlowError("subscription_url_required", "Subscription link is required")
 
     username_val = (username or "").strip() or None
+    account_verified = False
+
     if token:
-        try:
-            info = await marzban_api.get_subscription_info(token)
-        except Exception:
-            info = None
-        if info and not username_val:
-            username_val = info.get("username")
+        # PasarGuard v3 tokens embed the panel user id — one by-id call yields
+        # username + existence together, replacing the two-step share-info +
+        # admin-info round-trips. Possession security is preserved: the pasted
+        # token must equal the token in the account's CURRENT subscription_url
+        # (a revoked or forged link fails, exactly like /sub/{token}/info).
+        # Classic tokens keep the original two-step path unchanged.
+        from app.services.pasarguard import extract_v3_user_id
+
+        v3_id = extract_v3_user_id(token)
+        if v3_id is not None:
+            try:
+                by_id = await pasarguard_api.get_user_info_by_id(v3_id)
+            except Exception:
+                by_id = None
+            current_token = None
+            m = _SUB_TOKEN_RE.search((by_id or {}).get("subscription_url") or "")
+            if m:
+                current_token = m.group(1)
+            if by_id and current_token == token:
+                if not username_val:
+                    username_val = by_id.get("username")
+                account_verified = bool(username_val)
+
+        if not account_verified and not username_val:
+            try:
+                info = await pasarguard_api.get_subscription_info(token)
+            except Exception:
+                info = None
+            if info:
+                username_val = info.get("username")
 
     if not username_val:
         raise FlowError("cannot_resolve_username")
 
-    # The account must exist on Marzban (bot behavior; the webapp used to skip this).
-    user_info = await marzban_api.get_user_info(username_val)
-    if user_info is None:
-        raise FlowError("marzban_account_not_found", "No such account on the VPN server")
+    # The account must exist on PasarGuard (bot behavior; the webapp used to skip this).
+    if not account_verified:
+        user_info = await pasarguard_api.get_user_info(username_val)
+        if user_info is None:
+            raise FlowError("panel_account_not_found", "No such account on the VPN server")
 
     existing = await crud.get_subscription_by_username(session, username_val)
     if existing:
@@ -180,7 +207,7 @@ async def _get_owned_subscription(session: AsyncSession, user, sub_id: int) -> S
 
 
 async def remove_local_subscription(session: AsyncSession, user, sub_id: int) -> None:
-    """Detach a subscription from this user's panel (no Marzban change).
+    """Detach a subscription from this user's panel (no PasarGuard change).
 
     Owners are detached from the row; link-table (shared) users get their link row
     removed instead."""
@@ -201,19 +228,22 @@ async def remove_local_subscription(session: AsyncSession, user, sub_id: int) ->
 
 
 async def revoke_subscription(session: AsyncSession, user, sub_id: int) -> RevokeResult:
-    """Rotate the subscription link on Marzban. Ownership required — the old bot
+    """Rotate the subscription link on PasarGuard. Ownership required — the old bot
     button revoked any subscription id without checking."""
     sub = await _get_owned_subscription(session, user, sub_id)
 
-    ok = await marzban_api.revoke_user_subscription(sub.marzban_username)
-    if not ok:
+    result = await pasarguard_api.revoke_user_subscription(sub.marzban_username)
+    if not result:
         raise FlowError("revoke_failed")
 
-    info = None
+    # PasarGuard's revoke response carries the updated user (with the NEW
+    # subscription_url) — only fetch when the panel sent a bodyless success.
+    info = result if isinstance(result, dict) else None
     new_link = None
     new_token = None
     try:
-        info = await marzban_api.get_user_info(sub.marzban_username)
+        if info is None:
+            info = await pasarguard_api.get_user_info(sub.marzban_username)
         new_link = (info or {}).get("subscription_url")
         if new_link:
             m = _SUB_TOKEN_RE.search(new_link)

@@ -29,7 +29,7 @@ from app.core.settings import (
 )
 from app.database import crud
 from app.database.models import AsyncSessionLocal, Referral, Subscription, User
-from app.services.marzban import marzban_api
+from app.services.pasarguard import pasarguard_api
 from app.utils.validation import detect_image_type, validate_image_bytes
 
 logger = logging.getLogger(__name__)

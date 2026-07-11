@@ -5,6 +5,6 @@ from . import (
     star_tier,  # noqa: F401
     voucher,  # noqa: F401
 )
-from .common import _patch_marzban_user, router
+from .common import _patch_panel_user, router
 
-__all__ = ["router", "_patch_marzban_user"]
+__all__ = ["router", "_patch_panel_user"]

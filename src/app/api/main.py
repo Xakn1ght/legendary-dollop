@@ -33,7 +33,7 @@ def build_app() -> web.Application:
         """Tear down resources when the aiohttp app stops.
 
         When ``embedded_user_bot`` is True (normal ``main.py`` embed), the user bot's
-        shutdown handler already closes Marzban, Redis, DB, and both bot helper sessions;
+        shutdown handler already closes PasarGuard, Redis, DB, and both bot helper sessions;
         we only run the lightweight path here to avoid double-disposing the engine.
         """
         embedded = app_.get("embedded_user_bot", False)
@@ -47,9 +47,9 @@ def build_app() -> web.Application:
         if embedded:
             return
         try:
-            from app.services.marzban import marzban_api
+            from app.services.pasarguard import pasarguard_api
 
-            await marzban_api.close()
+            await pasarguard_api.close()
         except Exception:
             pass
         try:

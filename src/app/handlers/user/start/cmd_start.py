@@ -135,7 +135,7 @@ async def cmd_start(message: Message, state: FSMContext, session: AsyncSession, 
 		try:
 			import time
 
-			from app.services.marzban import marzban_api
+			from app.services.pasarguard import pasarguard_api
 			user_obj = await crud.get_user(session, chat_id)
 			subs = await crud.get_user_subscriptions(session, user_obj.id)
 			active_subs = [s for s in subs if (getattr(s, 'status', None) or '').lower() == 'active']
@@ -148,7 +148,9 @@ async def cmd_start(message: Message, state: FSMContext, session: AsyncSession, 
 			for s in active_subs:
 				if not getattr(s, 'marzban_username', None):
 					continue
-				info = await marzban_api.get_user_info(s.marzban_username)
+				# Read-only summary — the short-TTL cached path spares the panel
+				# a full admin fetch per subscription on every /start.
+				info = await pasarguard_api.get_fast_user_info(s.marzban_username, getattr(s, 'sub_token', None))
 				if not info:
 					continue
 				# Expiry (seconds since epoch)

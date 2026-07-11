@@ -5,7 +5,7 @@ Covers the divergences fixed by the shared layer:
 - service-name regex enforced server-side
 - orders start as draft; receipt flips to pending; double-submit rejected
 - cancel refunds credit to the INTERNAL user id and restores coupon + discounts
-- auto-approve rollback when Marzban provisioning fails
+- auto-approve rollback when the panel provisioning fails
 - deny restores the consumed coupon (previously lost on both surfaces)
 
 Run: PYTHONPATH=src python tests/test_purchase_service.py
@@ -222,9 +222,9 @@ async def test_auto_approve_rollback():
         await db.commit()
 
         async def _fail_marzban(sub, plan_info):
-            raise RuntimeError("marzban down")
+            raise RuntimeError("panel down")
 
-        crud.create_subscription_on_marzban = _fail_marzban
+        crud.create_subscription_on_pasarguard = _fail_marzban
 
         q = await quote_purchase(db, user, plan_name="plan20", coupon_id=c.id, use_credit=True)
         assert q.final_price == 0
@@ -255,7 +255,7 @@ async def test_auto_approve_success_free_gb():
             captured["plan_info"] = plan_info
             return {"subscription_url": "https://x/sub/tok"}
 
-        crud.create_subscription_on_marzban = _ok_marzban
+        crud.create_subscription_on_pasarguard = _ok_marzban
 
         q = await quote_purchase(db, user, plan_name="plan20", coupon_id=c.id, use_credit=True)
         res = await start_purchase_order(db, user, quote=q, service_name="svcfree", bot=None)

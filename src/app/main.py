@@ -38,7 +38,7 @@ from app.jobs.notifications import check_low_data_job
 from app.jobs.renewal import renewal_job
 from app.jobs.season_reset import season_reset_job
 from app.jobs.sms_sweep import sms_sweep_job
-from app.services.marzban import marzban_api
+from app.services.pasarguard import pasarguard_api
 from app.utils.banned_user_middleware import BannedUserMiddleware
 from app.utils.error_middleware import (
     ErrorHandlingMiddleware,
@@ -275,7 +275,7 @@ async def main():
                 token_re = re.compile(r"/sub/([^/]+)/?")
                 for sub in subs:
                     try:
-                        info = await marzban_api.get_user_info(sub.marzban_username)
+                        info = await pasarguard_api.get_user_info(sub.marzban_username)
                         if not info:
                             continue
                         sub_url = info.get("subscription_url")
@@ -356,6 +356,17 @@ async def main():
     # Perform backfill in the background without blocking startup
     asyncio.create_task(backfill_share_link_tokens())
 
+    # One-time PasarGuard template audit: logs which plan shapes are
+    # template-backed (creation then uses /api/user/from_template for those).
+    # Failure is non-fatal — creation falls back to the manual path.
+    async def _audit_panel_templates():
+        try:
+            await pasarguard_api.audit_templates()
+        except Exception as e:
+            log_error(e, {"operation": "startup_template_audit"})
+
+    asyncio.create_task(_audit_panel_templates())
+
     # Start the dedicated notification worker
     notification_task = asyncio.create_task(notification_worker(notification_queue, bot))
     
@@ -386,7 +397,7 @@ async def main():
                 http_runner = None
             
             # 4. Close external connections
-            await marzban_api.close()
+            await pasarguard_api.close()
             if _fsm_redis is not None:
                 try:
                     await _fsm_redis.aclose()

@@ -5,7 +5,7 @@ Covers the divergences fixed by the shared layer:
 - server-side >5GB gate
 - approve is idempotent and requires an active subscription
 - carry-over math cases (expired / <=5GB / >5GB with 5GB-limit / days-only)
-- booking: renewal_paid is set ONLY at approval, with no Marzban call
+- booking: renewal_paid is set ONLY at approval, with no the panel call
 
 Run: PYTHONPATH=src python tests/test_charge_service.py
 """
@@ -56,12 +56,13 @@ class _FakeHttp:
         return _FakeResp()
 
 
-class FakeMarzban:
+class FakePasarGuard:
     base_url = "http://fake"
 
     def __init__(self, info):
         self.info = info
         self.calls = []
+        self.invalidated = []  # cache invalidations (money paths must hit this)
 
     async def get_user_info(self, username):
         return self.info
@@ -70,6 +71,9 @@ class FakeMarzban:
         self.calls.append(("reset", new_data_limit_bytes, new_expire_ts))
         return True
 
+    async def invalidate_user_info(self, username):
+        self.invalidated.append(username)
+
     async def _get_session(self):
         return _FakeHttp(self.calls)
 
@@ -77,7 +81,7 @@ class FakeMarzban:
         return {}
 
 
-async def _setup(marzban_info=None):
+async def _setup(pasarguard_info=None):
     eng = create_async_engine("sqlite+aiosqlite:///:memory:")
     async with eng.begin() as c:
         await c.run_sync(Base.metadata.create_all)
@@ -85,8 +89,8 @@ async def _setup(marzban_info=None):
 
     charge_mod.CHARGE_PRESET_PACKAGES = PACKAGES
     charge_mod.PLANS = PLANS
-    fake = FakeMarzban(marzban_info or {"data_limit": 10 * GB, "used_traffic": 8 * GB, "expire": 0})
-    charge_mod.marzban_api = fake
+    fake = FakePasarGuard(pasarguard_info or {"data_limit": 10 * GB, "used_traffic": 8 * GB, "expire": 0})
+    charge_mod.pasarguard_api = fake
 
     async with Session() as db:
         db.add(User(id=1, chat_id=CHAT, referral_code="me", credit=200000))
@@ -158,7 +162,7 @@ async def test_full_credit_charge_goes_to_admin_queue():
 
 
 async def test_gate_ownership_and_guards():
-    Session, fake = await _setup(marzban_info={"data_limit": 20 * GB, "used_traffic": 0, "expire": 0})
+    Session, fake = await _setup(pasarguard_info={"data_limit": 20 * GB, "used_traffic": 0, "expire": 0})
     async with Session() as db:
         user = await crud.get_user(db, CHAT)
 
@@ -197,7 +201,7 @@ async def test_gate_ownership_and_guards():
 
 async def test_approve_carry_over_and_idempotency():
     # remaining = 2GB (<=5GB): carry it all, reset usage.
-    Session, fake = await _setup(marzban_info={"data_limit": 10 * GB, "used_traffic": 8 * GB, "expire": 0})
+    Session, fake = await _setup(pasarguard_info={"data_limit": 10 * GB, "used_traffic": 8 * GB, "expire": 0})
     async with Session() as db:
         user = await crud.get_user(db, CHAT)
         res = await start_charge_order(db, user, subscription_id=10, package_name="pkg30")
@@ -216,7 +220,7 @@ async def test_approve_carry_over_and_idempotency():
             assert e.code == "not_found_or_handled"
 
     # remaining = 12GB with 5GB-limit: carry 5, lose 7.
-    Session, fake = await _setup(marzban_info={"data_limit": 12 * GB, "used_traffic": 0, "expire": 0})
+    Session, fake = await _setup(pasarguard_info={"data_limit": 12 * GB, "used_traffic": 0, "expire": 0})
     async with Session() as db:
         user = await crud.get_user(db, CHAT)
         res = await start_charge_order(
@@ -228,7 +232,7 @@ async def test_approve_carry_over_and_idempotency():
 
     # expired subscription: fresh limit, no carry.
     past = int(datetime.datetime.utcnow().timestamp()) - 1000
-    Session, fake = await _setup(marzban_info={"data_limit": 12 * GB, "used_traffic": 1 * GB, "expire": past})
+    Session, fake = await _setup(pasarguard_info={"data_limit": 12 * GB, "used_traffic": 1 * GB, "expire": past})
     async with Session() as db:
         user = await crud.get_user(db, CHAT)
         res = await start_charge_order(
@@ -273,9 +277,9 @@ async def test_booking_renewal_only_at_approval():
         sub = await db.get(Subscription, 10)
         assert not sub.renewal_paid  # still not set: receipt is unverified
 
-        marzban_calls_before = list(fake.calls)
+        pasarguard_calls_before = list(fake.calls)
         await approve_charge(db, req.id, user_bot=None)
-        assert fake.calls == marzban_calls_before  # booking approval never touches Marzban
+        assert fake.calls == pasarguard_calls_before  # booking approval never touches the panel
 
         await db.refresh(sub)
         assert sub.renewal_paid and sub.renewal_template == "plan50" and sub.renewal_price == 200000
@@ -335,6 +339,9 @@ async def test_custom_charge_days_only_and_gate():
         # days-only: extend expiry via PUT, no traffic reset, no carry/loss.
         assert result.extra_days == 15 and result.added_gb == 0 and result.carry_bytes == 0
         assert fake.calls != before and fake.calls[-1][0] == "put"
+        # The non-reset PUT branch must invalidate the cached panel info —
+        # the user opens the dashboard right after approval.
+        assert "svc" in fake.invalidated, fake.invalidated
 
     # Active-subscription gate.
     Session, fake = await _setup()
@@ -355,7 +362,7 @@ async def test_vip_only_package_gate():
     """VIP-exclusive charge packages (2026-07-09) are rejected for non-VIP
     users at the money path and priced flat (no discounts) for VIPs."""
     Session, fake = await _setup(
-        marzban_info={"data_limit": 10 * GB, "used_traffic": 9 * GB, "expire": 0}
+        pasarguard_info={"data_limit": 10 * GB, "used_traffic": 9 * GB, "expire": 0}
     )
     charge_mod.CHARGE_PRESET_PACKAGES = {
         **PACKAGES,
@@ -393,7 +400,7 @@ async def test_unlimited_sub_not_chargeable():
     (2026-07-09, Pasha could start a charge on an unlimited admin sub)."""
     for dl in (0, None):
         Session, fake = await _setup(
-            marzban_info={"data_limit": dl, "used_traffic": 5221 * GB, "expire": 0}
+            pasarguard_info={"data_limit": dl, "used_traffic": 5221 * GB, "expire": 0}
         )
         async with Session() as db:
             user = await crud.get_user(db, CHAT)
@@ -411,7 +418,7 @@ async def test_custom_gb_package():
     from app.services.flows.pricing import get_plan_info
 
     Session, fake = await _setup(
-        marzban_info={"data_limit": 10 * GB, "used_traffic": 9 * GB, "expire": 0}
+        pasarguard_info={"data_limit": 10 * GB, "used_traffic": 9 * GB, "expire": 0}
     )
     async with Session() as db:
         user = await crud.get_user(db, CHAT)

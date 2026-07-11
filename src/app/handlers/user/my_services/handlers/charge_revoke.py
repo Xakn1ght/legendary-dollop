@@ -9,7 +9,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.database import crud
 from app.database.models import Subscription
 from app.handlers.user.charge import check_subscription_traffic
-from app.services.marzban import marzban_api
+from app.services.pasarguard import pasarguard_api
 from app.utils.bot_i18n import get_cached_lang, t
 
 from ..utils import to_persian_digits
@@ -53,7 +53,7 @@ async def handle_charge_button(callback: CallbackQuery, state: FSMContext, sessi
     token = callback.data.split("_", 1)[1]
     subscription: Subscription | None = None
     user = await crud.get_user(session, callback.from_user.id)
-    # Prefer numeric id when provided; otherwise treat as marzban username.
+    # Prefer numeric id when provided; otherwise treat as panel username.
     # Either way the subscription must belong to the caller (the numeric path
     # previously skipped that check and leaked other users' traffic info).
     try:
@@ -133,7 +133,7 @@ async def revoke_subscription(callback: CallbackQuery, session: AsyncSession, st
                 _ = None
             # Rebuild the subscription detail card with the new URL and update the existing card
             try:
-                sub_info = await marzban_api.get_fast_user_info(sub.marzban_username, getattr(sub, 'sub_token', None))
+                sub_info = await pasarguard_api.get_fast_user_info(sub.marzban_username, getattr(sub, 'sub_token', None))
                 detail_text, detail_kb, _ = build_subscription_detail(sub, sub_info, generate_image=False)
                 # Try edit as text message
                 try:

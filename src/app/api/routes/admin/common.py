@@ -34,7 +34,7 @@ from app.database.models import (
     User,
     VipOrder,
 )
-from app.services.marzban import marzban_api
+from app.services.pasarguard import pasarguard_api
 from app.utils.admin_ip_whitelist import load_whitelist, update_whitelist
 
 # WebSocket broadcast (safe import - if fails, just doesn't broadcast)

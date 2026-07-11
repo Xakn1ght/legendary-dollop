@@ -87,9 +87,9 @@ async def handle_dashboard_redeem_referral_reward(request: web.Request):
                 if not target_sub:
                     return web.json_response({"ok": False, "error": "no_active_subscription"}, status=400)
 
-                info = await marzban_api.get_user_info(target_sub.marzban_username)
+                info = await pasarguard_api.get_user_info(target_sub.marzban_username)
                 if not info:
-                    return web.json_response({"ok": False, "error": "marzban_user_not_found"}, status=502)
+                    return web.json_response({"ok": False, "error": "pasarguard_user_not_found"}, status=502)
 
                 # Traffic onto an unlimited account is meaningless — reject
                 # before the voucher is spent. Days are fine (expiry applies
@@ -104,9 +104,9 @@ async def handle_dashboard_redeem_referral_reward(request: web.Request):
                     patch["expire"] = int(info.get("expire") or 0) + (chosen_days * 24 * 60 * 60)
 
                 if patch:
-                    ok = await marzban_api.update_user(target_sub.marzban_username, patch)
+                    ok = await pasarguard_api.update_user(target_sub.marzban_username, patch)
                     if not ok:
-                        return web.json_response({"ok": False, "error": "marzban_update_failed"}, status=502)
+                        return web.json_response({"ok": False, "error": "panel_update_failed"}, status=502)
 
             landed_bucket = None
             if chosen_credit > 0:

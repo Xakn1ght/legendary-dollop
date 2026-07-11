@@ -67,7 +67,7 @@ async def handle_dashboard_overview(request: web.Request):
 
         info = None
         try:
-            info = await marzban_api.get_fast_user_info(sub.marzban_username, getattr(sub, 'sub_token', None))
+            info = await pasarguard_api.get_fast_user_info(sub.marzban_username, getattr(sub, 'sub_token', None))
         except Exception:
             info = None
 
@@ -81,6 +81,10 @@ async def handle_dashboard_overview(request: web.Request):
                     m = re.search(r"/sub/([^/]+)/?", sub_url_candidate)
                     if m:
                         token = m.group(1)
+                        # Persist so future reads ride the share-link fast path
+                        # instead of deriving the token from the admin API again.
+                        sub.sub_token = token
+                        await session.commit()
             except Exception:
                 token = None
         public_url = None
@@ -93,7 +97,7 @@ async def handle_dashboard_overview(request: web.Request):
         # Guess location from the last 7 days of usage by node name
         location_guess = None
         try:
-            usage_list = await marzban_api.get_user_usage(sub.marzban_username, days=7)
+            usage_list = await pasarguard_api.get_user_usage(sub.marzban_username, days=7)
             if usage_list:
                 totals = {}
                 for item in usage_list:

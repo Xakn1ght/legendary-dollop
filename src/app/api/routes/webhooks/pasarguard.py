@@ -22,7 +22,7 @@ from app.core.settings import PASARGUARD_WEBHOOK_SECRET
 from app.database import models
 from app.database.models import AsyncSessionLocal
 from app.services import user_alerts
-from app.services.marzban import marzban_api
+from app.services.pasarguard import pasarguard_api
 from app.utils.logger import bot_logger
 
 # Actions that mean "plan ran out" → try instant auto-renew / finished DM.
@@ -104,7 +104,7 @@ async def handle_pasarguard_webhook(request: web.Request):
 
         # Any lifecycle event → that user's cached panel info is stale.
         try:
-            await marzban_api.invalidate_user_info(username)
+            await pasarguard_api.invalidate_user_info(username)
         except Exception:
             pass
 
@@ -132,7 +132,7 @@ async def handle_pasarguard_webhook(request: web.Request):
 
                 elif action in _USAGE_WARN_ACTIONS:
                     # Threshold warning (panel configured at 80% used).
-                    info = await marzban_api.get_fast_user_info(username, getattr(sub, "sub_token", None))
+                    info = await pasarguard_api.get_fast_user_info(username, getattr(sub, "sub_token", None))
                     data_limit = (info or {}).get("data_limit") or 0
                     used = (info or {}).get("used_traffic") or 0
                     remaining = max(data_limit - used, 0)

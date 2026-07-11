@@ -41,7 +41,7 @@ from app.database.models import (
     VipOrder,
 )
 from app.handlers.user.my_services.utils import map_inbound_to_country
-from app.services.marzban import marzban_api
+from app.services.pasarguard import pasarguard_api
 from app.utils.validation import detect_image_type, validate_image_bytes
 from app.utils.webapp_verify import create_session_token, verify_init_data, verify_session_token
 

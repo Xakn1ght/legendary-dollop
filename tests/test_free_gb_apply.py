@@ -46,7 +46,7 @@ class FakeRequest:
         return self._body
 
 
-class FakeMarzban:
+class FakePasarGuard:
     """data_limit map per username; None entry = panel user missing."""
 
     def __init__(self):
@@ -93,7 +93,7 @@ async def _setup():
         )
     Session = async_sessionmaker(eng, expire_on_commit=False)
 
-    fake = FakeMarzban()
+    fake = FakePasarGuard()
     future = datetime.datetime.utcnow() + datetime.timedelta(days=30)
     past = datetime.datetime.utcnow() - datetime.timedelta(days=1)
 
@@ -123,7 +123,7 @@ async def _setup():
 
     for mod in (fga_mod, rr_mod):
         mod.AsyncSessionLocal = Session
-        mod.marzban_api = fake
+        mod.pasarguard_api = fake
         mod._verify_webapp_auth = _auth_ok
     return Session, fake
 

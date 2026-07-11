@@ -7,7 +7,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import crud
 from app.handlers.admin.common import ADMIN_IDS, _send_pending_requests
-from app.services.marzban import marzban_api
+from app.services.pasarguard import pasarguard_api
 from app.utils.admin_bot_helper import get_user_bot
 from app.utils.bot_i18n import get_cached_lang, guess_lang_from_telegram, t
 
@@ -35,7 +35,7 @@ async def _edit_user_detail(sub, user_chat_id, user_msg_id):
     if not ub:
         return
     try:
-        user_info = await marzban_api.get_user_info(sub.marzban_username)
+        user_info = await pasarguard_api.get_user_info(sub.marzban_username)
         if user_info:
             from app.handlers.user.my_services import build_subscription_detail
             text, kb = build_subscription_detail(sub, user_info)
@@ -117,9 +117,9 @@ async def approve_disable(callback: CallbackQuery, session: AsyncSession, bot: B
         await callback.answer(t(lang, "admin_toggle_invalid_disable"), show_alert=True)
         return
 
-    success = await marzban_api.toggle_user_status(sub.marzban_username, 'disabled')
+    success = await pasarguard_api.toggle_user_status(sub.marzban_username, 'disabled')
     if not success:
-        await callback.answer(t(lang, "admin_toggle_marzban_failed"), show_alert=True)
+        await callback.answer(t(lang, "admin_toggle_panel_failed"), show_alert=True)
         return
 
     sub.status = 'disabled'
@@ -188,8 +188,8 @@ async def approve_enable(callback: CallbackQuery, session: AsyncSession, bot: Bo
         await callback.answer(t(lang, "admin_toggle_invalid_enable"), show_alert=True)
         return
 
-    if not await marzban_api.toggle_user_status(sub.marzban_username, 'active'):
-        await callback.answer(t(lang, "admin_toggle_marzban_failed"), show_alert=True)
+    if not await pasarguard_api.toggle_user_status(sub.marzban_username, 'active'):
+        await callback.answer(t(lang, "admin_toggle_panel_failed"), show_alert=True)
         return
 
     sub.status = 'active'

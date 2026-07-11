@@ -2,25 +2,31 @@
 
 from aiogram import Router
 
-from app.services.marzban import marzban_api
+from app.services.pasarguard import pasarguard_api
 
 router = Router()
 
 
-async def _patch_marzban_user(username: str, patch_data: dict) -> bool:
-    """Low-level helper to PATCH a Marzban user; retries once on 401."""
-    session_http = await marzban_api._get_session()
-    url = f"{marzban_api.base_url}/api/user/{username}"
-    headers = await marzban_api._get_headers()
+async def _patch_panel_user(username: str, patch_data: dict) -> bool:
+    """Low-level helper to PATCH a PasarGuard user; retries once on 401.
+    Invalidates the short-TTL panel-info cache so reward GB/days show up
+    immediately in the dashboard/bot views."""
+    await pasarguard_api.invalidate_user_info(username)
+    session_http = await pasarguard_api._get_session()
+    url = f"{pasarguard_api.base_url}/api/user/{username}"
+    headers = await pasarguard_api._get_headers()
+    ok = False
     async with session_http.put(url, headers=headers, json=patch_data) as response:
         if response.status in (200, 204):
-            return True
-        if response.status == 401:
-            await marzban_api._login()
-            headers = await marzban_api._get_headers()
+            ok = True
+        elif response.status == 401:
+            await pasarguard_api._login()
+            headers = await pasarguard_api._get_headers()
             async with session_http.put(url, headers=headers, json=patch_data) as retry_resp:
-                return retry_resp.status in (200, 204)
-    return False
+                ok = retry_resp.status in (200, 204)
+    if ok:
+        await pasarguard_api.invalidate_user_info(username)
+    return ok
 
 
 def _parse_reward_callback(data: str):

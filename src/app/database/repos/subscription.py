@@ -7,7 +7,7 @@ from sqlalchemy.future import select
 from sqlalchemy.orm import selectinload
 
 from app.database.models import ChargeRequest, ReferralReward, RenewalHistory, Subscription
-from app.services.marzban import marzban_api
+from app.services.pasarguard import pasarguard_api
 
 
 class SubscriptionRepository:
@@ -376,7 +376,7 @@ class SubscriptionRepository:
         return sub
 
     @staticmethod
-    async def create_subscription_on_marzban(subscription: Subscription, plan_info: Dict[str, Any]) -> Optional[dict]:
+    async def create_subscription_on_pasarguard(subscription: Subscription, plan_info: Dict[str, Any]) -> Optional[dict]:
         gb = plan_info.get("gb", 0)
         if gb <= 0:
             return None
@@ -386,22 +386,22 @@ class SubscriptionRepository:
             # Reward free-plans provision as on_hold: countdown starts at the
             # user's first connection instead of at approval time.
             on_hold_days = plan_days if plan_info.get("on_hold") else None
-            marzban_user = await marzban_api.add_user(
+            pasarguard_user = await pasarguard_api.add_user(
                 subscription.marzban_username, gb, plan_days, on_hold_days=on_hold_days
             )
             
             # If add_user failed (returns None), check if user already exists (from partial approval)
-            if marzban_user is None:
-                existing_user = await marzban_api.get_user_info(subscription.marzban_username)
+            if pasarguard_user is None:
+                existing_user = await pasarguard_api.get_user_info(subscription.marzban_username)
                 if existing_user and existing_user.get("subscription_url"):
                     # User already exists, return their info for the approval to proceed
                     return existing_user
             
-            return marzban_user
+            return pasarguard_user
         except Exception:
             # Also try to get existing user on exception
             try:
-                existing_user = await marzban_api.get_user_info(subscription.marzban_username)
+                existing_user = await pasarguard_api.get_user_info(subscription.marzban_username)
                 if existing_user and existing_user.get("subscription_url"):
                     return existing_user
             except Exception:

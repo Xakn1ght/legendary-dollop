@@ -25,7 +25,7 @@ class AdminUserUpdateRequest(BaseModel):
 
 
 class AdminToggleUserStatusRequest(BaseModel):
-    """Schema for toggling Marzban user status"""
+    """Schema for toggling PasarGuard user status"""
     status: Literal["active", "disabled"] = Field(
         ..., 
         description="New status for the user"

@@ -2,7 +2,7 @@ import time
 
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 
-from app.core.settings import MARZBAN_BASE_URL
+from app.core.settings import PASARGUARD_BASE_URL
 
 from .constants import STATUS_MAP, STATUS_MAP_NO_EMOJI
 from .utils import convert_to_gb, to_persian_digits
@@ -75,7 +75,7 @@ def build_subscription_detail(sub, user_info, generate_image=True):
         if isinstance(user_info, dict):
             sub_url = user_info.get('subscription_url')
         if not sub_url and getattr(sub, 'sub_token', None):
-            sub_url = f"{MARZBAN_BASE_URL}/sub/{sub.sub_token}"
+            sub_url = f"{PASARGUARD_BASE_URL}/sub/{sub.sub_token}"
     except Exception:
         sub_url = None
 

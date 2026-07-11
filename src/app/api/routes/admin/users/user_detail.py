@@ -13,7 +13,7 @@ async def handle_admin_user_detail(request: web.Request):
                 return web.json_response({"ok": False, "error": "not_found"}, status=404)
             
             subs = await crud.get_user_subscriptions(session, user.id)
-            # NB: expiry lives in Marzban, not the DB — the old `s.expire_date`
+            # NB: expiry lives in PasarGuard, not the DB — the old `s.expire_date`
             # attribute never existed and 500'd this endpoint for any user
             # that owned a subscription.
             subs_data = []
@@ -30,7 +30,7 @@ async def handle_admin_user_detail(request: web.Request):
                 # Live "online now" flag (panel online_at within 3 min). Served
                 # from the 90s panel cache — cheap even with several services.
                 try:
-                    info = await marzban_api.get_fast_user_info(s.marzban_username, getattr(s, "sub_token", None))
+                    info = await pasarguard_api.get_fast_user_info(s.marzban_username, getattr(s, "sub_token", None))
                     online_at = (info or {}).get("online_at")
                     if online_at:
                         row["online_at"] = online_at

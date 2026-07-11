@@ -8,7 +8,7 @@ from app.api.deps import _verify_webapp_auth, set_tma_session_cookie
 from app.api.routes.dashboard.common import _parse_tier_reward_value
 from app.database import crud
 from app.database.models import AsyncSessionLocal, StarRewardTier
-from app.services.marzban import marzban_api
+from app.services.pasarguard import pasarguard_api
 
 logger = logging.getLogger(__name__)
 
@@ -85,14 +85,14 @@ async def handle_dashboard_star_claim_apply(request: web.Request):
                     if not target_sub:
                         return web.json_response({"ok": False, "error": "invalid_subscription"}, status=400)
 
-                info = await marzban_api.get_user_info(target_sub.marzban_username)
+                info = await pasarguard_api.get_user_info(target_sub.marzban_username)
                 if not info:
-                    return web.json_response({"ok": False, "error": "marzban_user_not_found"}, status=502)
+                    return web.json_response({"ok": False, "error": "pasarguard_user_not_found"}, status=502)
                 add_bytes = int(traffic_gb) * 1024**3
                 patch = {"data_limit": int(info.get("data_limit") or 0) + add_bytes}
-                ok = await marzban_api.update_user(target_sub.marzban_username, patch)
+                ok = await pasarguard_api.update_user(target_sub.marzban_username, patch)
                 if not ok:
-                    return web.json_response({"ok": False, "error": "marzban_update_failed"}, status=502)
+                    return web.json_response({"ok": False, "error": "panel_update_failed"}, status=502)
                 applied_to = str(getattr(target_sub, "marzban_username", "") or "")
                 await crud.add_reward_history(
                     session,

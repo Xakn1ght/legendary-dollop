@@ -1,5 +1,5 @@
 """Operational admin endpoints: audit trail, revenue analytics, expiry cohorts,
-system health, Marzban nodes, CSV export, coupon campaigns, SMS auto-approve
+system health, PasarGuard nodes, CSV export, coupon campaigns, SMS auto-approve
 control."""
 
 from .analytics import (

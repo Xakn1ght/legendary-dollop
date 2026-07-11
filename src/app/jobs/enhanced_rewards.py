@@ -19,7 +19,7 @@ from app.database.crud import (
     update_leaderboard,
 )
 from app.database.models import AsyncSessionLocal
-from app.services.marzban import marzban_api
+from app.services.pasarguard import pasarguard_api
 
 logger = logging.getLogger(__name__)
 
@@ -52,12 +52,16 @@ async def update_user_analytics_job(bot: Bot):
                     await update_leaderboard(session, user.id, "activity", user.login_streak)
 
                     # --- NEW: Update usage leaderboard ---
+                    # Cached fast path: this sweep touches every user's subs —
+                    # leaderboard math happily tolerates the 90s cache TTL.
                     total_usage = 0
                     for sub in subscriptions:
                         if sub.marzban_username:
                             try:
-                                user_info = await marzban_api.get_user_info(sub.marzban_username)
-                                if user_info and "used_traffic" in user_info:
+                                user_info = await pasarguard_api.get_fast_user_info(
+                                    sub.marzban_username, getattr(sub, "sub_token", None)
+                                )
+                                if user_info and user_info.get("used_traffic") is not None:
                                     total_usage += user_info["used_traffic"]
                             except Exception:
                                 continue
@@ -110,8 +114,10 @@ async def check_challenge_progress_job(bot: Bot):
                             for sub in subscriptions:
                                 if sub.marzban_username:
                                     try:
-                                        user_info = await marzban_api.get_user_info(sub.marzban_username)
-                                        if user_info and "used_traffic" in user_info:
+                                        user_info = await pasarguard_api.get_fast_user_info(
+                                            sub.marzban_username, getattr(sub, "sub_token", None)
+                                        )
+                                        if user_info and user_info.get("used_traffic") is not None:
                                             total_usage += user_info["used_traffic"]
                                     except Exception:
                                         continue

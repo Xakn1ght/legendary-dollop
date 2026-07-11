@@ -1,12 +1,16 @@
-"""Marzban, subscription links, and dashboard purchase/discount env configuration."""
+"""PasarGuard panel, subscription links, and dashboard purchase/discount env configuration."""
 
 import os
 
 # Backend panel/API details
 # IMPORTANT: Set these in your .env file for security.
-MARZBAN_USERNAME = os.environ.get("MARZBAN_USERNAME", "mykp")
-MARZBAN_PASSWORD = os.environ.get("MARZBAN_PASSWORD", "")
-MARZBAN_BASE_URL = os.environ.get("MARZBAN_BASE_URL", "https://home.afffb.com:9443")
+# Legacy MARZBAN_* env keys are still honored as fallbacks (pre-2026-07 deploys).
+PASARGUARD_USERNAME = os.environ.get("PASARGUARD_USERNAME") or os.environ.get("MARZBAN_USERNAME", "mykp")
+PASARGUARD_PASSWORD = os.environ.get("PASARGUARD_PASSWORD") or os.environ.get("MARZBAN_PASSWORD", "")
+PASARGUARD_BASE_URL = (
+    os.environ.get("PASARGUARD_BASE_URL")
+    or os.environ.get("MARZBAN_BASE_URL", "https://home.afffb.com:9443")
+)
 
 # PasarGuard groups: users get their inbounds via group membership (the old
 # per-user inbounds dict is gone). New users are created in these groups —

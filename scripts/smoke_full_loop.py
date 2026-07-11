@@ -58,7 +58,7 @@ async def main():
     from app.services.flows import charge as charge_flow
     from app.services.flows import purchase as purchase_flow
     from app.services.flows.pricing import quote_purchase
-    from app.services.marzban import marzban_api
+    from app.services.pasarguard import pasarguard_api
     from app.services.subscription_processing import process_approved_subscription
 
     bot = Bot(BOT_TOKEN)
@@ -94,7 +94,7 @@ async def main():
             vouchers_before = len(await crud.get_unspent_rewards_by_referrer(session, referrer.id))
             ok = await process_approved_subscription(sub.id, session, bot)
             await session.refresh(sub)
-            minfo = await marzban_api.get_user_info(marz_username)
+            minfo = await pasarguard_api.get_user_info(marz_username)
             provisioned = bool(ok and minfo and (minfo.get("status") == "active"))
             report("approve+provision", provisioned,
                    f"marzban={marz_username} limit_gb={round(((minfo or {}).get('data_limit') or 0)/2**30, 1)}")
@@ -161,9 +161,9 @@ async def main():
                 req = await charge_flow.submit_charge_receipt(
                     session, buyer, res.charge_request.id, receipt_message_id=-1,
                 )
-                before = await marzban_api.get_user_info(marz_username)
+                before = await pasarguard_api.get_user_info(marz_username)
                 approved = await charge_flow.approve_charge(session, req.id, user_bot=bot)
-                after = await marzban_api.get_user_info(marz_username)
+                after = await pasarguard_api.get_user_info(marz_username)
                 grew = (after or {}).get("expire") and (before or {}).get("expire") and after["expire"] > before["expire"]
                 report("charge-approve", bool(approved and grew),
                        f"limit_gb={round(((after or {}).get('data_limit') or 0)/2**30, 1)} expire+={bool(grew)}")
@@ -190,10 +190,10 @@ async def main():
 
 async def cleanup(username: str):
     from app.database.models import AsyncSessionLocal, Subscription
-    from app.services.marzban import marzban_api
+    from app.services.pasarguard import pasarguard_api
     from sqlalchemy import select
 
-    deleted = await marzban_api.delete_user(username)
+    deleted = await pasarguard_api.delete_user(username)
     async with AsyncSessionLocal() as session:
         sub = (await session.execute(
             select(Subscription).filter(Subscription.marzban_username == username)
@@ -201,7 +201,7 @@ async def cleanup(username: str):
         if sub:
             sub.status = "removed"
             await session.commit()
-    print(f"cleanup: marzban_deleted={bool(deleted)} sub_marked_removed={bool(sub)}")
+    print(f"cleanup: pasarguard_deleted={bool(deleted)} sub_marked_removed={bool(sub)}")
 
 
 if __name__ == "__main__":

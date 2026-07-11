@@ -2,7 +2,7 @@ from ..common import *  # noqa: F403
 
 
 async def handle_admin_subscriptions(request: web.Request):
-    """Get subscriptions with real-time Marzban data"""
+    """Get subscriptions with real-time PasarGuard data"""
     try:
         page = int(request.query.get('page', 1))
         limit = int(request.query.get('limit', 100))
@@ -10,14 +10,14 @@ async def handle_admin_subscriptions(request: web.Request):
         sort_by = request.query.get('sort', 'created')  # created, expire, used, username
         sort_order = request.query.get('order', 'desc')  # asc, desc
         
-        # Fetch ALL users from Marzban (paged walk — no silent truncation at 2000)
+        # Fetch ALL users from PasarGuard (paged walk — no silent truncation at 2000)
         offset = (page - 1) * limit
-        marzban_users = await marzban_api.get_all_users_paged(search=search if search else None)
-        total_count = len(marzban_users)
+        pasarguard_users = await pasarguard_api.get_all_users_paged(search=search if search else None)
+        total_count = len(pasarguard_users)
         
-        # Transform Marzban user data
+        # Transform PasarGuard user data
         subs_data = []
-        for u in marzban_users:
+        for u in pasarguard_users:
             username = u.get('username', '')
             status = u.get('status', 'unknown')
             
@@ -42,7 +42,7 @@ async def handle_admin_subscriptions(request: web.Request):
             created_date = None
             if created_ts:
                 try:
-                    # Marzban returns ISO format string
+                    # PasarGuard returns ISO format string
                     created_date = created_ts if isinstance(created_ts, str) else datetime.fromtimestamp(created_ts, tz=timezone.utc).isoformat()
                 except:
                     created_date = None

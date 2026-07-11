@@ -5,11 +5,11 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import crud
 from app.database.models import ReferralReward, UserStarRewardClaim
-from app.services.marzban import marzban_api
+from app.services.pasarguard import pasarguard_api
 from app.utils.logger import bot_logger
 from app.utils.text_format import to_persian_digits
 
-from .common import _patch_marzban_user
+from .common import _patch_panel_user
 
 
 async def _redeem_traffic(
@@ -21,12 +21,12 @@ async def _redeem_traffic(
         await callback.answer("شما سرویس فعالی ندارید.", show_alert=True)
         return
     sub = subs[0]
-    user_info = await marzban_api.get_user_info(sub.marzban_username)
+    user_info = await pasarguard_api.get_user_info(sub.marzban_username)
     if not user_info:
         await callback.answer("نشد! اطلاعات سرویس یافت نشد.", show_alert=True)
         return
     new_limit = (user_info.get("data_limit") or 0) + (reward.traffic_bytes or 0)
-    if not await _patch_marzban_user(sub.marzban_username, {"data_limit": new_limit}):
+    if not await _patch_panel_user(sub.marzban_username, {"data_limit": new_limit}):
         await callback.answer("خطا در افزایش ترافیک.", show_alert=True)
         return
 
@@ -54,13 +54,13 @@ async def _redeem_days(
         await callback.answer("شما سرویس فعالی ندارید.", show_alert=True)
         return
     sub = subs[0]
-    user_info = await marzban_api.get_user_info(sub.marzban_username)
+    user_info = await pasarguard_api.get_user_info(sub.marzban_username)
     if not user_info:
         await callback.answer("خطا در دریافت اطلاعات سرویس.", show_alert=True)
         return
     current_expire_ts = user_info.get("expire") or 0
     new_expire = current_expire_ts + (reward.extra_days or 0) * 24 * 60 * 60
-    if not await _patch_marzban_user(sub.marzban_username, {"expire": new_expire}):
+    if not await _patch_panel_user(sub.marzban_username, {"expire": new_expire}):
         await callback.answer("خطا در افزایش زمان اعتبار.", show_alert=True)
         return
     await crud.spend_reward(session, reward.id)

@@ -8,7 +8,7 @@ this is applied case-by-case (e.g. an obvious link-sharer), never in bulk.
 from aiohttp import web
 
 from app.services.audit import record_audit
-from app.services.marzban import marzban_api
+from app.services.pasarguard import pasarguard_api
 
 
 async def handle_admin_set_hwid_limit(request: web.Request):
@@ -23,10 +23,10 @@ async def handle_admin_set_hwid_limit(request: web.Request):
     if limit < 0 or limit > 50:
         return web.json_response({"ok": False, "error": "invalid_limit"}, status=400)
 
-    ok = await marzban_api.update_user(username, {"hwid_limit": limit})
+    ok = await pasarguard_api.update_user(username, {"hwid_limit": limit})
     if not ok:
         return web.json_response({"ok": False, "error": "panel_update_failed"}, status=502)
-    await marzban_api.invalidate_user_info(username)
+    await pasarguard_api.invalidate_user_info(username)
 
     await record_audit(
         request, "subscription.hwid_limit", target_type="subscription", target_id=username,

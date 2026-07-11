@@ -1,5 +1,5 @@
 from .hwid_limit import handle_admin_set_hwid_limit
-from .marzban_subscriptions_list import handle_admin_subscriptions
+from .pasarguard_subscriptions_list import handle_admin_subscriptions
 from .servers import handle_admin_servers
 from .subscription_delete import handle_admin_subscription_delete
 from .subscription_extend import handle_admin_subscription_extend

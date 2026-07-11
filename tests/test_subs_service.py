@@ -2,7 +2,7 @@
 
 Covers the Phase-2 divergences:
 - domain allowlist enforced on every surface (was webapp-only)
-- the Marzban account must exist before a row is created (was bot-only)
+- the the panel account must exist before a row is created (was bot-only)
 - dedupe: re-adding your own sub is a no-op; someone else's sub links via the
   shared-account table; detached rows re-attach
 - revoke requires ownership (the bot button used to skip the check entirely)
@@ -32,7 +32,7 @@ from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine  # no
 CHAT = 333
 
 
-class FakeMarzban:
+class FakePasarGuard:
     def __init__(self):
         self.accounts = {"alice": {"subscription_url": "https://panel.astrobyte.org/sub/tok-alice"}}
         self.tokens = {"tok-alice": {"username": "alice"}}
@@ -67,8 +67,8 @@ async def _setup():
 
     subs_mod.DASHBOARD_SUBSCRIPTION_ALLOWED_DOMAINS = ["astrobyte.org"]
     subs_mod.DASHBOARD_SUBSCRIPTION_DOMAIN_ENFORCE = True
-    fake = FakeMarzban()
-    subs_mod.marzban_api = fake
+    fake = FakePasarGuard()
+    subs_mod.pasarguard_api = fake
 
     async with Session() as db:
         db.add(User(id=1, chat_id=CHAT, referral_code="me"))
@@ -121,14 +121,14 @@ async def test_add_verifies_marzban_and_dedupes():
         await db.refresh(res.subscription)
         assert res.subscription.user_id == 1
 
-        # An account that doesn't exist on Marzban is refused (token resolves to a
-        # username Marzban then denies knowing).
+        # An account that doesn't exist on the panel is refused (token resolves to a
+        # username the panel then denies knowing).
         fake.tokens["tok-ghost"] = {"username": "ghost"}
         try:
             await add_subscription_by_link(db, user, url="https://panel.astrobyte.org/sub/tok-ghost")
-            raise AssertionError("expected marzban_account_not_found")
+            raise AssertionError("expected panel_account_not_found")
         except FlowError as e:
-            assert e.code == "marzban_account_not_found"
+            assert e.code == "panel_account_not_found"
 
         # With enforcement on, a bare username is not accepted.
         try:

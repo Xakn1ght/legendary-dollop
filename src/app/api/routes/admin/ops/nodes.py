@@ -1,18 +1,18 @@
 from aiohttp import web
 
-from app.services.marzban import marzban_api
+from app.services.pasarguard import pasarguard_api
 
 _OK_STATUSES = {"connected", "healthy"}
 
 
 async def handle_admin_nodes(request: web.Request):
-    """GET /api/admin/nodes — Marzban nodes with status + per-node user spread."""
+    """GET /api/admin/nodes — PasarGuard nodes with status + per-node user spread."""
     try:
-        nodes = await marzban_api.get_nodes()
+        nodes = await pasarguard_api.get_nodes()
         if not isinstance(nodes, list):
             nodes = []
         # Live per-node cpu/mem/bandwidth (PasarGuard; keyed by node id as str).
-        realtime = await marzban_api.get_nodes_realtime_stats()
+        realtime = await pasarguard_api.get_nodes_realtime_stats()
 
         out = []
         for n in nodes:
@@ -38,7 +38,7 @@ async def handle_admin_nodes(request: web.Request):
 
         system = None
         try:
-            stats = await marzban_api.get_system_stats()
+            stats = await pasarguard_api.get_system_stats()
             if stats:
                 system = {
                     "version": stats.get("version"),

@@ -17,10 +17,10 @@ async def handle_admin_toggle_user(request: web.Request):
         return web.json_response(error, status=400)
     
     try:
-        success = await marzban_api.toggle_user_status(username, validated.status)
+        success = await pasarguard_api.toggle_user_status(username, validated.status)
         if success:
              return web.json_response({"ok": True})
         else:
-             return web.json_response({"ok": False, "error": "marzban_error"}, status=500)
+             return web.json_response({"ok": False, "error": "pasarguard_error"}, status=500)
     except Exception as e:
         return web.json_response({"ok": False, "error": "server_error"}, status=500)

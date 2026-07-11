@@ -50,7 +50,7 @@ CRITICAL_INDEXES = [
     # Pending subscriptions for admin approval
     Index('idx_subscriptions_status_pending', 'subscriptions', 'status'),
     
-    # Marzban username lookup (frequent in API calls)
+    # PasarGuard username lookup (frequent in API calls)
     Index('idx_subscriptions_marzban_username', 'subscriptions', 'marzban_username'),
     
     # Referrer lookup for reward calculations

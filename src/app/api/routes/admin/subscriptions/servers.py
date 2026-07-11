@@ -2,13 +2,13 @@ from ..common import *  # noqa: F403
 
 
 async def handle_admin_servers(request: web.Request):
-    """Get servers/nodes from Marzban"""
+    """Get servers/nodes from PasarGuard"""
     try:
-        # Get nodes from Marzban
-        nodes = await marzban_api.get_nodes()
+        # Get nodes from PasarGuard
+        nodes = await pasarguard_api.get_nodes()
         
         # Get system stats for traffic
-        system_stats = await marzban_api.get_system_stats()
+        system_stats = await pasarguard_api.get_system_stats()
         
         servers = []
         
@@ -32,13 +32,13 @@ async def handle_admin_servers(request: web.Request):
                     "id": 1,
                     "name": "Main Server",
                     "location": "Primary",
-                    "ip": marzban_api.base_url.replace("https://", "").replace("http://", "").split(":")[0] if marzban_api.base_url else "N/A",
+                    "ip": pasarguard_api.base_url.replace("https://", "").replace("http://", "").split(":")[0] if pasarguard_api.base_url else "N/A",
                     "traffic": format_bytes(total_traffic) if total_traffic else "N/A",
                     "active": True,
                     "status": "connected"
                 })
             else:
-                # No connection to Marzban
+                # No connection to PasarGuard
                 servers.append({
                     "id": 1,
                     "name": "Main Server",

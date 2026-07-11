@@ -66,7 +66,8 @@ export function HealthCard() {
   const chips = [
     { name: 'Database', s: h?.db },
     { name: 'Redis', s: h?.redis },
-    { name: 'Marzban', s: h?.marzban },
+    // key fallback: tolerate an admin bundle deployed ahead of/behind the API
+    { name: 'PasarGuard', s: h?.pasarguard || h?.marzban },
   ];
 
   return (
@@ -103,9 +104,11 @@ export function HealthCard() {
         ))}
       </div>
 
-      {h?.marzban?.ok && (
+      {(h?.pasarguard || h?.marzban)?.ok && (
         <div className="health-sub">
-          Marzban v{h.marzban.version} · {h.marzban.users_active ?? '?'} active / {h.marzban.total_users ?? '?'} users
+          {(() => { const p = h.pasarguard || h.marzban; return (
+            <>PasarGuard v{p.version} · {p.users_active ?? '?'} active / {p.total_users ?? '?'} users</>
+          ); })()}
         </div>
       )}
 

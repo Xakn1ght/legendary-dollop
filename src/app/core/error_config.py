@@ -9,11 +9,11 @@ ERROR_MESSAGES = {
     "database_timeout": "عملیات پایگاه داده طولانی شد. لطفاً دوباره تلاش کنید.",
     "database_integrity": "خطا در داده‌های ورودی. لطفاً اطلاعات را بررسی کنید.",
     
-    # Marzban API errors
-    "marzban_connection": "خطا در اتصال به سرور VPN. لطفاً بعداً تلاش کنید.",
-    "marzban_auth": "خطا در احراز هویت سرور VPN.",
-    "marzban_user_exists": "کاربر VPN قبلاً وجود دارد.",
-    "marzban_user_not_found": "کاربر VPN یافت نشد.",
+    # PasarGuard API errors
+    "pasarguard_connection": "خطا در اتصال به سرور VPN. لطفاً بعداً تلاش کنید.",
+    "pasarguard_auth": "خطا در احراز هویت سرور VPN.",
+    "pasarguard_user_exists": "کاربر VPN قبلاً وجود دارد.",
+    "pasarguard_user_not_found": "کاربر VPN یافت نشد.",
     
     # Telegram API errors
     "telegram_message_too_long": "پیام خیلی طولانی است.",
@@ -45,7 +45,7 @@ ERROR_RECOVERY = {
         "retry_delay": 1,  # seconds
         "fallback_message": "سرویس موقتاً در دسترس نیست. لطفاً بعداً تلاش کنید."
     },
-    "marzban_connection": {
+    "pasarguard_connection": {
         "retry_count": 2,
         "retry_delay": 2,
         "fallback_message": "سرور VPN موقتاً در دسترس نیست. لطفاً بعداً تلاش کنید."
@@ -61,17 +61,17 @@ ERROR_RECOVERY = {
 ERROR_SEVERITY = {
     "critical": [
         "database_connection",
-        "marzban_connection",
+        "pasarguard_connection",
         "telegram_auth"
     ],
     "high": [
         "database_timeout",
-        "marzban_auth",
+        "pasarguard_auth",
         "telegram_rate_limit"
     ],
     "medium": [
         "database_integrity",
-        "marzban_user_exists",
+        "pasarguard_user_exists",
         "validation_error"
     ],
     "low": [

@@ -292,7 +292,7 @@ async def submit_ticket(callback: CallbackQuery, state: FSMContext, session: Asy
     try:
         from app.database import crud as _crud
         from app.handlers.admin.common import get_admin_broadcast_ids
-        from app.services.marzban import marzban_api as _api
+        from app.services.pasarguard import pasarguard_api as _api
         # Build short summary
         first_text = (texts[0] if texts else "").strip()
         summary = "\n".join(first_text.splitlines()[:2])[:300]

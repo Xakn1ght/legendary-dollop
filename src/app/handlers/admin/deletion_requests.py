@@ -9,7 +9,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.database import crud
 from app.database.models import PendingDeletionRequest, Subscription, User
 from app.handlers.admin.common import ADMIN_IDS
-from app.services.marzban import marzban_api
+from app.services.pasarguard import pasarguard_api
 from app.utils.admin_bot_helper import get_user_bot
 from app.utils.logger import bot_logger, log_error
 
@@ -96,8 +96,8 @@ async def approve_deletion_request(callback: CallbackQuery, session: AsyncSessio
         return
     
     try:
-        # Delete from Marzban
-        success = await marzban_api.delete_user(subscription.marzban_username)
+        # Delete from PasarGuard
+        success = await pasarguard_api.delete_user(subscription.marzban_username)
         if not success:
             await callback.answer("خطا در حذف سرویس از پنل", show_alert=True)
             return

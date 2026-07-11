@@ -21,7 +21,7 @@ async def handle_dashboard_links(request: web.Request):
         if not sub or sub.user_id != user.id:
             return web.json_response({"ok": False, "error": "not_found"}, status=404)
 
-        info = await marzban_api.get_fast_user_info(sub.marzban_username, getattr(sub, 'sub_token', None))
+        info = await pasarguard_api.get_fast_user_info(sub.marzban_username, getattr(sub, 'sub_token', None))
         links = (info or {}).get("links") or []
         resp = web.json_response({"ok": True, "links": links})
         if new_session_token:

@@ -11,7 +11,7 @@ from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database.models import AsyncSessionLocal
-from app.services.marzban import marzban_api
+from app.services.pasarguard import pasarguard_api
 from app.utils.logger import bot_logger, log_error
 
 
@@ -59,12 +59,12 @@ class HealthChecker:
                 "error": str(e)
             }
     
-    async def check_marzban_connection(self) -> Dict[str, Any]:
-        """Check Marzban API connectivity"""
+    async def check_pasarguard_connection(self) -> Dict[str, Any]:
+        """Check PasarGuard API connectivity"""
         start_time = time.time()
         try:
             # Test login
-            login_success = await marzban_api._login()
+            login_success = await pasarguard_api._login()
             duration = time.time() - start_time
             
             if login_success:
@@ -82,7 +82,7 @@ class HealthChecker:
                 
         except Exception as e:
             duration = time.time() - start_time
-            log_error(e, {"operation": "health_check_marzban"})
+            log_error(e, {"operation": "health_check_pasarguard"})
             return {
                 "status": "unhealthy",
                 "response_time_ms": round(duration * 1000, 2),
@@ -137,7 +137,7 @@ class HealthChecker:
         # Run all checks concurrently
         tasks = [
             self.check_database_connection(),
-            self.check_marzban_connection(),
+            self.check_pasarguard_connection(),
             self.check_system_resources(),
             self.check_bot_status()
         ]
@@ -150,7 +150,7 @@ class HealthChecker:
                 "status": "unhealthy",
                 "error": str(results[0])
             },
-            "marzban": results[1] if not isinstance(results[1], Exception) else {
+            "pasarguard": results[1] if not isinstance(results[1], Exception) else {
                 "status": "unhealthy",
                 "error": str(results[1])
             },

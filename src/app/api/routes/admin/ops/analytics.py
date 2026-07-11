@@ -124,7 +124,7 @@ async def handle_admin_analytics_expiring(request: web.Request):
     """GET /api/admin/analytics/expiring?window=7 — subs expiring within N days
     (and ones that expired in the last N), enriched with the owning user, so the
     admin can fire renewal reminders at exactly this cohort."""
-    from app.services.marzban import marzban_api
+    from app.services.pasarguard import pasarguard_api
 
     try:
         try:
@@ -132,7 +132,7 @@ async def handle_admin_analytics_expiring(request: web.Request):
         except (TypeError, ValueError):
             window = 7
 
-        marz_users = await marzban_api.get_all_users_paged()
+        marz_users = await pasarguard_api.get_all_users_paged()
         now = datetime.datetime.now(datetime.timezone.utc).timestamp()
         horizon = now + window * 86400
         floor = now - window * 86400

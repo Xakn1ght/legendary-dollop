@@ -17,14 +17,14 @@ from app.core.settings import (
 from app.database import crud
 from app.database.models import AsyncSessionLocal, Subscription
 from app.handlers.user.my_services.utils import map_inbound_to_country
-from app.services.marzban import marzban_api
+from app.services.pasarguard import pasarguard_api
 from app.utils.webapp_verify import create_session_token, verify_init_data, verify_session_token
 
 
 def _is_dashboard_visible_subscription(s: Subscription) -> bool:
     """
     Dashboard dropdown should include only subscriptions that can actually load.
-    Draft/pending purchase rows are not created on Marzban yet (no info/links),
+    Draft/pending purchase rows are not created on PasarGuard yet (no info/links),
     so they must not be shown in the subscription selector.
     """
     st = (getattr(s, "status", None) or "").lower().strip()

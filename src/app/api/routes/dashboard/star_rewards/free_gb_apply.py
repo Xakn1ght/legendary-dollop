@@ -18,7 +18,7 @@ from sqlalchemy.future import select
 from app.api.deps import _verify_webapp_auth, set_tma_session_cookie
 from app.database import crud
 from app.database.models import AsyncSessionLocal, Subscription
-from app.services.marzban import marzban_api
+from app.services.pasarguard import pasarguard_api
 
 logger = logging.getLogger(__name__)
 
@@ -71,7 +71,7 @@ async def handle_dashboard_coupon_apply_gb(request: web.Request):
             if not sub or not sub.marzban_username:
                 return web.json_response({"ok": False, "error": "subscription_not_found"}, status=404)
 
-            info = await marzban_api.get_user_info(sub.marzban_username)
+            info = await pasarguard_api.get_user_info(sub.marzban_username)
             if not info:
                 return web.json_response({"ok": False, "error": "panel_user_not_found"}, status=502)
 
@@ -88,7 +88,7 @@ async def handle_dashboard_coupon_apply_gb(request: web.Request):
                 return web.json_response({"ok": False, "error": "coupon_not_active"}, status=400)
 
             new_limit = current_limit + gb * (1024 ** 3)
-            ok = await marzban_api.update_user(sub.marzban_username, {"data_limit": new_limit})
+            ok = await pasarguard_api.update_user(sub.marzban_username, {"data_limit": new_limit})
             if not ok:
                 await crud.restore_coupon(session, coupon.id)
                 return web.json_response({"ok": False, "error": "panel_update_failed"}, status=502)

@@ -34,8 +34,8 @@ async def handle_admin_subscription_extend(request: web.Request):
         return web.json_response({"ok": False, "error": "invalid_mode"}, status=400)
     
     try:
-        # Get current user info from Marzban
-        user_info = await marzban_api.get_user_info(username)
+        # Get current user info from PasarGuard
+        user_info = await pasarguard_api.get_user_info(username)
         if not user_info:
             return web.json_response({"ok": False, "error": "user_not_found"}, status=404)
         
@@ -70,13 +70,13 @@ async def handle_admin_subscription_extend(request: web.Request):
             update_data['expire'] = int(new_expire_dt.timestamp())
         
         # Traffic handling: add / set (convert GB to bytes) / reset (usage → 0).
-        # 'reset' zeroes used traffic via Marzban's POST /reset while keeping the
+        # 'reset' zeroes used traffic via PasarGuard's POST /reset while keeping the
         # current limit + expire (or the new expire computed above).
         if traffic_mode == 'reset':
             reset_expire = update_data.get('expire', current_expire or 0)
-            success = await marzban_api.reset_user_traffic_bytes(username, int(current_limit or 0), int(reset_expire or 0))
+            success = await pasarguard_api.reset_user_traffic_bytes(username, int(current_limit or 0), int(reset_expire or 0))
             if not success:
-                return web.json_response({"ok": False, "error": "marzban_update_failed"}, status=500)
+                return web.json_response({"ok": False, "error": "panel_update_failed"}, status=500)
             update_data.pop('expire', None)  # already applied inside the reset call
         elif traffic_gb > 0 or (traffic_mode == 'set' and traffic_gb >= 0):
             if traffic_mode == 'set':
@@ -86,9 +86,9 @@ async def handle_admin_subscription_extend(request: web.Request):
             update_data['data_limit'] = new_limit
 
         if update_data:
-            success = await marzban_api.update_user(username, update_data)
+            success = await pasarguard_api.update_user(username, update_data)
             if not success:
-                return web.json_response({"ok": False, "error": "marzban_update_failed"}, status=500)
+                return web.json_response({"ok": False, "error": "panel_update_failed"}, status=500)
             
             # Send notification to user about subscription extension
             async with AsyncSessionLocal() as session:

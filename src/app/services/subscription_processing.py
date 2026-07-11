@@ -78,7 +78,7 @@ async def process_approved_subscription(sub_id: int, session: AsyncSession, bot:
     # Only a row we ATOMICALLY move pending→active here may be provisioned. This
     # guard closes the approve-vs-deny race: if a concurrent deny already claimed
     # the row (status 'processing'/'denied' or the row is gone), we must NOT fall
-    # through to Marzban provisioning — otherwise we'd build a service for an
+    # through to PasarGuard provisioning — otherwise we'd build a service for an
     # order that deny is simultaneously refunding and deleting.
     if subscription.status != "pending":
         logging.warning(f"Sub {sub_id} not pending (status={subscription.status}); refusing to provision.")
@@ -134,9 +134,9 @@ async def process_approved_subscription(sub_id: int, session: AsyncSession, bot:
         pass
 
     try:
-        marzban_user = await crud.create_subscription_on_marzban(subscription, plan_info)
+        pasarguard_user = await crud.create_subscription_on_pasarguard(subscription, plan_info)
     except Exception as e:
-        logging.error(f"Failed to create Marzban user for sub {sub_id}: {e}")
+        logging.error(f"Failed to create PasarGuard user for sub {sub_id}: {e}")
         await crud.deactivate_subscription_on_failure(session, sub_id)
         try:
             await bot.send_message(
@@ -144,10 +144,10 @@ async def process_approved_subscription(sub_id: int, session: AsyncSession, bot:
                 "متاسفانه در ساخت سرویس شما مشکلی پیش آمده. لطفاً مجدداً تلاش کنید یا به پشتیبانی پیام دهید.",
             )
         except Exception as notify_error:
-            logging.error(f"Failed to notify user {user.chat_id} about marzban failure: {notify_error}")
+            logging.error(f"Failed to notify user {user.chat_id} about panel failure: {notify_error}")
         return False
 
-    sub_url = marzban_user.get("subscription_url") if marzban_user else None
+    sub_url = pasarguard_user.get("subscription_url") if pasarguard_user else None
     if not sub_url:
         await crud.deactivate_subscription_on_failure(session, sub_id)
         try:
@@ -159,6 +159,18 @@ async def process_approved_subscription(sub_id: int, session: AsyncSession, bot:
             logging.error(f"Failed to notify user {user.chat_id} about URL failure: {notify_error}")
         return False
 
+    # Persist the share-link token NOW (it used to happen after the DM block,
+    # whose failure path returns early — losing the token and forcing the next
+    # read back onto the admin API). Creation already returned the link; no
+    # extra panel call ever needed for it again.
+    try:
+        token_match = re.search(r"/sub/([^/]+)/?", sub_url)
+        if token_match and not getattr(subscription, "sub_token", None):
+            subscription.sub_token = token_match.group(1)
+            await session.commit()
+    except Exception:
+        pass
+
     # Rewards policy: no XP / loyalty / purchase cashback from this flow (see handlers policy).
     # (Pack grants retired 2026-07: badge/theme now unlock at the star milestone,
     # VIP time comes from the wallet-redeemed vip_days coupon.)
@@ -167,13 +179,13 @@ async def process_approved_subscription(sub_id: int, session: AsyncSession, bot:
         pending_claim = await crud.get_pending_extradays_claim(session, user.id)
         if pending_claim:
             days_to_add = int(pending_claim.tier.reward_value)
-            from app.handlers.user.rewards.redemption import _patch_marzban_user
+            from app.handlers.user.rewards.redemption import _patch_panel_user
 
-            user_info = await crud.marzban_api.get_user_info(subscription.marzban_username)
+            user_info = await crud.pasarguard_api.get_user_info(subscription.marzban_username)
             # `or 0`: PasarGuard returns expire=null for never-expires users
             current_expire_ts = (user_info or {}).get("expire", 0) or 0
             new_expire_ts = current_expire_ts + (days_to_add * 24 * 60 * 60)
-            patch_success = await _patch_marzban_user(subscription.marzban_username, {"expire": new_expire_ts})
+            patch_success = await _patch_panel_user(subscription.marzban_username, {"expire": new_expire_ts})
             if patch_success:
                 pending_claim.status = "claimed"
                 pending_claim.claimed_at = datetime.utcnow()
@@ -228,15 +240,6 @@ async def process_approved_subscription(sub_id: int, session: AsyncSession, bot:
     except Exception as notify_error:
         logging.error(f"Failed to send subscription link to user {user.chat_id}: {notify_error}")
         return True
-
-    if sub_url:
-        try:
-            token_match = re.search(r"/sub/([^/]+)/?", sub_url)
-            if token_match:
-                subscription.sub_token = token_match.group(1)
-                await session.commit()
-        except Exception:
-            pass
 
     await _cleanup_admin_messages(subscription)
 

@@ -4,9 +4,9 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import crud
 from app.handlers.user.purchase import PLANS
-from app.services.marzban import marzban_api
+from app.services.pasarguard import pasarguard_api
 
-from .common import _patch_marzban_user, router
+from .common import _patch_panel_user, router
 
 
 def _parse_free_renew_callback(data: str):
@@ -53,7 +53,7 @@ async def _apply_free_renew(
         await callback.answer("پلن ناشناخته.", show_alert=True)
         return
 
-    user_info = await marzban_api.get_user_info(subscription.marzban_username)
+    user_info = await pasarguard_api.get_user_info(subscription.marzban_username)
     if not user_info:
         await callback.answer("خطای اطلاعات سرویس.", show_alert=True)
         return
@@ -62,7 +62,7 @@ async def _apply_free_renew(
     new_limit = (user_info.get("data_limit") or 0) + add_bytes
     new_expire = (user_info.get("expire") or 0) + 30 * 24 * 60 * 60
 
-    success = await _patch_marzban_user(
+    success = await _patch_panel_user(
         subscription.marzban_username,
         {"data_limit": new_limit, "expire": new_expire, "status": "active"},
     )

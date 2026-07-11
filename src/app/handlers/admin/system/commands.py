@@ -92,7 +92,7 @@ async def renewal_preview(message: Message, session: AsyncSession):
     if message.from_user.id not in ADMIN_IDS:
         return
     from app.database import crud as _crud
-    from app.services.marzban import marzban_api as _api
+    from app.services.pasarguard import pasarguard_api as _api
 
     subs = await _crud.get_subscriptions_for_renewal(session)
     if not subs:

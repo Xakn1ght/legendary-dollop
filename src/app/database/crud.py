@@ -59,7 +59,7 @@ get_pending_charge_requests = SubscriptionRepository.get_pending_charge_requests
 get_charge_request = SubscriptionRepository.get_charge_request
 update_charge_request_status = SubscriptionRepository.update_charge_request_status
 set_subscription_carry_over = SubscriptionRepository.set_subscription_carry_over
-create_subscription_on_marzban = SubscriptionRepository.create_subscription_on_marzban
+create_subscription_on_pasarguard = SubscriptionRepository.create_subscription_on_pasarguard
 
 # --- Ticket ---
 create_ticket = TicketRepository.create_ticket

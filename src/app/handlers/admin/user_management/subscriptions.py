@@ -9,7 +9,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.settings import PLANS
 from app.database.models import Receipt, Subscription, User
-from app.services.marzban import marzban_api
+from app.services.pasarguard import pasarguard_api
 from app.utils.admin_bot_helper import get_user_bot
 from app.utils.bot_i18n import t
 from app.utils.logger import bot_logger, log_error
@@ -55,21 +55,21 @@ async def _build_subscription_details_view(
             return "نامشخص"
         return str(text).replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
 
-    # Get Marzban user details if possible
-    marzban_info = ""
+    # Get PasarGuard user details if possible
+    pasarguard_info = ""
     try:
         if subscription.marzban_username:
-            marzban_user = await marzban_api.get_user_info(subscription.marzban_username)
-            if marzban_user:
+            pasarguard_user = await pasarguard_api.get_user_info(subscription.marzban_username)
+            if pasarguard_user:
                 # Format data usage
-                used_traffic = marzban_user.get("used_traffic", 0)
-                data_limit = marzban_user.get("data_limit", 0)
+                used_traffic = pasarguard_user.get("used_traffic", 0)
+                data_limit = pasarguard_user.get("data_limit", 0)
 
                 # Convert bytes to GB
                 used_gb = used_traffic / (1024**3) if used_traffic else 0
                 limit_gb = data_limit / (1024**3) if data_limit else 0
 
-                expire_timestamp = marzban_user.get("expire")
+                expire_timestamp = pasarguard_user.get("expire")
                 if expire_timestamp:
                     expire_date = datetime.fromtimestamp(expire_timestamp).strftime(
                         "%Y-%m-%d %H:%M"
@@ -77,38 +77,38 @@ async def _build_subscription_details_view(
                 else:
                     expire_date = "نامحدود"
 
-                marzban_status = marzban_user.get("status", "unknown")
-                marzban_status_map = {
+                pasarguard_status = pasarguard_user.get("status", "unknown")
+                pasarguard_status_map = {
                     "active": "🟢 فعال",
                     "disabled": "🔴 غیرفعال",
                     "limited": "🟡 محدود",
                     "expired": "⚫️ منقضی",
                 }
-                marzban_status_emoji = marzban_status_map.get(marzban_status, "❓")
+                pasarguard_status_emoji = pasarguard_status_map.get(pasarguard_status, "❓")
 
-                marzban_info = (
-                    f"\n📈 <b>اطلاعات مرزبان:</b>\n"
+                pasarguard_info = (
+                    f"\n📈 <b>اطلاعات پنل:</b>\n"
                     f"🌐 مصرف: <code>{used_gb:.2f} GB</code> از <code>{limit_gb:.2f} GB</code>\n"
                     f"⏰ انقضا: {expire_date}\n"
-                    f"🔄 وضعیت پنل: {marzban_status_emoji}\n"
+                    f"🔄 وضعیت پنل: {pasarguard_status_emoji}\n"
                 )
     except Exception as e:
         bot_logger.error(
             f"Could not fetch marzban info for {subscription.marzban_username}: {e}"
         )
-        marzban_info = "\n⚠️ unable to fetch panel info"
+        pasarguard_info = "\n⚠️ unable to fetch panel info"
 
     text = (
         f"<b>جزئیات اشتراک</b>\n\n"
         f"👤 کاربر: {escape_html(user.full_name if user else 'Unknown')}\n"
         f"🆔 شناسه: <code>{subscription.id}</code>\n"
-        f"🏷 نام کاربری مرزبان: <code>{escape_html(subscription.marzban_username)}</code>\n"
+        f"🏷 نام کاربری پنل: <code>{escape_html(subscription.marzban_username)}</code>\n"
         f"📦 پلن: {escape_html(subscription.plan_name)}\n"
         f"💰 قیمت: <code>{subscription.price:,}</code> تومان\n"
         f"🔄 وضعیت: {status_emoji}\n"
         f"📅 تاریخ ایجاد: {created_date}\n"
         f"💳 شناسه رسید: {subscription.receipt_message_id or 'ندارد'}\n"
-        f"{marzban_info}"
+        f"{pasarguard_info}"
     )
 
     kb = InlineKeyboardBuilder()
@@ -177,13 +177,13 @@ async def disable_subscription(callback: CallbackQuery, session: AsyncSession):
             await callback.answer("❌ اشتراک یافت نشد.", show_alert=True)
             return
 
-        # Disable in Marzban
+        # Disable in PasarGuard
         try:
             if subscription.marzban_username:
-                await marzban_api.toggle_user_status(subscription.marzban_username, "disabled")
+                await pasarguard_api.toggle_user_status(subscription.marzban_username, "disabled")
         except Exception as e:
             await callback.answer(
-                f"⚠️ خطا در غیرفعال کردن در مرزبان: {str(e)}", show_alert=True
+                f"⚠️ خطا در غیرفعال کردن در پنل: {str(e)}", show_alert=True
             )
             return
 
@@ -231,18 +231,18 @@ async def enable_subscription(callback: CallbackQuery, session: AsyncSession):
             await callback.answer("❌ اشتراک یافت نشد.", show_alert=True)
             return
 
-        # Enable in Marzban
+        # Enable in PasarGuard
         if subscription.marzban_username:
             try:
-                success = await marzban_api.toggle_user_status(
+                success = await pasarguard_api.toggle_user_status(
                     subscription.marzban_username, "active"
                 )
                 if not success:
-                    await callback.answer("⚠️ خطا در فعال کردن در مرزبان", show_alert=True)
+                    await callback.answer("⚠️ خطا در فعال کردن در پنل", show_alert=True)
                     return
             except Exception as e:
-                bot_logger.error(f"Error enabling user in Marzban: {str(e)}")
-                await callback.answer("⚠️ خطا در فعال کردن در مرزبان", show_alert=True)
+                bot_logger.error(f"Error enabling user in PasarGuard: {str(e)}")
+                await callback.answer("⚠️ خطا در فعال کردن در پنل", show_alert=True)
                 return
 
         # Update status in database
@@ -290,16 +290,16 @@ async def renew_subscription_admin(callback: CallbackQuery, session: AsyncSessio
             await callback.answer("❌ پلن اشتراک یافت نشد.", show_alert=True)
             return
 
-        # Renew user in Marzban using the PLAN's own duration (was hardcoded to
+        # Renew user in PasarGuard using the PLAN's own duration (was hardcoded to
         # 30 days, so 35/90-day plans were under-renewed — audit fix).
-        success = await marzban_api.reset_user_traffic(
+        success = await pasarguard_api.reset_user_traffic(
             username=subscription.marzban_username,
             new_data_limit_gb=plan_details["gb"],
             new_expire_days=int(plan_details.get("days", 30) or 30),
         )
 
         if not success:
-            await callback.answer("❌ خطا در تمدید در مرزبان.", show_alert=True)
+            await callback.answer("❌ خطا در تمدید در پنل.", show_alert=True)
             return
 
         # Create a new receipt. (Do NOT write receipt.id into
@@ -381,17 +381,17 @@ async def process_traffic_amount(
         # Get subscription
         subscription = await session.get(Subscription, sub_id)
         if not subscription or not subscription.marzban_username:
-            await message.answer("❌ اشتراک یافت نشد یا نام کاربری مرزبان ندارد.")
+            await message.answer("❌ اشتراک یافت نشد یا نام کاربری پنل ندارد.")
             await state.clear()
             return
 
         # Convert GB to bytes
         new_traffic_bytes = new_traffic_gb * (1024**3)
 
-        # Update user in Marzban
-        api_session = await marzban_api._get_session()
-        headers = await marzban_api._get_headers()
-        url = f"{marzban_api.base_url}/api/user/{subscription.marzban_username}"
+        # Update user in PasarGuard
+        api_session = await pasarguard_api._get_session()
+        headers = await pasarguard_api._get_headers()
+        url = f"{pasarguard_api.base_url}/api/user/{subscription.marzban_username}"
 
         async with api_session.put(
             url, headers=headers, json={"data_limit": new_traffic_bytes}
@@ -436,12 +436,12 @@ async def process_traffic_amount(
                         f"Failed to update traffic for {subscription.marzban_username}: {resp.status} - {error_details}"
                     ),
                     {
-                        "operation": "marzban_update_traffic",
+                        "operation": "pasarguard_update_traffic",
                         "username": subscription.marzban_username,
                         "status_code": resp.status,
                     },
                 )
-                await message.answer("❌ خطا در به‌روزرسانی حجم در مرزبان.")
+                await message.answer("❌ خطا در به‌روزرسانی حجم در پنل.")
 
     except ValueError:
         await message.answer("❌ لطفاً یک عدد معتبر وارد کنید.")
@@ -456,7 +456,7 @@ async def process_traffic_amount(
 # (reject_sub_) handlers lived here but were removed (audit):
 #   • approve_sub_ was a dead duplicate — the real, provisioning handler in
 #     handlers/admin/subscription.py wins router registration. Keeping a second
-#     Marzban-toggle-only copy risked a future reorder silently swapping in a
+#     PasarGuard-toggle-only copy risked a future reorder silently swapping in a
 #     broken approve.
 #   • reject_sub_ cancelled the order WITHOUT refunding credit/discounts/coupon
 #     or notifying the user. The detail keyboard now emits deny_sub_, handled by

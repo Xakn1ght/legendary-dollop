@@ -10,7 +10,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.database import crud
 from app.database.models import ChargeRequest, ReferralReward, Subscription, User
 from app.handlers.admin.common import ADMIN_IDS
-from app.services.marzban import marzban_api
+from app.services.pasarguard import pasarguard_api
 from app.utils.bot_i18n import guess_lang_from_telegram, normalize_lang, set_cached_lang, t
 from app.utils.validation import InputValidator, sanitize_user_input
 
@@ -64,12 +64,12 @@ async def admin_dashboard(message: Message, session: AsyncSession):
     ) or 0
 
     # System health indicators
-    marzban_status = "🟢 آنلاین"
+    pasarguard_status = "🟢 آنلاین"
     try:
-        # Quick check to Marzban API
-        await marzban_api.get_users(limit=1)
+        # Quick check to PasarGuard API
+        await pasarguard_api.get_users(limit=1)
     except:
-        marzban_status = "🔴 آفلاین"
+        pasarguard_status = "🔴 آفلاین"
 
     dashboard_text = (
         "🚀 **داشبورد مدیریت**\n\n"
@@ -85,7 +85,7 @@ async def admin_dashboard(message: Message, session: AsyncSession):
         f"💳 موجودی کل کیف پول‌ها: `{wallet_sum:,}` تومان\n"
         f"🎁 کل پاداش‌های ارجاع: `{total_referral_rewards:,}`\n\n"
         "⚡ **وضعیت سیستم:**\n"
-        f"🖥 مرزبان: {marzban_status}\n"
+        f"🖥 پنل: {pasarguard_status}\n"
         f"🤖 ربات: 🟢 آنلاین\n\n"
         f"🕐 آخرین بروزرسانی: `{datetime.now().strftime('%H:%M:%S')}`"
     )
@@ -231,11 +231,11 @@ async def system_alerts(callback: CallbackQuery, session: AsyncSession):
     if high_credit_users > 0:
         alerts.append(f"⚠️ {high_credit_users} کاربر با موجودی بالای 1 میلیون تومان")
 
-    # Check Marzban connectivity
+    # Check PasarGuard connectivity
     try:
-        await marzban_api.get_users(limit=1)
+        await pasarguard_api.get_users(limit=1)
     except:
-        alerts.append("🚨 مشکل در اتصال به مرزبان")
+        alerts.append("🚨 مشکل در اتصال به پنل")
 
     if not alerts:
         alerts.append("✅ همه چیز عالی است!")

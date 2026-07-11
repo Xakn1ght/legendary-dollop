@@ -4,7 +4,7 @@ from ..common import *  # noqa: F403
 
 
 async def handle_admin_subscription_delete(request: web.Request):
-    """Delete a user from Marzban"""
+    """Delete a user from PasarGuard"""
     username = request.match_info.get('username', '').strip()
     if not username or len(username) > 100:
         return web.json_response({"ok": False, "error": "invalid_username"}, status=400)
@@ -20,7 +20,7 @@ async def handle_admin_subscription_delete(request: web.Request):
             if sub and sub.user_id:
                 user_to_notify = await session.get(User, sub.user_id)
         
-        success = await marzban_api.delete_user(username)
+        success = await pasarguard_api.delete_user(username)
         if success:
             # Send notification to user
             if user_to_notify:
@@ -48,7 +48,7 @@ async def handle_admin_subscription_delete(request: web.Request):
 
             await record_audit(
                 request, "subscription.delete", target_type="subscription", target_id=username,
-                summary=f"deleted marzban user {username}",
+                summary=f"deleted panel user {username}",
             )
             return web.json_response({"ok": True, "message": "deleted"})
         else:

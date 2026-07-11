@@ -18,7 +18,7 @@ from app.api.deps import _verify_webapp_auth, set_tma_session_cookie
 from app.core.settings import ADMIN_ID, BOT_TOKEN, CHARGE_PRESET_PACKAGES, PAYMENT_CARD_HOLDER, PAYMENT_CARD_NUMBER
 from app.database import crud
 from app.database.models import AsyncSessionLocal, ChargeRequest, Subscription, User
-from app.services.marzban import marzban_api
+from app.services.pasarguard import pasarguard_api
 from app.utils.validation import detect_image_type, validate_image_bytes
 
 logger = logging.getLogger(__name__)

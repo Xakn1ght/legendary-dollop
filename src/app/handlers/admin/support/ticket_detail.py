@@ -128,9 +128,9 @@ async def admin_view_subscription(callback: CallbackQuery, session: AsyncSession
         return
     try:
         from app.handlers.user.my_services import build_subscription_detail
-        from app.services.marzban import marzban_api
+        from app.services.pasarguard import pasarguard_api
 
-        ui = await marzban_api.get_fast_user_info(
+        ui = await pasarguard_api.get_fast_user_info(
             sub.marzban_username, getattr(sub, "sub_token", None)
         )
         text, kb = build_subscription_detail(sub, ui or {})
@@ -159,9 +159,9 @@ async def admin_refresh_subscription(callback: CallbackQuery, session: AsyncSess
     if not sub:
         await callback.answer()
         return
-    from app.services.marzban import marzban_api
+    from app.services.pasarguard import pasarguard_api
 
-    ui = await marzban_api.get_fast_user_info(
+    ui = await pasarguard_api.get_fast_user_info(
         sub.marzban_username, getattr(sub, "sub_token", None)
     )
     status = ui.get("status") if ui else "-"

@@ -26,7 +26,7 @@ from app.database import crud, notifications_crud
 from app.database.models import ChargeRequest, Subscription
 from app.database.models import User as _User
 from app.services.flows.errors import FlowError
-from app.services.marzban import marzban_api
+from app.services.pasarguard import pasarguard_api
 
 logger = logging.getLogger(__name__)
 
@@ -134,7 +134,7 @@ async def start_charge_order(
     if sub.status != "active":
         raise FlowError("subscription_not_active")
 
-    user_info = await marzban_api.get_user_info(sub.marzban_username)
+    user_info = await pasarguard_api.get_user_info(sub.marzban_username)
     if not user_info:
         raise FlowError("failed_to_fetch_traffic", "Could not fetch subscription status from server")
 
@@ -410,7 +410,7 @@ async def deny_charge(session: AsyncSession, charge_id: int) -> DenyChargeResult
 
 
 async def approve_charge(session: AsyncSession, charge_id: int, *, user_bot) -> ApproveChargeResult:
-    """Approve a pending charge: apply the carry-over math on Marzban, persist the
+    """Approve a pending charge: apply the carry-over math on PasarGuard, persist the
     new state, apply any auto-renew intent, grant referral rewards, and notify the
     user. ``user_bot`` is the user-facing Telegram bot (DMs the customer/referrer).
 
@@ -451,7 +451,7 @@ async def _approve_charge_claimed(session: AsyncSession, charge_id: int, *, user
 
     if getattr(charge_req, "charge_type", "normal") == "booking":
         # A booking only records paid renewal intent — the plan itself is applied by
-        # the renewal job later. No Marzban change now (traffic_bytes is 0; running
+        # the renewal job later. No PasarGuard change now (traffic_bytes is 0; running
         # the carry-over math would wipe the user's data limit).
         await crud.update_charge_request_status(session, charge_id, "approved")
         await crud.update_subscription_renewal(
@@ -482,9 +482,9 @@ async def _approve_charge_claimed(session: AsyncSession, charge_id: int, *, user
                 logger.error(f"Failed to DM booking approval to user {user.chat_id}: {e}")
         return result
 
-    user_info = await marzban_api.get_user_info(sub.marzban_username)
+    user_info = await pasarguard_api.get_user_info(sub.marzban_username)
     if not user_info:
-        raise FlowError("marzban_fetch_failed")
+        raise FlowError("panel_fetch_failed")
 
     now_ts = datetime.utcnow().timestamp()
     expire_ts = user_info.get("expire", 0) or 0
@@ -540,26 +540,30 @@ async def _approve_charge_claimed(session: AsyncSession, charge_id: int, *, user
                 new_expire_ts = int((expire_ts or now_ts) + charge_req.extra_days * 24 * 3600)
 
     if reset_usage:
-        ok = await marzban_api.reset_user_traffic_bytes(
+        ok = await pasarguard_api.reset_user_traffic_bytes(
             sub.marzban_username,
             new_data_limit_bytes=int(data_limit_after or 0),
             new_expire_ts=int(new_expire_ts or 0),
         )
         if not ok:
-            raise FlowError("marzban_reset_failed")
+            raise FlowError("panel_reset_failed")
     else:
-        session_http = await marzban_api._get_session()
-        headers = await marzban_api._get_headers()
-        url = f"{marzban_api.base_url}/api/user/{sub.marzban_username}"
+        session_http = await pasarguard_api._get_session()
+        headers = await pasarguard_api._get_headers()
+        url = f"{pasarguard_api.base_url}/api/user/{sub.marzban_username}"
         patch_body = {
             "data_limit": int(data_limit_after or 0),
             "expire": int(new_expire_ts or 0),
             "status": "active",
             "data_limit_reset_strategy": "no_reset",
         }
+        await pasarguard_api.invalidate_user_info(sub.marzban_username)
         async with session_http.put(url, headers=headers, json=patch_body) as resp:
             if resp.status not in (200, 204):
-                raise FlowError("marzban_update_failed")
+                raise FlowError("panel_update_failed")
+        # Money path: the user opens the dashboard right after approval — the
+        # cached panel info must not show pre-charge numbers for another 90s.
+        await pasarguard_api.invalidate_user_info(sub.marzban_username)
 
     await crud.set_subscription_carry_over(session, sub.id, carry_bytes, reset_at)
     await crud.update_charge_request_status(session, charge_id, "approved")

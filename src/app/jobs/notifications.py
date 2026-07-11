@@ -8,7 +8,7 @@ from app.core.settings import RENEWAL_TRAFFIC_SKIP_PERCENT, SUPPORT_TICKET_AUTOC
 from app.database import crud
 from app.database.models import AsyncSessionLocal
 from app.keyboards.inline import get_low_resource_keyboard, get_low_traffic_keyboard, get_renewal_keyboard
-from app.services.marzban import marzban_api
+from app.services.pasarguard import pasarguard_api
 
 EXPIRY_NOTIFY_THRESHOLD = timedelta(days=3)
 
@@ -19,12 +19,12 @@ async def check_low_data_job(bot: Bot):
         
         for sub in subscriptions:
             try:
-                user_info = await marzban_api.get_fast_user_info(sub.marzban_username, getattr(sub, 'sub_token', None))
+                user_info = await pasarguard_api.get_fast_user_info(sub.marzban_username, getattr(sub, 'sub_token', None))
                 if not user_info:
                     continue
                 # Some share-link responses may omit expire; fallback to admin API for completeness
                 if not user_info.get('expire'):
-                    admin_info = await marzban_api.get_user_info(sub.marzban_username)
+                    admin_info = await pasarguard_api.get_user_info(sub.marzban_username)
                     if admin_info:
                         user_info['expire'] = admin_info.get('expire', user_info.get('expire'))
 

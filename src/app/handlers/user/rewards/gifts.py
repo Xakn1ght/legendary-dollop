@@ -428,7 +428,7 @@ async def accept_gift_callback(callback: CallbackQuery, session: AsyncSession):
         if not plan_name or plan_name not in PLANS:
             await callback.answer("❌ پلن هدیه نامعتبر است.", show_alert=True)
             return
-        # Generate marzban username
+        # Generate panel username
         base_username = (receiver.username or receiver.full_name or "gift").replace(" ", "")[:12]
         if not base_username:
             base_username = "gift"

@@ -13,7 +13,7 @@ from sqlalchemy.orm import selectinload
 from app.database import crud
 from app.database.models import ChargeRequest, Subscription, User
 from app.handlers.admin.common import ADMIN_IDS
-from app.services.marzban import marzban_api
+from app.services.pasarguard import pasarguard_api
 from app.utils.bot_i18n import get_cached_lang, guess_lang_from_telegram, t
 from app.utils.validation import InputValidator, sanitize_user_input
 
@@ -48,12 +48,12 @@ async def service_management_menu(message: Message, session: AsyncSession):
         select(func.count(Subscription.id)).filter(Subscription.status == 'expired')
     ) or 0
     
-    # Get Marzban sync status
-    marzban_status = "🟢 متصل"
+    # Get PasarGuard sync status
+    pasarguard_status = "🟢 متصل"
     try:
-        marzban_users = await marzban_api.get_all_users(limit=1)
+        pasarguard_users = await pasarguard_api.get_all_users(limit=1)
     except:
-        marzban_status = "🔴 قطع"
+        pasarguard_status = "🔴 قطع"
 
     stats_text = (
         "🛍 **مدیریت سرویس‌ها**\n\n"
@@ -61,7 +61,7 @@ async def service_management_menu(message: Message, session: AsyncSession):
         f"✅ فعال: `{active_subs:,}`\n"
         f"⏳ در انتظار: `{pending_subs:,}`\n"
         f"❌ منقضی: `{expired_subs:,}`\n\n"
-        f"🖥 وضعیت مرزبان: {marzban_status}\n\n"
+        f"🖥 وضعیت پنل: {pasarguard_status}\n\n"
         "عملیات مورد نظر را انتخاب کنید:"
     )
 
@@ -69,7 +69,7 @@ async def service_management_menu(message: Message, session: AsyncSession):
     kb.button(text='📋 لیست سرویس‌ها', callback_data='list_services')
     # kb.button(text='🔍 جستجوی سرویس', callback_data='search_service')
     kb.button(text='⚠️ سرویس‌های مشکل‌دار', callback_data='problematic_services')
-    kb.button(text='🔄 همگام‌سازی مرزبان', callback_data='sync_marzban')
+    kb.button(text='🔄 همگام‌سازی پنل', callback_data='sync_pasarguard')
     kb.button(text='🎯 عملیات گروهی', callback_data='bulk_service_operations')
     kb.button(text='📊 گزارش سرویس‌ها', callback_data='service_reports')
     kb.adjust(2)
@@ -185,24 +185,24 @@ async def service_details(callback: CallbackQuery, session: AsyncSession):
     # Refresh user relationship
     await session.refresh(service, attribute_names=["user"])
 
-    # Get Marzban info if active
-    marzban_info = ""
+    # Get PasarGuard info if active
+    pasarguard_info = ""
     if service.status == 'active' and service.marzban_username:
         try:
-            marzban_user = await marzban_api.get_user_info(service.marzban_username)
-            if marzban_user:
-                used_gb = marzban_user.get('used_traffic', 0) / (1024**3)  # Convert to GB
-                total_gb = marzban_user.get('data_limit', 0) / (1024**3) if marzban_user.get('data_limit') else 0
-                expire_date = marzban_user.get('expire', 'نامحدود')
+            pasarguard_user = await pasarguard_api.get_user_info(service.marzban_username)
+            if pasarguard_user:
+                used_gb = pasarguard_user.get('used_traffic', 0) / (1024**3)  # Convert to GB
+                total_gb = pasarguard_user.get('data_limit', 0) / (1024**3) if pasarguard_user.get('data_limit') else 0
+                expire_date = pasarguard_user.get('expire', 'نامحدود')
                 
-                marzban_info = (
-                    f"\n🖥 **اطلاعات مرزبان:**\n"
+                pasarguard_info = (
+                    f"\n🖥 **اطلاعات پنل:**\n"
                     f"📊 مصرف: `{used_gb:.1f}` / `{total_gb:.1f}` GB\n"
                     f"📅 انقضا: {expire_date}\n"
-                    f"🔄 وضعیت: {'فعال' if marzban_user.get('status') == 'active' else 'غیرفعال'}"
+                    f"🔄 وضعیت: {'فعال' if pasarguard_user.get('status') == 'active' else 'غیرفعال'}"
                 )
         except:
-            marzban_info = "\n🖥 **مرزبان:** خطا در دریافت اطلاعات"
+            pasarguard_info = "\n🖥 **پنل:** خطا در دریافت اطلاعات"
 
     created_date = service.created_at.strftime('%Y-%m-%d %H:%M') if service.created_at else "نامشخص"
     status_emoji = {"active": "✅", "pending": "⏳", "expired": "❌"}.get(service.status, "❓")
@@ -218,7 +218,7 @@ async def service_details(callback: CallbackQuery, session: AsyncSession):
         f"🔄 وضعیت: {status_emoji} {service.status}"
         # (removed `service.charge_request_id` — no such column on Subscription;
         #  it raised AttributeError on every tap outside the try/except — audit fix)
-        f"{marzban_info}"
+        f"{pasarguard_info}"
     )
 
     # Create action buttons
@@ -258,7 +258,7 @@ async def problematic_services(callback: CallbackQuery, session: AsyncSession):
 
     issues = []
     
-    # Find services that are active but don't exist in Marzban
+    # Find services that are active but don't exist in PasarGuard
     active_services = await session.execute(
         select(Subscription).filter(
             and_(
@@ -268,14 +268,14 @@ async def problematic_services(callback: CallbackQuery, session: AsyncSession):
         ).limit(50)
     )
     
-    marzban_issues = []
+    pasarguard_issues = []
     for service in active_services.scalars():
         try:
-            marzban_user = await marzban_api.get_user(service.marzban_username)
-            if not marzban_user:
-                marzban_issues.append(service)
+            pasarguard_user = await pasarguard_api.get_user(service.marzban_username)
+            if not pasarguard_user:
+                pasarguard_issues.append(service)
         except:
-            marzban_issues.append(service)
+            pasarguard_issues.append(service)
     
     # Find old pending services (EAGER LOAD user)
     old_pending = await session.execute(
@@ -296,12 +296,12 @@ async def problematic_services(callback: CallbackQuery, session: AsyncSession):
 
     issues_text = "⚠️ **سرویس‌های مشکل‌دار**\n\n"
     
-    if marzban_issues:
-        issues_text += f"🖥 **مشکل مرزبان ({len(marzban_issues)} سرویس):**\n"
-        for service in marzban_issues[:5]:
-            issues_text += f"• {service.marzban_username} - فعال ولی در مرزبان موجود نیست\n"
-        if len(marzban_issues) > 5:
-            issues_text += f"• ... و {len(marzban_issues) - 5} سرویس دیگر\n"
+    if pasarguard_issues:
+        issues_text += f"🖥 **مشکل پنل ({len(pasarguard_issues)} سرویس):**\n"
+        for service in pasarguard_issues[:5]:
+            issues_text += f"• {service.marzban_username} - فعال ولی در پنل موجود نیست\n"
+        if len(pasarguard_issues) > 5:
+            issues_text += f"• ... و {len(pasarguard_issues) - 5} سرویس دیگر\n"
         issues_text += "\n"
     
     if old_pending_list:
@@ -319,12 +319,12 @@ async def problematic_services(callback: CallbackQuery, session: AsyncSession):
             issues_text += f"• {service.marzban_username} - بدون ارتباط کاربر\n"
         issues_text += "\n"
     
-    if not (marzban_issues or old_pending_list or orphaned_list):
+    if not (pasarguard_issues or old_pending_list or orphaned_list):
         issues_text += "✅ مشکل خاصی یافت نشد!"
 
     kb = InlineKeyboardBuilder()
-    # if marzban_issues:
-    #     kb.button(text='🔧 تعمیر مرزبان', callback_data='fix_marzban_issues')
+    # if pasarguard_issues:
+    #     kb.button(text='🔧 تعمیر پنل', callback_data='fix_marzban_issues')
     # if old_pending_list:
     #     kb.button(text='⏳ تعمیر انتظارات', callback_data='fix_pending_issues')
     # if orphaned_list:
@@ -340,18 +340,18 @@ async def problematic_services(callback: CallbackQuery, session: AsyncSession):
     )
     await callback.answer()
 
-@router.callback_query(F.data == 'sync_marzban')
-async def sync_marzban(callback: CallbackQuery, session: AsyncSession):
-    """Synchronize with Marzban server"""
+@router.callback_query(F.data == 'sync_pasarguard')
+async def sync_pasarguard(callback: CallbackQuery, session: AsyncSession):
+    """Synchronize with PasarGuard server"""
     if callback.from_user.id not in ADMIN_IDS:
         await callback.answer(t(_lang_for_tg_user(callback.from_user), "not_authorized"), show_alert=True)
         return
 
-    await callback.answer("در حال همگام‌سازی با مرزبان...", show_alert=True)
+    await callback.answer("در حال همگام‌سازی با پنل...", show_alert=True)
     
     try:
-        # Get all users from Marzban
-        marzban_users = await marzban_api.get_all_users()
+        # Get all users from PasarGuard
+        pasarguard_users = await pasarguard_api.get_all_users()
         
         # Get all active subscriptions
         active_subs = await session.execute(
@@ -361,22 +361,22 @@ async def sync_marzban(callback: CallbackQuery, session: AsyncSession):
         sync_results = {
             'found_in_both': 0,
             'only_in_db': 0,
-            'only_in_marzban': 0,
+            'only_in_panel': 0,
             'status_mismatch': 0
         }
         
         db_usernames = {sub.marzban_username for sub in active_subs.scalars() if sub.marzban_username}
-        marzban_usernames = {user['username'] for user in marzban_users if user.get('username')}
+        pasarguard_usernames = {user['username'] for user in pasarguard_users if user.get('username')}
         
-        sync_results['found_in_both'] = len(db_usernames & marzban_usernames)
-        sync_results['only_in_db'] = len(db_usernames - marzban_usernames)
-        sync_results['only_in_marzban'] = len(marzban_usernames - db_usernames)
+        sync_results['found_in_both'] = len(db_usernames & pasarguard_usernames)
+        sync_results['only_in_db'] = len(db_usernames - pasarguard_usernames)
+        sync_results['only_in_panel'] = len(pasarguard_usernames - db_usernames)
         
         sync_text = (
-            "🔄 **نتایج همگام‌سازی مرزبان**\n\n"
+            "🔄 **نتایج همگام‌سازی پنل**\n\n"
             f"✅ موجود در هر دو: `{sync_results['found_in_both']}`\n"
             f"🔍 فقط در دیتابیس: `{sync_results['only_in_db']}`\n"
-            f"🆕 فقط در مرزبان: `{sync_results['only_in_marzban']}`\n\n"
+            f"🆕 فقط در پنل: `{sync_results['only_in_panel']}`\n\n"
             "همگام‌سازی کامل شد ✅"
         )
         
@@ -454,7 +454,7 @@ async def confirm_bulk_approve(callback: CallbackQuery, session: AsyncSession):
     await callback.answer("در حال تایید گروهی...")
 
     # CRITICAL (audit fix): the old code flipped every pending sub to 'active'
-    # with a raw UPDATE — no Marzban user, no link DM, no reward grants. Those
+    # with a raw UPDATE — no PasarGuard user, no link DM, no reward grants. Those
     # became ghosts (active in DB, absent from the panel). Route each order
     # through the real provisioning flow, exactly like the single-receipt
     # approve, using the USER bot for the link DM.

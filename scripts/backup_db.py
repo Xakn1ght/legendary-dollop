@@ -183,7 +183,7 @@ def backup_env_safe(backup_dir):
                 masked_lines = []
                 sensitive_keys = [
                     "PASSWORD", "SECRET", "TOKEN", "KEY", "HASH",
-                    "MARZBAN_PASSWORD", "BOT_TOKEN", "ADMIN_BOT_TOKEN"
+                    "PASARGUARD_PASSWORD", "BOT_TOKEN", "ADMIN_BOT_TOKEN"
                 ]
                 
                 for line in lines:

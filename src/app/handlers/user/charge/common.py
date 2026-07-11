@@ -10,7 +10,7 @@ from app.core.settings import CHARGE_PLANS_BUTTON_COLUMNS, PLANS_BUTTON_COLUMNS
 from app.database import crud
 from app.handlers.user.flow_inline import ikb
 from app.keyboards.reply import get_main_keyboard
-from app.services.marzban import marzban_api
+from app.services.pasarguard import pasarguard_api
 from app.shared.plan_ordering import get_ordered_charge_plans, get_ordered_plans
 from app.utils.bot_i18n import get_cached_lang, normalize_lang, set_cached_lang, t
 
@@ -127,8 +127,8 @@ async def check_subscription_traffic(message: Message, state: FSMContext, sessio
     """Check if subscription has >5GB remaining and show appropriate options"""
     lang = await _get_lang(message.chat.id, session)
     
-    # Get current traffic info from Marzban
-    user_info = await marzban_api.get_user_info(subscription.marzban_username)
+    # Get current traffic info from PasarGuard
+    user_info = await pasarguard_api.get_user_info(subscription.marzban_username)
     if not user_info:
         await message.answer(t(lang, "charge_error_fetch"), reply_markup=get_main_keyboard(message.chat.id, lang=lang))
         await state.clear()

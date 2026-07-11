@@ -1,5 +1,8 @@
 import asyncio
+import base64
 import json
+import re
+import time as _time
 from datetime import datetime, timedelta
 from typing import Optional
 
@@ -7,7 +10,7 @@ import aiohttp
 
 from app.core.paths import core_path
 from app.core.redis_config import cache
-from app.core.settings import MARZBAN_BASE_URL, MARZBAN_PASSWORD, MARZBAN_USERNAME, PASARGUARD_GROUP_IDS
+from app.core.settings import PASARGUARD_BASE_URL, PASARGUARD_PASSWORD, PASARGUARD_USERNAME, PASARGUARD_GROUP_IDS
 from app.utils.logger import log_api_call, log_error
 
 # Panel-load shield. Every read surface (dashboard list/overview, bot menus, the
@@ -18,6 +21,14 @@ from app.utils.logger import log_api_call, log_error
 # to the panel exactly as before.
 USER_INFO_CACHE_TTL = 90       # seconds; live usage % may lag at most this much
 USAGE_CHART_CACHE_TTL = 600    # 7-day usage chart changes slowly
+
+# Any single panel HTTP call slower than this logs a warning with the duration
+# and (token-redacted) endpoint, so panel degradation is visible in the logs
+# before users complain. Timeouts count too — they are the truest slow signal.
+SLOW_PANEL_WARN_SECONDS = 4.0
+
+# In-process cache of the panel's user-template list (template-based creation).
+TEMPLATE_LIST_TTL = 600  # re-list at most every 10 min; admin edits show up then
 
 # ---- PasarGuard (2026-07 panel migration) compatibility layer -------------
 # The panel is now PasarGuard, a Marzban fork with a few breaking API changes.
@@ -60,15 +71,79 @@ def _usage_key(username: str, days: int) -> str:
     return f"mz:usage:{days}d:{username}"
 
 
-class MarzbanAPI:
+_V3_TOKEN_RE = re.compile(r"v3,(\d+),(\d+)")
+
+
+def extract_v3_user_id(token: str) -> Optional[int]:
+    """PasarGuard v3 share tokens are base64("v3,<panel_user_id>,<ts>") plus a
+    hex signature tail. Return the embedded panel user id, or None for classic
+    tokens. Pure parse — never a substitute for validating the token."""
+    tok = (token or "").strip()
+    if not tok.startswith("djM"):  # base64 of "v3" — cheap pre-filter
+        return None
+    for cut in range(min(len(tok), 40), 7, -1):
+        seg = tok[:cut] + "=" * (-cut % 4)
+        try:
+            decoded = base64.b64decode(seg, validate=True).decode("utf-8", "strict")
+        except Exception:
+            continue
+        m = _V3_TOKEN_RE.fullmatch(decoded)
+        if m:
+            return int(m.group(1))
+    return None
+
+
+def _redact_panel_path(path: str) -> str:
+    """Share-link tokens must not land in logs: /sub/<token>/info → /sub/***/info."""
+    return re.sub(r"/sub/[^/]+", "/sub/***", path or "")
+
+
+def _make_slow_call_tracer() -> aiohttp.TraceConfig:
+    """TraceConfig hooked into the panel HTTP session: one warning per call that
+    exceeds SLOW_PANEL_WARN_SECONDS (finished or failed), with method, redacted
+    path and duration. Instruments every panel call, including the raw
+    session.put/post usages in renewal/charge/redemption code."""
+    tc = aiohttp.TraceConfig()
+
+    async def _on_start(session, ctx, params):
+        ctx.start = _time.monotonic()
+
+    async def _on_end(session, ctx, params):
+        dur = _time.monotonic() - getattr(ctx, "start", _time.monotonic())
+        if dur >= SLOW_PANEL_WARN_SECONDS:
+            from app.utils.logger import bot_logger
+            bot_logger.warning(
+                f"[PANEL] slow call: {params.method} {_redact_panel_path(params.url.path)} took {dur:.1f}s"
+            )
+
+    async def _on_exception(session, ctx, params):
+        dur = _time.monotonic() - getattr(ctx, "start", _time.monotonic())
+        if dur >= SLOW_PANEL_WARN_SECONDS:
+            from app.utils.logger import bot_logger
+            bot_logger.warning(
+                f"[PANEL] slow call FAILED ({type(params.exception).__name__}): "
+                f"{params.method} {_redact_panel_path(params.url.path)} after {dur:.1f}s"
+            )
+
+    tc.on_request_start.append(_on_start)
+    tc.on_request_end.append(_on_end)
+    tc.on_request_exception.append(_on_exception)
+    return tc
+
+
+class PasarGuardAPI:
     def __init__(self):
-        self.base_url = MARZBAN_BASE_URL
-        self.username = MARZBAN_USERNAME
-        self.password = MARZBAN_PASSWORD
+        self.base_url = PASARGUARD_BASE_URL
+        self.username = PASARGUARD_USERNAME
+        self.password = PASARGUARD_PASSWORD
         self._access_token: Optional[str] = None
         self._session: Optional[aiohttp.ClientSession] = None
         # Prevent concurrent logins when multiple jobs request headers at once
         self._login_lock: asyncio.Lock = asyncio.Lock()
+        # (data_limit_bytes, expire_seconds) → template dict; None = never audited
+        self._template_map: Optional[dict] = None
+        self._template_fetched_at: float = 0.0
+        self._template_lock: asyncio.Lock = asyncio.Lock()
 
     async def _get_session(self) -> aiohttp.ClientSession:
         # aiohttp can end up with a closed connector even if the session object still exists
@@ -80,7 +155,7 @@ class MarzbanAPI:
         ):
             # Apply conservative timeouts so scheduled jobs don't hang and get cancelled
             timeout = aiohttp.ClientTimeout(total=12, connect=5, sock_connect=5, sock_read=10)
-            self._session = aiohttp.ClientSession(timeout=timeout)
+            self._session = aiohttp.ClientSession(timeout=timeout, trace_configs=[_make_slow_call_tracer()])
         return self._session
 
     async def _reset_http(self):
@@ -112,19 +187,19 @@ class MarzbanAPI:
                     if response.status == 200:
                         data = await response.json()
                         self._access_token = data.get("access_token")
-                        log_api_call("marzban", "login", True, duration)
+                        log_api_call("pasarguard", "login", True, duration)
                         return True
                     else:
                         error_text = await response.text()
-                        log_api_call("marzban", "login", False, duration, status_code=response.status, error=error_text)
-                        log_error(Exception(f"Marzban login failed: {response.status} - {error_text}"),
-                                 {"operation": "marzban_login", "status_code": response.status})
+                        log_api_call("pasarguard", "login", False, duration, status_code=response.status, error=error_text)
+                        log_error(Exception(f"PasarGuard login failed: {response.status} - {error_text}"),
+                                 {"operation": "pasarguard_login", "status_code": response.status})
                         return False
 
         except Exception as e:
             duration = time.time() - start_time
-            log_api_call("marzban", "login", False, duration, error=str(e))
-            log_error(e, {"operation": "marzban_login"})
+            log_api_call("pasarguard", "login", False, duration, error=str(e))
+            log_error(e, {"operation": "pasarguard_login"})
             return False
 
     async def _get_headers(self):
@@ -133,7 +208,7 @@ class MarzbanAPI:
         return {"Authorization": f"Bearer {self._access_token}"}
 
     async def _inbounds_for_new_user(self) -> dict:
-        """Load configured inbounds and drop any tag missing on the Marzban panel."""
+        """Load configured inbounds and drop any tag missing on the PasarGuard panel."""
         with open(core_path("inbounds.json"), "r", encoding="utf-8") as f:
             configured = json.load(f)
         try:
@@ -162,11 +237,137 @@ class MarzbanAPI:
         except Exception:
             return configured
 
+    # ---- PasarGuard user templates (2026-07-10 speed work) -----------------
+    # Fixed plans whose (data_limit, duration) exactly matches a panel template
+    # are created via POST /api/user/from_template — one lightweight call, no
+    # inbound filtering, and plan shape managed on the panel. Everything else
+    # (custom GB, multi-month scaling, coupon bonus GB, on_hold gifts, missing
+    # template) transparently keeps the manual path.
+
+    async def audit_templates(self, force: bool = False) -> dict:
+        """Fetch + cache the panel's user templates as {(data_limit_bytes,
+        expire_seconds): template}. Only templates that create users equivalent
+        to our manual creation qualify: enabled, active, and group_ids exactly
+        our PASARGUARD_GROUP_IDS (the panel also holds legacy templates with NO
+        groups — those would create config-less dud users). Never hard-fails:
+        on any error the map stays as-is (or empty) and creation falls back to
+        the manual path."""
+        now = _time.monotonic()
+        if not force and self._template_map is not None and (now - self._template_fetched_at) < TEMPLATE_LIST_TTL:
+            return self._template_map
+        async with self._template_lock:
+            now = _time.monotonic()
+            if not force and self._template_map is not None and (now - self._template_fetched_at) < TEMPLATE_LIST_TTL:
+                return self._template_map
+            first_audit = self._template_map is None
+            new_map: dict = {}
+            try:
+                session = await self._get_session()
+                headers = await self._get_headers()
+                url = f"{self.base_url}/api/user_templates"
+                async with session.get(url, headers=headers) as resp:
+                    if resp.status == 401:
+                        await self._login()
+                        headers = await self._get_headers()
+                        async with session.get(url, headers=headers) as retry:
+                            templates = (await retry.json()) if retry.status == 200 else None
+                    elif resp.status == 200:
+                        templates = await resp.json()
+                    else:
+                        templates = None
+                if not isinstance(templates, list):
+                    raise RuntimeError(f"unexpected template list response: {type(templates)}")
+
+                our_groups = set(PASARGUARD_GROUP_IDS)
+                for t in templates:
+                    if not isinstance(t, dict):
+                        continue
+                    if t.get("is_disabled") or (t.get("status") or "active") != "active":
+                        continue
+                    if set(t.get("group_ids") or []) != our_groups:
+                        continue
+                    if t.get("username_prefix") or t.get("username_suffix"):
+                        continue  # would mangle our service names
+                    limit = int(t.get("data_limit") or 0)
+                    duration = int(t.get("expire_duration") or 0)
+                    if limit <= 0 or duration <= 0:
+                        continue
+                    key = (limit, duration)
+                    # Prefer the AstroByte-named template on shape collisions.
+                    if key in new_map and not str(t.get("name") or "").startswith("AstroByte"):
+                        continue
+                    new_map[key] = t
+
+                self._template_map = new_map
+                self._template_fetched_at = _time.monotonic()
+                if first_audit:
+                    from app.utils.logger import bot_logger
+                    backed = sorted(
+                        f"{limit // (1024 ** 3)}GB/{dur // 86400}d({t.get('name')})"
+                        for (limit, dur), t in new_map.items()
+                    )
+                    bot_logger.info(
+                        f"[PANEL] template audit: {len(new_map)} usable template(s): "
+                        + (", ".join(backed) if backed else "none — all creations use the manual path")
+                    )
+            except Exception as e:
+                if self._template_map is None:
+                    self._template_map = {}
+                self._template_fetched_at = _time.monotonic()  # don't re-hammer a sick panel
+                log_error(e, {"operation": "pasarguard_template_audit"})
+            return self._template_map
+
+    async def _add_user_from_template(self, username: str, template_id: int):
+        """POST /api/user/from_template. Returns the normalized user dict, or
+        None on any failure (caller falls back to manual creation). 409
+        already-exists is treated as idempotent success, same as add_user."""
+        session = await self._get_session()
+        headers = await self._get_headers()
+        url = f"{self.base_url}/api/user/from_template"
+        payload = {"user_template_id": int(template_id), "username": username, "note": ""}
+        async with session.post(url, headers=headers, json=payload) as resp:
+            if resp.status in (200, 201):
+                return _norm_user_payload(await resp.json())
+            if resp.status == 409 and "already exists" in (await resp.text()).lower():
+                try:
+                    return await self.get_user_info(username)
+                except Exception:
+                    return None
+            if resp.status == 401:
+                await self._login()
+                headers = await self._get_headers()
+                async with session.post(url, headers=headers, json=payload) as retry:
+                    if retry.status in (200, 201):
+                        return _norm_user_payload(await retry.json())
+            return None
+
     async def add_user(self, username: str, data_limit_gb: int, expire_days: int,
                        on_hold_days: int | None = None):
         import time
         start_time = time.time()
         await self.invalidate_user_info(username)
+
+        # Template fast path — only for plain active plans whose exact shape is
+        # template-backed on the panel. on_hold gifts can't ride a template.
+        if not on_hold_days and data_limit_gb > 0 and expire_days > 0 and float(data_limit_gb).is_integer():
+            try:
+                tmap = await self.audit_templates()
+                template = tmap.get((int(data_limit_gb) * 1024 ** 3, int(expire_days) * 86400))
+                if template:
+                    result = await self._add_user_from_template(username, template["id"])
+                    if result:
+                        await self.invalidate_user_info(username)
+                        log_api_call("pasarguard", "add_user", True, time.time() - start_time,
+                                     username=username, template=template.get("name"))
+                        return result
+                    # fall through to manual creation on any template failure
+                    from app.utils.logger import bot_logger
+                    bot_logger.warning(
+                        f"[PANEL] from_template failed for {username} "
+                        f"(template {template.get('name')}); using manual creation"
+                    )
+            except Exception as e:
+                log_error(e, {"operation": "pasarguard_add_user_template", "username": username})
         try:
             session = await self._get_session()
             url = f"{self.base_url}/api/user"
@@ -202,7 +403,8 @@ class MarzbanAPI:
                     
                     if response.status in (200, 201):
                         result = _norm_user_payload(await response.json())
-                        log_api_call("marzban", "add_user", True, duration, username=username)
+                        await self.invalidate_user_info(username)
+                        log_api_call("pasarguard", "add_user", True, duration, username=username)
                         return result
                     else:
                         # Treat "already exists" as a safe idempotent success
@@ -210,7 +412,7 @@ class MarzbanAPI:
                             error_details = await response.text()
                             if "already exists" in error_details.lower():
                                 # Fetch existing user and proceed without logging as error
-                                log_api_call("marzban", "add_user", True, duration, username=username, already_exists=True)
+                                log_api_call("pasarguard", "add_user", True, duration, username=username, already_exists=True)
                                 try:
                                     existing = await self.get_user_info(username)
                                     return existing
@@ -225,14 +427,14 @@ class MarzbanAPI:
                                 retry_duration = time.time() - start_time
                                 if retry_response.status in (200, 201):
                                     result = _norm_user_payload(await retry_response.json())
-                                    log_api_call("marzban", "add_user", True, retry_duration, username=username, retry=True)
+                                    log_api_call("pasarguard", "add_user", True, retry_duration, username=username, retry=True)
                                     return result
                         
                         error_details = await response.text()
-                        log_api_call("marzban", "add_user", False, duration, username=username, 
+                        log_api_call("pasarguard", "add_user", False, duration, username=username, 
                                    status_code=response.status, error=error_details)
                         log_error(Exception(f"Failed to add user {username}: {response.status} - {error_details}"), 
-                                 {"operation": "marzban_add_user", "username": username, "status_code": response.status})
+                                 {"operation": "pasarguard_add_user", "username": username, "status_code": response.status})
                         return None
             except (aiohttp.ClientConnectionError, RuntimeError) as e:
                 # Auto-recover from "Connector is closed"/"Session is closed" once
@@ -244,19 +446,19 @@ class MarzbanAPI:
                         duration = time.time() - start_time
                         if response.status in (200, 201):
                             result = _norm_user_payload(await response.json())
-                            log_api_call("marzban", "add_user", True, duration, username=username, recovered=True)
+                            log_api_call("pasarguard", "add_user", True, duration, username=username, recovered=True)
                             return result
                         # If it still fails, fall through to generic error handling below
                         error_details = await response.text()
-                        log_api_call("marzban", "add_user", False, duration, username=username, 
+                        log_api_call("pasarguard", "add_user", False, duration, username=username, 
                                    status_code=response.status, error=error_details, recovered=True)
                         return None
                 raise
                     
         except Exception as e:
             duration = time.time() - start_time
-            log_api_call("marzban", "add_user", False, duration, username=username, error=str(e))
-            log_error(e, {"operation": "marzban_add_user", "username": username})
+            log_api_call("pasarguard", "add_user", False, duration, username=username, error=str(e))
+            log_error(e, {"operation": "pasarguard_add_user", "username": username})
             return None
 
     async def get_user_info(self, username: str):
@@ -288,6 +490,27 @@ class MarzbanAPI:
                     return None
             return None
 
+    async def get_user_info_by_id(self, panel_user_id: int):
+        """PasarGuard: GET /api/user/by-id/{id}. One call resolves username +
+        full user object when the caller only holds a v3 share token (see
+        extract_v3_user_id). Returns None on 404/any failure."""
+        url = f"{self.base_url}/api/user/by-id/{int(panel_user_id)}"
+        try:
+            session = await self._get_session()
+            headers = await self._get_headers()
+            async with session.get(url, headers=headers) as response:
+                if response.status == 200:
+                    return _norm_user_payload(await response.json())
+                if response.status == 401:
+                    await self._login()
+                    headers = await self._get_headers()
+                    async with session.get(url, headers=headers) as retry_response:
+                        if retry_response.status == 200:
+                            return _norm_user_payload(await retry_response.json())
+                return None
+        except Exception:
+            return None
+
     async def get_subscription_url(self, username: str):
         user_info = await self.get_user_info(username)
         if user_info:
@@ -303,6 +526,7 @@ class MarzbanAPI:
         # PasarGuard answers 204 No Content; classic Marzban answered 200.
         async with session.delete(url, headers=headers) as response:
             if response.status in (200, 204):
+                await self.invalidate_user_info(username)
                 return True
             else:
                 if response.status == 401:
@@ -310,6 +534,7 @@ class MarzbanAPI:
                     headers = await self._get_headers()
                     async with session.delete(url, headers=headers) as retry_response:
                         if retry_response.status in (200, 204):
+                            await self.invalidate_user_info(username)
                             return True
                 return False
 
@@ -340,7 +565,7 @@ class MarzbanAPI:
                     return None
             return None
         except Exception as e:
-            log_error(e, {"operation": "marzban_get_subscription_info", "url": url})
+            log_error(e, {"operation": "pasarguard_get_subscription_info", "url": url})
             return None
 
     async def get_subscription_links(self, token: str) -> list:
@@ -373,7 +598,12 @@ class MarzbanAPI:
         return None
 
     async def invalidate_user_info(self, username: str):
-        """Drop the cached info/usage for a user after any panel mutation."""
+        """Drop the cached info/usage for a user around any panel mutation.
+
+        Mutators call this BEFORE the panel write (stop serving stale data now)
+        and again AFTER success — a concurrent reader can re-cache the old panel
+        state mid-write, and without the second delete that zombie entry would
+        survive for the full TTL right after a payment."""
         try:
             await cache.delete(_info_key(username))
             await cache.delete(_usage_key(username, 7))
@@ -515,9 +745,9 @@ class MarzbanAPI:
 
     async def reset_user_traffic_bytes(self, username: str, new_data_limit_bytes: int, new_expire_ts: int):
         """
-        Reset user traffic via Marzban and then set new limits.
+        Reset user traffic via PasarGuard and then set new limits.
 
-        Marzban does not reliably accept `used_traffic` updates via `PUT /api/user/{username}`.
+        PasarGuard does not reliably accept `used_traffic` updates via `PUT /api/user/{username}`.
         The canonical way to reset usage is `POST /api/user/{username}/reset`.
         """
         await self.invalidate_user_info(username)
@@ -538,13 +768,13 @@ class MarzbanAPI:
                                 Exception(
                                     f"Failed to reset traffic for {username} after retry: {retry_resp.status} - {await retry_resp.text()}"
                                 ),
-                                {"operation": "marzban_reset_traffic", "username": username, "status_code": retry_resp.status},
+                                {"operation": "pasarguard_reset_traffic", "username": username, "status_code": retry_resp.status},
                             )
                             return False
                 else:
                     log_error(
                         Exception(f"Failed to reset traffic for {username}: {resp.status} - {await resp.text()}"),
-                        {"operation": "marzban_reset_traffic", "username": username, "status_code": resp.status},
+                        {"operation": "pasarguard_reset_traffic", "username": username, "status_code": resp.status},
                     )
                     return False
 
@@ -559,6 +789,7 @@ class MarzbanAPI:
 
         async with session.put(modify_url, headers=headers, json=payload) as resp:
             if resp.status in (200, 204):
+                await self.invalidate_user_info(username)
                 return True
             # Attempt to handle token expiration and retry once for the modification
             if resp.status == 401:
@@ -566,18 +797,19 @@ class MarzbanAPI:
                 headers = await self._get_headers()
                 async with session.put(modify_url, headers=headers, json=payload) as retry_resp:
                     if retry_resp.status in (200, 204):
+                        await self.invalidate_user_info(username)
                         return True
                     log_error(
                         Exception(
                             f"Failed to modify user after reset for {username} after retry: {retry_resp.status} - {await retry_resp.text()}"
                         ),
-                        {"operation": "marzban_modify_after_reset", "username": username, "status_code": retry_resp.status},
+                        {"operation": "pasarguard_modify_after_reset", "username": username, "status_code": retry_resp.status},
                     )
                     return False
 
             log_error(
                 Exception(f"Failed to modify user after reset for {username}: {resp.status} - {await resp.text()}"),
-                {"operation": "marzban_modify_after_reset", "username": username, "status_code": resp.status},
+                {"operation": "pasarguard_modify_after_reset", "username": username, "status_code": resp.status},
             )
             return False
 
@@ -594,21 +826,43 @@ class MarzbanAPI:
         headers = await self._get_headers()
         url = f"{self.base_url}/api/user/{username}"
         async with session.put(url, headers=headers, json={"status": status}) as resp:
-            return resp.status in (200, 204)
+            ok = resp.status in (200, 204)
+        if ok:
+            await self.invalidate_user_info(username)
+        return ok
 
-    async def revoke_user_subscription(self, username: str) -> bool:
+    async def revoke_user_subscription(self, username: str):
+        """Rotate the user's share link. PasarGuard answers with the full updated
+        user object — return it (truthy) so callers get the NEW subscription_url
+        without a follow-up get_user_info round-trip. Falsy return = failure;
+        a bare ``True`` remains possible when the panel sends no body."""
         await self.invalidate_user_info(username)
         session = await self._get_session()
         headers = await self._get_headers()
         url = f"{self.base_url}/api/user/{username}/revoke_sub"
+
+        async def _handle(resp):
+            if resp.status not in (200, 204):
+                return None
+            await self.invalidate_user_info(username)
+            try:
+                data = await resp.json()
+                if isinstance(data, dict) and data:
+                    return _norm_user_payload(data)
+            except Exception:
+                pass
+            return True
+
         async with session.post(url, headers=headers) as resp:
-            if resp.status in (200, 204):
-                return True
+            result = await _handle(resp)
+            if result is not None:
+                return result
             if resp.status == 401:
                 await self._login()
                 headers = await self._get_headers()
                 async with session.post(url, headers=headers) as retry_resp:
-                    return retry_resp.status in (200, 204)
+                    result = await _handle(retry_resp)
+                    return result if result is not None else False
             return False
 
     async def get_nodes_realtime_stats(self) -> dict:
@@ -666,7 +920,7 @@ class MarzbanAPI:
             return None
     
     async def get_all_users(self, offset: int = 0, limit: int = 100, search: str = None):
-        """Get all users from Marzban with pagination"""
+        """Get all users from PasarGuard with pagination"""
         session = await self._get_session()
         url = f"{self.base_url}/api/users"
         headers = await self._get_headers()
@@ -706,7 +960,8 @@ class MarzbanAPI:
         return users
 
     async def update_user(self, username: str, update_data: dict) -> bool:
-        """Update a user in Marzban"""
+        """Update a user in PasarGuard"""
+        await self.invalidate_user_info(username)
         session = await self._get_session()
         url = f"{self.base_url}/api/user/{username}"
         headers = await self._get_headers()
@@ -714,7 +969,8 @@ class MarzbanAPI:
         
         try:
             async with session.put(url, headers=headers, json=update_data) as resp:
-                if resp.status == 200:
+                if resp.status in (200, 204):
+                    await self.invalidate_user_info(username)
                     return True
                 print(f"Error updating user {username}: status {resp.status}")
                 return False
@@ -726,4 +982,4 @@ class MarzbanAPI:
         # Ensure we fully reset state so next call can recreate cleanly
         await self._reset_http()
 
-marzban_api = MarzbanAPI()
+pasarguard_api = PasarGuardAPI()

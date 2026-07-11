@@ -9,7 +9,7 @@ from passlib.hash import argon2
 from app.core.paths import data_path
 from app.core.settings.bootstrap import logger
 from app.core.settings.bots import ADMIN_BOT_TOKEN, BOT_TOKEN
-from app.core.settings.external import MARZBAN_PASSWORD
+from app.core.settings.external import PASARGUARD_PASSWORD
 from app.core.settings.persistence import DATABASE_URL
 
 # ===========================================
@@ -197,8 +197,8 @@ def security_sanity_warnings() -> None:
         )
     if not DATABASE_URL:
         logger.critical("DATABASE_URL is not set. Database access will fail.")
-    if not MARZBAN_PASSWORD:
-        logger.warning("MARZBAN_PASSWORD is not set. Marzban API calls will fail.")
+    if not PASARGUARD_PASSWORD:
+        logger.warning("PASARGUARD_PASSWORD is not set. PasarGuard API calls will fail.")
     if not WEBAPP_SESSION_SECRET_EXPLICIT:
         logger.warning(
             "WEBAPP_SESSION_SECRET is not explicitly set. Set it in .env for stable WebApp sessions."

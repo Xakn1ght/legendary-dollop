@@ -7,7 +7,7 @@ from aiogram.types import BufferedInputFile, CallbackQuery, InputMediaAnimation
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database.models import Subscription
-from app.services.marzban import marzban_api
+from app.services.pasarguard import pasarguard_api
 from app.utils.bot_i18n import get_cached_lang, t
 from app.utils.render_manager import render_subscription_gif_async
 
@@ -39,7 +39,7 @@ async def refresh_subscription(callback: CallbackQuery, session: AsyncSession):
         return
     _last_text_refresh[key] = now
 
-    user_info = await marzban_api.get_fast_user_info(sub.marzban_username, getattr(sub, 'sub_token', None))
+    user_info = await pasarguard_api.get_fast_user_info(sub.marzban_username, getattr(sub, 'sub_token', None))
     if not user_info:
         await callback.answer(t(lang, "error_fetch_service"), show_alert=True)
         return
@@ -48,12 +48,11 @@ async def refresh_subscription(callback: CallbackQuery, session: AsyncSession):
     await callback.answer(t(lang, "updating"))
 
     # Ensure we persist a stable token for the subscription link and avoid duplicates in text
+    # (user_info already carries subscription_url on the admin-API path; when it
+    # came via share link the token was already known — no extra panel fetch.)
     try:
         if not getattr(sub, 'sub_token', None):
             sub_url_candidate = user_info.get('subscription_url') if isinstance(user_info, dict) else None
-            if not sub_url_candidate:
-                from app.services.marzban import marzban_api as _api
-                sub_url_candidate = await _api.get_subscription_url(sub.marzban_username)
             if sub_url_candidate:
                 m = re.search(r"/sub/([^/]+)/?", sub_url_candidate)
                 if m:
@@ -140,7 +139,7 @@ async def subscription_detail(callback: CallbackQuery, session: AsyncSession):
             'expire': 0,
         }
     else:
-        user_info = await marzban_api.get_fast_user_info(sub.marzban_username, getattr(sub, 'sub_token', None))
+        user_info = await pasarguard_api.get_fast_user_info(sub.marzban_username, getattr(sub, 'sub_token', None))
     if not user_info:
         await callback.answer(t(lang, "error_fetch_service"), show_alert=True)
         return

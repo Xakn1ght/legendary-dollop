@@ -9,7 +9,7 @@ _ERROR_STATUS = {
     "invalid_subscription_url": 400,
     "subscription_url_required": 400,
     "cannot_resolve_username": 400,
-    "marzban_account_not_found": 400,
+    "panel_account_not_found": 400,
 }
 
 

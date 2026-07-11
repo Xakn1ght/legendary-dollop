@@ -10,7 +10,7 @@ must NEVER flow through the user bot — alerts go out on the admin bot client.
 import json
 
 from app.core.paths import data_path
-from app.services.marzban import marzban_api
+from app.services.pasarguard import pasarguard_api
 from app.shared.admin_access import ADMIN_IDS
 from app.utils.admin_bot_helper import get_admin_bot
 from app.utils.logger import bot_logger
@@ -36,7 +36,7 @@ def _save_state(state: dict) -> None:
 
 
 async def node_watch_job(bot) -> None:
-    nodes = await marzban_api.get_nodes()
+    nodes = await pasarguard_api.get_nodes()
     if not isinstance(nodes, list) or not nodes:
         return  # unreachable panel is alerted through its own health checks
 

@@ -1,6 +1,6 @@
 """Checkout coupon-spend tests (webapp start_purchase) on an in-memory SQLite DB.
 
-Drives handle_start_purchase directly with auth + Marzban patched, exercising the
+Drives handle_start_purchase directly with auth + the panel patched, exercising the
 Phase-1 coupon types (discount_percent, free_gb), the 100GB discount cap, rejection of
 unsupported/invalid coupons (no consumption), and coupon restore.
 
@@ -78,7 +78,7 @@ async def _run():
     pricing_mod.VIP_PURCHASE_DISCOUNT_ENABLED = False
     pricing_mod.VIP_PURCHASE_DISCOUNT_PERCENT = 0
 
-    # Service-name availability normally checks Marzban; keep it DB-only here.
+    # Service-name availability normally checks the panel; keep it DB-only here.
     async def _name_taken(db, username):
         return bool(await crud.get_subscription_by_username(db, username))
 
@@ -90,7 +90,7 @@ async def _run():
     abh.get_user_bot = lambda: None
     abh.get_admin_bot = lambda: None
 
-    # Capture Marzban provisioning instead of hitting the network.
+    # Capture the panel provisioning instead of hitting the network.
     captured = {}
 
     async def _fake_marzban(sub, plan_info):
@@ -100,7 +100,7 @@ async def _run():
     async def _fake_activate(db, sub_id):
         return None
 
-    crud.create_subscription_on_marzban = _fake_marzban
+    crud.create_subscription_on_pasarguard = _fake_marzban
     crud.activate_subscription = _fake_activate
 
     async with Session() as db:

@@ -80,7 +80,7 @@ async def handle_dashboard_referral_rewards(request: web.Request):
                         target_sub = preferred_sub
                         if not target_sub:
                             return False
-                        info = await marzban_api.get_user_info(target_sub.marzban_username)
+                        info = await pasarguard_api.get_user_info(target_sub.marzban_username)
                         if not info:
                             return False
                         patch = {}
@@ -89,7 +89,7 @@ async def handle_dashboard_referral_rewards(request: web.Request):
                         if extra_days > 0:
                             patch["expire"] = int(info.get("expire") or 0) + (extra_days * 24 * 60 * 60)
                         if patch:
-                            ok = await marzban_api.update_user(target_sub.marzban_username, patch)
+                            ok = await pasarguard_api.update_user(target_sub.marzban_username, patch)
                             if not ok:
                                 return False
 

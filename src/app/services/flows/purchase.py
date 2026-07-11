@@ -7,7 +7,7 @@ purchase FSM (``handlers/user/purchase``). Money rules live here once:
 - credit / user-discounts / the reward coupon are consumed atomically at order
   creation and restored on every exit path (cancel, deny, auto-approve failure);
 - fully-covered orders (final price <= 0) are provisioned immediately through
-  ``process_approved_subscription`` with a full rollback when Marzban fails.
+  ``process_approved_subscription`` with a full rollback when PasarGuard fails.
 """
 from __future__ import annotations
 
@@ -54,16 +54,16 @@ class DenyResult:
 # ── username helpers (canonical; both surfaces' duplicates defer here) ──────────
 
 async def is_service_name_taken(session: AsyncSession, username: str) -> bool:
-    """True if the name exists locally or on Marzban."""
+    """True if the name exists locally or on PasarGuard."""
     if await crud.get_subscription_by_username(session, username):
         return True
-    from app.services.marzban import marzban_api
+    from app.services.pasarguard import pasarguard_api
 
-    return await marzban_api.get_user_info(username) is not None
+    return await pasarguard_api.get_user_info(username) is not None
 
 
 async def generate_unique_service_name(session: AsyncSession, base_username: str) -> str:
-    """Append a counter until the name is free both in our DB and on Marzban."""
+    """Append a counter until the name is free both in our DB and on PasarGuard."""
     username = base_username
     i = 1
     while await is_service_name_taken(session, username):
@@ -178,8 +178,8 @@ async def _auto_approve(session: AsyncSession, sub: Subscription, bot) -> None:
             bonus_gb = await crud.free_gb_bonus_for_coupon(session, getattr(sub, "applied_coupon_id", None))
             if bonus_gb > 0:
                 plan_info = {**plan_info, "gb": int(plan_info.get("gb") or 0) + int(bonus_gb)}
-            marzban_info = await crud.create_subscription_on_marzban(sub, plan_info)
-            if marzban_info and marzban_info.get("subscription_url"):
+            pasarguard_info = await crud.create_subscription_on_pasarguard(sub, plan_info)
+            if pasarguard_info and pasarguard_info.get("subscription_url"):
                 await crud.activate_subscription(session, sub.id)
                 try:
                     sub.user_link_sent = True

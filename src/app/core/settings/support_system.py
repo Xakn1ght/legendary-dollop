@@ -48,10 +48,10 @@ MAX_TICKET_IMAGES = 3
 # Job Schedules (overrideable)
 JOB_SCHEDULES = {
     # Low-data warnings are throttled to once/day per sub anyway — sweeping every 15s
-    # only hammered the Marzban panel (one API call per active sub per tick). 10 min
+    # only hammered the PasarGuard panel (one API call per active sub per tick). 10 min
     # is still far more responsive than a daily notification needs.
     "check_low_data_job": {"type": "interval", "minutes": 10},
-    # Auto-renew should feel "instant"; 60s + the 90s marzban info cache keeps worst-case
+    # Auto-renew should feel "instant"; 60s + the 90s panel info cache keeps worst-case
     # renewal lag ~2-3 min while cutting panel sweeps 4x. Override via job_schedules.json.
     "renewal_job": {"type": "interval", "seconds": 60, "max_instances": 1, "coalesce": True},
     "update_user_analytics_job": {"type": "interval", "hours": 1},
@@ -65,7 +65,7 @@ JOB_SCHEDULES = {
     # Re-check pooled bank-SMS deposits vs pending orders (SMS-before-receipt case).
     # Inert unless SMS auto-approval is armed; cheap when there's nothing pooled.
     "sms_sweep_job": {"type": "interval", "seconds": 60, "max_instances": 1, "coalesce": True},
-    # Marzban node watchdog: DMs admins when a node goes down / comes back.
+    # PasarGuard node watchdog: DMs admins when a node goes down / comes back.
     "node_watch_job": {"type": "interval", "minutes": 5, "max_instances": 1, "coalesce": True},
 }
 

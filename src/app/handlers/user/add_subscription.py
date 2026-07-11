@@ -100,7 +100,7 @@ async def receive_link(message: Message, state: FSMContext, session: AsyncSessio
             language=lang,
         )
 
-    # Shared flow: domain allowlist + token extraction + Marzban verification +
+    # Shared flow: domain allowlist + token extraction + PasarGuard verification +
     # dedupe/shared-account linking (same rules as the dashboard).
     from app.services.flows.errors import FlowError
     from app.services.flows.subs import add_subscription_by_link
@@ -112,8 +112,8 @@ async def receive_link(message: Message, state: FSMContext, session: AsyncSessio
             await message.answer(t(lang, "add_subscription_invalid_format"))
         elif e.code == "cannot_resolve_username":
             await message.answer(t(lang, "add_subscription_no_username"))
-        elif e.code == "marzban_account_not_found":
-            await message.answer(t(lang, "add_subscription_marzban_not_found"))
+        elif e.code == "panel_account_not_found":
+            await message.answer(t(lang, "add_subscription_panel_not_found"))
         else:
             await message.answer(t(lang, "add_subscription_fetch_failed"))
         return
