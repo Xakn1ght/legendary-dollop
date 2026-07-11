@@ -606,7 +606,13 @@
       if (t && t.closest && t.closest('input, textarea, select, [contenteditable="true"], button, a, label')) return;
     } catch (_) {}
     try { el.blur(); } catch (_) {}
-    suppressClickUntil = Date.now() + 700;
+    // Sheet backdrops are full-viewport: after the blur re-layout the click
+    // still lands on the SAME backdrop, so letting it through closes the
+    // sheet in one natural tap (kb closed + sheet dismissed together). It
+    // can never hit the nav/page behind — the backdrop covers them.
+    var onBackdrop = false;
+    try { onBackdrop = !!(t && t.closest && t.closest('.sheet-backdrop')); } catch (_) {}
+    if (!onBackdrop) suppressClickUntil = Date.now() + 700;
   }, { capture: true, passive: true });
   // Same orphan guard for scrolling (reading the page with a phantom gap).
   document.addEventListener('scroll', function () {
