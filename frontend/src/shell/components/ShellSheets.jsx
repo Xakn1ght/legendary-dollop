@@ -210,18 +210,6 @@ export function AddSubSheet({ t, open, onClose, onSubmit }) {
     }
   }, [open]);
 
-  // Import-from-clipboard prefill: the home button opens this sheet right
-  // away and pushes the clipboard text here when the read succeeds.
-  useEffect(() => {
-    if (!open) return undefined;
-    const onPrefill = (e) => {
-      const txt = String(e.detail?.text || '');
-      if (txt) setValue(txt);
-    };
-    window.addEventListener('astro:addsheet-prefill', onPrefill);
-    return () => window.removeEventListener('astro:addsheet-prefill', onPrefill);
-  }, [open]);
-
   const submit = async () => {
     const raw = value.trim();
     if (!raw) { showToast(t('invalidInput'), 'error'); return; }

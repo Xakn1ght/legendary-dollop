@@ -2,7 +2,6 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 
 import { useBackClose } from '../../shared/backstack.js';
 import { getWebApp, hapticImpact } from '../../shared/telegram.js';
-import { api } from '../api.js';
 import { faDigits, fmtDays, fmtGB, fmtNum, formatDate, getLocale } from '../format.js';
 import { useShell } from '../ShellContext.js';
 import { showToast } from '../toast.js';
@@ -181,45 +180,16 @@ export function HomePage() {
     } catch (_) { showToast(t('copyFailed'), 'error'); }
   };
 
-  // Round 3 (2026-07-10, Pasha: "extract it and add it straightaway").
-  // Rules learned the hard way:
-  //  - Telegram's readTextFromClipboard is BANNED: attachment-menu-apps
-  //    only; calling it from our menu-button launch made Telegram Android
-  //    reload the whole webview.
-  //  - navigator.clipboard.readText() only has a chance while the tap's
-  //    transient user activation is alive — it must be called SYNCHRONOUSLY
-  //    in the handler (any await/timeout first = guaranteed NotAllowedError;
-  //    that's why earlier rounds always "failed").
-  // Success path adds the subscription immediately, no sheet, no typing.
-  // Only when the webview denies clipboard access (iOS Telegram mostly)
-  // does the Add sheet open as the manual fallback.
-  const importFromClipboard = () => {
-    const addNow = async (txt) => {
-      try {
-        const r = await api('/api/dashboard/subscriptions/add', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ url: txt }) });
-        if (r && r.ok) {
-          showToast(t('addedSuccess'), 'success');
-          await loadSubscriptions(r.subscription_id || null);
-        } else {
-          showToast((r && (r.message || r.error)) ? String(r.message || r.error) : t('addFailed'), 'error');
-        }
-      } catch (_) { showToast(t('addFailed'), 'error'); }
-    };
-
-    if (!(navigator.clipboard && navigator.clipboard.readText)) {
-      openAddSheet();
-      showToast(t('clipboardManualPaste'));
-      return;
-    }
-    navigator.clipboard.readText().then((text) => {
-      const txt = (text || '').trim();
-      if (txt.length < 4) { showToast(t('clipboardEmpty'), 'error'); return; }
-      addNow(txt);
-    }).catch(() => {
-      openAddSheet();
-      showToast(t('clipboardManualPaste'));
-    });
-  };
+  // Round 4 — FINAL (2026-07-11). Clipboard auto-import is DEAD, do not
+  // resurrect it: Telegram embeds the dashboard under a permissions policy
+  // that hard-blocks the Clipboard API (console: "Permissions policy
+  // violation: The Clipboard API has been blocked") — on web, Android AND
+  // iOS. No user prompt exists for a policy block, and Telegram's own
+  // readTextFromClipboard is attachment-menu-only (calling it reloaded the
+  // whole webview — round 2). Per Pasha: the tile is now an honest "paste
+  // link" that opens the Add sheet with the field focused; the OS paste
+  // bubble on a focused input always works.
+  const openPasteSheet = () => { openAddSheet(); };
 
   const status = (overview?.status || 'disabled').toLowerCase();
   const cfg = STATUS_CONFIG[status] || STATUS_CONFIG.disabled;
@@ -445,11 +415,11 @@ export function HomePage() {
                 </svg>
                 <span>{t('qr')}</span>
               </button>
-              <button className="foot-tile" type="button" onClick={() => { setDdOpen(false); importFromClipboard(); }}>
+              <button className="foot-tile" type="button" onClick={() => { setDdOpen(false); openPasteSheet(); }}>
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
                   <path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2" /><rect x="9" y="2" width="6" height="4" rx="1" /><path d="M12 11v6" /><path d="m9 14 3 3 3-3" />
                 </svg>
-                <span>{t('importFromClipboard')}</span>
+                <span>{t('pasteLink')}</span>
               </button>
             </div>
           </div>
