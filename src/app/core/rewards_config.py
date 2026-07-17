@@ -51,7 +51,9 @@ STAR_SEASON_MILESTONES = {
 CASHOUT_MIN_ACTIVE_REFERRALS = 20
 CASHOUT_MIN_AMOUNT_TOMAN = 200_000   # below this, credit stays spendable in-app
 # Cash-out is 1:1 by decision — credit is referral-only, so no haircut. (Was 5%.)
-PROMOTER_REFERRAL_CUT = {0: 0.10, 20: 0.12, 50: 0.15}  # store-credit % by active-referral tier
+# Store-credit % by active-referral tier (2026-07-13, Pasha: 5% under 10
+# actives, 10% under 20; the 20+/50+ tiers unchanged).
+PROMOTER_REFERRAL_CUT = {0: 0.05, 10: 0.10, 20: 0.12, 50: 0.15}
 # Two-stage earnings (Pasha, 2026-07-08): BEFORE the 20-active gate the cut
 # pays STORE CREDIT, capped at this lifetime total; crossing the gate flips
 # the account permanently (promoter_unlocked_at) and from then on the cut

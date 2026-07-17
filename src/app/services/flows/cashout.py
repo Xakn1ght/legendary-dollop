@@ -23,7 +23,7 @@ CASHOUT_MIN_ACTIVE_REFERRALS = 20
 
 def promoter_credit_percent(active_referrals: int) -> float:
     """Store-credit % a referrer earns per referral, by active-referral tier
-    (PROMOTER_REFERRAL_CUT). 0→10%, 20→12%, 50→15%. Returns a percent (e.g. 12.0)."""
+    (PROMOTER_REFERRAL_CUT). 0→5%, 10→10%, 20→12%, 50→15%. Returns a percent (e.g. 12.0)."""
     pct = PROMOTER_REFERRAL_CUT[min(PROMOTER_REFERRAL_CUT)]
     for thr in sorted(PROMOTER_REFERRAL_CUT):
         if active_referrals >= thr:
