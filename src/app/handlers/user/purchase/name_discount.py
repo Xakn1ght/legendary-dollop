@@ -23,6 +23,19 @@ async def process_name(message: Message, state: FSMContext, session: AsyncSessio
         await state.clear()
         return  # Let start handler handle it
 
+    # Back button BEFORE the safe-text gate: the button text carries an emoji
+    # that validate_safe_text rejects, so checking it later made the name step
+    # a dead end ("invalid name" on every Back tap). Charge handlers order it
+    # the same way.
+    if message.text in ('بازگشت🔙', 'Back 🔙', t(lang, "btn_back")):
+        await state.set_state(PurchaseState.plan)
+        plan_kb = await _get_plan_keyboard_for_user(session, message.chat.id, state, lang)
+        await message.answer(
+            ("لطفا یکی از پلن های زیر را انتخاب کنید:" if lang == "fa" else "Please choose a plan:"),
+            reply_markup=plan_kb,
+        )
+        return
+
     # Validate and sanitize username input
     if not InputValidator.validate_safe_text(message.text):
         await message.answer(
@@ -38,14 +51,6 @@ async def process_name(message: Message, state: FSMContext, session: AsyncSessio
 
     # Sanitize input
     sanitized_name = sanitize_user_input(message.text)
-    if message.text in ('بازگشت🔙', 'Back 🔙', t(lang, "btn_back")):
-        await state.set_state(PurchaseState.plan)
-        plan_kb = await _get_plan_keyboard_for_user(session, message.chat.id, state, lang)
-        await message.answer(
-            ("لطفا یکی از پلن های زیر را انتخاب کنید:" if lang == "fa" else "Please choose a plan:"),
-            reply_markup=plan_kb,
-        )
-        return
 
     # Be forgiving about stray spaces: "my name 12" -> "myname12" instead of a
     # rejection (the regex below still guards everything else).
