@@ -16,25 +16,34 @@ const ACCENTS = [
   { key: 'emerald', swatch: '#34d399' },
   { key: 'violet', swatch: '#a78bfa' },
   { key: 'amber', swatch: '#fbbf24' },
-  { key: 'vip', swatch: '#c9d6e8', locked: true },
-  // Earned accents render as metal-gradient chips (premium finish, 2026-07-09)
-  { key: 'champion', swatch: 'linear-gradient(135deg, #f8cc57, #e8a300 55%, #8a5c00)', locked: true },
-  { key: 'legend', swatch: 'linear-gradient(135deg, #e766f2, #c026d3 55%, #6d0b8f)', locked: true },
+];
+
+// Tier WORLDS (2026-07-12, image-13): full exclusive themes, always visible
+// so locked users see what they're missing. Unlock rails: VIP membership /
+// 40-star Champion milestone / 50-star Legend milestone (rewards_config).
+// Bubblegum (2026-07-15, third mock) is PURCHASABLE: one-time wallet-credit
+// buy via /api/dashboard/theme-shop (shop: true drives the buy flow).
+const TIER_THEMES = [
+  { key: 'vip', name: 'tierVipName', hint: 'tierVipHint' },
+  { key: 'champion', name: 'tierChampionName', hint: 'tierChampionHint' },
+  { key: 'legend', name: 'tierLegendName', hint: 'tierLegendHint' },
+  { key: 'bubblegum', name: 'tierBubblegumName', hint: 'tierBubblegumHint', shop: true },
 ];
 
 // Server-driven mission achievements (GET /api/dashboard/achievements).
 // key → i18n key + icon; conditions/progress/claims all live server-side.
 const ACH_META = {
-  launch: { i18n: 'achLaunch', icon: <path d="M4.5 16.5c-1.5 1.26-2 5-2 5s3.74-.5 5-2c.71-.84.7-2.13-.09-2.91a2.18 2.18 0 0 0-2.91-.09zM12 15l-3-3a22 22 0 0 1 2-3.95A12.88 12.88 0 0 1 22 2c0 2.72-.78 7.5-6 11a22.35 22.35 0 0 1-4 2zM9 12H4s.55-3.03 2-4c1.62-1.08 5 0 5 0M12 15v5s3.03-.55 4-2c1.08-1.62 0-5 0-5" /> },
-  refuel: { i18n: 'achRefuel', icon: <path d="M12 2.69l5.66 5.66a8 8 0 1 1-11.31 0z" /> },
-  starHunter: { i18n: 'achStarHunter', icon: <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01z" /> },
-  orbiter: { i18n: 'achOrbiter', icon: <><circle cx="12" cy="12" r="3" /><path d="M20.2 20.2c2.04-2.03.02-7.36-4.5-11.9-4.54-4.52-9.87-6.54-11.9-4.5-2.04 2.03-.02 7.36 4.5 11.9 4.54 4.52 9.87 6.54 11.9 4.5z" /></> },
-  supernova: { i18n: 'achSupernova', icon: <path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83" /> },
-  envoy: { i18n: 'achEnvoy', icon: <><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" /><circle cx="9" cy="7" r="4" /><path d="M23 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75" /></> },
-  fleetCommander: { i18n: 'achFleetCommander', icon: <path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1zM4 22v-7" /> },
-  crew: { i18n: 'achCrew', img: '/webapp/static/badges/vip.png', icon: <path d="M2 4l3 12h14l3-12-6 7-4-7-4 7-6-7zm3 16h14" /> },
-  arcadePilot: { i18n: 'achArcadePilot', icon: <><line x1="6" y1="11" x2="10" y2="11" /><line x1="8" y1="9" x2="8" y2="13" /><line x1="15" y1="12" x2="15.01" y2="12" /><line x1="18" y1="10" x2="18.01" y2="10" /><path d="M17.32 5H6.68a4 4 0 0 0-3.978 3.59c-.006.052-.01.101-.017.152C2.604 9.416 2 14.456 2 16a3 3 0 0 0 3 3c1 0 1.5-.5 2-1l1.414-1.414A2 2 0 0 1 9.828 16h4.344a2 2 0 0 1 1.414.586L17 18c.5.5 1 1 2 1a3 3 0 0 0 3-3c0-1.545-.604-6.584-.685-7.258-.007-.05-.011-.1-.017-.151A4 4 0 0 0 17.32 5z" /></> },
-  inOrbit: { i18n: 'achInOrbit', icon: <><circle cx="12" cy="12" r="10" /><polyline points="12 6 12 12 16 14" /></> },
+  launch: { i18n: 'achLaunch', req: 'achReqLaunch', icon: <path d="M4.5 16.5c-1.5 1.26-2 5-2 5s3.74-.5 5-2c.71-.84.7-2.13-.09-2.91a2.18 2.18 0 0 0-2.91-.09zM12 15l-3-3a22 22 0 0 1 2-3.95A12.88 12.88 0 0 1 22 2c0 2.72-.78 7.5-6 11a22.35 22.35 0 0 1-4 2zM9 12H4s.55-3.03 2-4c1.62-1.08 5 0 5 0M12 15v5s3.03-.55 4-2c1.08-1.62 0-5 0-5" /> },
+  refuel: { i18n: 'achRefuel', req: 'achReqRefuel', icon: <path d="M12 2.69l5.66 5.66a8 8 0 1 1-11.31 0z" /> },
+  starHunter: { i18n: 'achStarHunter', req: 'achReqStarHunter', icon: <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01z" /> },
+  orbiter: { i18n: 'achOrbiter', req: 'achReqOrbiter', icon: <><circle cx="12" cy="12" r="3" /><path d="M20.2 20.2c2.04-2.03.02-7.36-4.5-11.9-4.54-4.52-9.87-6.54-11.9-4.5-2.04 2.03-.02 7.36 4.5 11.9 4.54 4.52 9.87 6.54 11.9 4.5z" /></> },
+  supernova: { i18n: 'achSupernova', req: 'achReqSupernova', icon: <path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83" /> },
+  envoy: { i18n: 'achEnvoy', req: 'achReqEnvoy', icon: <><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" /><circle cx="9" cy="7" r="4" /><path d="M23 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75" /></> },
+  fleetCommander: { i18n: 'achFleetCommander', req: 'achReqFleetCommander', icon: <path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1zM4 22v-7" /> },
+  crew: { i18n: 'achCrew', req: 'achReqCrew', img: '/webapp/static/badges/vip.png', icon: <path d="M2 4l3 12h14l3-12-6 7-4-7-4 7-6-7zm3 16h14" /> },
+  arcadePilot: { i18n: 'achArcadePilot', req: 'achReqArcadePilot', icon: <><line x1="6" y1="11" x2="10" y2="11" /><line x1="8" y1="9" x2="8" y2="13" /><line x1="15" y1="12" x2="15.01" y2="12" /><line x1="18" y1="10" x2="18.01" y2="10" /><path d="M17.32 5H6.68a4 4 0 0 0-3.978 3.59c-.006.052-.01.101-.017.152C2.604 9.416 2 14.456 2 16a3 3 0 0 0 3 3c1 0 1.5-.5 2-1l1.414-1.414A2 2 0 0 1 9.828 16h4.344a2 2 0 0 1 1.414.586L17 18c.5.5 1 1 2 1a3 3 0 0 0 3-3c0-1.545-.604-6.584-.685-7.258-.007-.05-.011-.1-.017-.151A4 4 0 0 0 17.32 5z" /></> },
+  deepSpace: { i18n: 'achDeepSpace', req: 'achReqDeepSpace', icon: <><circle cx="12" cy="12" r="6" /><path d="M20.2 6.7c1.5 1.1 2.3 2.3 2.3 3.3 0 3-4.7 5.5-10.5 5.5S1.5 13 1.5 10c0-1 .8-2.2 2.3-3.3" /></> },
+  inOrbit: { i18n: 'achInOrbit', req: 'achReqInOrbit', icon: <><circle cx="12" cy="12" r="10" /><polyline points="12 6 12 12 16 14" /></> },
 };
 
 function perfStoredMode() {
@@ -96,10 +105,18 @@ export function ProfilePage() {
   const [referrals, setReferrals] = useState(null);
   const [achData, setAchData] = useState(null); // { paying_customer, achievements[] }
   const [achClaiming, setAchClaiming] = useState(null); // key being claimed
-  const [copied, setCopied] = useState(null); // 'chatId' | 'referralCode' | 'link'
+  const [achOpen, setAchOpen] = useState(null); // achievement key whose requirement is revealed
+  const [claimSheet, setClaimSheet] = useState(null); // { couponId, gb, subs[] } — pick a sub to apply
+  const [claimApplying, setClaimApplying] = useState(false);
+  const [copied, setCopied] = useState(null); // 'referralCode' | 'link'
   const [accent, setAccentState] = useState(() => document.documentElement.getAttribute('data-accent') || 'red');
   const [unlockedThemes, setUnlockedThemes] = useState([]);
   const [packBadge, setPackBadge] = useState('');
+  // Purchasable themes: {key: {price, owned}} + wallet credit (theme-shop API).
+  const [themeShop, setThemeShop] = useState({ items: {}, credit: 0 });
+  const [themeBuying, setThemeBuying] = useState(null); // key mid-purchase
+  const [themeConfirm, setThemeConfirm] = useState(null); // key awaiting 2nd tap
+  const [tierHelpOpen, setTierHelpOpen] = useState(false); // worlds mini guide
   const [notifOn, setNotifOn] = useState(() => {
     try { return localStorage.getItem('notifications') !== 'off'; } catch (_) { return true; }
   });
@@ -114,8 +131,9 @@ export function ProfilePage() {
   // in the VIP modal it steps payment→plans before closing.
   useBackClose(!!vip && vip.step !== 2, () => setVip(null));
   useBackClose(!!vip && vip.step === 2, () => setVip((cur) => (cur ? { ...cur, step: 1 } : cur)));
-  // Page behind the VIP modal must not scroll (same guard as Sheet).
-  useScrollLock(!!vip);
+  useBackClose(!!claimSheet, () => setClaimSheet(null));
+  // Page behind the VIP modal / claim picker must not scroll (same as Sheet).
+  useScrollLock(!!vip || !!claimSheet);
 
   const isVip = !!user?.is_vip;
 
@@ -159,6 +177,18 @@ export function ProfilePage() {
         });
       } catch (_) { /* ignore */ }
       if (vipActive) themes.add('vip'); // active VIP unlocks the platinum accent
+      // Purchasable themes: owned ones unlock; locked ones need the price tag.
+      try {
+        const shop = await api('/api/dashboard/theme-shop');
+        if (shop && shop.ok) {
+          const items = {};
+          (shop.items || []).forEach((it) => {
+            items[it.key] = it;
+            if (it.owned) themes.add(it.key);
+          });
+          setThemeShop({ items, credit: Number(shop.credit || 0) });
+        }
+      } catch (_) { /* ignore */ }
       setUnlockedThemes([...themes]);
       setPackBadge(badge);
     } catch (_) { /* ignore */ }
@@ -180,13 +210,53 @@ export function ProfilePage() {
           ...cur,
           achievements: cur.achievements.map((a) => (a.key === key ? { ...a, claimed: true, claimable: false } : a)),
         } : cur));
-        showToast(tt('achClaimSuccess'), 'success');
         hapticSelection();
+        // Reward minted into the wallet. Instead of leaving it there silently
+        // (2026-07-12, Pasha: "it just claims it without asking what sub"),
+        // ask which service to apply the GB to and apply it right away.
+        const couponId = r.coupon?.id;
+        const gb = r.coupon?.gb || 1;
+        let actives = [];
+        try {
+          const subs = await api('/api/dashboard/subscriptions');
+          actives = (subs.ok && subs.subscriptions ? subs.subscriptions : [])
+            .filter((s) => String(s.status || '').toLowerCase() === 'active');
+        } catch (_) { /* ignore */ }
+        if (couponId && actives.length > 0) {
+          setClaimSheet({ couponId, gb, subs: actives });
+        } else {
+          showToast(actives.length === 0 ? tt('achNoSubs') : tt('achClaimSuccess'), 'success', 3500);
+        }
       } else {
         showToast(tt(r?.error === 'requires_purchase' ? 'achLockedNote' : 'achClaimFailed'), 'error');
       }
     } catch (_) { showToast(tt('achClaimFailed'), 'error'); }
     setAchClaiming(null);
+  };
+
+  const applyClaimToSub = async (subId) => {
+    if (!claimSheet || claimApplying) return;
+    setClaimApplying(true);
+    try {
+      const r = await api(`/api/dashboard/coupons/${claimSheet.couponId}/apply-gb`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ subscription_id: subId }),
+      });
+      if (r && r.ok) {
+        showToast(tt('achAppliedToSub'), 'success', 3500);
+        hapticSelection();
+        setClaimSheet(null);
+      } else {
+        // Coupon is safe in the wallet either way — tell them, close.
+        showToast(tt('achClaimSuccess'), 'success', 3500);
+        setClaimSheet(null);
+      }
+    } catch (_) {
+      showToast(tt('achClaimSuccess'), 'success', 3500);
+      setClaimSheet(null);
+    }
+    setClaimApplying(false);
   };
 
   useEffect(() => {
@@ -202,6 +272,20 @@ export function ProfilePage() {
       setTimeout(() => setCopied(null), 2000);
       showToast(toastMsg, 'success', 2500);
     } catch (_) { /* ignore */ }
+  };
+
+  // Share the invite link via Telegram's native share sheet; fall back to copy.
+  const shareReferral = () => {
+    const tg = getWebApp();
+    if (tg?.openTelegramLink && referralLink) {
+      hapticSelection();
+      tg.openTelegramLink(
+        'https://t.me/share/url?url=' + encodeURIComponent(referralLink)
+        + '&text=' + encodeURIComponent(tt('shareInviteText')),
+      );
+    } else {
+      copyValue('link', referralLink, tt('linkCopied'));
+    }
   };
 
   const referralLink = referrals?.referral_link
@@ -523,8 +607,17 @@ export function ProfilePage() {
             if (!meta) return null;
             const pct = Math.min(100, Math.round((a.progress / a.target) * 100));
             const showBar = !a.done && a.target > 1;
+            const revealed = achOpen === a.key;
             return (
-              <div key={a.key} className={`ach-item${a.done ? ' done' : ''}${a.claimed ? ' claimed' : ''}`}>
+              <div
+                key={a.key}
+                className={`ach-item${a.done ? ' done' : ''}${a.claimed ? ' claimed' : ''}${revealed ? ' revealed' : ''}`}
+                role="button"
+                tabIndex={0}
+                aria-expanded={revealed}
+                onClick={() => { setAchOpen(revealed ? null : a.key); hapticSelection(); }}
+                onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setAchOpen(revealed ? null : a.key); } }}
+              >
                 <div className="ach-item-top">
                   <div className="ach-icon">
                     {meta.img && a.done
@@ -541,12 +634,19 @@ export function ProfilePage() {
                 {showBar && (
                   <div className="ach-bar"><div className="ach-bar-fill" style={{ width: pct + '%' }} /></div>
                 )}
+                {/* Tap-to-reveal requirement (2026-07-12): plain "what to do" + reward. */}
+                {revealed && (
+                  <div className="ach-desc">
+                    <div className="ach-desc-req">{tt(meta.req)}</div>
+                    <div className="ach-desc-reward">{tt('achReward1gb')}</div>
+                  </div>
+                )}
                 {a.claimable && (
                   <button
                     className={`ach-claim${achClaiming === a.key ? ' busy' : ''}`}
                     type="button"
                     disabled={!!achClaiming}
-                    onClick={() => claimAchievement(a.key)}
+                    onClick={(e) => { e.stopPropagation(); claimAchievement(a.key); }}
                   >
                     {tt('achClaim')}
                   </button>
@@ -585,13 +685,28 @@ export function ProfilePage() {
           </div>
           <div className="referral-link-box">
             <div className="referral-link" id="referralLinkDisplay">{referralLink || '—'}</div>
-            <button
-              className="referral-copy-btn"
-              onClick={() => copyValue('link', referralLink, tt('linkCopied'))}
-              style={copied === 'link' ? { background: '#34d399' } : undefined}
-            >
-              {copied === 'link' ? '✓' : tt('copyLink')}
-            </button>
+            <div className="referral-actions">
+              <button
+                className="referral-icon-btn share"
+                type="button"
+                aria-label={tt('shareInvite')}
+                title={tt('shareInvite')}
+                onClick={shareReferral}
+              >
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" width="18" height="18"><path d="M22 2 11 13" /><path d="M22 2 15 22l-4-9-9-4 20-7z" /></svg>
+              </button>
+              <button
+                className={`referral-icon-btn copy${copied === 'link' ? ' done' : ''}`}
+                type="button"
+                aria-label={tt('copyLink')}
+                title={tt('copyLink')}
+                onClick={() => copyValue('link', referralLink, tt('linkCopied'))}
+              >
+                {copied === 'link'
+                  ? <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" width="18" height="18"><path d="M20 6 9 17l-5-5" /></svg>
+                  : <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" width="18" height="18"><rect x="9" y="9" width="13" height="13" rx="2" /><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" /></svg>}
+              </button>
+            </div>
           </div>
           <div className="referral-stats">
             <div className="referral-stat">
@@ -623,20 +738,7 @@ export function ProfilePage() {
         </div>
         <div className="profile-info-row">
           <span className="profile-info-label">{tt('userId')}</span>
-          <span className="profile-info-value" id="infoUserId">{user?.id ?? '—'}</span>
-        </div>
-        <div className="profile-info-row">
-          <span className="profile-info-label">{tt('chatId')}</span>
-          <span className="profile-info-value">
-            <span id="infoChatId">{user?.chat_id ?? '—'}</span>{' '}
-            <button
-              className="profile-copy-btn"
-              onClick={() => copyValue('chatId', user?.chat_id, tt('copied'))}
-              style={copied === 'chatId' ? { background: '#34d399' } : undefined}
-            >
-              {copied === 'chatId' ? '✓' : tt('copy')}
-            </button>
-          </span>
+          <span className="profile-info-value" id="infoUserId">{user?.id == null ? '—' : fmt(user.id)}</span>
         </div>
         <div className="profile-info-row">
           <span className="profile-info-label">{tt('referralCode')}</span>
@@ -699,7 +801,7 @@ export function ProfilePage() {
             </div>
             <div className="settings-item-right">
               <div className="accent-swatches" role="radiogroup" aria-label="Accent color">
-                {ACCENTS.filter((a) => !a.locked || unlockedThemes.includes(a.key)).map((a) => (
+                {ACCENTS.map((a) => (
                   <button
                     key={a.key}
                     type="button"
@@ -714,6 +816,133 @@ export function ProfilePage() {
                   />
                 ))}
               </div>
+            </div>
+          </div>
+          {/* Tier worlds — full exclusive themes, always on display so the
+              locked ones sell the rank (image-13). Locked tap = unlock hint. */}
+          <div className="settings-item settings-item--tiers">
+            <div className="tier-themes-head">
+              <div>
+                <div className="settings-item-title">{tt('tierThemesTitle')}</div>
+                <div className="settings-item-desc">{tt('tierThemesDesc')}</div>
+              </div>
+              <button
+                type="button"
+                className={`tier-help-btn${tierHelpOpen ? ' open' : ''}`}
+                aria-expanded={tierHelpOpen}
+                aria-label={tt('tierHelpTitle')}
+                onClick={() => { setTierHelpOpen((v) => !v); hapticSelection(); }}
+              >
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" width="14" height="14"><circle cx="12" cy="12" r="10" /><path d="M9.1 9a3 3 0 1 1 5.8 1c0 2-3 2-3 4" /><path d="M12 18h.01" /></svg>
+              </button>
+            </div>
+            {tierHelpOpen && (
+              <div className="tier-help" role="note">
+                <div className="tier-help-intro">{tt('tierHelpIntro')}</div>
+                <div className="tier-help-row"><span className="tier-help-dot dot-vip" />{tt('tierHelpVip')}</div>
+                <div className="tier-help-row"><span className="tier-help-dot dot-champion" />{tt('tierHelpChampion')}</div>
+                <div className="tier-help-row"><span className="tier-help-dot dot-legend" />{tt('tierHelpLegend')}</div>
+                <div className="tier-help-row">
+                  <span className="tier-help-dot dot-bubblegum" />
+                  {tt('tierHelpBubblegum').replace(
+                    '{price}',
+                    fmt(Number(themeShop.items.bubblegum?.price || 40000)),
+                  )}
+                </div>
+                <div className="tier-help-foot">{tt('tierHelpEarn')}</div>
+                <div className="tier-help-foot">{tt('tierHelpKeep')}</div>
+              </div>
+            )}
+            <div className="tier-cards" role="radiogroup" aria-label={tt('tierThemesTitle')}>
+              {TIER_THEMES.map((th) => {
+                const unlocked = unlockedThemes.includes(th.key);
+                const active = accent === th.key;
+                const shopItem = th.shop ? themeShop.items[th.key] : null;
+                const price = shopItem ? Number(shopItem.price || 0) : 0;
+                const confirming = themeConfirm === th.key;
+                const buyTheme = async () => {
+                  if (themeBuying) return;
+                  // Two-tap confirm: first tap arms the card for 4s, second buys.
+                  if (!confirming) {
+                    setThemeConfirm(th.key);
+                    hapticSelection();
+                    setTimeout(() => setThemeConfirm((cur) => (cur === th.key ? null : cur)), 4000);
+                    return;
+                  }
+                  setThemeConfirm(null);
+                  setThemeBuying(th.key);
+                  try {
+                    const res = await api('/api/dashboard/theme-shop/buy', {
+                      method: 'POST',
+                      body: JSON.stringify({ theme: th.key }),
+                    });
+                    if (res && res.ok) {
+                      setThemeShop((cur) => ({
+                        credit: Number(res.credit || 0),
+                        items: { ...cur.items, [th.key]: { ...(cur.items[th.key] || {}), owned: true } },
+                      }));
+                      setUnlockedThemes((cur) => (cur.includes(th.key) ? cur : [...cur, th.key]));
+                      setAccent(th.key);
+                      setAccentState(th.key);
+                      showToast(tt('tierBought'), 'success', 3200);
+                    } else if (res && res.error === 'insufficient_credit') {
+                      showToast(
+                        tt('tierNoCredit')
+                          .replace('{price}', fmt(res.price ?? price))
+                          .replace('{credit}', fmt(res.credit ?? themeShop.credit)),
+                        'error', 4200,
+                      );
+                    } else {
+                      showToast(tt('errorOccurred'), 'error', 3200);
+                    }
+                  } catch (_) {
+                    showToast(tt('errorOccurred'), 'error', 3200);
+                  } finally {
+                    setThemeBuying(null);
+                  }
+                };
+                return (
+                  <button
+                    key={th.key}
+                    type="button"
+                    className={`tier-card tier-${th.key}${active ? ' is-active' : ''}${unlocked ? '' : ' is-locked'}`}
+                    role="radio"
+                    aria-checked={active}
+                    disabled={themeBuying === th.key}
+                    onClick={() => {
+                      if (!unlocked) {
+                        if (th.shop && shopItem) { buyTheme(); return; }
+                        showToast(tt(th.hint), 'info', 3200);
+                        return;
+                      }
+                      setAccent(th.key);
+                      setAccentState(th.key);
+                      hapticSelection();
+                    }}
+                  >
+                    <span className="tier-card-orb" aria-hidden="true" />
+                    <span className="tier-card-name">{tt(th.name)}</span>
+                    <span className="tier-card-state">
+                      {unlocked
+                        ? (active ? tt('tierActive') : tt('tierApply'))
+                        : th.shop && shopItem
+                          ? (themeBuying === th.key
+                            ? tt('tierBuying')
+                            : confirming
+                              ? tt('tierConfirmBuy')
+                              : tt('tierBuyFor').replace('{price}', fmt(price)))
+                          : tt(th.hint)}
+                    </span>
+                    {!unlocked && (
+                      <span className="tier-card-lock" aria-hidden="true">
+                        {th.shop
+                          ? <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" width="13" height="13"><circle cx="9" cy="20" r="1.5" /><circle cx="17" cy="20" r="1.5" /><path d="M3 4h2l2.6 12h10.8L21 8H6" /></svg>
+                          : <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" width="13" height="13"><rect x="3" y="11" width="18" height="11" rx="2" /><path d="M7 11V7a5 5 0 0 1 10 0v4" /></svg>}
+                      </span>
+                    )}
+                  </button>
+                );
+              })}
             </div>
           </div>
           <SettingsRow
@@ -940,6 +1169,43 @@ export function ProfilePage() {
                 <button className="vip-purchase-btn" id="vipContinueBtn" disabled={!vip.selectedPlanId || vip.busy} onClick={continueVip}>{vt('continue')}</button>
               </div>
             )}
+          </div>
+        </div>,
+        document.body,
+      )}
+
+      {/* Reward sub-picker — after claiming an achievement GB, ask which
+          service to apply it to (2026-07-12). Portaled like the VIP modal. */}
+      {claimSheet && createPortal(
+        <div
+          className="vip-modal-overlay active"
+          onClick={() => { if (!claimApplying) setClaimSheet(null); }}
+        >
+          <div className="claim-sheet" onClick={(e) => e.stopPropagation()}>
+            <div className="claim-sheet-head">
+              <div className="claim-sheet-title">{tt('achPickSubTitle')}</div>
+              <button className="vip-modal-close" onClick={() => setClaimSheet(null)} disabled={claimApplying}>×</button>
+            </div>
+            <div className="claim-sheet-hint">{tt('achPickSubHint')}</div>
+            <div className="claim-sheet-list">
+              {claimSheet.subs.map((s) => {
+                const name = s.name || s.username || s.marzban_username || `#${s.id}`;
+                const initial = (String(name).trim()[0] || 'S').toUpperCase();
+                return (
+                  <button
+                    key={s.id}
+                    type="button"
+                    className="claim-sub-row"
+                    disabled={claimApplying}
+                    onClick={() => applyClaimToSub(s.id)}
+                  >
+                    <span className="claim-sub-avatar" aria-hidden="true">{initial}</span>
+                    <span className="claim-sub-name">{name}</span>
+                    <span className="claim-sub-plus">+{fmt(claimSheet.gb)} {lang === 'fa' ? 'گیگ' : 'GB'}</span>
+                  </button>
+                );
+              })}
+            </div>
           </div>
         </div>,
         document.body,

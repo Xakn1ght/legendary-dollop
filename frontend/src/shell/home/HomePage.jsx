@@ -428,6 +428,11 @@ export function HomePage() {
 
       {!noSubs && (
         <div className="card vpn-card">
+          {/* Tier-world decoration layer (2026-07-14). Inert for the standard
+              accents; only VIP/Champion/Legend paint into it (tier-worlds.css)
+              — its own pseudo-elements avoid the glass.css ::before/::after
+              !important war on .vpn-card. */}
+          <div className="tier-fx" aria-hidden="true" />
           <div className="vpn-lava" aria-hidden="true">
             <div className="vpn-blob vpn-blob-1" />
             <div className="vpn-blob vpn-blob-2" />

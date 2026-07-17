@@ -1,5 +1,9 @@
 import { api } from './auth.js';
 
+const ACCENTS_ALL = ['red', 'cyan', 'emerald', 'violet', 'amber', 'vip', 'champion', 'legend', 'bubblegum'];
+// Tier accents ship BOTH scenes since 2026-07-15 (Pasha's light-mode mock);
+// the old enforceTierDark() forcing is gone — the saved theme pref applies.
+
 // Pull cross-device prefs (theme/lang/sub ids) before first render, same as legacy pages.
 export async function syncPrefsFromServer() {
   try {
@@ -9,6 +13,10 @@ export async function syncPrefsFromServer() {
       if (p.theme === 'light' || p.theme === 'dark') {
         try { localStorage.setItem('theme', p.theme); } catch (_) { /* ignore */ }
         document.documentElement.setAttribute('data-theme', p.theme);
+      }
+      if (ACCENTS_ALL.includes(p.accent)) {
+        try { localStorage.setItem('accent', p.accent); } catch (_) { /* ignore */ }
+        document.documentElement.setAttribute('data-accent', p.accent);
       }
       if (p.lang === 'fa' || p.lang === 'en') {
         const localLang = window.AstroLang?.getLang

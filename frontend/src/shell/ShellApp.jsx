@@ -76,7 +76,10 @@ function goFullscreen(opts = {}) {
   }
 }
 
-const ACCENT_ALLOWED = ['red', 'cyan', 'emerald', 'violet', 'amber', 'vip', 'champion', 'legend'];
+const ACCENT_ALLOWED = ['red', 'cyan', 'emerald', 'violet', 'amber', 'vip', 'champion', 'legend', 'bubblegum'];
+// World accents (tokens.css overrides every surface token): the earned tiers
+// plus the purchasable bubblegum. Both scenes supported since 2026-07-15.
+const TIER_ACCENTS = ['vip', 'champion', 'legend', 'bubblegum'];
 
 export function ShellApp() {
   const [lang, setLang] = useState(() => detectLanguage());
@@ -106,6 +109,11 @@ export function ShellApp() {
   const [authHelp, setAuthHelp] = useState(false);
   const [notRegistered, setNotRegistered] = useState(false);
   const [dataLoading, setDataLoading] = useState(false);
+  // Transient tier-world splash (2026-07-15, Pasha: the crest strip "doesn't
+  // need to be there — just a quick popup when they switch to it").
+  const [tierSplash, setTierSplash] = useState(null); // 'vip' | 'champion' | 'legend' | null
+  const tierSplashTimerRef = useRef(null);
+  useEffect(() => () => clearTimeout(tierSplashTimerRef.current), []);
 
   // Terminal auth failure: the overlay is the ONLY thing allowed on screen.
   const authBlocked = authHelp || notRegistered;
@@ -268,8 +276,15 @@ export function ShellApp() {
       const tg = getWebApp();
       if (!tg) return;
       const isLight = themeName === 'light';
-      const bg = isLight ? '#f1ede5' : '#0a141b';
-      const headerBg = isLight ? '#f1ede5' : '#10202a';
+      // Tier worlds recolor the surface tokens, so read the LIVE values —
+      // hardcoded teal-dark chrome clashed with the gold/violet worlds.
+      let bg = isLight ? '#f1ede5' : '#0a141b';
+      let headerBg = isLight ? '#f1ede5' : '#10202a';
+      try {
+        const cs = getComputedStyle(document.documentElement);
+        bg = (cs.getPropertyValue('--bg-base') || '').trim() || bg;
+        headerBg = (cs.getPropertyValue('--bg-elev-1') || '').trim() || headerBg;
+      } catch (_) { /* ignore */ }
       try { if (typeof tg.setBackgroundColor === 'function') tg.setBackgroundColor(bg); } catch (_) { /* ignore */ }
       try { if (typeof tg.setHeaderColor === 'function') tg.setHeaderColor(headerBg); } catch (_) { /* ignore */ }
       try { if (typeof tg.setBottomBarColor === 'function') tg.setBottomBarColor(bg); } catch (_) { /* ignore */ }
@@ -280,6 +295,9 @@ export function ShellApp() {
   const themeDesiredRef = useRef(null);
   const setTheme = useCallback((next0, { save = true } = {}) => {
     const next = next0 === 'light' ? 'light' : 'dark';
+    // Tier worlds ship BOTH scenes since 2026-07-15 (Pasha's light mock):
+    // the toggle simply switches light/dark INSIDE the world — no more
+    // forced-dark, no more "toggling exits the world".
     themeDesiredRef.current = next;
     try { localStorage.setItem('theme', next); } catch (_) { /* ignore */ }
     setThemeState(next);
@@ -291,7 +309,7 @@ export function ShellApp() {
       if (prev === target) { syncTelegramChromeToTheme(target); return; }
       const apply = () => {
         document.documentElement.setAttribute('data-theme', target);
-        if (save) schedulePrefsSave({ theme: target });
+        if (save) schedulePrefsSave({ theme: themeDesiredRef.current });
         requestAnimationFrame(() => syncTelegramChromeToTheme(target));
       };
       if (prev) {
@@ -310,11 +328,25 @@ export function ShellApp() {
     const prev = document.documentElement.getAttribute('data-accent') || 'red';
     if (prev !== next) document.documentElement.setAttribute('data-accent', next);
     try { localStorage.setItem('accent', next); } catch (_) { /* ignore */ }
+    // Tier worlds ship both scenes (2026-07-15): the saved light/dark pref
+    // stays in charge; switching worlds only re-skins the current scene.
+    const effective = (() => { try { return localStorage.getItem('theme') || 'dark'; } catch (_) { return 'dark'; } })();
+    if ((document.documentElement.getAttribute('data-theme') || '') !== effective) {
+      document.documentElement.setAttribute('data-theme', effective);
+    }
+    if (prev !== next) requestAnimationFrame(() => syncTelegramChromeToTheme(effective));
     if (!opts.silent) schedulePrefsSave({ accent: next });
     if (prev !== next) {
       try { window.dispatchEvent(new CustomEvent('astro:accent-changed', { detail: { accent: next } })); } catch (_) { /* ignore */ }
     }
-  }, []);
+    // Entering a tier world (user action, not the silent boot restore):
+    // flash the crest splash for a beat, then let the theme speak for itself.
+    if (!opts.silent && prev !== next && TIER_ACCENTS.includes(next)) {
+      clearTimeout(tierSplashTimerRef.current);
+      setTierSplash(next);
+      tierSplashTimerRef.current = setTimeout(() => setTierSplash(null), 2400);
+    }
+  }, [syncTelegramChromeToTheme]);
 
   const setLanguage = useCallback((next0, { save = true } = {}) => {
     const next = next0 === 'fa' ? 'fa' : 'en';
@@ -910,6 +942,50 @@ export function ShellApp() {
           onBellClick={() => { setPanelOpen(true); notifBoostRef.current?.(); }}
           fmt={fmt}
         />
+
+        {/* Tier-world splash (Pasha 2026-07-15: not a permanent strip — "just
+            a quick popup when they switch to it"). Renders only for ~2.4s
+            after a user-initiated switch; pointer-events none, auto-fades. */}
+        {tierSplash && (
+          <div className="tier-splash" aria-live="polite">
+            <span className="tier-crest-badge">
+              {tierSplash === 'vip' && (
+                <svg viewBox="0 0 24 24" strokeWidth="1.8" strokeLinejoin="round"><path d="M12 2.5 20 12l-8 9.5L4 12z" /><path d="M12 6.8 16.4 12 12 17.2 7.6 12z" /></svg>
+              )}
+              {tierSplash === 'champion' && (
+                <svg viewBox="0 0 24 24" strokeWidth="1.8" strokeLinejoin="round"><path d="M12 2.8 14 9l6.2 2-6.2 2-2 6.2L10 13 3.8 11 10 9z" /></svg>
+              )}
+              {tierSplash === 'legend' && (
+                <svg viewBox="0 0 24 24" strokeWidth="1.8" strokeLinejoin="round"><path d="M3.5 8.5 8 12l4-6.5L16 12l4.5-3.5L18.6 18H5.4z" /><path d="M5.4 18h13.2" /></svg>
+              )}
+              {tierSplash === 'bubblegum' && (
+                <svg viewBox="0 0 24 24" strokeWidth="1.8"><circle cx="12" cy="12" r="8.5" /><circle cx="12" cy="12" r="3.4" /></svg>
+              )}
+            </span>
+            <span>
+              <span className="tier-crest-name">
+                {tierSplash === 'vip' ? t('tierVip')
+                  : tierSplash === 'champion' ? t('tierChampion')
+                    : tierSplash === 'legend' ? t('tierLegend') : t('tierBubblegum')}
+              </span>
+              <span className="tier-crest-tagline" style={{ display: 'block' }}>
+                {tierSplash === 'vip' ? t('tierVipTag')
+                  : tierSplash === 'champion' ? t('tierChampionTag')
+                    : tierSplash === 'legend' ? t('tierLegendTag') : t('tierBubblegumTag')}
+              </span>
+            </span>
+          </div>
+        )}
+
+        {/* Bubblegum world deco: fixed edge bubbles (CSS shows it only under
+            html[data-accent="bubblegum"]; inert otherwise). Shell only —
+            money pages stay calm. */}
+        <div className="bubblegum-deco" aria-hidden="true">
+          <span className="bg-bubble bg-bubble-1 solid" />
+          <span className="bg-bubble bg-bubble-2 soap" />
+          <span className="bg-bubble bg-bubble-3 solid" />
+          <span className="bg-bubble bg-bubble-4 soap" />
+        </div>
 
         {updateReady && !netDown && (
           <div className="net-banner update-banner" role="status">

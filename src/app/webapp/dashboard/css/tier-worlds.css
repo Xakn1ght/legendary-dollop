@@ -1,0 +1,380 @@
+/* ============================================================
+   TIER WORLDS v3 — built 1:1 from Pasha's own mock
+   (docs/Premium tier theme redesign.zip, 2026-07-15).
+
+   Design language: ONE structure, THREE worlds. The single premium
+   material is the tier METAL gradient (--tier-metal from tokens.css):
+   it paints the hero number, key stats, primary buttons, the game FAB,
+   toggles and the progress fill — always with DARK INK text on it
+   (--tier-ink). Cards are calm tinted glass (--tier-card) with a metal
+   hairline (--tier-border). One soft shimmer sweeps the hero. No
+   embers / aurora / starfields — v2's ornament scenes are retired.
+
+   Scoped to html[data-accent="vip|champion|legend"]; the standard
+   accents are untouched. Loads AFTER glass.css so equal-specificity
+   !important rules here win. All motion is transform/opacity;
+   reduced-motion and perf-lite pause it.
+   ============================================================ */
+
+/* Shorthand scope: any tier world active. */
+:is(html[data-accent="vip"], html[data-accent="champion"], html[data-accent="legend"], html[data-accent="bubblegum"]) {
+  /* nothing here — tokens.css owns the variables; this file consumes them */
+}
+
+/* ── 1. CARDS — calm tinted glass with a metal hairline ─────────
+   Surfaces/shadows come from the --tier-* tokens so the SAME rules
+   serve both scenes (light blocks in tokens.css swap the values). */
+:is(html[data-accent="vip"], html[data-accent="champion"], html[data-accent="legend"], html[data-accent="bubblegum"]) .card,
+:is(html[data-accent="vip"], html[data-accent="champion"], html[data-accent="legend"], html[data-accent="bubblegum"]) .action-tile,
+:is(html[data-accent="vip"], html[data-accent="champion"], html[data-accent="legend"], html[data-accent="bubblegum"]) .placeholder-card {
+  background:
+    var(--tier-card),
+    var(--tier-card-under, rgba(10, 12, 18, 0.78)) !important;
+  border: 1px solid var(--tier-border) !important;
+  box-shadow:
+    var(--tier-shadow, 0 18px 50px rgba(0, 0, 0, 0.55)),
+    inset 0 1px 0 rgba(255, 255, 255, 0.10) !important;
+}
+:is(html[data-accent="vip"], html[data-accent="champion"], html[data-accent="legend"], html[data-accent="bubblegum"]) .vpn-card {
+  background:
+    var(--tier-card),
+    var(--tier-card-under, rgba(8, 10, 15, 0.82)) !important;
+  border: 1px solid var(--tier-border) !important;
+  box-shadow:
+    var(--tier-shadow-hero, 0 22px 60px rgba(0, 0, 0, 0.62)),
+    0 0 34px var(--tier-glow),
+    inset 0 1px 0 rgba(255, 255, 255, 0.14) !important;
+}
+
+/* ── 2. METAL TEXT — hero number + headline stats ─────────────── */
+:is(html[data-accent="vip"], html[data-accent="champion"], html[data-accent="legend"], html[data-accent="bubblegum"]) .vpn-balance,
+:is(html[data-accent="vip"], html[data-accent="champion"], html[data-accent="legend"], html[data-accent="bubblegum"]) #balance2 {
+  background-image: var(--tier-metal);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent !important;
+  text-shadow: none !important;
+}
+
+/* ── 3. METAL FILLS — buttons, FAB, toggles, usage fill ───────── */
+/* Primary buttons: metal plate, dark ink (mock: «ارسال لینک دعوت», «ادامه») */
+:is(html[data-accent="vip"], html[data-accent="champion"], html[data-accent="legend"], html[data-accent="bubblegum"]) .btn-primary,
+:is(html[data-accent="vip"], html[data-accent="champion"], html[data-accent="legend"], html[data-accent="bubblegum"]) button.btn-primary {
+  background: var(--tier-metal) !important;
+  color: var(--tier-ink) !important;
+  border: 1px solid rgba(255, 255, 255, 0.30) !important;
+  box-shadow:
+    inset 0 1.5px 0 rgba(255, 255, 255, 0.45),
+    0 10px 30px var(--tier-glow) !important;
+}
+:is(html[data-accent="vip"], html[data-accent="champion"], html[data-accent="legend"], html[data-accent="bubblegum"]) .btn-primary svg {
+  stroke: var(--tier-ink);
+}
+
+/* The big connect button: metal with dark ink icon (active state only —
+   expired/limited keep their semantic colors from HomePage's inline style). */
+:is(html[data-accent="vip"], html[data-accent="champion"], html[data-accent="legend"], html[data-accent="bubblegum"]) .power-btn:not(.inactive) {
+  background: var(--tier-metal) !important;
+  box-shadow:
+    0 12px 36px var(--tier-glow),
+    inset 0 3px 10px rgba(255, 255, 255, 0.35) !important;
+}
+:is(html[data-accent="vip"], html[data-accent="champion"], html[data-accent="legend"], html[data-accent="bubblegum"]) .power-btn:not(.inactive) svg {
+  fill: var(--tier-ink) !important;
+}
+
+/* Game FAB (nav notch): the mock's glowing metal orb. */
+:is(html[data-accent="vip"], html[data-accent="champion"], html[data-accent="legend"], html[data-accent="bubblegum"]) .nav-item-notch {
+  background:
+    radial-gradient(circle at 30% 30%, rgba(255, 255, 255, 0.35) 0%, transparent 50%),
+    var(--tier-metal);
+  border: 2px solid rgba(255, 255, 255, 0.35);
+  box-shadow:
+    0 0 34px var(--tier-glow),
+    0 12px 30px rgba(0, 0, 0, 0.55),
+    inset 0 2px 10px rgba(255, 255, 255, 0.25);
+}
+:is(html[data-accent="vip"], html[data-accent="champion"], html[data-accent="legend"], html[data-accent="bubblegum"]) .nav-item-notch .nav-item-icon svg {
+  stroke: var(--tier-ink);
+  fill: none;
+}
+
+/* Settings toggles: metal track when on. */
+:is(html[data-accent="vip"], html[data-accent="champion"], html[data-accent="legend"], html[data-accent="bubblegum"]) .toggle-switch.active {
+  background: var(--tier-metal) !important;
+  box-shadow: 0 3px 12px var(--tier-glow) !important;
+}
+
+/* Language pill (header FA/EN): metal chip like the mock's avatar.
+   NOT gated on .active — that class means "FA selected" (legacy quirk),
+   which left the EN state a plain white chip in every world (Pasha
+   2026-07-16 "fix all themes"). Both states wear the metal. */
+:is(html[data-accent="vip"], html[data-accent="champion"], html[data-accent="legend"], html[data-accent="bubblegum"]) .lang-switch {
+  background: var(--tier-metal) !important;
+  color: var(--tier-ink) !important;
+  border-color: rgba(255, 255, 255, 0.35) !important;
+  text-shadow: none !important;
+}
+
+/* Segmented controls (shop pills, months tabs, tasks tabs): the active
+   segment is a metal plate with dark ink — mock's «۱ ماهه» tab. */
+:is(html[data-accent="vip"], html[data-accent="champion"], html[data-accent="legend"], html[data-accent="bubblegum"]) .months-tab.active,
+:is(html[data-accent="vip"], html[data-accent="champion"], html[data-accent="legend"], html[data-accent="bubblegum"]) .shop-sort-pill.active,
+:is(html[data-accent="vip"], html[data-accent="champion"], html[data-accent="legend"], html[data-accent="bubblegum"]) .shop-tab.active,
+:is(html[data-accent="vip"], html[data-accent="champion"], html[data-accent="legend"], html[data-accent="bubblegum"]) .tab-btn.active {
+  background: var(--tier-metal) !important;
+  color: var(--tier-ink) !important;
+  border-color: rgba(255, 255, 255, 0.30) !important;
+  text-shadow: none !important;
+  box-shadow: 0 6px 22px var(--tier-glow) !important;
+}
+:is(html[data-accent="vip"], html[data-accent="champion"], html[data-accent="legend"], html[data-accent="bubblegum"]) .shop-tab.active svg {
+  stroke: var(--tier-ink) !important;
+}
+
+/* Primary CTA family beyond .btn-primary (tasks reward button, welcome /
+   empty-state CTAs, apps "get" button): same metal plate. */
+:is(html[data-accent="vip"], html[data-accent="champion"], html[data-accent="legend"], html[data-accent="bubblegum"]) .rw-btn.primary,
+:is(html[data-accent="vip"], html[data-accent="champion"], html[data-accent="legend"], html[data-accent="bubblegum"]) .es-btn-primary,
+:is(html[data-accent="vip"], html[data-accent="champion"], html[data-accent="legend"], html[data-accent="bubblegum"]) .welcome-start-btn,
+:is(html[data-accent="vip"], html[data-accent="champion"], html[data-accent="legend"], html[data-accent="bubblegum"]) .app-get.primary {
+  background: var(--tier-metal) !important;
+  color: var(--tier-ink) !important;
+  border: 1px solid rgba(255, 255, 255, 0.30) !important;
+  box-shadow:
+    inset 0 1.5px 0 rgba(255, 255, 255, 0.45),
+    0 10px 30px var(--tier-glow) !important;
+  text-shadow: none !important;
+}
+
+/* ICON CHIP FAMILY (Pasha 2026-07-15: "the gradient still there" — the
+   default diagonal brand→brandDark chips). Per the mock, every small icon
+   square/circle is a METAL plate with dark-ink glyph: profile section
+   headers + avatar, home action tiles, challenge icons, purchase card
+   titles, empty-state/welcome orbs, shop title mark, claim avatars,
+   placeholder icons. */
+:is(html[data-accent="vip"], html[data-accent="champion"], html[data-accent="legend"], html[data-accent="bubblegum"]) :is(
+  .profile-section-title .icon-box,
+  .profile-avatar,
+  .claim-sub-avatar,
+  .action-ic,
+  .challenge-icon,
+  .card-title .icon,
+  .title .mark,
+  .es-icon,
+  .welcome-orb-core,
+  .placeholder-icon
+) {
+  background: var(--tier-metal) !important;
+  color: var(--tier-ink) !important;
+  box-shadow:
+    0 6px 20px var(--tier-glow),
+    inset 0 1px 0 rgba(255, 255, 255, 0.45) !important;
+  border: none !important;
+}
+/* Glyphs inherit the ink through currentColor — never force stroke/fill
+   here (these chips mix stroke-based and fill-based SVGs). */
+:is(html[data-accent="vip"], html[data-accent="champion"], html[data-accent="legend"], html[data-accent="bubblegum"]) :is(
+  .profile-section-title .icon-box,
+  .profile-avatar,
+  .claim-sub-avatar,
+  .action-ic,
+  .challenge-icon,
+  .card-title .icon,
+  .title .mark,
+  .es-icon,
+  .welcome-orb-core,
+  .placeholder-icon
+) svg {
+  color: var(--tier-ink) !important;
+}
+
+/* ── 4. HERO SHIMMER — one soft specular sweep (mock: 3.6s) ───── */
+.tier-fx { display: none; }
+:is(html[data-accent="vip"], html[data-accent="champion"], html[data-accent="legend"], html[data-accent="bubblegum"]) .tier-fx {
+  display: block;
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  border-radius: inherit;
+  overflow: hidden;
+  pointer-events: none;
+}
+:is(html[data-accent="vip"], html[data-accent="champion"], html[data-accent="legend"], html[data-accent="bubblegum"]) .tier-fx::before {
+  content: "";
+  position: absolute; inset: 0; z-index: 3;
+  background: linear-gradient(105deg,
+    transparent 38%, var(--tier-shimmer-soft, rgba(255, 255, 255, 0.05)) 47%,
+    var(--tier-shimmer, rgba(255, 255, 255, 0.13)) 50%,
+    var(--tier-shimmer-soft, rgba(255, 255, 255, 0.05)) 53%, transparent 62%);
+  transform: translateX(-135%);
+  animation: tw-sheen 3.6s ease-in-out infinite;
+}
+/* Bubblegum has NO metal shimmer (mock: shimmerAnim none) — its motion is
+   the floating bubbles deco instead. */
+html[data-accent="bubblegum"] .tier-fx::before { display: none; }
+/* Light scene: the mock brightens the sweep (white 0.6) so it still reads
+   on near-white cards. */
+:is(html[data-accent="vip"], html[data-accent="champion"], html[data-accent="legend"], html[data-accent="bubblegum"])[data-theme="light"] .tier-fx::before {
+  --tier-shimmer: rgba(255, 255, 255, 0.60);
+  --tier-shimmer-soft: rgba(255, 255, 255, 0.25);
+}
+
+/* ── 5. TIER SPLASH — quick popup on switching into a world ─────
+   (Pasha 2026-07-15: no permanent strip; a ~2.4s floating crest card.)
+   React mounts it only right after a user-initiated switch, so the
+   tier tokens are guaranteed active while it exists. */
+.tier-splash {
+  position: fixed;
+  top: calc(88px + env(safe-area-inset-top, 0px));
+  left: 50%;
+  z-index: 1200;
+  display: flex; align-items: center; gap: 12px;
+  padding: 12px 20px 12px 14px;
+  border-radius: 18px;
+  background:
+    var(--tier-card, linear-gradient(150deg, rgba(255,255,255,0.08), rgba(0,0,0,0.4))),
+    var(--tier-card-under, rgba(8, 10, 15, 0.90));
+  border: 1px solid var(--tier-border, rgba(255, 255, 255, 0.2));
+  box-shadow:
+    var(--tier-shadow-hero, 0 22px 60px rgba(0, 0, 0, 0.60)),
+    0 0 34px var(--tier-glow, rgba(255, 255, 255, 0.2)),
+    inset 0 1px 0 rgba(255, 255, 255, 0.14);
+  pointer-events: none;
+  transform: translateX(-50%);
+  animation: tier-splash-pop 2.4s cubic-bezier(0.22, 0.9, 0.3, 1) both;
+}
+.tier-crest-badge {
+  width: 42px; height: 42px;
+  flex: 0 0 auto;
+  border-radius: 13px;
+  background: var(--tier-metal);
+  display: flex; align-items: center; justify-content: center;
+  box-shadow: 0 8px 26px var(--tier-glow), inset 0 1px 0 rgba(255, 255, 255, 0.5);
+}
+.tier-crest-badge svg { width: 20px; height: 20px; stroke: var(--tier-ink); fill: none; }
+.tier-crest-name {
+  font-size: 15.5px; font-weight: 900; line-height: 1.35;
+  background-image: var(--tier-metal);
+  -webkit-background-clip: text; background-clip: text; color: transparent;
+  white-space: nowrap;
+}
+.tier-crest-tagline { font-size: 11px; color: var(--text-muted); margin-top: 1px; white-space: nowrap; }
+
+@keyframes tier-splash-pop {
+  0%   { opacity: 0; transform: translateX(-50%) translateY(-10px) scale(0.94); }
+  9%   { opacity: 1; transform: translateX(-50%) translateY(0) scale(1); }
+  82%  { opacity: 1; transform: translateX(-50%) translateY(0) scale(1); }
+  100% { opacity: 0; transform: translateX(-50%) translateY(-6px) scale(0.97); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .tier-splash { animation: none; }
+}
+
+/* ── 6. small accents ─────────────────────────────────────────── */
+/* Header brand chip: QUIET in tier worlds — the mock's header square is a
+   soft tint + hairline with the accent-colored mark, no gradient, no glow
+   (Pasha 2026-07-15: "i dont like the golden glow and gradient"). */
+:is(html[data-accent="vip"], html[data-accent="champion"], html[data-accent="legend"], html[data-accent="bubblegum"]) header .center .brand-icon {
+  background: var(--brand-soft) !important;
+  border: 1px solid var(--tier-border) !important;
+  box-shadow: none !important;
+  filter: none !important;
+}
+:is(html[data-accent="vip"], html[data-accent="champion"], html[data-accent="legend"], html[data-accent="bubblegum"]) header .center .brand-icon svg {
+  color: var(--brand) !important;
+}
+/* Boot splash chip: same quiet treatment (it flashed the loud gradient+glow
+   square mid-screen on every open of a tier world). */
+:is(html[data-accent="vip"], html[data-accent="champion"], html[data-accent="legend"], html[data-accent="bubblegum"]) #bootSplash .inner {
+  background: var(--bg-elev-2, rgba(255, 255, 255, 0.06)) !important;
+  border: 1px solid var(--tier-border) !important;
+  box-shadow: none !important;
+  color: var(--brand) !important;
+}
+/* Date badge on the hero: quiet inner chip (dark: black glass; light: milk). */
+:is(html[data-accent="vip"], html[data-accent="champion"], html[data-accent="legend"], html[data-accent="bubblegum"]) .vpn-card .date-badge {
+  background: var(--tier-inner, rgba(0, 0, 0, 0.30)) !important;
+  border: 1px solid var(--line) !important;
+  color: var(--text-soft) !important;
+}
+/* Hero action chips pick up the metal hairline. */
+:is(html[data-accent="vip"], html[data-accent="champion"], html[data-accent="legend"], html[data-accent="bubblegum"]) .vpn-action-btn {
+  border-color: var(--tier-border) !important;
+}
+
+/* ── 7. BUBBLEGUM DECO — floating gumballs/bubbles on the edges ──
+   (Pasha's third mock.) A dedicated fixed layer rendered by ShellApp
+   (shell only — money pages stay calm per PRODUCT.md), shown only
+   under the bubblegum accent. 2 solid gumballs + 2 soap bubbles with
+   baked-in highlights; transform-only bob motion. */
+.bubblegum-deco { display: none; }
+html[data-accent="bubblegum"] .bubblegum-deco {
+  display: block;
+  position: fixed;
+  inset: 0;
+  z-index: 0;              /* over the page bg, under .wrap (z-index ≥1) */
+  pointer-events: none;
+  overflow: hidden;
+}
+.bg-bubble {
+  position: absolute;
+  border-radius: 50%;
+}
+.bg-bubble::after {        /* glossy highlight */
+  content: "";
+  position: absolute;
+  top: 14%; left: 20%;
+  width: 27%; height: 15%;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.85);
+  filter: blur(2px);
+  transform: rotate(-24deg);
+}
+/* solid gumballs */
+.bg-bubble.solid {
+  background: radial-gradient(circle at 32% 26%, #ffe4f1 0%, #ff96cb 42%, #d84690 78%, #8e2258 100%);
+  box-shadow: inset -7px -9px 16px rgba(120, 15, 70, 0.45), 0 10px 20px rgba(0, 0, 0, 0.30);
+}
+/* translucent soap bubbles */
+.bg-bubble.soap {
+  background: radial-gradient(circle at 34% 28%,
+    rgba(255, 236, 246, 0.28) 0%, rgba(255, 175, 215, 0.10) 45%,
+    rgba(255, 150, 205, 0.04) 68%, rgba(255, 165, 212, 0.19) 100%);
+  border: 1px solid rgba(255, 185, 222, 0.42);
+  box-shadow: inset -8px -10px 20px rgba(255, 120, 190, 0.15);
+}
+.bg-bubble.soap::after { background: rgba(255, 255, 255, 0.50); filter: blur(4px); }
+/* light scene: gumballs keep their candy body; soften the soap borders */
+html[data-theme="light"] .bg-bubble.soap { border-color: rgba(236, 111, 177, 0.35); }
+html[data-theme="light"] .bg-bubble.solid { box-shadow: inset -7px -9px 16px rgba(160, 40, 100, 0.35), 0 10px 20px rgba(214, 105, 160, 0.25); }
+
+.bg-bubble-1 { top: -26px;   inset-inline-end: -20px;  width: 78px;  height: 78px;  animation: tw-bob2 8s   ease-in-out infinite; }
+.bg-bubble-2 { top: 42%;     inset-inline-start: -34px; width: 96px;  height: 96px;  animation: tw-bob 9s    ease-in-out infinite; }
+.bg-bubble-3 { bottom: 96px; inset-inline-start: -24px; width: 64px;  height: 64px;  animation: tw-bob2 7.5s ease-in-out infinite; opacity: 0.95; }
+.bg-bubble-4 { bottom: -45px; inset-inline-end: -45px;  width: 170px; height: 170px; animation: tw-bob2 10s  ease-in-out infinite; }
+
+/* ── keyframes + perf guards ──────────────────────────────────── */
+@keyframes tw-bob {
+  0%, 100% { transform: translateY(0) rotate(0deg); }
+  50%      { transform: translateY(-16px) rotate(4deg); }
+}
+@keyframes tw-bob2 {
+  0%, 100% { transform: translateY(-8px); }
+  50%      { transform: translateY(10px); }
+}
+@keyframes tw-sheen {
+  0%   { transform: translateX(-135%); }
+  55%  { transform: translateX(135%); }
+  100% { transform: translateX(135%); }
+}
+@media (prefers-reduced-motion: reduce) {
+  :is(html[data-accent="vip"], html[data-accent="champion"], html[data-accent="legend"], html[data-accent="bubblegum"]) .tier-fx::before,
+  .bg-bubble {
+    animation: none;
+  }
+}
+html[data-perf="lite"] .tier-fx::before,
+html[data-perf="lite"] .bg-bubble { animation: none !important; }
+html.astro-idle .tier-fx::before,
+html.astro-idle .bg-bubble { animation-play-state: paused !important; }

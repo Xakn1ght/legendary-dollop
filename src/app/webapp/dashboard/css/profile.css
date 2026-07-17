@@ -1,4 +1,4 @@
-    @import url("./tokens.css?v=7");
+    @import url("./tokens.css?v=11");
 
     /* ============================================
        ASTROBYTE ENHANCED PROFILE PAGE
@@ -29,10 +29,18 @@
     .profile-section,
     .referral-card,
     .achievements-grid,
-    .profile-stats-grid,
-    .settings-list {
+    .profile-stats-grid {
       max-width: 100%;
       overflow: hidden;
+    }
+    /* .settings-list must NOT clip: its rows bleed with margin:0 -12px so the
+       hover/active highlight reaches the section padding. overflow:hidden here
+       sheared that bleed, chopping the rounded corners of the hover shape
+       (2026-07-14 "hover shape is chopped on the right"). The parent
+       .profile-section still bounds it, so nothing overflows the page. */
+    .settings-list {
+      max-width: 100%;
+      overflow: visible;
     }
     
     /* Animations */
@@ -249,9 +257,40 @@
       background: linear-gradient(135deg, rgba(255, 215, 0, 0.3), rgba(255, 165, 0, 0.3));
       color: #cc8800;
     }
+    /* VIP badge — SILVER (2026-07-12, Pasha: "shouldnt be purple at all").
+       Brushed-metal gradient + a soft, thin glint that drifts across slowly.
+       Low peak alpha and wide soft edges so no frozen frame reads as a bar. */
+    /* v3 (2026-07-14, Pasha: "shine animation still looks horrible") — the
+       moving sweep is GONE on both badge and card. The shine is now baked
+       into a STATIC polished-metal finish: a fixed diagonal highlight band
+       + inset top/bottom bevels read as brushed silver catching light,
+       with zero motion to ever look cheap. */
     .profile-badge.vip {
-      background: linear-gradient(135deg, rgba(167, 139, 250, 0.25), rgba(139, 92, 246, 0.25));
-      color: #a78bfa;
+      position: relative;
+      overflow: hidden;
+      background:
+        linear-gradient(135deg,
+          rgba(255, 255, 255, 0.34) 0%,
+          rgba(226, 232, 240, 0.16) 24%,
+          rgba(148, 163, 184, 0.12) 58%,
+          rgba(203, 213, 225, 0.22) 100%);
+      border: 1px solid rgba(226, 232, 240, 0.42);
+      color: #eef2f8;
+      text-shadow: 0 1px 2px rgba(0, 0, 0, 0.35);
+      box-shadow:
+        inset 0 1px 0 rgba(255, 255, 255, 0.38),
+        inset 0 -1px 0 rgba(0, 0, 0, 0.28);
+    }
+    [data-theme="light"] .profile-badge.vip {
+      background:
+        linear-gradient(135deg,
+          rgba(255, 255, 255, 0.65) 0%,
+          rgba(148, 163, 184, 0.26) 30%,
+          rgba(100, 116, 139, 0.18) 100%);
+      border-color: rgba(100, 116, 139, 0.42);
+      color: #475569;
+      text-shadow: none;
+      box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.7);
     }
     
     /* Enhanced Stats Grid */
@@ -857,9 +896,12 @@
     .ach-grid {
       display: grid;
       grid-template-columns: repeat(2, 1fr);
-      /* Every card the same size: rows share the tallest card's height
-         (claim-button cards set the bar) — no more ragged bottoms. */
-      grid-auto-rows: 1fr;
+      /* Rows size to their OWN content (align-items:stretch still makes the
+         two cards in a row equal height). Was grid-auto-rows:1fr, which
+         forced ALL rows to the tallest row's height — so revealing one card
+         ballooned the whole grid (2026-07-14 "cards are buggy"). */
+      grid-auto-rows: auto;
+      align-items: stretch;
       gap: 8px;
     }
     .ach-item {
@@ -939,6 +981,58 @@
       color: var(--muted);
       text-align: center;
     }
+    /* Tap-to-reveal requirement (2026-07-12). The whole card is a button. */
+    .ach-item { cursor: pointer; -webkit-tap-highlight-color: transparent; }
+    .ach-item:active { transform: scale(0.985); }
+    .ach-item.revealed { border-color: rgba(var(--brandRgb), 0.45); }
+    .ach-desc {
+      margin-top: 8px;
+      padding-top: 8px;
+      border-top: 1px dashed var(--line);
+      animation: ach-desc-in 0.18s ease both;
+    }
+    .ach-desc-req { font-size: 11.5px; font-weight: 600; color: var(--text-soft); line-height: 1.5; }
+    .ach-desc-reward { margin-top: 4px; font-size: 11px; font-weight: 800; color: var(--brand); }
+    @keyframes ach-desc-in { from { opacity: 0; transform: translateY(-3px); } to { opacity: 1; transform: none; } }
+
+    /* Reward sub-picker sheet (achievement claim → pick a service). */
+    .claim-sheet {
+      width: min(420px, 92vw);
+      background: var(--panel, var(--bg-elev-2));
+      border: 1px solid var(--line);
+      border-radius: 18px;
+      padding: 16px;
+      box-shadow: var(--shadow-3, 0 18px 44px rgba(0,0,0,0.55));
+    }
+    .claim-sheet-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+    .claim-sheet-title { font-size: 15px; font-weight: 800; color: var(--text); }
+    .claim-sheet-hint { margin: 4px 0 12px; font-size: 12px; color: var(--muted); }
+    .claim-sheet-list { display: flex; flex-direction: column; gap: 8px; max-height: 52vh; overflow-y: auto; }
+    .claim-sub-row {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      width: 100%;
+      padding: 11px 12px;
+      border-radius: 12px;
+      border: 1px solid var(--line);
+      background: var(--chip);
+      cursor: pointer;
+      transition: border-color 0.15s ease, transform 0.1s ease;
+    }
+    .claim-sub-row:hover { border-color: rgba(var(--brandRgb), 0.5); }
+    .claim-sub-row:active { transform: scale(0.98); }
+    .claim-sub-row:disabled { opacity: 0.55; }
+    .claim-sub-avatar {
+      flex-shrink: 0;
+      width: 30px; height: 30px;
+      border-radius: 9px;
+      display: grid; place-items: center;
+      font-size: 13px; font-weight: 800; color: #fff;
+      background: linear-gradient(135deg, var(--brand), var(--brandDark, var(--brand)));
+    }
+    .claim-sub-name { flex: 1; min-width: 0; font-size: 13px; font-weight: 700; color: var(--text); text-align: start; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .claim-sub-plus { flex-shrink: 0; font-size: 12px; font-weight: 800; color: var(--ok, #34d399); }
 
     /* Achievements Section */
     .achievements-grid {
@@ -1071,6 +1165,42 @@
     .referral-copy-btn:active {
       transform: scale(0.95);
     }
+    /* Two icon actions (2026-07-12): Share on Telegram + Copy. */
+    .referral-actions {
+      display: flex;
+      gap: 8px;
+      flex-shrink: 0;
+    }
+    .referral-icon-btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 44px;
+      height: 44px;
+      border-radius: 12px;
+      border: 1px solid var(--line);
+      background: var(--chip);
+      cursor: pointer;
+      transition: transform 0.15s ease, background 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
+      -webkit-tap-highlight-color: transparent;
+    }
+    .referral-icon-btn.share {
+      color: #fff;
+      background: linear-gradient(135deg, #2aabee, #229ed9);
+      border-color: transparent;
+    }
+    .referral-icon-btn.share:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 4px 14px rgba(34, 158, 217, 0.4);
+    }
+    .referral-icon-btn.copy { color: var(--text-soft); }
+    .referral-icon-btn.copy:hover { border-color: var(--ok); color: var(--ok); }
+    .referral-icon-btn.copy.done {
+      color: #fff;
+      background: var(--ok);
+      border-color: transparent;
+    }
+    .referral-icon-btn:active { transform: scale(0.92); }
     .referral-stats {
       display: grid;
       grid-template-columns: repeat(3, 1fr);
@@ -1956,6 +2086,41 @@ body.platform-ios .vip-modal-overlay { padding-top: calc(env(safe-area-inset-top
   box-shadow: 0 12px 36px rgba(60, 48, 32, 0.10);
 }
 .profile-hero.ph4::before, .profile-hero.ph4::after { content: none; }
+
+/* VIP profile card — silver premium treatment (2026-07-12, v2). v1 shipped a
+   hard white diagonal streak that read as a glitch (Pasha: "ew wtf is this").
+   v2 = brushed-metal identity carried by a STATIC soft top highlight + silver
+   tokens/border, and a WHISPER-soft specular glint that drifts rarely. Peak
+   alpha 0.07 with wide soft edges so no frozen frame is ever a visible bar;
+   "calm where money moves" (PRODUCT.md) — the shine is felt, not stared at. */
+/* v3 (2026-07-14): NO moving sheen. The card's premium silver read comes
+   from a STATIC diagonal polished-metal highlight baked into the background
+   + silver border/tokens. Nothing sweeps, so there's nothing to look cheap. */
+.profile-hero.ph4:has(.profile-badge.vip) {
+  --ph-gold: #d3dbe6;
+  --ph-gold-deep: #9aa6b8;
+  --ph-gold-bg: rgba(205, 214, 227, 0.09);
+  --ph-gold-ln: rgba(205, 214, 227, 0.32);
+  border-color: rgba(205, 214, 227, 0.30);
+  background:
+    /* fixed specular highlight sweeping top-left → soft, always still */
+    linear-gradient(118deg,
+      rgba(255, 255, 255, 0.10) 0%,
+      rgba(226, 232, 240, 0.05) 18%,
+      transparent 42%),
+    /* top edge sheen */
+    linear-gradient(180deg, rgba(226, 232, 240, 0.08), transparent 34%),
+    var(--panel);
+  box-shadow:
+    0 12px 40px rgba(0, 0, 0, 0.24),
+    inset 0 1px 0 rgba(255, 255, 255, 0.12);
+}
+[data-theme="light"] .profile-hero.ph4:has(.profile-badge.vip) {
+  background:
+    linear-gradient(118deg, rgba(255, 255, 255, 0.55) 0%, rgba(148, 163, 184, 0.10) 20%, transparent 44%),
+    linear-gradient(180deg, rgba(148, 163, 184, 0.12), transparent 34%),
+    var(--panel);
+}
 .ph4-body { display: grid; grid-template-columns: 1.5fr 1fr; position: relative; z-index: 1; }
 .ph4-id {
   padding: 18px 16px;
@@ -2034,3 +2199,196 @@ html[dir="rtl"] .ph4-vip-go.flip-rtl { transform: scaleX(-1); }
 .ph4-vip:not(.is-vip) .ph4-vip-row > svg:first-child,
 .ph4-vip:not(.is-vip) .ph4-vip-t,
 .ph4-vip:not(.is-vip) .ph4-vip-go { color: var(--brand); }
+
+/* ── Tier worlds picker (2026-07-12, image-13) ───────────────────────
+   Three always-visible cards, each a mini preview of its world (hardcoded
+   world colors — they must show the OTHER worlds while any accent is
+   active). Locked cards stay covetable: full color, small lock, hint. */
+.settings-item--tiers {
+  display: block;
+  cursor: default;
+}
+.tier-themes-head {
+  margin-bottom: 10px;
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 10px;
+}
+/* Mini guide (2026-07-15, Pasha: "add a guide … so users understand how to
+   get it"). A quiet ?-toggle + compact explainer rows, one per world. */
+.tier-help-btn {
+  flex: 0 0 auto;
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--line, rgba(255, 255, 255, 0.14));
+  background: transparent;
+  color: var(--text-muted, #9aa2b5);
+  cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+.tier-help-btn.open,
+.tier-help-btn:active {
+  background: rgba(var(--brandRgb), 0.14);
+  color: var(--brand);
+  border-color: rgba(var(--brandRgb), 0.4);
+}
+.tier-help {
+  margin: 0 0 12px;
+  padding: 12px 14px;
+  border-radius: 14px;
+  border: 1px dashed var(--line, rgba(255, 255, 255, 0.14));
+  background: rgba(0, 0, 0, 0.14);
+  font-size: 11.5px;
+  line-height: 1.9;
+  color: var(--text-soft, #ccd3de);
+}
+[data-theme="light"] .tier-help { background: rgba(255, 255, 255, 0.5); }
+.tier-help-intro { margin-bottom: 8px; }
+.tier-help-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  margin-top: 4px;
+}
+.tier-help-dot {
+  flex: 0 0 auto;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  margin-top: 6px;
+}
+.tier-help-dot.dot-vip { background: radial-gradient(circle at 32% 28%, #f4f7fb, #8e98ab 80%); }
+.tier-help-dot.dot-champion { background: radial-gradient(circle at 32% 28%, #f0dcff, #8b46f0 80%); }
+.tier-help-dot.dot-legend { background: radial-gradient(circle at 32% 28%, #fff4cf, #c3922a 80%); }
+.tier-help-dot.dot-bubblegum { background: radial-gradient(circle at 32% 28%, #ffe4f1, #d84690 80%); }
+.tier-help-foot {
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px solid var(--divider, rgba(255, 255, 255, 0.07));
+  color: var(--text-muted, #9aa2b5);
+}
+.tier-help-foot + .tier-help-foot {
+  margin-top: 4px;
+  padding-top: 0;
+  border-top: none;
+}
+.tier-cards {
+  display: grid;
+  /* 2x2 since bubblegum joined (Pasha's third mock switches the worlds
+     grid from 3 columns to 2). */
+  grid-template-columns: repeat(2, 1fr);
+  gap: 8px;
+}
+.tier-card {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  padding: 14px 6px 10px;
+  border-radius: 14px;
+  border: 1.5px solid transparent;
+  color: #fff;
+  cursor: pointer;
+  overflow: hidden;
+  transition: transform 160ms cubic-bezier(0.23, 1, 0.32, 1), border-color 180ms ease, box-shadow 180ms ease;
+}
+.tier-card:active { transform: scale(0.97); }
+.tier-card-orb {
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  flex: 0 0 auto;
+}
+.tier-card-name {
+  font-size: 11.5px;
+  font-weight: 800;
+  letter-spacing: -0.1px;
+  white-space: nowrap;
+}
+.tier-card-state {
+  font-size: 9.5px;
+  font-weight: 600;
+  opacity: 0.75;
+  line-height: 1.5;
+  min-height: 2.6em;
+  display: flex;
+  align-items: center;
+  text-align: center;
+  white-space: normal;
+}
+.tier-card-lock {
+  position: absolute;
+  top: 8px;
+  inset-inline-end: 8px;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  background: rgba(0, 0, 0, 0.4);
+  border: 1px solid rgba(255, 255, 255, 0.22);
+  color: rgba(255, 255, 255, 0.85);
+}
+.tier-card.is-locked { opacity: 0.88; }
+.tier-card.is-active {
+  border-color: rgba(255, 255, 255, 0.65);
+  box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.18), var(--shadow-2);
+}
+
+/* World previews — Pasha's mock palette (2026-07-15): VIP platinum,
+   CHAMPION amethyst purple, LEGEND royal gold. Orb gradients are taken
+   verbatim from the mock's world cards. */
+.tier-card.tier-vip {
+  background:
+    radial-gradient(120% 90% at 50% 0%, rgba(216, 224, 238, 0.22), transparent 58%),
+    linear-gradient(180deg, #1a1f29, #0b0d13);
+  border-color: rgba(208, 218, 234, 0.30);
+  color: #eef2f8;
+}
+.tier-card.tier-vip .tier-card-orb {
+  background: radial-gradient(circle at 32% 28%, #ffffff 0%, #c9d1de 35%, #78818f 75%, #4c525e 100%);
+  box-shadow: 0 8px 22px rgba(212, 222, 238, 0.40);
+}
+.tier-card.tier-champion {
+  background:
+    radial-gradient(120% 90% at 50% 0%, rgba(180, 130, 255, 0.26), transparent 58%),
+    linear-gradient(180deg, #241a3a, #0d0916);
+  border-color: rgba(190, 150, 255, 0.32);
+  color: #f5f0fc;
+}
+.tier-card.tier-champion .tier-card-orb {
+  background: radial-gradient(circle at 32% 28%, #f0dcff 0%, #b57bff 40%, #6d28d9 78%, #3b1470 100%);
+  box-shadow: 0 8px 22px rgba(168, 110, 255, 0.44);
+}
+.tier-card.tier-legend {
+  background:
+    radial-gradient(120% 90% at 50% 0%, rgba(240, 205, 110, 0.24), transparent 58%),
+    linear-gradient(180deg, #2b210c, #0f0b05);
+  border-color: rgba(232, 192, 105, 0.34);
+  color: #f8f3e7;
+}
+.tier-card.tier-legend .tier-card-orb {
+  background: radial-gradient(circle at 32% 28%, #fff4cf 0%, #f0c85e 40%, #a5761c 78%, #57390b 100%);
+  box-shadow: 0 8px 22px rgba(240, 196, 92, 0.44);
+}
+.tier-card.tier-bubblegum {
+  background:
+    radial-gradient(120% 90% at 50% 0%, rgba(255, 150, 205, 0.24), transparent 58%),
+    linear-gradient(180deg, #2c1524, #120810);
+  border-color: rgba(255, 158, 205, 0.34);
+  color: #f6f0f4;
+}
+.tier-card.tier-bubblegum .tier-card-orb {
+  background: radial-gradient(circle at 32% 26%, #ffe4f1 0%, #ff96cb 42%, #cf3f8d 78%, #6f1a48 100%);
+  box-shadow: 0 8px 22px rgba(255, 130, 195, 0.42);
+}
+[data-theme="light"] .tier-card { color: #fff; }
+@media (prefers-reduced-motion: reduce) {
+  .tier-card { transition: none; }
+}
