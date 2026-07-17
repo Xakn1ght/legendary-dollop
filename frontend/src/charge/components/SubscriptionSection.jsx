@@ -1,11 +1,8 @@
 import React from 'react';
 
-function formatDataUsage(sub, fmt, t) {
-  const usedGB = (sub.used_traffic || 0) / (1024 * 1024 * 1024);
-  const limitGB = (sub.data_limit || 0) / (1024 * 1024 * 1024);
-  if (!sub.data_limit) return `${fmt(usedGB.toFixed(1))} ${t('GB')}`;
-  return `${fmt(usedGB.toFixed(1))}/${fmt(limitGB.toFixed(0))} ${t('GB')}`;
-}
+// Smart precision: tiny (sub-1GB test plans) keep a decimal so the number
+// never rounds to "0"; ≥10GB drops decimals for a calmer read.
+const gbNum = (v) => String(Number(v.toFixed(v >= 10 ? 0 : 1)));
 
 function formatDaysLeft(sub, fmt, t) {
   const expireTs = sub.expire;
@@ -14,6 +11,17 @@ function formatDaysLeft(sub, fmt, t) {
   const daysLeft = Math.ceil((expireTs - now) / (60 * 60 * 24));
   if (daysLeft < 0) return t('expired');
   return `${fmt(daysLeft)} ${t('daysLeft')}`;
+}
+
+// The glance read of a card: how much is LEFT, as a health-colored meter
+// (PRODUCT.md: "how much traffic/days do I have left" in under a second).
+function usageInfo(sub) {
+  const used = Math.max(sub.used_traffic || 0, 0) / (1024 * 1024 * 1024);
+  const limit = Math.max(sub.data_limit || 0, 0) / (1024 * 1024 * 1024);
+  const remaining = Math.max(limit - used, 0);
+  const pct = limit > 0 ? Math.max(0, Math.min(100, (remaining / limit) * 100)) : 100;
+  const health = pct > 40 ? 'ok' : pct > 15 ? 'warn' : 'bad';
+  return { used, limit, remaining, pct, health };
 }
 
 export function SubscriptionSection({ t, fmt, subscriptions, subsLoaded, selectedSubId, searchQuery, onSearch, onSelect, onContinue }) {
@@ -63,11 +71,11 @@ export function SubscriptionSection({ t, fmt, subscriptions, subsLoaded, selecte
                 {list.map((sub) => {
                   const name = sub.name || sub.username || sub.marzban_username || `Subscription #${sub.id}`;
                   const daysLeft = formatDaysLeft(sub, fmt, t);
-                  const initial = (String(name).trim()[0] || 'S').toUpperCase();
                   const selected = String(sub.id) === String(selectedSubId);
                   // Unlimited subs can't be charged — the approve path would
                   // set a finite limit and downgrade them (server rejects too).
                   const unlimited = !sub.data_limit;
+                  const u = usageInfo(sub);
                   return (
                     <div
                       key={sub.id}
@@ -79,28 +87,31 @@ export function SubscriptionSection({ t, fmt, subscriptions, subsLoaded, selecte
                       onClick={unlimited ? undefined : () => onSelect(sub.id)}
                       onKeyDown={unlimited ? undefined : (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onSelect(sub.id); } }}
                     >
-                      <div className="sub-avatar" aria-hidden="true">{initial}</div>
-                      <div className="sub-main">
-                        <div className="sub-title-row">
-                          <div className="sub-name">{name}</div>
+                      <div className="sub-card-top">
+                        <div className="sub-name">{name}</div>
+                        <div className="sub-check" aria-hidden="true">
+                          <svg viewBox="0 0 24 24"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z" /></svg>
                         </div>
-                        <div className="sub-meta">
-                          <span>
-                            <svg viewBox="0 0 24 24"><path d="M2 20h20v-4H2v4zm2-3h2v2H4v-2zM2 4v4h20V4H2zm4 3H4V5h2v2zm-4 7h20v-4H2v4zm2-3h2v2H4v-2z" /></svg>
-                            {formatDataUsage(sub, fmt, t)}
-                          </span>
-                          {daysLeft && (
-                            <span>
-                              <svg viewBox="0 0 24 24"><path d="M11.99 2C6.47 2 2 6.48 2 12s4.47 10 9.99 10C17.52 22 22 17.52 22 12S17.52 2 11.99 2zM12 20c-4.42 0-8-3.58-8-8s3.58-8 8-8 8 3.58 8 8-3.58 8-8 8zm.5-13H11v6l5.25 3.15.75-1.23-4.5-2.67z" /></svg>
-                              {daysLeft}
+                      </div>
+                      {unlimited ? (
+                        <div className="sub-unlimited-note">{t('unlimitedNoCharge')}</div>
+                      ) : (
+                        <>
+                          {/* Lead with what the user cares about: what's LEFT. */}
+                          <div className={`sub-remaining h-${u.health}`}>
+                            <b>{fmt(gbNum(u.remaining))}</b> {t('GB')} {t('remainingWord')}
+                          </div>
+                          <div className={`sub-usage-track h-${u.health}`} aria-hidden="true">
+                            <span className="sub-usage-fill" style={{ width: `${Math.max(u.pct, 3)}%` }} />
+                          </div>
+                          <div className="sub-foot">
+                            <span className="sub-foot-usage">
+                              {fmt(gbNum(u.used))} / {fmt(gbNum(u.limit))} {t('GB')}
                             </span>
-                          )}
-                        </div>
-                        {unlimited && <div className="sub-unlimited-note">{t('unlimitedNoCharge')}</div>}
-                      </div>
-                      <div className="sub-check" aria-hidden="true">
-                        <svg viewBox="0 0 24 24"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z" /></svg>
-                      </div>
+                            {daysLeft && <span className="sub-foot-days">{daysLeft}</span>}
+                          </div>
+                        </>
+                      )}
                     </div>
                   );
                 })}

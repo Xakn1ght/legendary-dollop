@@ -1,25 +1,39 @@
 import React from 'react';
 
-function getPlanDisplayName(plan, lang) {
-  if (!plan) return '';
-  const en = String(plan.name_en || '').trim();
-  const fa = String(plan.name || '').trim();
-  if (lang === 'en' && en) return en;
-  return fa;
+import { MonthsTabs } from '../../purchase/components/PlanGrid.jsx';
+
+import { PlanRows } from './PlanRows.jsx';
+
+// Selection objects come from PlanGrid: sel.gb is ALREADY scaled to the
+// chosen duration (scaledPlanSelection). The old label used the base plan
+// NAME ("۵۰۰ گیگ VIP") whose embedded per-month number contradicted the
+// card's scaled total (1000) — the invoice said 500 while the card said 1000
+// and the user actually receives 1000 (2026-07-14, Pasha). Label now shows
+// the SAME scaled total the card shows, so card, invoice and grant agree.
+function planSelectionLabel(sel, t, fmt) {
+  if (!sel) return '-';
+  if (sel.custom) return `${t('customPlan')} — ${fmt(sel.gb)} ${t('GB')}`;
+  const months = Number(sel.months || 1);
+  const vip = sel.vip_only ? ' VIP' : '';
+  const monthsPart = months > 1 ? ` | ${t('monthsN').replace('{n}', fmt(months))}` : '';
+  return `${fmt(sel.gb)} ${t('GB')}${vip}${monthsPart}`;
 }
 
 export function PaymentSection({
-  t, fmt, fmtPrice, lang, userInfo,
+  t, fmt, fmtPrice, lang, userInfo, bookingMode = false,
   useCredit, onUseCreditChange,
   autoRenewal, onAutoRenewalChange,
-  plans, selectedRenewalPlan, onSelectRenewalPlan,
+  plans, autoDiscounts, planMonths, onPlanMonthsChange,
+  selectedRenewalPlan, onSelectRenewalPlan,
   selectedSubscription, selectedPackage, pricing,
   onBack, onConfirm,
 }) {
   const subLabel = selectedSubscription
     ? (selectedSubscription.name || selectedSubscription.marzban_username || `#${selectedSubscription.id}`)
     : '-';
-  const pkgLabel = selectedPackage ? `${selectedPackage.name} (${fmt(selectedPackage.gb)} ${t('GB')})` : '-';
+  const pkgLabel = bookingMode
+    ? planSelectionLabel(selectedRenewalPlan, t, fmt)
+    : (selectedPackage ? `${selectedPackage.display_name || selectedPackage.name} (${fmt(selectedPackage.gb)} ${t('GB')})` : '-');
 
   return (
     <div className="section active" id="section-payment">
@@ -31,7 +45,8 @@ export function PaymentSection({
           <span>{t('paymentInfo')}</span>
         </div>
 
-        {userInfo?.credit > 0 && (
+        {/* Bookings are receipt-paid in full — no credit spend (flow parity). */}
+        {!bookingMode && userInfo?.credit > 0 && (
           <div id="creditInfo" style={{ marginBottom: 20 }}>
             {/* Label + toggle share the first row; the credit chip sits below. */}
             <div className="toggle-row" style={{ border: 'none', padding: 0, marginBottom: 10 }}>
@@ -54,42 +69,41 @@ export function PaymentSection({
           </div>
         )}
 
-        <div className="toggle-row" style={{ marginBottom: 16 }}>
-          <span className="toggle-label">{t('autoRenewal')}</span>
-          <label className="toggle-switch">
-            <input
-              type="checkbox"
-              id="autoRenewal"
-              aria-label={t('autoRenewal')}
-              checked={autoRenewal}
-              onChange={(e) => onAutoRenewalChange(e.target.checked)}
-            />
-            <span className="toggle-slider" />
-          </label>
-        </div>
+        {/* A booking IS the renewal — the auto-renew toggle only applies to top-ups. */}
+        {!bookingMode && (
+          <div className="toggle-row" style={{ marginBottom: 16 }}>
+            <span className="toggle-label">{t('autoRenewal')}</span>
+            <label className="toggle-switch">
+              <input
+                type="checkbox"
+                id="autoRenewal"
+                aria-label={t('autoRenewal')}
+                checked={autoRenewal}
+                onChange={(e) => onAutoRenewalChange(e.target.checked)}
+              />
+              <span className="toggle-slider" />
+            </label>
+          </div>
+        )}
 
-        {autoRenewal && (
+        {/* Renewal picker (image-5): months tabs + the full purchase PlanGrid,
+            custom builder included — same anatomy as the shop. Months tabs are
+            VIP-only (2026-07-14): non-VIP renews 1-month plans only. */}
+        {!bookingMode && autoRenewal && (
           <div id="renewalPlanGroup" style={{ marginBottom: 16 }}>
             <label className="form-label">{t('renewalPlan')}</label>
-            <div id="renewalPlansGrid" className="plans-grid" style={{ marginTop: 12 }}>
-              {plans.map((plan) => (
-                <div
-                  key={plan.name}
-                  className={`plan-card${selectedRenewalPlan === plan.name ? ' selected' : ''}`}
-                  data-plan={plan.name}
-                  role="button"
-                  tabIndex={0}
-                  onClick={() => onSelectRenewalPlan(plan.name)}
-                  onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onSelectRenewalPlan(plan.name); } }}
-                >
-                  <div className="plan-name">{getPlanDisplayName(plan, lang) || plan.name}</div>
-                  <div className="plan-details">
-                    <span>{fmt(plan.gb)} {t('GB')}</span>
-                  </div>
-                  <div className="plan-price">{fmtPrice(plan.price)}</div>
-                </div>
-              ))}
-            </div>
+            {!!userInfo?.is_vip && <MonthsTabs t={t} fmt={fmt} months={planMonths} onChange={onPlanMonthsChange} />}
+            <PlanRows
+              t={t}
+              fmt={fmt}
+              lang={lang}
+              plans={plans}
+              autoDiscounts={autoDiscounts}
+              months={planMonths}
+              selected={selectedRenewalPlan}
+              onSelect={onSelectRenewalPlan}
+              idPrefix="renewplan"
+            />
           </div>
         )}
 
@@ -99,7 +113,7 @@ export function PaymentSection({
             <span className="value" id="summarySubscription">{subLabel}</span>
           </div>
           <div className="summary-row">
-            <span className="label">{t('selectedPackage')}</span>
+            <span className="label">{bookingMode ? t('selectedPlan') : t('selectedPackage')}</span>
             <span className="value" id="summaryPackage">{pkgLabel}</span>
           </div>
           <div className="summary-row">

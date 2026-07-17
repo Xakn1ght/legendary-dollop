@@ -1,4 +1,4 @@
-@import url("./tokens.css?v=7");
+@import url("./tokens.css?v=11");
 
 /* ═══════════════════════════════════════════════════════════════
    SHOP — Editorial Ticket Layout · v4
@@ -437,8 +437,12 @@ html[dir="rtl"] .card.shop-hero::before { right: auto; left: -60px; }
   background: rgba(var(--brandRgb), 0.09);
 }
 
-/* Size-order segmented control (the only remaining plan sort) */
+/* Size-order segmented control + months selector: even spacing between the
+   two pill rows and the plan grid (2026-07-12, Pasha: "fix spacing here"). */
 .shop-size-order {
+  margin-bottom: 10px;
+}
+.shop-months-pills {
   margin-bottom: 14px;
 }
 

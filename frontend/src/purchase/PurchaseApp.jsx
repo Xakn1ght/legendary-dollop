@@ -92,24 +92,24 @@ export function PurchaseApp() {
   const serviceNameState = useServiceNameCheck(t, lang, setNameValid);
   const referralState = useReferralCheck(t);
 
+  // Show the SCALED total GB (plan.gb is already ×months from
+  // scaledPlanSelection) so the summary matches the card and the real grant.
+  // The old code echoed the base plan NAME whose per-month number ("۵۰۰ گیگ
+  // VIP") contradicted the card's scaled total (1000) — 2026-07-14, Pasha.
   const getPlanDisplayName = useCallback((plan) => {
     if (!plan) return '';
+    const isEn = langRef.current === 'en';
     if (plan.custom) {
-      return langRef.current === 'en' ? `${plan.gb} GB | Custom` : `${formatNumberExt(plan.gb, 'fa')} گیگ | سفارشی`;
+      return isEn ? `${plan.gb} GB | Custom` : `${formatNumberExt(plan.gb, 'fa')} گیگ | سفارشی`;
     }
     const monthsN = Math.max(1, Number(plan.months || 1));
-    const en = String(plan.name_en || '').trim();
-    const fa = String(plan.base_name || plan.name || '').replace(/@\d+m$/, '').trim();
-    if (monthsN <= 1) {
-      if (langRef.current === 'en' && en) return en;
-      return fa;
-    }
-    // «| یکماه» / "| 30 D" segments are stale on a multi-month package.
-    if (langRef.current === 'en' && en) {
-      return `${en.replace(/\|\s*30\s*D/i, '').replace(/\s{2,}/g, ' ').trim()} | ${monthsN} Months`;
-    }
-    const base = fa.replace('| یکماه', '').replace(/\s{2,}/g, ' ').trim();
-    return `${base} | ${formatNumberExt(monthsN, 'fa')} ماهه`;
+    const gb = Number(plan.gb || 0);
+    const gbStr = isEn ? String(gb) : formatNumberExt(gb, 'fa');
+    const unit = isEn ? 'GB' : 'گیگ';
+    const vip = plan.vip_only ? ' VIP' : '';
+    if (monthsN <= 1) return `${gbStr} ${unit}${vip}`;
+    const monthsPart = isEn ? ` | ${monthsN} Months` : ` | ${formatNumberExt(monthsN, 'fa')} ماهه`;
+    return `${gbStr} ${unit}${vip}${monthsPart}`;
   }, []);
 
   // Duration tab change: carry the selection over by re-scaling its base
@@ -359,9 +359,11 @@ export function PurchaseApp() {
     }
 
     async function loadUserInfo() {
+      let info = null;
       try {
         const data = await api('/api/dashboard/purchase/user-info');
         if (data.ok && !cancelled) {
+          info = data.info;
           setUserInfo(data.info);
           // All manual discounts start selected (legacy parity).
           setSelectedDiscountIds((data.info?.discounts || []).map((d) => d.id));
@@ -377,6 +379,7 @@ export function PurchaseApp() {
       } catch (_) {
         if (!cancelled) setActiveCoupons([]);
       }
+      return info;
     }
 
     async function init() {
@@ -401,10 +404,10 @@ export function PurchaseApp() {
       } catch (_) { /* ignore */ }
 
       const loadedPlans = await loadPlans();
-      await loadUserInfo();
+      const loadedInfo = await loadUserInfo();
       if (cancelled) return;
 
-      // Shop deep-link: ?plan=<name>|custom&step=<n>
+      // Shop deep-link: ?plan=<name>|custom&months=<n>&step=<n>
       try {
         const urlP = new URLSearchParams(window.location.search || '');
         const pre = urlP.get('plan');
@@ -413,8 +416,16 @@ export function PurchaseApp() {
         } else if (pre) {
           const match = loadedPlans.find((p) => String(p.name) === String(pre));
           if (match) {
-            selectedPlanRef.current = match;
-            setSelectedPlan(match);
+            // Months from the shop selector; VIP packages force their minimum.
+            // Non-VIP: months param ignored — multi-month is a VIP perk and
+            // the server rejects @Nm from non-VIP anyway (months_vip_only).
+            const mParam = loadedInfo?.is_vip ? parseInt(urlP.get('months'), 10) : 1;
+            const minM = Math.max(1, Number(match.min_months || 1));
+            const mN = Math.max(minM, (mParam >= 2 && mParam <= 3) ? mParam : 1);
+            const sel = mN > 1 ? scaledPlanSelection(match, mN) : match;
+            if (mN > 1) setMonths(mN);
+            selectedPlanRef.current = sel;
+            setSelectedPlan(sel);
             const stepParam = parseInt(urlP.get('step'), 10);
             if (stepParam && stepParam > 1 && stepParam <= 3) {
               setTimeout(() => goToStep(stepParam), 80);
@@ -494,7 +505,9 @@ export function PurchaseApp() {
               )}
               {plansStatus === 'ready' && (
                 <>
-                  <MonthsTabs t={t} fmt={fmt} months={months} onChange={changeMonths} />
+                  {/* Multi-month is a VIP perk (2026-07-14): non-VIP never
+                      sees the duration tabs and buys 1-month only. */}
+                  {!!userInfo?.is_vip && <MonthsTabs t={t} fmt={fmt} months={months} onChange={changeMonths} />}
                   <PlanGrid
                     id="plansGrid"
                     t={t} fmt={fmt} lang={lang}

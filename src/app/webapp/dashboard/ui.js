@@ -886,6 +886,19 @@
       });
       return !!v;
     },
+    // N-way chooser: resolves to the picked button's value, false on
+    // dismiss/backdrop (confirm semantics). buttons render in given order.
+    choose: async ({ title, message, buttons } = {}) => {
+      const v = await showModal({
+        kind: 'confirm',
+        title: title || '',
+        message: message || '',
+        buttons: (buttons || []).map((b) => ({
+          text: b.text, value: b.value, primary: !!b.primary, danger: !!b.danger,
+        })),
+      });
+      return v;
+    },
     prompt: async ({ title, message, placeholder, defaultValue, okText, cancelText, inputMode, readOnly } = {}) => {
       const v = await showModal({
         kind: 'prompt',

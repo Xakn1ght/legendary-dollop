@@ -1,0 +1,200 @@
+/* PlanRows — the charge/booking plan picker, restyled to the shop's row
+   anatomy (2026-07-18, Pasha: "the ui is kinda horrible and i want the same
+   exact plans for charge that we have for purchase").
+   Same look as .shop-plan-card in shop-content.css but SELECTABLE (radio
+   semantics, no navigation chevron) and calm — money moves here, so no
+   ambient float animations. Co-located CSS Module per the new convention;
+   consumes global tokens only. */
+
+.list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-top: 4px;
+}
+
+.row {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 14px 16px;
+  border-radius: 16px;
+  border: 1px solid var(--line);
+  background: var(--card2, var(--chip));
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  transition: border-color 0.15s ease, background 0.15s ease, transform 0.12s ease;
+}
+.row:active { transform: scale(0.985); }
+.row.selected {
+  border-color: rgba(var(--brandRgb), 0.55);
+  background:
+    linear-gradient(180deg, rgba(var(--brandRgb), 0.10), rgba(var(--brandRgb), 0.04)),
+    var(--card2, var(--chip));
+}
+
+.topRow {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+/* Radio dot — fills with the accent when the row is picked. */
+.check {
+  flex-shrink: 0;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  border: 2px solid var(--line-strong, var(--line));
+  display: grid;
+  place-items: center;
+  color: #fff;
+  background: transparent;
+  transition: background 0.15s ease, border-color 0.15s ease;
+}
+.check svg { opacity: 0; transform: scale(0.5); transition: opacity 0.15s ease, transform 0.18s ease; }
+.row.selected .check {
+  background: rgb(var(--brandRgb));
+  border-color: rgb(var(--brandRgb));
+}
+.row.selected .check svg { opacity: 1; transform: scale(1); }
+
+.title {
+  font-size: 15px;
+  font-weight: 800;
+  color: var(--text);
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.bottomRow {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 10px;
+  /* clear the 20px check + 10px gap so pills align with the title */
+  padding-inline-start: 30px;
+}
+
+.pills {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: center;
+}
+.pill {
+  font-size: 11.5px;
+  font-weight: 700;
+  padding: 4px 9px;
+  border-radius: 999px;
+  border: 1px solid var(--line);
+  background: var(--chip);
+  color: var(--muted);
+  white-space: nowrap;
+}
+.pill.gb {
+  color: rgb(var(--brandRgb));
+  border-color: rgba(var(--brandRgb), 0.35);
+  background: rgba(var(--brandRgb), 0.10);
+}
+.pill.days {
+  color: var(--ok);
+  border-color: rgba(var(--okRgb), 0.35);
+  background: rgba(var(--okRgb), 0.10);
+}
+.pill.off {
+  color: var(--warn, #f59e0b);
+  border-color: rgba(245, 158, 11, 0.4);
+  background: rgba(245, 158, 11, 0.10);
+}
+.pill.vip {
+  color: var(--text);
+  border-color: rgba(148, 163, 184, 0.45);
+  background: linear-gradient(180deg, rgba(226, 232, 240, 0.16), rgba(148, 163, 184, 0.10));
+}
+
+.priceCol {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 2px;
+  flex-shrink: 0;
+}
+:global(html[dir="rtl"]) .priceCol { align-items: flex-start; }
+.price {
+  display: flex;
+  align-items: baseline;
+  gap: 7px;
+}
+.price .new {
+  font-size: 15.5px;
+  font-weight: 800;
+  color: var(--text);
+  white-space: nowrap;
+}
+.price .old {
+  font-size: 12px;
+  color: var(--muted);
+  text-decoration: line-through;
+  white-space: nowrap;
+}
+.perGb {
+  font-size: 11px;
+  color: var(--muted);
+  white-space: nowrap;
+}
+
+/* ── custom (build-your-own) row ───────────────────────────────────────── */
+.customTitle {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+}
+.customTitle svg { flex-shrink: 0; }
+
+.editor {
+  margin-top: 10px;
+  padding-top: 12px;
+  border-top: 1px dashed var(--line);
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  cursor: default;
+}
+.sliderRow {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  direction: ltr;
+}
+.range {
+  flex: 1;
+  accent-color: rgb(var(--brandRgb));
+  min-height: 28px; /* touch target */
+}
+.num {
+  width: 72px;
+  padding: 9px 10px;
+  border-radius: 12px;
+  border: 1px solid var(--line);
+  background: var(--chip);
+  color: var(--text);
+  font-size: 16px; /* <16px zooms iOS on focus */
+  font-weight: 700;
+  text-align: center;
+}
+.unit {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--muted);
+}
+.editorFoot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}

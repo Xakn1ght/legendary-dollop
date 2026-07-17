@@ -68,6 +68,7 @@ function CustomPlanCard({ t, fmt, selected, onSelect, autoOpen, autoDiscounts })
   const discounted = (price) => (customPct > 0 ? price - Math.floor(price * (customPct / 100)) : price);
   const [open, setOpen] = useState(autoOpen || (selected?.custom ?? false));
   const [gb, setGb] = useState(selected?.custom ? selected.gb : 50);
+  const [maxGb, setMaxGb] = useState(300); // VIP-aware ceiling from the server (300 / 500)
   const [priceLabel, setPriceLabel] = useState(null); // null=tap hint, 'loading', number=price
   // Android Telegram overlays the keyboard without resizing the page; while
   // the GB field is being edited, float the whole editor to the top of the
@@ -87,7 +88,10 @@ function CustomPlanCard({ t, fmt, selected, onSelect, autoOpen, autoDiscounts })
     if (tableRef.current || tableLoadRef.current) return tableLoadRef.current;
     tableLoadRef.current = api('/api/dashboard/purchase/custom-quote?gb=all')
       .then((d) => {
-        if (d && d.ok && Array.isArray(d.prices)) tableRef.current = { min: d.min || 1, prices: d.prices };
+        if (d && d.ok && Array.isArray(d.prices)) {
+          tableRef.current = { min: d.min || 1, prices: d.prices };
+          if (d.max) setMaxGb(d.max);
+        }
         return tableRef.current;
       })
       .catch(() => null)
@@ -102,7 +106,7 @@ function CustomPlanCard({ t, fmt, selected, onSelect, autoOpen, autoDiscounts })
 
   const quote = (value) => {
     clearTimeout(timerRef.current);
-    if (!value || value < 1 || value > 300) { setPriceLabel(null); return; }
+    if (!value || value < 1 || value > maxGb) { setPriceLabel(null); return; }
     const tab = tableRef.current;
     if (tab) {
       const price = tab.prices[value - tab.min];
@@ -152,7 +156,7 @@ function CustomPlanCard({ t, fmt, selected, onSelect, autoOpen, autoDiscounts })
 
   const setGbClamped = (raw) => {
     let v = parseInt(raw, 10);
-    if (Number.isFinite(v)) v = Math.max(1, Math.min(300, v));
+    if (Number.isFinite(v)) v = Math.max(1, Math.min(maxGb, v));
     setGb(Number.isFinite(v) ? v : raw);
     quote(Number.isFinite(v) ? v : 0);
   };
@@ -167,6 +171,9 @@ function CustomPlanCard({ t, fmt, selected, onSelect, autoOpen, autoDiscounts })
   };
 
   const isSelected = !!selected?.custom;
+  // Hint reflects the live VIP-aware ceiling (maxGb = 300 / 500 from the
+  // server) instead of a hardcoded "1-300".
+  const customHint = t('customPlanHint').replace('{max}', fmt(maxGb));
   return (
     <>
       <div
@@ -213,36 +220,48 @@ function CustomPlanCard({ t, fmt, selected, onSelect, autoOpen, autoDiscounts })
       >
         <div className="custom-plan-row">
           <input
-            type="range" min="1" max="300" step="1" dir="ltr"
+            type="range" min="1" max={maxGb} step="1" dir="ltr"
             className="custom-gb-range"
             value={Number.isFinite(parseInt(gb, 10)) ? gb : 50}
             onChange={(e) => setGbClamped(e.target.value)}
-            aria-label={t('customPlanHint')}
+            aria-label={customHint}
           />
           <input
             ref={numRef}
-            type="number" inputMode="numeric" min="1" max="300" dir="ltr"
+            type="number" inputMode="numeric" min="1" max={maxGb} dir="ltr"
             className="custom-gb-num"
             value={gb}
             onChange={(e) => setGbClamped(e.target.value)}
             onFocus={() => { if (isAndroidLike()) setKbFloat(true); }}
             onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); e.target.blur(); } }}
-            aria-label={t('customPlanHint')}
+            aria-label={customHint}
           />
           <span className="custom-gb-unit">{t('GB')}</span>
         </div>
-        <div className="custom-plan-hint">{t('customPlanHint')}</div>
+        <div className="custom-plan-hint">{customHint}</div>
       </div>
     </>
   );
 }
 
 export function PlanGrid({ id, t, fmt, lang, plans, autoDiscounts, selectedPlan, onSelect, autoOpenCustom, months = 1 }) {
-  // months=1: base plans + custom builder (VIP packages start at 2 months).
+  // months=1: base plans + custom builder + VIP plans (shown at their 2-month
+  //           minimum — they must never be hidden from VIP users).
   // months=2/3: everything scaled ×months, no custom builder.
   // months=null (renewal grid): all plans, each at its own minimum duration.
-  const showCustom = months === 1;
-  const visiblePlans = plans.filter((p) => months == null || months >= Math.max(1, Number(p.min_months || 1)));
+  // Custom builder shows on the 1-month tab AND the renewal/auto-renew grid
+  // (months==null). Custom plans are GB-only/1-month by design, and the
+  // server accepts "custom:<gb>" as a renewal_template — so auto-renew must
+  // offer it too (2026-07-14, Pasha: "auto renew still doesn't have custom
+  // gb plans"). It's hidden on the 2/3-month tabs (custom isn't multi-month).
+  const showCustom = months === 1 || months == null;
+  // months==null = renewal/booking grid → every plan at its own minimum.
+  // Numeric tabs (1/2/3) govern for ALL plans incl. VIP bundles: a
+  // min_months=2 VIP plan must NOT appear on the 1-month tab (2026-07-14,
+  // Pasha). The API already hides vip_only from non-VIP entirely.
+  const visiblePlans = plans.filter(
+    (p) => months == null || months >= Math.max(1, Number(p.min_months || 1)),
+  );
   return (
     <div className="plans-grid" id={id}>
       {visiblePlans.map((plan) => {

@@ -9,6 +9,16 @@ export async function astroConfirm({ title, message, okText, cancelText, danger 
   return window.confirm(message);
 }
 
+// Multi-button chooser; resolves to the picked button's value, false on
+// dismiss. Fallback degrades to the primary-or-nothing confirm().
+export async function astroChoose({ title, message, buttons } = {}) {
+  if (window.AstroUI?.choose) {
+    return window.AstroUI.choose({ title, message, buttons });
+  }
+  const primary = (buttons || []).find((b) => b.primary) || (buttons || [])[0];
+  return window.confirm(message) ? (primary && primary.value) : false;
+}
+
 // Info popup: one OK button, multiline message (AstroUI body is pre-line).
 export async function astroAlert({ title, message, okText } = {}) {
   if (window.AstroUI?.alert) {

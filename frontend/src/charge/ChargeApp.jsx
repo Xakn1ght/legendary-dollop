@@ -9,11 +9,13 @@ import { formatNumber } from '../shared/format.js';
 import { applyLanguage, detectLanguage, onLanguageChange } from '../shared/lang.js';
 import { initTheme, syncPrefsFromServer } from '../shared/prefs.js';
 import { detectPlatform, getWebApp, hapticImpact, hapticNotify, hapticSelection } from '../shared/telegram.js';
-import { astroConfirm, setLoading, setupSwipeBack, showToast } from '../shared/ui.js';
+import { astroChoose, astroConfirm, setLoading, setupSwipeBack, showToast } from '../shared/ui.js';
 import { useReceipt } from '../shared/useReceipt.js';
 
+import { BookingPlanSection } from './components/BookingPlanSection.jsx';
 import { PackageSection } from './components/PackageSection.jsx';
 import { PaymentSection } from './components/PaymentSection.jsx';
+import { scaledSelection } from './components/PlanRows.jsx';
 import { SubscriptionSection } from './components/SubscriptionSection.jsx';
 import { makeT } from './translations.js';
 
@@ -56,8 +58,16 @@ export function ChargeApp() {
   const [vipDiscountPercent, setVipDiscountPercent] = useState(0);
   const [paymentInfo, setPaymentInfo] = useState({ card_number: '6037-xxxx-xxxx-xxxx', card_holder: '' });
   const [selectedSubId, setSelectedSubId] = useState(null);
-  const [selectedPackageName, setSelectedPackageName] = useState(null);
+  // Top-up selection OBJECT from PlanRows (plan parity 2026-07-18): .name
+  // carries the final order string ("plan", "plan@2m", "custom:52"); price/
+  // gb/days arrive already scaled to the chosen months.
+  const [selectedPackage, setSelectedPackage] = useState(null);
+  // Renewal/booking plan selection OBJECT from PlanRows — same shape.
   const [selectedRenewalPlan, setSelectedRenewalPlan] = useState(null);
+  const [planMonths, setPlanMonths] = useState(1);
+  // Booking mode (image-6 "book button"): step 2 picks a next PLAN instead of
+  // a top-up package; at approval the panel arms it as a native next_plan.
+  const [bookingMode, setBookingMode] = useState(false);
   const [useCredit, setUseCredit] = useState(false);
   const [autoRenewal, setAutoRenewal] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
@@ -67,10 +77,13 @@ export function ChargeApp() {
 
   // Refs mirror state needed inside once-registered listeners (popstate, swipe-back).
   const stepRef = useRef(step);
+  const plansRef = useRef([]);
   const selectedSubRef = useRef(null);
   const selectedPkgRef = useRef(null);
   const langRef = useRef(lang);
   const chargeTypeRef = useRef('normal'); // 'normal' | 'normal_5gb_limit' | 'booking'
+  const bookingModeRef = useRef(false);
+  const selectedRenewalRef = useRef(null);
   const orderIdRef = useRef(null);
   const loadingCountRef = useRef(0);
   const isPopStateNavRef = useRef(false);
@@ -81,16 +94,26 @@ export function ChargeApp() {
     () => subscriptions.find((s) => String(s.id) === String(selectedSubId)) || null,
     [subscriptions, selectedSubId],
   );
-  // "custom:<gb>" builder selections live outside the fixed packages list.
-  const [customPackage, setCustomPackage] = useState(null);
-  const selectedPackage = useMemo(
-    () => (customPackage && customPackage.name === selectedPackageName
-      ? customPackage
-      : packages.find((p) => p.name === selectedPackageName) || null),
-    [packages, selectedPackageName, customPackage],
-  );
+  // Months selector (2026-07-12): N prepaid months of a plan — the order
+  // posts "<name>@Nm" and flows/charge.py re-resolves/scales authoritatively.
+  const [months, setMonths] = useState(1);
+  const changeMonths = useCallback((n) => {
+    setMonths(n);
+    setSelectedPackage(null); // scale changed — re-pick at the new duration
+  }, []);
   selectedSubRef.current = selectedSubscription;
   selectedPkgRef.current = selectedPackage;
+  bookingModeRef.current = bookingMode;
+  selectedRenewalRef.current = selectedRenewalPlan;
+  plansRef.current = plans;
+
+  // VIP % as a PlanGrid-style auto-discount badge; VIP-exclusive plans are
+  // exempt inside PlanGrid itself (same rule as the purchase page).
+  const autoDiscounts = useMemo(() => (
+    (userInfo?.is_vip && Number(vipDiscountPercent || 0) > 0)
+      ? [{ type: 'vip', percent: Number(vipDiscountPercent) }]
+      : []
+  ), [userInfo, vipDiscountPercent]);
 
   const busy = useCallback(async (fn) => {
     loadingCountRef.current++;
@@ -105,16 +128,27 @@ export function ChargeApp() {
   const receipt = useReceipt({ busy, getT });
 
   const pricing = useMemo(() => {
+    if (bookingMode) {
+      // Booking: plan list price minus the VIP % (VIP-exclusive plans exempt);
+      // no credit — mirrors flows/charge.start_booking_order exactly.
+      const sel = selectedRenewalPlan;
+      const totalPrice = Number(sel?.price || 0);
+      const vipDiscount = (userInfo?.is_vip && !sel?.vip_only) ? (Number(vipDiscountPercent || 0) || 0) : 0;
+      const discountAmount = vipDiscount > 0 ? Math.floor(totalPrice * (vipDiscount / 100)) : 0;
+      return { totalPrice, discountAmount, creditUsed: 0, finalPrice: totalPrice - discountAmount };
+    }
     const totalPrice = Number(selectedPackage?.price || 0);
     const pkgDiscount = Number(selectedPackage?.discount_percent || 0) || 0;
-    const vipDiscount = userInfo?.is_vip ? (Number(vipDiscountPercent || 0) || 0) : 0;
+    // VIP bundles are the perk — no VIP % on them (parity with purchases).
+    const vipDiscount = (userInfo?.is_vip && !selectedPackage?.vip_only) ? (Number(vipDiscountPercent || 0) || 0) : 0;
     const totalDiscountPercent = Math.max(0, Math.min(90, pkgDiscount + vipDiscount));
     const discountAmount = totalDiscountPercent > 0 ? Math.floor(totalPrice * (totalDiscountPercent / 100)) : 0;
     const discountedPrice = totalPrice - discountAmount;
     const creditUsed = (useCredit && userInfo?.credit > 0) ? Math.min(userInfo.credit, discountedPrice) : 0;
     return { totalPrice, discountAmount, creditUsed, finalPrice: discountedPrice - creditUsed };
-  }, [selectedPackage, userInfo, vipDiscountPercent, useCredit]);
+  }, [bookingMode, selectedRenewalPlan, selectedPackage, userInfo, vipDiscountPercent, useCredit]);
 
+  // Returns true (charge allowed), 'book' (user picked booking) or false (leave).
   const check5GBRule = useCallback(async () => {
     const sub = selectedSubRef.current;
     if (!sub) return true;
@@ -126,20 +160,25 @@ export function ChargeApp() {
       return true;
     }
     const l = langRef.current || 'fa';
+    // Third path (image-6, native next-plan): book the next plan instead —
+    // it activates when the current one runs out, so NOTHING is deleted.
     const message = l === 'fa'
-      ? `هشدار مهم\n\nحجم باقی‌مانده: ${remainingGB.toFixed(1)} گیگابایت\n\nقانون ۵ گیگابایت:\nهنگام شارژ، حداکثر ۵ گیگابایت از حجم فعلی به پلن جدید منتقل می‌شود و باقی (${(remainingGB - 5).toFixed(1)} گیگابایت) حذف می‌گردد.\n\nتوصیه: وقتی حجمتان به زیر ۵ گیگ رسید شارژ کنید تا چیزی از دست نرود.\n\nادامه می‌دهید؟`
-      : `Important warning\n\nRemaining data: ${remainingGB.toFixed(1)} GB\n\n5GB rule:\nWhen you charge, up to 5GB of your current data carries into the new plan; the rest (${(remainingGB - 5).toFixed(1)} GB) is removed.\n\nTip: charge once you drop below 5GB so nothing is lost.\n\nContinue?`;
-    const confirmed = await astroConfirm({
+      ? `حجم باقی‌مانده: ${remainingGB.toFixed(1)} گیگابایت\n\nقانون ۵ گیگابایت:\nهنگام شارژ، حداکثر ۵ گیگابایت از حجم فعلی به پلن جدید منتقل می‌شود و باقی (${(remainingGB - 5).toFixed(1)} گیگابایت) حذف می‌گردد.\n\nپیشنهاد: به‌جای شارژ، پلن بعدی را رزرو کنید — به محض تمام شدن حجم فعلی خودکار فعال می‌شود و هیچ حجمی از دست نمی‌رود.`
+      : `Remaining data: ${remainingGB.toFixed(1)} GB\n\n5GB rule:\nWhen you charge, up to 5GB of your current data carries into the new plan; the rest (${(remainingGB - 5).toFixed(1)} GB) is removed.\n\nBetter: book your next plan instead — it activates automatically the moment your current data runs out, so nothing is lost.`;
+    const choice = await astroChoose({
       title: l === 'fa' ? 'هشدار' : 'Warning',
       message,
-      okText: l === 'fa' ? 'ادامه' : 'Continue',
-      cancelText: l === 'fa' ? 'لغو' : 'Cancel',
-      danger: true,
+      buttons: [
+        { text: l === 'fa' ? 'لغو' : 'Cancel', value: false },
+        { text: l === 'fa' ? 'ادامه شارژ' : 'Charge anyway', value: 'continue', danger: true },
+        { text: l === 'fa' ? 'رزرو پلن بعدی' : 'Book next plan', value: 'book', primary: true },
+      ],
     });
-    if (confirmed) {
+    if (choice === 'continue') {
       chargeTypeRef.current = 'normal_5gb_limit';
       return true;
     }
+    if (choice === 'book') return 'book';
     return false;
   }, []);
 
@@ -150,9 +189,23 @@ export function ChargeApp() {
       if (cur === 1 && !selectedSubRef.current) { showToast(tt('selectSubFirst')); return; }
       if (cur === 1 && next === 2 && selectedSubRef.current) {
         const ok = await check5GBRule();
-        if (!ok) return;
+        // Cancelling the 5GB warning means "I don't want to charge" — leave the
+        // flow entirely instead of stranding the user on the select screen
+        // (2026-07-12, Pasha: "لغو ... instead of going back to home page").
+        if (!ok) { goToDashboard(); return; }
+        if (ok === 'book') {
+          chargeTypeRef.current = 'booking';
+          bookingModeRef.current = true;
+          setBookingMode(true);
+          if (plansRef.current.length === 0) loadRenewalPlans();
+        } else if (bookingModeRef.current) {
+          // Re-entering the charge lane after a previous booking detour.
+          bookingModeRef.current = false;
+          setBookingMode(false);
+        }
       }
-      if (cur === 2 && !selectedPkgRef.current) { showToast(tt('selectPackageFirst')); return; }
+      if (cur === 2 && bookingModeRef.current && !selectedRenewalRef.current) { showToast(tt('selectPlanFirst')); return; }
+      if (cur === 2 && !bookingModeRef.current && !selectedPkgRef.current) { showToast(tt('selectPackageFirst')); return; }
     }
     try { document.body.dataset.chargeStep = String(next); } catch (_) { /* ignore */ }
     stepRef.current = next;
@@ -176,22 +229,19 @@ export function ChargeApp() {
     hapticSelection();
   }, []);
 
-  const selectPackage = useCallback((pkgName) => {
-    setSelectedPackageName(pkgName);
-    hapticSelection();
+  // PlanRows hands back a full selection OBJECT (scaled plan or custom
+  // builder) — or null when the custom editor goes out of range.
+  const selectPackage = useCallback((sel) => {
+    setSelectedPackage(sel);
   }, []);
 
-  // Build-your-own top-up: the card hands us a full pseudo-package
-  // ({name:"custom:<gb>", gb, price, days}) priced by the server curve.
-  const selectCustomPackage = useCallback((pkg) => {
-    setCustomPackage(pkg);
-    setSelectedPackageName(pkg ? pkg.name : null);
-    if (pkg) hapticSelection();
+  const selectRenewalPlan = useCallback((sel) => {
+    setSelectedRenewalPlan(sel);
   }, []);
 
-  const selectRenewalPlan = useCallback((planName) => {
-    setSelectedRenewalPlan(planName);
-    hapticSelection();
+  const changePlanMonths = useCallback((n) => {
+    setPlanMonths(n);
+    setSelectedRenewalPlan(null); // duration changed — re-pick at the new scale
   }, []);
 
   const loadRenewalPlans = useCallback(async () => {
@@ -211,6 +261,33 @@ export function ChargeApp() {
 
   const confirmOrder = useCallback(async () => {
     const tt = makeT(langRef.current);
+    if (bookingMode) {
+      if (!selectedRenewalPlan) { showToast(tt('selectPlanFirst')); return; }
+      await busy(async () => {
+        try {
+          const data = await api('/api/dashboard/charge/book', {
+            method: 'POST',
+            body: JSON.stringify({
+              subscription_id: selectedSubRef.current.id,
+              plan_name: selectedRenewalPlan.name,
+            }),
+          });
+          if (data.ok) {
+            orderIdRef.current = data.order.id;
+            setOrderFinalPrice(data.order.final_price);
+            goToStep(4);
+            hapticNotify('success');
+          } else {
+            showToast(data.message || tt('errorOccurred'));
+            hapticNotify('error');
+          }
+        } catch (e) {
+          console.error('Failed to create booking order:', e);
+          showToast(tt('errorOccurred'));
+        }
+      });
+      return;
+    }
     if (autoRenewal && !selectedRenewalPlan) { showToast(tt('selectRenewalPlan')); return; }
     await busy(async () => {
       try {
@@ -222,7 +299,7 @@ export function ChargeApp() {
             use_credit: useCredit,
             charge_type: chargeTypeRef.current,
             auto_renewal: autoRenewal,
-            renewal_template: selectedRenewalPlan || null,
+            renewal_template: selectedRenewalPlan ? selectedRenewalPlan.name : null,
           }),
         });
         if (data.ok) {
@@ -247,7 +324,7 @@ export function ChargeApp() {
         showToast(tt('errorOccurred'));
       }
     });
-  }, [autoRenewal, selectedRenewalPlan, useCredit, busy, goToStep]);
+  }, [bookingMode, autoRenewal, selectedRenewalPlan, useCredit, busy, goToStep]);
 
   const submitReceipt = useCallback(async () => {
     const tt = makeT(langRef.current);
@@ -354,8 +431,9 @@ export function ChargeApp() {
     async function loadUserInfo() {
       try {
         const data = await api('/api/dashboard/purchase/user-info');
-        if (data.ok && !cancelled) setUserInfo(data.info);
+        if (data.ok && !cancelled) { setUserInfo(data.info); return data.info; }
       } catch (e) { console.error('Failed to load user info:', e); }
+      return null;
     }
 
     async function init() {
@@ -381,14 +459,23 @@ export function ChargeApp() {
       pushStepState(1, true);
       try { document.body.dataset.chargeStep = '1'; } catch (_) { /* ignore */ }
 
-      const [subs, pkgs] = await Promise.all([loadSubscriptions(), loadPackages(), loadUserInfo()]);
+      const [subs, pkgs, info] = await Promise.all([loadSubscriptions(), loadPackages(), loadUserInfo()]);
       if (cancelled) return;
 
-      // Deep-link pre-selection: ?sub_id=X&package=Y&step=N (bot + shop links).
+      // Deep-link pre-selection: ?sub_id=X&package=Y[@Nm]&step=N (bot + shop links).
       const urlParams = new URLSearchParams(window.location.search);
       const preSubId = urlParams.get('sub_id');
-      const prePkg = urlParams.get('package');
+      let prePkg = urlParams.get('package');
       const preStep = parseInt(urlParams.get('step'), 10);
+      let preMonths = 1;
+      const monthsMatch = /^(.+)@([23])m$/.exec(prePkg || '');
+      if (monthsMatch) {
+        prePkg = monthsMatch[1];
+        preMonths = parseInt(monthsMatch[2], 10);
+      }
+      // Multi-month is a VIP perk (2026-07-14): stale non-VIP links with a
+      // months suffix fall back to 1 month (server rejects @Nm anyway).
+      if (!info?.is_vip) preMonths = 1;
 
       if (preSubId && subs.length > 0) {
         const sub = subs.find((s) => String(s.id) === String(preSubId));
@@ -399,8 +486,14 @@ export function ChargeApp() {
             const match = pkgs.find((p) => String(p.name) === String(prePkg));
             if (match) {
               await goToStep(2);
-              selectedPkgRef.current = match;
-              setSelectedPackageName(match.name);
+              // Build the same scaled selection object PlanRows would hand
+              // back (min_months-aware: a VIP bundle resolves to >= 2).
+              const tDetected = makeT(detected);
+              const fmtDetected = (n) => formatNumber(n, detected);
+              const sel = scaledSelection(match, preMonths, detected, tDetected, fmtDetected);
+              if (sel.months > 1) setMonths(sel.months);
+              selectedPkgRef.current = sel;
+              setSelectedPackage(sel);
               if (preStep && preStep >= 3) setTimeout(() => goToStep(3), 100);
             }
           } else if (preStep && preStep >= 2) {
@@ -470,17 +563,35 @@ export function ChargeApp() {
           />
         )}
 
-        {step === 2 && (
+        {step === 2 && bookingMode && (
+          <BookingPlanSection
+            t={t}
+            fmt={fmt}
+            lang={lang}
+            plans={plans}
+            autoDiscounts={autoDiscounts}
+            isVip={!!userInfo?.is_vip}
+            selectedPlan={selectedRenewalPlan}
+            onSelect={selectRenewalPlan}
+            months={planMonths}
+            onMonthsChange={changePlanMonths}
+            onBack={() => goToStep(1)}
+            onContinue={() => goToStep(3)}
+          />
+        )}
+        {step === 2 && !bookingMode && (
           <PackageSection
             t={t}
             fmt={fmt}
+            lang={lang}
             packages={packages}
             packagesStatus={packagesStatus}
-            selectedPackageName={selectedPackageName}
+            autoDiscounts={autoDiscounts}
+            selected={selectedPackage}
             isVip={!!userInfo?.is_vip}
-            vipDiscountPercent={vipDiscountPercent}
+            months={months}
+            onMonthsChange={changeMonths}
             onSelect={selectPackage}
-            onSelectCustom={selectCustomPackage}
             onBack={() => goToStep(1)}
             onContinue={() => goToStep(3)}
           />
@@ -493,11 +604,15 @@ export function ChargeApp() {
             fmtPrice={fmtPrice}
             lang={lang}
             userInfo={userInfo}
+            bookingMode={bookingMode}
             useCredit={useCredit}
             onUseCreditChange={setUseCredit}
             autoRenewal={autoRenewal}
             onAutoRenewalChange={toggleAutoRenewal}
             plans={plans}
+            autoDiscounts={autoDiscounts}
+            planMonths={planMonths}
+            onPlanMonthsChange={changePlanMonths}
             selectedRenewalPlan={selectedRenewalPlan}
             onSelectRenewalPlan={selectRenewalPlan}
             selectedSubscription={selectedSubscription}
@@ -525,7 +640,13 @@ export function ChargeApp() {
           />
         )}
 
-        {step === 5 && <SuccessSection t={t} message={t('chargeSuccessMessage')} onDone={goToDashboard} />}
+        {step === 5 && (
+          <SuccessSection
+            t={t}
+            message={bookingMode ? t('bookingSuccessMessage') : t('chargeSuccessMessage')}
+            onDone={goToDashboard}
+          />
+        )}
       </div>
     </div>
   );
