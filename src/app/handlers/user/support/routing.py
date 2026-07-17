@@ -110,8 +110,11 @@ async def pick_subscription(callback: CallbackQuery, state: FSMContext, session:
     # Move to category selection
     await state.set_state(SupportStates.choosing_category)
     kb = InlineKeyboardBuilder()
-    for cat in SUPPORT_CATEGORIES:
-        kb.button(text=cat["label"], callback_data=f"support_cat_{cat['key']}")
+    # SUPPORT_CATEGORIES is {"support_quick_<cat>": label}; support_cat_*
+    # expects the bare category key. The old dict-style access crashed with
+    # TypeError before any reply (same bug as the my-services bridge).
+    for cat_key, label in SUPPORT_CATEGORIES.items():
+        kb.button(text=label, callback_data=f"support_cat_{cat_key.removeprefix('support_quick_')}")
     kb.button(text="🎟 تیکت‌های من", callback_data="support_my_tickets")
     kb.adjust(2)
     kb.button(text="بازگشت🔙", callback_data="support_back_main")

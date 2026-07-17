@@ -99,7 +99,11 @@ export function TicketsList({ t, lang, tickets, filter, loading, onOpen, onCreat
               </svg>
               {categoryText}
             </div>
-            <div className="ticket-preview" data-role="preview">{tk.last_message || t('noMessagesYet')}</div>
+            <div className="ticket-preview" data-role="preview">
+              {tk.last_message_type === 'photo' && !tk.last_message
+                ? t('photoMessage')
+                : (tk.last_message || t('noMessagesYet'))}
+            </div>
             <div className="ticket-footer">
               <span data-role="date">{date}</span>
               {tk.subscription_username ? <span>{tk.subscription_username}</span> : null}

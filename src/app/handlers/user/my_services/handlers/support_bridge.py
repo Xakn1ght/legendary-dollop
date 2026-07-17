@@ -22,8 +22,12 @@ async def support_for_subscription(callback: CallbackQuery, state: FSMContext):
 
     from app.core.settings import SUPPORT_CATEGORIES
     kb = InlineKeyboardBuilder()
-    for cat in SUPPORT_CATEGORIES:
-        kb.button(text=cat["label"], callback_data=f"support_cat_{cat['key']}")
+    # SUPPORT_CATEGORIES is {callback_key: label} — the keys are the working
+    # support_quick_* callbacks. The old dict-style access crashed with
+    # TypeError, leaving the «گزارش مشکل» button dead (caught by
+    # tests/test_my_services_buttons.py, 2026-07-13).
+    for cat_key, label in SUPPORT_CATEGORIES.items():
+        kb.button(text=label, callback_data=cat_key)
     kb.adjust(2)
     kb.button(text=t(lang, "btn_back"), callback_data="support_back_main")
     # Try to update the existing card (may be a media message). Fallback to sending a new message.
