@@ -12,6 +12,20 @@ approves anything:
 
 Providers (checked in this order; set whichever key you have in config/.env):
   - GEMINI_API_KEY      Google AI Studio free tier (~1500 req/day on Flash).
+    GEMINI_API_KEY2     Optional second key (different Google account) used
+                        when the first is quota-exhausted: keys iterate OUTER,
+                        models INNER — HTTP 429 jumps to the next key (same
+                        model list), HTTP 404 tries the next model (same key).
+                        2026-format keys start with "AQ." (old "AIza…" work).
+  - NVIDIA_API_KEY      NVIDIA NIM (integrate.api.nvidia.com, OpenAI chat
+                        format). TEXT ONLY (admin match-hints): ground-truth
+                        tests on real Iranian receipts (Jul 2026) showed NIM
+                        vision models must NEVER read receipts —
+                        nemotron-nano-12b-v2-vl fabricates plausible digits
+                        (fake refs/cards, the worst failure for a money
+                        matcher), llama-3.2-90b-vision refuses financial
+                        images, gemma-4-31b-it/qwen3.5 cold-start past 25s,
+                        gemma-3-27b is EOL (HTTP 410).
   - OPENROUTER_API_KEY  OpenRouter :free vision models (~50 req/day).
 
 No key -> ``ai_available()`` is False and callers skip AI entirely.
@@ -38,51 +52,137 @@ def _clean(name: str, default: str = '') -> str:
 
 
 GEMINI_API_KEY = _clean('GEMINI_API_KEY')
+# Optional second key (different Google account): its own ~1500 req/day budget.
+GEMINI_API_KEY2 = _clean('GEMINI_API_KEY2')
+GEMINI_KEYS = [k for k in (GEMINI_API_KEY, GEMINI_API_KEY2) if k]
+NVIDIA_API_KEY = _clean('NVIDIA_API_KEY')
 OPENROUTER_API_KEY = _clean('OPENROUTER_API_KEY')
 # First model that answers wins; env override goes first if set.
+# Mixed old/new-account list: 2.5-flash is the proven digit-exact reader on
+# older keys but 404s ("not available to new users") on 2026 Google accounts,
+# which get 3-flash-preview / 3.1-flash-lite instead. 404 tries the next
+# model on the same key; 429 jumps to the next key.
 GEMINI_MODELS = [m for m in [_clean('SMS_AI_MODEL')] if m] + [
-    'gemini-3-flash', 'gemini-2.5-flash', 'gemini-2.0-flash',
+    'gemini-2.5-flash', 'gemini-3-flash-preview',
+    'gemini-3.1-flash-lite', 'gemini-2.0-flash',
+]
+# TEXT models only — see the NVIDIA note in the module docstring. Override via
+# NVIDIA_MODEL only after a ground-truth digit test against known receipts.
+NVIDIA_MODELS = [m for m in [_clean('NVIDIA_MODEL')] if m] + [
+    'nvidia/nvidia-nemotron-nano-9b-v2',
+    'qwen/qwen3-next-80b-a3b-instruct',
 ]
 OPENROUTER_MODEL = _clean('OPENROUTER_MODEL', 'google/gemma-4-31b-it:free')
 
 
 def ai_available() -> bool:
-    return bool(GEMINI_API_KEY or OPENROUTER_API_KEY)
+    return bool(GEMINI_KEYS or NVIDIA_API_KEY or OPENROUTER_API_KEY)
 
 
 # ── provider plumbing ───────────────────────────────────────────────────────
+async def _post(http: aiohttp.ClientSession, url: str, *, params=None,
+                headers=None, payload=None) -> tuple[int, str]:
+    """One POST -> (status, body text). Kept tiny so tests can monkeypatch it."""
+    async with http.post(url, params=params, headers=headers, json=payload) as r:
+        return r.status, await r.text()
+
+
 async def _gemini(prompt: str, image_bytes: bytes | None = None,
                   mime: str = 'image/jpeg', want_json: bool = True) -> str | None:
-    if not GEMINI_API_KEY:
+    if not GEMINI_KEYS:
         return None
     parts = [{'text': prompt}]
     if image_bytes:
         parts.append({'inline_data': {'mime_type': mime,
                                       'data': base64.b64encode(image_bytes).decode()}})
-    payload = {'contents': [{'parts': parts}]}
+    gen_cfg: dict = {}
     if want_json:
-        payload['generationConfig'] = {'response_mime_type': 'application/json'}
+        gen_cfg['response_mime_type'] = 'application/json'
+    # Extraction needs no reasoning: gemini-3 models "think" by default and can
+    # blow a 25s read budget on images (measured 25s+ -> 2.8s with thinking
+    # off). Models that reject the knob get one retry without it (400).
+    gen_cfg['thinkingConfig'] = {'thinkingBudget': 0}
+    payload = {'contents': [{'parts': parts}], 'generationConfig': gen_cfg}
     async with aiohttp.ClientSession(timeout=_TIMEOUT) as http:
-        for model in GEMINI_MODELS:
-            try:
-                async with http.post(
-                    f'https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent',
-                    params={'key': GEMINI_API_KEY}, json=payload,
-                ) as r:
-                    if r.status == 404:
-                        continue  # model id not on this account — try the next
-                    if r.status != 200:
-                        bot_logger.warning(f'[SMS-AI] gemini {model} HTTP {r.status}: {(await r.text())[:200]}')
-                        return None
-                    data = await r.json()
+        for ki, key in enumerate(GEMINI_KEYS):
+            for model in GEMINI_MODELS:
+                body = payload
+                status: int | None = None
+                text = ''
+                for attempt in range(2):
+                    try:
+                        status, text = await _post(
+                            http,
+                            f'https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent',
+                            params={'key': key}, payload=body)
+                    except Exception as e:
+                        # Timeout / network: advance to the next model, never
+                        # abort the whole chain.
+                        bot_logger.warning(f'[SMS-AI] gemini {model} error: {e} — trying next model')
+                        status = None
+                        break
+                    if status == 400 and attempt == 0 and 'thinkingConfig' in (body.get('generationConfig') or {}):
+                        # Model rejects the thinking knob — retry once without it.
+                        body = {**payload,
+                                'generationConfig': {k: v for k, v in gen_cfg.items() if k != 'thinkingConfig'}}
+                        continue
+                    break
+                if status is None:
+                    continue
+                if status == 404:
+                    continue  # model id not available on this account — next model
+                if status == 429:
+                    bot_logger.warning(f'[SMS-AI] gemini key{ki + 1} {model} quota 429'
+                                       + (' — trying next key' if ki + 1 < len(GEMINI_KEYS) else ''))
+                    break  # this key is exhausted — same model list on the next key
+                if status != 200:
+                    bot_logger.warning(f'[SMS-AI] gemini {model} HTTP {status}: {text[:200]}')
+                    continue  # non-quota HTTP error — next model
+                try:
+                    data = json.loads(text)
+                except ValueError:
+                    continue
                 cands = data.get('candidates') or []
                 texts = [p.get('text', '') for c in cands
                          for p in (c.get('content', {}).get('parts') or [])]
                 out = ''.join(texts).strip()
-                return out or None
+                if out:
+                    return out
+    return None
+
+
+async def _nvidia(prompt: str) -> str | None:
+    """NVIDIA NIM, TEXT ONLY — never handed a receipt image (vision models
+    fabricate digits / refuse / cold-start; see module docstring). 400/404/410
+    and per-model timeouts advance to the next model."""
+    if not NVIDIA_API_KEY:
+        return None
+    async with aiohttp.ClientSession(timeout=_TIMEOUT) as http:
+        for model in NVIDIA_MODELS:
+            try:
+                status, text = await _post(
+                    http, 'https://integrate.api.nvidia.com/v1/chat/completions',
+                    headers={'Authorization': f'Bearer {NVIDIA_API_KEY}'},
+                    payload={'model': model,
+                             'messages': [{'role': 'user', 'content': prompt}],
+                             'max_tokens': 1024, 'temperature': 0})
             except Exception as e:
-                bot_logger.warning(f'[SMS-AI] gemini error: {e}')
+                # Cold/heavy models time out — give the next one a shot.
+                bot_logger.warning(f'[SMS-AI] nvidia {model} error: {e} — trying next model')
+                continue
+            if status in (400, 404, 410):
+                continue  # model rejected/retired for this account — next model
+            if status != 200:
+                bot_logger.warning(f'[SMS-AI] nvidia {model} HTTP {status}: {text[:200]}')
                 return None
+            try:
+                data = json.loads(text)
+            except ValueError:
+                continue
+            choices = data.get('choices') or []
+            out = (choices[0].get('message', {}).get('content') or '').strip() if choices else ''
+            if out:
+                return out
     return None
 
 
@@ -99,16 +199,15 @@ async def _openrouter(prompt: str, image_bytes: bytes | None = None,
         content = prompt
     try:
         async with aiohttp.ClientSession(timeout=_TIMEOUT) as http:
-            async with http.post(
-                'https://openrouter.ai/api/v1/chat/completions',
+            status, text = await _post(
+                http, 'https://openrouter.ai/api/v1/chat/completions',
                 headers={'Authorization': f'Bearer {OPENROUTER_API_KEY}'},
-                json={'model': OPENROUTER_MODEL,
-                      'messages': [{'role': 'user', 'content': content}]},
-            ) as r:
-                if r.status != 200:
-                    bot_logger.warning(f'[SMS-AI] openrouter HTTP {r.status}: {(await r.text())[:200]}')
-                    return None
-                data = await r.json()
+                payload={'model': OPENROUTER_MODEL,
+                         'messages': [{'role': 'user', 'content': content}]})
+        if status != 200:
+            bot_logger.warning(f'[SMS-AI] openrouter HTTP {status}: {text[:200]}')
+            return None
+        data = json.loads(text)
         choices = data.get('choices') or []
         out = (choices[0].get('message', {}).get('content') or '').strip() if choices else ''
         return out or None
@@ -120,6 +219,10 @@ async def _openrouter(prompt: str, image_bytes: bytes | None = None,
 async def _ask(prompt: str, image_bytes: bytes | None = None,
                mime: str = 'image/jpeg', want_json: bool = True) -> str | None:
     out = await _gemini(prompt, image_bytes, mime, want_json)
+    if out is None and image_bytes is None:
+        # NIM is a TEXT-ONLY fallback — its vision models hallucinated
+        # digits / refused on real receipts (see module docstring).
+        out = await _nvidia(prompt)
     if out is None:
         out = await _openrouter(prompt, image_bytes, mime)
     return out
