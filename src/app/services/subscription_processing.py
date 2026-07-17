@@ -24,47 +24,57 @@ async def extend_vip_window(session: AsyncSession, user, days: int) -> None:
     await session.commit()
 
 
-async def process_approved_subscription(sub_id: int, session: AsyncSession, bot: Bot) -> bool:
+async def process_approved_subscription(sub_id: int, session: AsyncSession, bot: Bot, approved_by: str | None = None) -> bool:
     """
     Handles all logic for an approved subscription, whether by admin or auto-approved (e.g., via credit).
     Returns True on success, False on failure.
 
     ``bot`` must be the **user** Telegram bot (``BOT_TOKEN``): it sends DMs with subscription links.
     When approving from AstroAdmin, use ``get_user_bot()`` — not the admin bot instance.
+    ``approved_by`` names who approved (admin display name / "سیستم …") for the
+    verified stamp edited onto the admin receipt card.
     """
     from app.database.models import Subscription
     from app.database.models import User as _User
 
     async def _cleanup_admin_messages(sub: Subscription) -> None:
-        # Admin chat messages (forwarded receipt + inline keyboard) live in the **admin** bot.
+        """Approved receipts stay in the admin chat as an audit trail
+        (2026-07-13, Pasha: "after accepting ... doesnt delete it, only edit
+        its caption as verified by admin"): rebuild the structured caption
+        from DB state, append the verified stamp, drop the buttons."""
+        from app.core.settings import PLANS
         from app.utils.admin_bot_helper import get_admin_bot
+        from app.utils.receipt_captions import purchase_receipt_caption, verified_stamp
 
         admin_bot = get_admin_bot()
         if not admin_bot:
             return
+
         try:
-            if getattr(sub, "admin_request_message_id", None):
-                try:
-                    await admin_bot.delete_message(ADMIN_ID, int(sub.admin_request_message_id))
-                except Exception:
-                    try:
-                        await admin_bot.edit_message_text(
-                            "✅ این درخواست در داشبورد/ربات تایید شد.",
-                            chat_id=ADMIN_ID,
-                            message_id=int(sub.admin_request_message_id),
-                        )
-                    except Exception:
-                        pass
+            receipt_user = await session.get(_User, sub.user_id)
+            caption = purchase_receipt_caption(sub, receipt_user, source="bot", plans=PLANS)
+            caption = f"{caption}\n\n{verified_stamp(approved_by)}"
         except Exception:
-            pass
-        try:
-            if getattr(sub, "admin_receipt_forward_message_id", None):
+            caption = f"رسید خرید — سفارش #{sub.id}\n\n{verified_stamp(approved_by)}"
+
+        # Both columns usually point at the SAME combined photo+buttons message.
+        msg_ids = []
+        for attr in ("admin_request_message_id", "admin_receipt_forward_message_id"):
+            mid = getattr(sub, attr, None)
+            if mid and int(mid) not in msg_ids:
+                msg_ids.append(int(mid))
+        for mid in msg_ids:
+            try:
+                await admin_bot.edit_message_caption(
+                    chat_id=ADMIN_ID, message_id=mid, caption=caption, reply_markup=None,
+                )
+            except Exception:
                 try:
-                    await admin_bot.delete_message(ADMIN_ID, int(sub.admin_receipt_forward_message_id))
+                    await admin_bot.edit_message_text(
+                        caption, chat_id=ADMIN_ID, message_id=mid, reply_markup=None,
+                    )
                 except Exception:
                     pass
-        except Exception:
-            pass
 
     subscription: Subscription | None = await session.get(Subscription, sub_id)
     if not subscription:
@@ -171,6 +181,16 @@ async def process_approved_subscription(sub_id: int, session: AsyncSession, bot:
     except Exception:
         pass
 
+    # A purchase with auto-renewal reserved arms the panel's native next_plan
+    # right at provisioning; it fires panel-side when the plan runs out. Failure
+    # is non-fatal — the renewal watchdog re-arms on its next sweep.
+    if getattr(subscription, "renewal_paid", False) and getattr(subscription, "renewal_template", None):
+        try:
+            from app.services.nextplan import arm_native_next_plan
+            await arm_native_next_plan(session, subscription, source="purchase_provision")
+        except Exception as e:
+            logging.warning(f"Native next_plan arming failed for sub {sub_id} (watchdog will retry): {e}")
+
     # Rewards policy: no XP / loyalty / purchase cashback from this flow (see handlers policy).
     # (Pack grants retired 2026-07: badge/theme now unlock at the star milestone,
     # VIP time comes from the wallet-redeemed vip_days coupon.)
@@ -227,11 +247,15 @@ async def process_approved_subscription(sub_id: int, session: AsyncSession, bot:
             kb = InlineKeyboardBuilder()
             kb.button(text="🌐 باز کردن داشبورد", web_app=WebAppInfo(url=dashboard_url))
             kb.adjust(1)
+            # Never DM the panel's relative "/sub/<token>" path — host the
+            # token on the public SUBLINK domain (utils/sub_links.py).
+            from app.utils.sub_links import public_sub_url
+            public_link = public_sub_url(sub_url, token=getattr(subscription, "sub_token", None)) or sub_url
             await bot.send_message(
                 user.chat_id,
-                "✅ سرویس شما با موفقیت فعال شد!\n\n"
-                f"🔗 لینک اشتراک شما:\n<code>{sub_url}</code>\n\n"
-                "برای مدیریت سرویس، کپی لینک، و مشاهده وضعیت، از داشبورد استفاده کنید:",
+                "سرویس شما فعال شد.\n\n"
+                f"لینک اتصال شما — با یک لمس کپی می‌شود:\n<code>{public_link}</code>\n\n"
+                "برای مدیریت سرویس، کپی لینک و مشاهده وضعیت، از داشبورد استفاده کنید:",
                 parse_mode="HTML",
                 reply_markup=kb.as_markup(),
             )
@@ -257,7 +281,7 @@ async def process_approved_subscription(sub_id: int, session: AsyncSession, bot:
                 traffic_pct = cfg.traffic_percent or 0
                 days_pct = cfg.days_percent or 0
                 # Tiered promoter cut: a referrer with more active referrals earns a
-                # higher store-credit % (10/12/15%). Admin keeps the on/off switch via
+                # higher store-credit % (5/10/12/15%). Admin keeps the on/off switch via
                 # credit_percent==0. ponytail: per-purchase O(referrals) count — fine at
                 # this scale; cache on the user row if referral volume ever spikes.
                 credit_pct = cfg.credit_percent or 0

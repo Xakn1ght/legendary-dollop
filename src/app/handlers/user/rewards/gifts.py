@@ -449,7 +449,7 @@ async def accept_gift_callback(callback: CallbackQuery, session: AsyncSession):
             renewal_applied=False,
             price=PLANS[plan_name]['price']
         )
-        ok = await process_approved_subscription(sub.id, session, callback.bot)
+        ok = await process_approved_subscription(sub.id, session, callback.bot, approved_by="سیستم (هدیه)")
         if not ok:
             await callback.answer("❌ خطا در فعال‌سازی اشتراک هدیه.", show_alert=True)
             return

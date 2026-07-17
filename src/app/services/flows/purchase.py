@@ -53,6 +53,23 @@ class DenyResult:
 
 # ── username helpers (canonical; both surfaces' duplicates defer here) ──────────
 
+_PANEL_SEED_BAD_RE = re.compile(r"[^A-Za-z0-9_]+")
+_PANEL_SEED_RUNS_RE = re.compile(r"_{2,}")
+
+
+def sanitize_panel_username_seed(seed: str) -> str:
+    """Make a seed safe for PasarGuard usernames before any suffix is appended.
+
+    PasarGuard 422s "Username cannot have consecutive special characters" when
+    a seam creates them (bakbot incident: customer name "YMS_" + "_ab12" ->
+    "YMS__ab12"). Collapse repeated underscores, fold other specials to one
+    underscore, and trim leading/trailing underscores; empty seeds (e.g. an
+    all-Persian Telegram name) fall back to "user"."""
+    s = _PANEL_SEED_BAD_RE.sub("_", str(seed or ""))
+    s = _PANEL_SEED_RUNS_RE.sub("_", s).strip("_")
+    return s or "user"
+
+
 async def is_service_name_taken(session: AsyncSession, username: str) -> bool:
     """True if the name exists locally or on PasarGuard."""
     if await crud.get_subscription_by_username(session, username):
@@ -63,11 +80,15 @@ async def is_service_name_taken(session: AsyncSession, username: str) -> bool:
 
 
 async def generate_unique_service_name(session: AsyncSession, base_username: str) -> str:
-    """Append a counter until the name is free both in our DB and on PasarGuard."""
-    username = base_username
+    """Append a counter until the name is free both in our DB and on PasarGuard.
+
+    The seed is sanitized first (gift flow feeds raw Telegram usernames /
+    full names here — "YMS_"-style seeds used to reach the panel unchanged)."""
+    base = sanitize_panel_username_seed(base_username)
+    username = base
     i = 1
     while await is_service_name_taken(session, username):
-        username = f"{base_username}{i}"
+        username = f"{base}{i}"
         i += 1
     return username
 
@@ -160,7 +181,7 @@ async def _auto_approve(session: AsyncSession, sub: Subscription, bot) -> None:
         sub.status = "pending"
         await session.commit()
         try:
-            ok = await process_approved_subscription(sub.id, session, bot)
+            ok = await process_approved_subscription(sub.id, session, bot, approved_by="سیستم (پرداخت با اعتبار)")
         except Exception as e:
             logger.error(f"Auto-approve failed for order {sub.id}: {e}")
             ok = False

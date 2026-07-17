@@ -5,7 +5,6 @@ from aiogram.types import CallbackQuery
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.database import crud
 from app.handlers.admin.common import ADMIN_IDS, _send_pending_requests
 from app.services.pasarguard import pasarguard_api
 from app.utils.admin_bot_helper import get_user_bot
@@ -71,7 +70,6 @@ async def show_toggle_request(callback: CallbackQuery, session: AsyncSession):
     elif sub.status == 'pending_enable':
         kb.button(text='✅ تایید فعال', callback_data=f'approve_enable_{sub_id}_{sub.user.chat_id}_0')
         kb.button(text='❌ رد', callback_data=f'deny_enable_{sub_id}_{sub.user.chat_id}_0')
-    kb.button(text=('💬 Chat' if lang == 'en' else '💬 چت'), callback_data=f'chat_sub_{sub_id}_{sub.user.chat_id}')
     kb.adjust(2)
 
     await callback.message.edit_text(

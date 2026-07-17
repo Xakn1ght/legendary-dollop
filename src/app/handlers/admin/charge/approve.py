@@ -42,10 +42,26 @@ async def approve_charge(callback: CallbackQuery, session: AsyncSession, bot: Bo
         return
 
     await callback.answer(t(lang, "admin_charge_approved"))
+    # Keep the receipt card as an audit trail: stamp it verified and drop the
+    # buttons instead of deleting (2026-07-13, Pasha).
     try:
-        await callback.message.delete()
+        from app.utils.receipt_captions import verified_stamp
+
+        approver = (
+            getattr(callback.from_user, "full_name", None)
+            or getattr(callback.from_user, "username", None)
+            or "ادمین"
+        )
+        stamped = f"{callback.message.caption or callback.message.text or ''}\n\n{verified_stamp(approver)}".strip()
+        if callback.message.caption is not None:
+            await callback.message.edit_caption(caption=stamped, reply_markup=None)
+        else:
+            await callback.message.edit_text(stamped, reply_markup=None)
     except Exception:
-        pass
+        try:
+            await callback.message.edit_reply_markup(reply_markup=None)
+        except Exception:
+            pass
     await _send_pending_requests(bot, session, callback.from_user.id, None)
 
     try:

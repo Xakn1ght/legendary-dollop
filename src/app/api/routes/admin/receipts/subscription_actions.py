@@ -31,8 +31,12 @@ async def handle_admin_approve_receipt(request: web.Request):
             user_id = sub.user_id if sub else None
             plan_name = sub.plan_name if sub else None
             service_name = sub.marzban_username if sub else None
-            
-            success = await process_approved_subscription(sub_id, session, bot)
+
+            from app.services.audit import _session_identity
+            _, panel_admin, _ = _session_identity(request)
+            success = await process_approved_subscription(
+                sub_id, session, bot, approved_by=(panel_admin or "پنل ادمین"),
+            )
             
             if success:
                 # Create dashboard notification

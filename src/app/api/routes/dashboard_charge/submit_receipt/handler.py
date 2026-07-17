@@ -95,7 +95,6 @@ async def handle_submit_charge_receipt(request: web.Request):
             builder = InlineKeyboardBuilder()
             builder.button(text="✅ تایید شارژ", callback_data=f"approve_charge_{charge_req.id}")
             builder.button(text="❌ رد", callback_data=f"deny_charge_{charge_req.id}")
-            builder.button(text="💬 Chat", callback_data=f"chat_with_user_{user_chat_id}")
             builder.adjust(2)
 
             from app.utils.receipt_captions import charge_receipt_caption

@@ -56,7 +56,6 @@ async def show_sub_request(callback: CallbackQuery, session: AsyncSession):
     kb = InlineKeyboardBuilder()
     kb.button(text="✅ تایید", callback_data=f"approve_sub_{sub_id}")
     kb.button(text="❌ رد", callback_data=f"deny_sub_{sub_id}")
-    kb.button(text="💬 Chat", callback_data=f"chat_sub_{sub_id}_{sub.user.chat_id}")
     kb.adjust(2)
 
     details = t(lang, "admin_sub_request_details").format(
@@ -113,7 +112,12 @@ async def approve_subscription(callback: CallbackQuery, session: AsyncSession, b
         )
         return
 
-    success = await process_approved_subscription(sub_id, session, user_bot)
+    approver = (
+        getattr(callback.from_user, "full_name", None)
+        or getattr(callback.from_user, "username", None)
+        or "ادمین"
+    )
+    success = await process_approved_subscription(sub_id, session, user_bot, approved_by=approver)
 
     if success:
         # Create dashboard notification for user
@@ -135,10 +139,8 @@ async def approve_subscription(callback: CallbackQuery, session: AsyncSession, b
                 logging.warning(f"Failed to create approval notification: {e}")
 
         await callback.answer(t(lang, "admin_sub_approved"))
-        try:
-            await callback.message.delete()
-        except Exception:
-            pass
+        # The receipt card stays in the chat — the service just edited its
+        # caption to the verified stamp and stripped the buttons.
         session.expire_all()
         await _send_pending_requests(bot, session, callback.from_user.id, None)
     else:

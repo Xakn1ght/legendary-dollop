@@ -5,7 +5,7 @@ from aiogram.fsm.context import FSMContext
 from aiogram.types import Message
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.settings import ADMIN_ID, CHARGE_PRESET_PACKAGES
+from app.core.settings import ADMIN_ID, PLANS
 from app.database import crud
 from app.keyboards.reply import get_main_keyboard
 from app.services.flows.charge import (
@@ -30,6 +30,8 @@ async def process_receipt(message: Message, state: FSMContext, session: AsyncSes
 
     user = await crud.get_user(session, message.chat.id)
 
+    from app.services.flows.pricing import get_plan_info as _gpi
+
     try:
         charge_order_id = data.get('charge_order_id')
         if charge_order_id:
@@ -37,9 +39,10 @@ async def process_receipt(message: Message, state: FSMContext, session: AsyncSes
             charge_req = await submit_charge_receipt(
                 session, user, charge_order_id, receipt_message_id=message.message_id
             )
-        elif pkg_label and pkg_label in CHARGE_PRESET_PACKAGES:
-            # Preset packages go through the shared flow (server-side >5GB gate,
-            # ownership/active checks); receipt is attached in the same step.
+        elif pkg_label and _gpi(pkg_label, PLANS):
+            # Plan-parity top-ups (fixed plan or "custom:<gb>") go through the
+            # shared flow (server-side >5GB gate, ownership/active checks);
+            # receipt is attached in the same step.
             result = await start_charge_order(
                 session,
                 user,
@@ -79,8 +82,7 @@ async def process_receipt(message: Message, state: FSMContext, session: AsyncSes
     kb = InlineKeyboardBuilder()
     kb.button(text='✅ تایید', callback_data=f'approve_charge_{charge_req.id}')
     kb.button(text='❌ رد', callback_data=f'deny_charge_{charge_req.id}')
-    kb.button(text='💬 چت', callback_data=f'chat_with_user_{user.chat_id}')
-    kb.adjust(2, 1)  # First row: 2 buttons (approve/deny), Second row: 1 button (chat)
+    kb.adjust(2)
 
     # Fetch subscription username explicitly to avoid lazy-load problems
     from app.database import models as db_models

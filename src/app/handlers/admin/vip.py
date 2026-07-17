@@ -189,8 +189,21 @@ async def approve_vip_order(callback: CallbackQuery, session: AsyncSession, bot:
         return
 
     await callback.answer("✅ تایید شد")
+    # Audit trail: stamp the VIP receipt card verified instead of deleting
+    # (2026-07-13, Pasha — same rule as purchase/charge receipts).
     try:
-        await callback.message.delete()
+        from app.utils.receipt_captions import verified_stamp
+
+        approver = (
+            getattr(callback.from_user, "full_name", None)
+            or getattr(callback.from_user, "username", None)
+            or "ادمین"
+        )
+        stamped = f"{callback.message.caption or callback.message.text or ''}\n\n{verified_stamp(approver)}".strip()
+        if callback.message.caption is not None:
+            await callback.message.edit_caption(caption=stamped, reply_markup=None)
+        else:
+            await callback.message.edit_text(stamped, reply_markup=None)
     except Exception:
         try:
             await callback.message.edit_reply_markup(reply_markup=None)

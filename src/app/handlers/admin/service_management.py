@@ -472,7 +472,7 @@ async def confirm_bulk_approve(callback: CallbackQuery, session: AsyncSession):
         failed_count = 0
         for sub_id in pending_ids:
             try:
-                ok = await process_approved_subscription(sub_id, session, user_bot)
+                ok = await process_approved_subscription(sub_id, session, user_bot, approved_by="ادمین (تایید گروهی)")
                 if ok:
                     approved_count += 1
                 else:
