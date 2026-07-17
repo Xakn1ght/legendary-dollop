@@ -1,5 +1,9 @@
 """Dashboard HTTP handlers (split from former routes/dashboard.py)."""
 
+from app.api.routes.dashboard.achievements import (
+    handle_dashboard_achievements,
+    handle_dashboard_achievements_claim,
+)
 from app.api.routes.dashboard.challenges_prefs import (
     handle_dashboard_challenges,
     handle_dashboard_challenges_claim,
@@ -20,10 +24,18 @@ from app.api.routes.dashboard.referrals import (
     handle_dashboard_referral_rewards,
     handle_dashboard_referrals,
 )
+from app.api.routes.dashboard.session_presence import (
+    handle_dashboard_session_close,
+    handle_dashboard_session_heartbeat,
+)
+from app.api.routes.dashboard.theme_shop import (
+    handle_theme_shop_buy,
+    handle_theme_shop_get,
+)
 from app.api.routes.dashboard.star_rewards import (
     handle_dashboard_coupon_apply_gb,
-    handle_dashboard_season,
     handle_dashboard_redeem_vip_days,
+    handle_dashboard_season,
     handle_dashboard_star_claim_apply,
     handle_dashboard_star_claims,
     handle_dashboard_star_tiers,
@@ -38,10 +50,6 @@ from app.api.routes.dashboard.vip import (
     handle_vip_plans,
     handle_vip_purchase,
     handle_vip_upload_receipt,
-)
-from app.api.routes.dashboard.achievements import (
-    handle_dashboard_achievements,
-    handle_dashboard_achievements_claim,
 )
 from app.api.routes.dashboard.wallet import (
     handle_dashboard_earnings,
@@ -66,6 +74,10 @@ __all__ = [
     "handle_dashboard_notifications",
     "handle_dashboard_preferences_get",
     "handle_dashboard_preferences_patch",
+    "handle_dashboard_session_close",
+    "handle_dashboard_session_heartbeat",
+    "handle_theme_shop_buy",
+    "handle_theme_shop_get",
     "handle_dashboard_enter_referral",
     "handle_dashboard_redeem_referral_reward",
     "handle_dashboard_referral_rewards",

@@ -40,6 +40,7 @@ from app.jobs.season_reset import season_reset_job
 from app.jobs.sms_sweep import sms_sweep_job
 from app.services.pasarguard import pasarguard_api
 from app.utils.banned_user_middleware import BannedUserMiddleware
+from app.utils.webapp_lock_middleware import WebappLockMiddleware
 from app.utils.error_middleware import (
     ErrorHandlingMiddleware,
     PerformanceMiddleware,
@@ -215,6 +216,7 @@ async def main():
     dp.update.outer_middleware.register(ValidationMiddleware())
     dp.update.outer_middleware.register(PerformanceMiddleware())
     dp.update.outer_middleware.register(BannedUserMiddleware())
+    dp.update.outer_middleware.register(WebappLockMiddleware())
     dp.update.outer_middleware.register(DispatcherMiddleware(dp))
 
     # Pass the notification queue to the handlers via middleware

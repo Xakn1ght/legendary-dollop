@@ -16,6 +16,10 @@ from app.api.routes.dashboard import (
     handle_dashboard_notifications,
     handle_dashboard_preferences_get,
     handle_dashboard_preferences_patch,
+    handle_dashboard_session_close,
+    handle_dashboard_session_heartbeat,
+    handle_theme_shop_buy,
+    handle_theme_shop_get,
     handle_dashboard_redeem_referral_reward,
     handle_dashboard_referral_rewards,
     handle_dashboard_referrals,
@@ -37,6 +41,7 @@ from app.api.routes.dashboard import (
     handle_vip_upload_receipt,
 )
 from app.api.routes.dashboard_charge import (
+    handle_book_plan,
     handle_cancel_charge,
     handle_get_charge_packages,
     handle_start_charge,

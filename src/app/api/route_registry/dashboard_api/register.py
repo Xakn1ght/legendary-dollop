@@ -4,14 +4,20 @@ from aiohttp import web
 
 from .constants import DASHBOARD_API_BASE_PATH
 from .handlers import (
+    handle_book_plan,
     handle_cancel_charge,
     handle_cancel_order,
     handle_check_service_name,
     handle_custom_plan_quote,
+    handle_dashboard_achievements,
+    handle_dashboard_achievements_claim,
     handle_dashboard_add_sub,
     handle_dashboard_challenges,
     handle_dashboard_challenges_claim,
+    handle_dashboard_coupon_apply_gb,
     handle_dashboard_detect_country,
+    handle_dashboard_earnings,
+    handle_dashboard_earnings_card,
     handle_dashboard_enter_referral,
     handle_dashboard_flag,
     handle_dashboard_links,
@@ -21,20 +27,23 @@ from .handlers import (
     handle_dashboard_notification_mark_read,
     handle_dashboard_notification_unread_count,
     handle_dashboard_notifications,
+    handle_dashboard_orbit_add_link,
     handle_dashboard_overview,
     handle_dashboard_ping,
     handle_dashboard_preferences_get,
     handle_dashboard_preferences_patch,
-    handle_dashboard_orbit_add_link,
-    handle_profile_photo,
     handle_dashboard_redeem_referral_reward,
+    handle_dashboard_redeem_vip_days,
     handle_dashboard_referral_rewards,
     handle_dashboard_referrals,
     handle_dashboard_remove_local,
     handle_dashboard_revoke,
     handle_dashboard_rewards_summary,
-    handle_dashboard_redeem_vip_days,
     handle_dashboard_season,
+    handle_dashboard_session_close,
+    handle_dashboard_session_heartbeat,
+    handle_theme_shop_buy,
+    handle_theme_shop_get,
     handle_dashboard_speed_dl,
     handle_dashboard_speed_ul,
     handle_dashboard_star_claim_apply,
@@ -42,24 +51,20 @@ from .handlers import (
     handle_dashboard_star_tiers,
     handle_dashboard_stats,
     handle_dashboard_submit_referral,
+    handle_dashboard_ticket_photo_get,
+    handle_dashboard_ticket_photo_upload,
     handle_dashboard_tickets_create,
     handle_dashboard_tickets_delete,
     handle_dashboard_tickets_detail,
     handle_dashboard_tickets_list,
-    handle_dashboard_ticket_photo_get,
-    handle_dashboard_ticket_photo_upload,
     handle_dashboard_tickets_reply,
-    handle_dashboard_achievements,
-    handle_dashboard_achievements_claim,
-    handle_dashboard_coupon_apply_gb,
-    handle_dashboard_earnings,
-    handle_dashboard_earnings_card,
     handle_dashboard_wallet_cashout,
     handle_dashboard_wallet_convert_loyalty,
     handle_get_charge_packages,
     handle_get_pending_orders,
     handle_get_plans,
     handle_get_user_purchase_info,
+    handle_profile_photo,
     handle_start_charge,
     handle_start_purchase,
     handle_submit_charge_receipt,
@@ -111,6 +116,14 @@ def register_dashboard_api_routes(app: web.Application) -> None:
 
     app.router.add_get(DASHBOARD_API_BASE_PATH + "/preferences", handle_dashboard_preferences_get)
     app.router.add_post(DASHBOARD_API_BASE_PATH + "/preferences", handle_dashboard_preferences_patch)
+
+    # Purchasable themes (bubblegum, 2026-07-15): wallet-credit one-time unlock.
+    app.router.add_get(DASHBOARD_API_BASE_PATH + "/theme-shop", handle_theme_shop_get)
+    app.router.add_post(DASHBOARD_API_BASE_PATH + "/theme-shop/buy", handle_theme_shop_buy)
+
+    # Webapp-open presence (bot-lock guard). heartbeat while visible; close on hide.
+    app.router.add_post(DASHBOARD_API_BASE_PATH + "/session/heartbeat", handle_dashboard_session_heartbeat)
+    app.router.add_post(DASHBOARD_API_BASE_PATH + "/session/close", handle_dashboard_session_close)
 
     app.router.add_get(DASHBOARD_API_BASE_PATH + "/referrals", handle_dashboard_referrals)
     app.router.add_post(DASHBOARD_API_BASE_PATH + "/referrals/enter", handle_dashboard_enter_referral)
@@ -164,5 +177,6 @@ def register_dashboard_api_routes(app: web.Application) -> None:
 
     app.router.add_get(DASHBOARD_API_BASE_PATH + "/charge/packages", handle_get_charge_packages)
     app.router.add_post(DASHBOARD_API_BASE_PATH + "/charge/start", handle_start_charge)
+    app.router.add_post(DASHBOARD_API_BASE_PATH + "/charge/book", handle_book_plan)
     app.router.add_post(DASHBOARD_API_BASE_PATH + "/charge/receipt", handle_submit_charge_receipt)
     app.router.add_post(DASHBOARD_API_BASE_PATH + "/charge/cancel", handle_cancel_charge)

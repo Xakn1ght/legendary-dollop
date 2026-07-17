@@ -144,8 +144,11 @@
         // Keep in sync with ShellApp's ACCENT_ALLOWED — this stale list once
         // dropped the unlockable accents (vip/champion/legend), so platinum
         // users flashed red here and standalone pages lost the accent for good.
-        const allowed = ['red','cyan','emerald','violet','amber','vip','champion','legend'];
-        document.documentElement.setAttribute('data-accent', allowed.indexOf(accent) >= 0 ? accent : 'red');
+        const allowed = ['red','cyan','emerald','violet','amber','vip','champion','legend','bubblegum'];
+        const applied = allowed.indexOf(accent) >= 0 ? accent : 'red';
+        document.documentElement.setAttribute('data-accent', applied);
+        // Tier worlds ship BOTH scenes since 2026-07-15 (Pasha's light-mode
+        // mock) — the saved light/dark pref applies as-is, no forcing.
       }catch(_){
         document.documentElement.setAttribute('data-accent', 'red');
       }
@@ -764,4 +767,68 @@
   };
   document.addEventListener('visibilitychange', apply, { passive: true });
   apply();
+})();
+
+// Webapp-open → bot-lock heartbeat (2026-07-13, Pasha). While THIS Mini App
+// is visible we ping the server every few seconds; the bot pauses that user's
+// chat until we stop (server key TTL) or explicitly close on hide. Runs on
+// every Mini-App page (shell/purchase/charge/support) via head-boot — one
+// place, no per-app wiring. Only real Telegram Mini App sessions beat, so the
+// browser admin panel never trips the lock.
+(function () {
+  'use strict';
+  const HEARTBEAT_MS = 8000;
+  const HB_URL = '/api/dashboard/session/heartbeat';
+  const CLOSE_URL = '/api/dashboard/session/close';
+
+  function initData() {
+    try { return (window.Telegram && window.Telegram.WebApp && window.Telegram.WebApp.initData) || ''; }
+    catch (_) { return ''; }
+  }
+  // No initData = not a Telegram Mini App (desktop browser / admin panel) —
+  // don't engage the guard.
+  if (!initData()) return;
+
+  let timer = null;
+  let inFlight = false;
+
+  async function beat() {
+    if (inFlight || document.hidden) return;
+    inFlight = true;
+    try {
+      await fetch(HB_URL, {
+        method: 'POST',
+        credentials: 'include',
+        keepalive: true,
+        headers: { 'Content-Type': 'application/json', 'X-Telegram-Init': initData() },
+      });
+    } catch (_) { /* offline: the TTL lapses, bot unlocks — safe */ }
+    finally { inFlight = false; }
+  }
+
+  function sendClose() {
+    // Beacon rides the tma_session cookie (no headers possible) — the close
+    // endpoint is cookie-authed. Falls back to keepalive fetch.
+    try {
+      if (navigator.sendBeacon && navigator.sendBeacon(CLOSE_URL, new Blob([], { type: 'text/plain' }))) return;
+    } catch (_) { /* fall through */ }
+    try { fetch(CLOSE_URL, { method: 'POST', credentials: 'include', keepalive: true }); } catch (_) {}
+  }
+
+  function start() {
+    if (timer) return;
+    beat();
+    timer = setInterval(beat, HEARTBEAT_MS);
+  }
+  function stop() {
+    if (timer) { clearInterval(timer); timer = null; }
+  }
+
+  document.addEventListener('visibilitychange', () => {
+    if (document.hidden) { stop(); sendClose(); } else { start(); }
+  }, { passive: true });
+  window.addEventListener('pagehide', () => { stop(); sendClose(); }, { passive: true });
+  window.addEventListener('beforeunload', () => { stop(); sendClose(); }, { passive: true });
+
+  if (!document.hidden) start();
 })();
