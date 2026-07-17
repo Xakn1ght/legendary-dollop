@@ -11,7 +11,7 @@ from app.database import crud
 from app.handlers.user.flow_inline import ikb
 from app.keyboards.reply import get_main_keyboard
 from app.services.pasarguard import pasarguard_api
-from app.shared.plan_ordering import get_ordered_charge_plans, get_ordered_plans
+from app.shared.plan_ordering import get_ordered_plans
 from app.utils.bot_i18n import get_cached_lang, normalize_lang, set_cached_lang, t
 
 router = Router()
@@ -51,7 +51,10 @@ class ChargeState(StatesGroup):
     subscription = State()
     traffic_check = State()
     package = State()
+    package_custom_gb = State()
+    booking_months = State()
     booking_plan = State()
+    booking_custom_gb = State()
     booking_choice = State()
     buy_days_plan = State()
     confirmation = State()
@@ -87,15 +90,17 @@ async def _is_vip_chat(session, chat_id: int) -> bool:
 
 
 async def _build_package_keyboard(state: FSMContext, lang: str = "fa", is_vip: bool = False) -> InlineKeyboardMarkup:
-    from app.core.settings import CHARGE_PRESET_PACKAGES
+    """Top-up package keyboard. Plan parity (2026-07-18, Pasha: "same exact
+    plans for charge that we have for purchase"): lists the purchase PLANS —
+    the separate charge catalog is retired. VIP-exclusive plans are hidden
+    for non-VIP users; the custom GB builder rides along like the webapp."""
+    from app.core.settings import PLANS
 
-    keys = get_ordered_charge_plans()
-    # VIP-exclusive top-ups hidden for non-VIP users (flows/charge.py
-    # enforces the same rule on the money path).
-    keys = [k for k in keys if is_vip or not CHARGE_PRESET_PACKAGES.get(k, {}).get("vip_only")]
+    keys = [k for k in get_ordered_plans() if is_vip or not PLANS.get(k, {}).get("vip_only")]
     button_grid = []
     for i in range(0, len(keys), CHARGE_PLANS_BUTTON_COLUMNS):
         button_grid.append(keys[i:i + CHARGE_PLANS_BUTTON_COLUMNS])
+    button_grid.append([t(lang, "charge_custom_plan_btn")])
     button_grid.append([t(lang, "btn_back")])
     return await ikb(state, button_grid)
 
@@ -109,14 +114,44 @@ async def _build_traffic_options_keyboard(state: FSMContext, lang: str = "fa") -
     ])
 
 
-async def _build_main_plan_keyboard(state: FSMContext, lang: str = "fa") -> InlineKeyboardMarkup:
-    """Keyboard for selecting main subscription PLANS (for booking/renewal template)."""
+async def _build_main_plan_keyboard(
+    state: FSMContext, lang: str = "fa", include_custom: bool = False, is_vip: bool = False,
+) -> InlineKeyboardMarkup:
+    """Keyboard for selecting main subscription PLANS (for booking/renewal template).
+
+    ``include_custom`` adds the build-your-own GB option (1-month bookings only —
+    custom plans are GB-only by design, same rule as the webapp picker).
+    VIP-exclusive plans are hidden for non-VIP users (flows enforce it too)."""
+    from app.core.settings import PLANS
+
     rows = []
-    keys = get_ordered_plans()
+    keys = [k for k in get_ordered_plans() if is_vip or not PLANS.get(k, {}).get("vip_only")]
     for i in range(0, len(keys), PLANS_BUTTON_COLUMNS):
         rows.append(keys[i:i + PLANS_BUTTON_COLUMNS])
+    if include_custom:
+        rows.append([t(lang, "charge_custom_plan_btn")])
     rows.append([t(lang, "btn_back")])
     return await ikb(state, rows)
+
+
+# Booking duration selector (2026-07-13, fix-ALL image-5 parity for the BOT
+# lane): 1/2/3 prepaid months of a plan; "<plan>@Nm" resolves server-side.
+BOOKING_MONTHS_LABELS = {
+    "fa": {"۱ ماهه": 1, "۲ ماهه": 2, "۳ ماهه": 3},
+    "en": {"1 Month": 1, "2 Months": 2, "3 Months": 3},
+}
+
+
+def booking_months_from_text(text: str) -> int | None:
+    for table in BOOKING_MONTHS_LABELS.values():
+        if text in table:
+            return table[text]
+    return None
+
+
+async def _build_booking_months_keyboard(state: FSMContext, lang: str = "fa") -> InlineKeyboardMarkup:
+    labels = list(BOOKING_MONTHS_LABELS.get(lang, BOOKING_MONTHS_LABELS["fa"]).keys())
+    return await ikb(state, [labels, [t(lang, "btn_back")]])
 
 
 async def _back_keyboard(state: FSMContext, lang: str = "fa") -> InlineKeyboardMarkup:

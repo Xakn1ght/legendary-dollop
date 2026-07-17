@@ -34,6 +34,10 @@ class Subscription(Base):
     renewal_price = Column(Integer, nullable=True)
     renewal_requested_at = Column(DateTime, nullable=True)
     renewal_applied = Column(Boolean, default=False, nullable=False)
+    # When WE armed PasarGuard's native next_plan for this booking (None = never
+    # armed). next_plan gone + armed_at set = the panel fired it (see
+    # services/nextplan.py reconcile).
+    renewal_armed_at = Column(DateTime, nullable=True)
     credit_used = Column(Integer, default=0)
     applied_discount_ids = Column(String, nullable=True)
     applied_coupon_id = Column(Integer, nullable=True)

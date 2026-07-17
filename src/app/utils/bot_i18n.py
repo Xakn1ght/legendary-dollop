@@ -119,18 +119,22 @@ STRINGS: dict[str, dict[str, str]] = {
     "charge_error_fetch": {"fa": "❌ خطا در دریافت اطلاعات سرویس. لطفا دوباره تلاش کنید.", "en": "❌ Error fetching service info. Please try again."},
     "charge_remaining": {"fa": "📊 ترافیک باقیمانده: {gb}GB", "en": "📊 Remaining traffic: {gb}GB"},
     "charge_immediate_title": {"fa": "✅ شارژ فوری (5GB انتقال)\n\nلطفا یکی از بسته‌های شارژ را انتخاب کنید:", "en": "✅ Charge Now (5GB transfer)\n\nPlease choose a charge package:"},
-    "charge_booking_title": {"fa": "📅 رزرو پلن\n\nپلن انتخابی زمانی اعمال می‌شود که ترافیک شما کمتر از 5% یا کمتر از 3 روز تا انقضا باشد.\n\nلطفاً پلن تمدید را انتخاب کنید:", "en": "📅 Book Plan\n\nYour selected plan will be applied when traffic drops below 5% or less than 3 days remain.\n\nPlease choose a renewal plan:"},
+    "charge_booking_title": {"fa": "رزرو پلن بعدی\n\nپلن رزروشده به محض تمام شدن پلن فعلی (حجم یا زمان) به‌صورت خودکار فعال می‌شود و چیزی از دست نمی‌رود.\n\nپلن را انتخاب کنید:", "en": "Book Next Plan\n\nThe booked plan activates automatically the moment your current plan runs out (data or time) — nothing is lost.\n\nChoose a plan:"},
+    "charge_booking_months_title": {"fa": "رزرو پلن بعدی\n\nمدت پلن رزرو را انتخاب کنید:", "en": "Book Next Plan\n\nChoose the booking duration:"},
+    "charge_custom_plan_btn": {"fa": "پلن دلخواه (گیگ دلخواه)", "en": "Custom plan (your GB)"},
+    "charge_custom_gb_ask": {"fa": "حجم دلخواه را به گیگابایت بفرستید (بین {min} تا {max}):", "en": "Send the GB amount you want ({min}-{max}):"},
+    "charge_invalid_gb": {"fa": "عدد نامعتبر است. یک عدد بین {min} تا {max} بفرستید.", "en": "Invalid number. Send a number between {min} and {max}."},
     "charge_back_step": {"fa": "به مرحله قبل بازگشتید. یک گزینه را انتخاب کنید:", "en": "Returned to previous step. Choose an option:"},
     "charge_cancelled": {"fa": "عملیات لغو شد.", "en": "Operation cancelled."},
     "charge_choose_from_buttons": {"fa": "لطفا از میان گزینه‌های موجود انتخاب کنید.", "en": "Please choose from available options."},
     "charge_choose_plan": {"fa": "لطفاً یکی از پلن‌های موجود را انتخاب کنید.", "en": "Please choose one of the available plans."},
     "charge_error_no_sub": {"fa": "خطا: سرویس انتخاب نشده است. دوباره تلاش کنید.", "en": "Error: No service selected. Please try again."},
-    "charge_booking_success": {"fa": "✅ رزرو پلن تمدید با موفقیت ثبت شد!\n\n📦 پلن: {plan} ({gb} گیگابایت)\n💵 مبلغ تمدید: {price} تومان\n\n🔄 در زمان مناسب (کمبود ترافیک یا نزدیک انقضا)، تمدید به‌صورت خودکار انجام می‌شود.", "en": "✅ Renewal plan booked successfully!\n\n📦 Plan: {plan} ({gb}GB)\n💵 Renewal price: {price} Toman\n\n🔄 The renewal will be applied automatically when traffic is low or expiry is near."},
+    "charge_booking_success": {"fa": "رزرو پلن ثبت شد.\n\nپلن: {plan}\nحجم: {gb} گیگابایت\nمبلغ: {price} تومان\n\nپس از تایید پرداخت، به محض تمام شدن پلن فعلی به‌صورت خودکار فعال می‌شود.", "en": "Booking registered.\n\nPlan: {plan}\nData: {gb} GB\nPrice: {price} Toman\n\nOnce payment is approved, it activates automatically the moment your current plan runs out."},
     "charge_request_registered": {"fa": "✅ درخواست شارژ ثبت شد.\n\nلطفا مبلغ را به شماره کارت زیر واریز کرده و سپس تصویر رسید را ارسال کنید:\n<code>{card}</code>", "en": "✅ Charge request registered.\n\nPlease transfer the amount to the card number below and then send the receipt image:\n<code>{card}</code>"},
     "charge_back_to_packages": {"fa": "به مرحله انتخاب بسته بازگشتید. لطفا یک بسته را انتخاب کنید:", "en": "Returned to package selection. Please choose a package:"},
     "charge_back_to_services": {"fa": "به مرحله انتخاب سرویس بازگشتید. سرویس را انتخاب کنید:", "en": "Returned to service selection. Choose a service:"},
     "charge_receipt_sent": {"fa": "رسید ارسال شد. لطفا منتظر تایید ادمین بمانید.", "en": "Receipt sent. Please wait for admin approval."},
-    "charge_booking_receipt_success": {"fa": "✅ رزرو پلن با موفقیت ثبت شد!\n\n📋 پلن: {plan}\n💵 مبلغ: {price} تومان\n\n🔄 این پلن زمانی اعمال می‌شود که ترافیک شما کمتر از 5% یا کمتر از 3 روز تا انقضا باشد.", "en": "✅ Plan booked successfully!\n\n📋 Plan: {plan}\n💵 Price: {price} Toman\n\n🔄 This plan will be applied when your traffic drops below 5% or less than 3 days remain."},
+    "charge_booking_receipt_success": {"fa": "رزرو پلن ثبت شد.\n\nپلن: {plan}\nمبلغ: {price} تومان\n\nپس از تایید پرداخت، به محض تمام شدن پلن فعلی به‌صورت خودکار فعال می‌شود.", "en": "Plan booked.\n\nPlan: {plan}\nPrice: {price} Toman\n\nOnce payment is approved, it activates automatically the moment your current plan runs out."},
     "charge_buy_days_title": {"fa": "📅 خرید روز بیشتر:\nلطفاً یکی از پلن‌های زمانی را انتخاب کنید:", "en": "📅 Buy More Days:\nPlease choose a time plan:"},
     "charge_buy_days_choose": {"fa": "لطفاً یکی از پلن‌های زمانی را انتخاب کنید.", "en": "Please choose a time plan."},
     "charge_buy_days_summary": {"fa": "📅 افزودن روز به سرویس\n\nروزهای اضافه: {days}\nمبلغ: {price} تومان\n\nلطفاً مبلغ را واریز کرده و سپس تصویر رسید را ارسال کنید.", "en": "📅 Add Days to Service\n\nExtra days: {days}\nPrice: {price} Toman\n\nPlease transfer the amount and send the receipt image."},
@@ -172,6 +176,14 @@ STRINGS: dict[str, dict[str, str]] = {
 
     # Admin / common alerts
     "not_authorized": {"fa": "دسترسی غیرمجاز", "en": "Not authorized"},
+    "webapp_open_lock": {
+        "fa": "اپلیکیشن (مینی‌اپ) شما باز است.\n\nتا وقتی وب‌اپ باز باشد، ربات موقتاً غیرفعال است تا از بروز خطا و مشکل در سفارش‌ها جلوگیری شود.\n\nلطفاً مینی‌اپ را کامل ببندید و بعد از چند لحظه دوباره به ربات پیام دهید. (برای بازنشانی می‌توانید /start را بزنید)",
+        "en": "Your Mini App is open.\n\nWhile the web app is open the bot is paused to prevent errors and order glitches.\n\nPlease fully close the Mini App, wait a moment, then message the bot again. (Send /start to reset.)",
+    },
+    "webapp_open_lock_short": {
+        "fa": "ابتدا مینی‌اپ را ببندید تا ربات فعال شود.",
+        "en": "Close the Mini App first to use the bot.",
+    },
     "invalid_number_try_again": {"fa": "❌ عدد نامعتبر است. دوباره تلاش کنید یا /cancel را بزنید.", "en": "❌ Invalid number. Try again or /cancel."},
 
     # User - Gifts (rewards)

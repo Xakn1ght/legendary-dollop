@@ -393,9 +393,10 @@ async def process_traffic_amount(
         headers = await pasarguard_api._get_headers()
         url = f"{pasarguard_api.base_url}/api/user/{subscription.marzban_username}"
 
-        async with api_session.put(
-            url, headers=headers, json={"data_limit": new_traffic_bytes}
-        ) as resp:
+        put_body = await pasarguard_api.with_next_plan_preserved(
+            subscription.marzban_username, {"data_limit": new_traffic_bytes}
+        )
+        async with api_session.put(url, headers=headers, json=put_body) as resp:
             if resp.status in (200, 204):
                 admin_lang = _lang_for_tg_user(message.from_user)
                 await message.answer(

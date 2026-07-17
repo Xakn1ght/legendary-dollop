@@ -14,7 +14,7 @@ from app.utils.bot_i18n import t
 from .common import (
     ChargeState,
     _back_keyboard,
-    _build_main_plan_keyboard,
+    _build_booking_months_keyboard,
     _get_lang,
     check_subscription_traffic,
     router,
@@ -96,7 +96,10 @@ async def handle_buy_days_plan(message: Message, state: FSMContext, session: Asy
 
 @router.callback_query(F.data.startswith('renew_'))
 async def cb_renew(cb: CallbackQuery, state: FSMContext, session: AsyncSession):
-    """Start renewal flow: ask user to pick a main plan (booking template)."""
+    """Start renewal flow — months first, then plan/custom (image-5 parity).
+
+    Months step is VIP-only (2026-07-14): non-VIP goes straight to the
+    1-month plan keyboard."""
     lang = await _get_lang(cb.from_user.id, session)
     username = cb.data[len('renew_'):]
     user = await crud.get_user(session, cb.from_user.id)
@@ -108,10 +111,20 @@ async def cb_renew(cb: CallbackQuery, state: FSMContext, session: AsyncSession):
     if not target:
         await cb.answer(t(lang, "charge_service_not_found"), show_alert=True)
         return
-    await state.update_data(subscription_id=target.id, charge_type='booking')
-    await state.set_state(ChargeState.booking_plan)
+    await state.update_data(subscription_id=target.id, charge_type='booking', booking_months=1)
+    is_vip = bool(await crud.is_user_vip(session, user.id))
+    if not is_vip:
+        from .common import _build_main_plan_keyboard
+        await state.set_state(ChargeState.booking_plan)
+        await cb.message.answer(
+            t(lang, "charge_booking_title"),
+            reply_markup=await _build_main_plan_keyboard(state, lang, include_custom=True, is_vip=False),
+        )
+        await cb.answer()
+        return
+    await state.set_state(ChargeState.booking_months)
     await cb.message.answer(
-        t(lang, "charge_renew_title"),
-        reply_markup=await _build_main_plan_keyboard(state, lang)
+        t(lang, "charge_booking_months_title"),
+        reply_markup=await _build_booking_months_keyboard(state, lang),
     )
     await cb.answer()

@@ -10,7 +10,7 @@ import aiohttp
 
 from app.core.paths import core_path
 from app.core.redis_config import cache
-from app.core.settings import PASARGUARD_BASE_URL, PASARGUARD_PASSWORD, PASARGUARD_USERNAME, PASARGUARD_GROUP_IDS
+from app.core.settings import PASARGUARD_BASE_URL, PASARGUARD_GROUP_IDS, PASARGUARD_PASSWORD, PASARGUARD_USERNAME
 from app.utils.logger import log_api_call, log_error
 
 # Panel-load shield. Every read surface (dashboard list/overview, bot menus, the
@@ -743,6 +743,31 @@ class PasarGuardAPI:
                 return usages
             return None
 
+    async def with_next_plan_preserved(self, username: str, payload: dict) -> dict:
+        """PasarGuard quirk (live-verified 2026-07-12): a PUT /api/user/{username}
+        whose body OMITS ``next_plan`` silently deletes any armed next-plan on
+        the panel. Every modify payload must therefore echo the armed plan
+        back. Call this right before any PUT to /api/user/{username}.
+
+        - The armed object is echoed verbatim (``next_plan.expire`` stays a raw
+          seconds-duration int on read, so the round-trip is loss-free).
+        - An explicit ``next_plan`` key in the payload wins — pass ``None`` to
+          deliberately clear an armed plan.
+        - Fail-open: if the pre-read fails, the payload is returned unchanged
+          (identical to pre-guard behavior; nothing arms next_plan yet).
+        """
+        if "next_plan" in payload:
+            return payload
+        try:
+            info = await self.get_user_info(username)
+            armed = (info or {}).get("next_plan")
+            if isinstance(armed, dict):
+                payload = dict(payload)
+                payload["next_plan"] = armed
+        except Exception:
+            pass
+        return payload
+
     async def reset_user_traffic_bytes(self, username: str, new_data_limit_bytes: int, new_expire_ts: int):
         """
         Reset user traffic via PasarGuard and then set new limits.
@@ -780,12 +805,12 @@ class PasarGuardAPI:
 
         # Extend data limit and expiration
         modify_url = f"{self.base_url}/api/user/{username}"
-        payload = {
+        payload = await self.with_next_plan_preserved(username, {
             "data_limit": max(int(new_data_limit_bytes or 0), 0),
             "expire": max(int(new_expire_ts or 0), 0),
             "status": "active",
             "data_limit_reset_strategy": "no_reset",
-        }
+        })
 
         async with session.put(modify_url, headers=headers, json=payload) as resp:
             if resp.status in (200, 204):
@@ -825,7 +850,8 @@ class PasarGuardAPI:
         session = await self._get_session()
         headers = await self._get_headers()
         url = f"{self.base_url}/api/user/{username}"
-        async with session.put(url, headers=headers, json={"status": status}) as resp:
+        payload = await self.with_next_plan_preserved(username, {"status": status})
+        async with session.put(url, headers=headers, json=payload) as resp:
             ok = resp.status in (200, 204)
         if ok:
             await self.invalidate_user_info(username)
@@ -966,7 +992,8 @@ class PasarGuardAPI:
         url = f"{self.base_url}/api/user/{username}"
         headers = await self._get_headers()
         headers['Content-Type'] = 'application/json'
-        
+        update_data = await self.with_next_plan_preserved(username, update_data)
+
         try:
             async with session.put(url, headers=headers, json=update_data) as resp:
                 if resp.status in (200, 204):

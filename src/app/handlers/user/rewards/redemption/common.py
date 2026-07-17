@@ -15,6 +15,7 @@ async def _patch_panel_user(username: str, patch_data: dict) -> bool:
     session_http = await pasarguard_api._get_session()
     url = f"{pasarguard_api.base_url}/api/user/{username}"
     headers = await pasarguard_api._get_headers()
+    patch_data = await pasarguard_api.with_next_plan_preserved(username, patch_data)
     ok = False
     async with session_http.put(url, headers=headers, json=patch_data) as response:
         if response.status in (200, 204):

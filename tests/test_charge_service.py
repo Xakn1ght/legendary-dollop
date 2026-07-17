@@ -71,6 +71,15 @@ class FakePasarGuard:
         self.calls.append(("reset", new_data_limit_bytes, new_expire_ts))
         return True
 
+    async def with_next_plan_preserved(self, username, payload):
+        # Real guard echoes an armed panel next_plan into the payload; the
+        # fake panel never arms one, so pass-through mirrors production.
+        return payload
+
+    async def update_user(self, username, update_data):
+        self.calls.append(("update_user", username, update_data))
+        return True
+
     async def invalidate_user_info(self, username):
         self.invalidated.append(username)
 
@@ -87,10 +96,14 @@ async def _setup(pasarguard_info=None):
         await c.run_sync(Base.metadata.create_all)
     Session = async_sessionmaker(eng, expire_on_commit=False)
 
-    charge_mod.CHARGE_PRESET_PACKAGES = PACKAGES
-    charge_mod.PLANS = PLANS
+    # Plan parity (2026-07-18): top-up packages ARE the purchase PLANS —
+    # one merged catalog patch (CHARGE_PRESET_PACKAGES is retired).
+    charge_mod.PLANS = {**PACKAGES, **PLANS}
     fake = FakePasarGuard(pasarguard_info or {"data_limit": 10 * GB, "used_traffic": 8 * GB, "expire": 0})
     charge_mod.pasarguard_api = fake
+    # Booking approval arms the panel's native next_plan through this module.
+    from app.services import nextplan as nextplan_mod
+    nextplan_mod.pasarguard_api = fake
 
     async with Session() as db:
         db.add(User(id=1, chat_id=CHAT, referral_code="me", credit=200000))
@@ -279,10 +292,21 @@ async def test_booking_renewal_only_at_approval():
 
         pasarguard_calls_before = list(fake.calls)
         await approve_charge(db, req.id, user_bot=None)
-        assert fake.calls == pasarguard_calls_before  # booking approval never touches the panel
+        # Booking approval must NOT run carry-over math on the panel — its one
+        # panel call is arming the native next_plan (fires at exhaustion).
+        new_calls = fake.calls[len(pasarguard_calls_before):]
+        assert len(new_calls) == 1 and new_calls[0][0] == "update_user", new_calls
+        armed = new_calls[0][2]["next_plan"]
+        assert armed == {
+            "user_template_id": None,
+            "data_limit": 50 * GB,
+            "expire": 35 * 86400,  # catalog plan days, as a DURATION in seconds
+            "add_remaining_traffic": False,  # carry nothing (Pasha 2026-07-12)
+        }, armed
 
         await db.refresh(sub)
         assert sub.renewal_paid and sub.renewal_template == "plan50" and sub.renewal_price == 200000
+        assert sub.renewal_armed_at is not None  # arm stamped for the watchdog
     print("PASS test_booking_renewal_only_at_approval")
 
 
@@ -364,8 +388,9 @@ async def test_vip_only_package_gate():
     Session, fake = await _setup(
         pasarguard_info={"data_limit": 10 * GB, "used_traffic": 9 * GB, "expire": 0}
     )
-    charge_mod.CHARGE_PRESET_PACKAGES = {
+    charge_mod.PLANS = {
         **PACKAGES,
+        **PLANS,
         "vip700": {"gb": 700, "days": 70, "price": 1_725_000, "vip_only": True},
     }
     async with Session() as db:
@@ -390,7 +415,7 @@ async def test_vip_only_package_gate():
             assert req.traffic_bytes == 700 * GB and req.extra_days == 70, (req.traffic_bytes, req.extra_days)
         finally:
             crud.is_user_vip = orig_is_vip
-    charge_mod.CHARGE_PRESET_PACKAGES = PACKAGES
+    charge_mod.PLANS = {**PACKAGES, **PLANS}
     print("PASS test_vip_only_package_gate")
 
 

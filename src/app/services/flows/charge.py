@@ -21,7 +21,11 @@ from datetime import datetime
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.settings import CHARGE_PRESET_PACKAGES, PLANS
+from app.core.settings import (
+    PLANS,
+    VIP_PURCHASE_DISCOUNT_ENABLED,
+    VIP_PURCHASE_DISCOUNT_PERCENT,
+)
 from app.database import crud, notifications_crud
 from app.database.models import ChargeRequest, Subscription
 from app.database.models import User as _User
@@ -111,20 +115,53 @@ async def start_charge_order(
     the bot attaches its Telegram receipt immediately and passes ``status="pending"``
     via :func:`submit_charge_receipt` instead.
     """
+    from app.core.pricing import CUSTOM_MAX_GB_NONVIP
     from app.services.flows.pricing import get_plan_info as _gpi
-    from app.services.flows.pricing import parse_custom_plan as _parse_custom
+    from app.services.flows.pricing import parse_plan_months as _parse_months
+    from app.services.flows.pricing import plan_min_months as _plan_min_months
 
-    # "custom:<gb>" top-ups (2026-07-09): priced by the same shared curve as
-    # custom purchase plans — get_plan_info resolves price/gb/days for them.
-    custom_gb = _parse_custom(package_name)
-    if package_name not in CHARGE_PRESET_PACKAGES and custom_gb is None:
+    # Plan parity (2026-07-18, Pasha: "the same exact plans for charge that we
+    # have for purchase"): the separate charge catalog is GONE. A top-up is
+    # one of the purchase PLANS (incl. "custom:<gb>" and "@Nm" multi-month
+    # variants) applied to an existing subscription — get_plan_info resolves
+    # and scales price/gb/days exactly like quote_purchase does.
+    pkg_info = _gpi(package_name, PLANS)
+    if not pkg_info:
+        # Distinguish "asked for a 1-month VIP package" (real plan, months
+        # below its minimum) from a garbage name — same split as
+        # quote_purchase; @0m and the like stay invalid_package.
+        base_name, parsed_months = _parse_months(package_name)
+        probe = _gpi(base_name, PLANS)
+        if probe and parsed_months is not None and 1 <= parsed_months < _plan_min_months(probe):
+            raise FlowError("plan_min_months", "This plan is only sold as a 2-3 month package")
         raise FlowError("invalid_package", "Selected package does not exist")
-    # VIP-exclusive top-ups (the 350-500GB monthly quotas as 2-3 month
-    # bundles): money-path gate — both surfaces order through here.
-    if custom_gb is None and CHARGE_PRESET_PACKAGES[package_name].get("vip_only") and not await crud.is_user_vip(session, user.id):
+
+    is_vip_user = await crud.is_user_vip(session, user.id)
+    package_is_vip_only = bool(pkg_info.get("vip_only"))
+    if package_is_vip_only and not is_vip_user:
         raise FlowError("vip_only_package", "This package is exclusive to VIP members")
-    if renewal_template is not None and not _gpi(renewal_template, PLANS):
-        raise FlowError("invalid_renewal_plan", "Invalid renewal plan selected")
+    # Multi-month top-ups are a VIP perk (2026-07-14, Pasha: "no other user
+    # except VIP should have the 2/3 months category"). Non-VIP = 1 month only.
+    months_n = int(pkg_info.get("months") or 1)
+    if months_n > 1 and not is_vip_user:
+        raise FlowError("months_vip_only", "Multi-month packages are exclusive to VIP members")
+    # Custom builds above 300GB are a VIP perk (same gate as quote_purchase —
+    # this path previously trusted the curve alone, which let a non-VIP order
+    # custom:400 by API).
+    if pkg_info.get("custom") and int(pkg_info.get("gb") or 0) > CUSTOM_MAX_GB_NONVIP and not is_vip_user:
+        raise FlowError("custom_gb_vip_only", "Custom plans above 300 GB are for VIP members")
+    if renewal_template is not None:
+        renewal_probe = _gpi(renewal_template, PLANS)
+        if not renewal_probe:
+            raise FlowError("invalid_renewal_plan", "Invalid renewal plan selected")
+        if int(renewal_probe.get("months") or 1) > 1 and not is_vip_user:
+            raise FlowError("months_vip_only", "Multi-month plans are exclusive to VIP members")
+        if (
+            renewal_probe.get("custom")
+            and int(renewal_probe.get("gb") or 0) > CUSTOM_MAX_GB_NONVIP
+            and not is_vip_user
+        ):
+            raise FlowError("custom_gb_vip_only", "Custom plans above 300 GB are for VIP members")
 
     sub = await session.get(Subscription, subscription_id)
     if not sub:
@@ -154,23 +191,46 @@ async def start_charge_order(
         err.remaining_gb = remaining_gb
         raise err
 
-    if custom_gb is not None:
-        info = _gpi(package_name, PLANS)
-        if not info:
-            raise FlowError("invalid_package", "Selected package does not exist")
-        pkg = {"price": info["price"], "gb": info["gb"], "days": info["days"]}
-    else:
-        pkg = CHARGE_PRESET_PACKAGES[package_name]
-    total_price = int(pkg.get("price", 0) or 0)
-    traffic_bytes = int(pkg.get("gb", 0) or 0) * GB
-    extra_days = pkg.get("days", 0) or None
+    # get_plan_info already scaled price/gb/days by the resolved months.
+    total_price = int(pkg_info.get("price", 0) or 0)
+    traffic_bytes = int(pkg_info.get("gb", 0) or 0) * GB
+    extra_days = int(pkg_info.get("days", 0) or 0) or None
+
+    # Pricing parity law (2026-07-12, Pasha: "all plans should be same for
+    # everything"): charges take the SAME discounts as purchases — the VIP %
+    # on any non-exclusive plan (incl. custom top-ups) plus the plan's own
+    # event percent; VIP-exclusive plans stay at list price. Matches the
+    # frontend math (floor of pct, capped like pricing.py).
+    from app.services.flows.pricing import MAX_TOTAL_DISCOUNT_PERCENT
+    event_pct = 0 if pkg_info.get("custom") else int(pkg_info.get("discount_percent") or 0)
+    vip_pct = (
+        VIP_PURCHASE_DISCOUNT_PERCENT
+        if (is_vip_user and not package_is_vip_only
+            and VIP_PURCHASE_DISCOUNT_ENABLED and VIP_PURCHASE_DISCOUNT_PERCENT > 0)
+        else 0
+    )
+    total_pct = max(0, min(event_pct + vip_pct, MAX_TOTAL_DISCOUNT_PERCENT))
+    if total_pct > 0:
+        total_price -= int(total_price * (total_pct / 100))
 
     credit_used = 0
     if use_credit and (user.credit or 0) > 0:
         credit_used = min(int(user.credit or 0), total_price)
 
     from app.services.flows.pricing import get_plan_info
-    renewal_price = int((get_plan_info(renewal_template, PLANS) or {}).get("price") or 0) if renewal_template else None
+    renewal_price = None
+    if renewal_template:
+        renewal_info = get_plan_info(renewal_template, PLANS) or {}
+        renewal_price = int(renewal_info.get("price") or 0)
+        # Parity: the stored future-renewal price carries the VIP % exactly
+        # like a purchase with auto-renew does (vip_only plans exempt).
+        if (
+            renewal_price
+            and not renewal_info.get("vip_only")
+            and is_vip_user
+            and VIP_PURCHASE_DISCOUNT_ENABLED and VIP_PURCHASE_DISCOUNT_PERCENT > 0
+        ):
+            renewal_price -= int(renewal_price * (VIP_PURCHASE_DISCOUNT_PERCENT / 100))
 
     charge_req = await crud.create_charge_request(
         session,
@@ -229,15 +289,10 @@ async def _notify_admin_credit_paid_charge(session: AsyncSession, charge_req: Ch
         kb.button(text="✅ تایید شارژ", callback_data=f"approve_charge_{charge_req.id}")
         kb.button(text="❌ رد", callback_data=f"deny_charge_{charge_req.id}")
         kb.adjust(2)
-        gb_amount = (charge_req.traffic_bytes or 0) / GB
+        from app.utils.receipt_captions import charge_receipt_caption
         text_msg = (
-            "💳 درخواست شارژ با پرداخت کامل از اعتبار\n\n"
-            f"👤 کاربر: {user.full_name} ({user.chat_id})\n"
-            f"🔖 اشتراک: {sub.marzban_username if sub else 'N/A'}\n"
-            f"📦 بسته: {gb_amount:.0f} گیگابایت"
-            + (f" + {charge_req.extra_days} روز" if charge_req.extra_days else "")
-            + f"\n💰 اعتبار استفاده شده: {charge_req.credit_used:,} تومان"
-            + f"\n\n🆔 شماره درخواست: #{charge_req.id}"
+            charge_receipt_caption(charge_req, user, sub.marzban_username if sub else "-", source="webapp")
+            + "\n\nپرداخت کامل از اعتبار — رسیدی وجود ندارد."
         )
         await admin_bot.send_message(ADMIN_ID, text_msg, reply_markup=kb.as_markup())
     except Exception as e:
@@ -271,7 +326,32 @@ async def start_booking_order(
     if sub.status != "active":
         raise FlowError("subscription_not_active")
 
+    is_vip_user = await crud.is_user_vip(session, user.id)
+    # Money-path gate (2026-07-13): VIP-exclusive plans cannot be BOOKED by
+    # non-VIP users either — quote_purchase has the same rule; the bot plan
+    # keyboard and the webapp picker both hide them, this closes the API path.
+    if plan_info.get("vip_only") and not is_vip_user:
+        raise FlowError("vip_only_plan", "This plan is exclusive to VIP members")
+    # Multi-month bookings are a VIP perk too (2026-07-14) — same rule as
+    # quote_purchase/start_charge_order: non-VIP books 1 month only.
+    if int(plan_info.get("months") or 1) > 1 and not is_vip_user:
+        raise FlowError("months_vip_only", "Multi-month plans are exclusive to VIP members")
+    # Custom bookings above 300GB are VIP-only (parity with quote_purchase).
+    from app.core.pricing import CUSTOM_MAX_GB_NONVIP as _CMAX_NONVIP
+    if plan_info.get("custom") and int(plan_info.get("gb") or 0) > _CMAX_NONVIP and not is_vip_user:
+        raise FlowError("custom_gb_vip_only", "Custom plans above 300 GB are for VIP members")
+
     price = int(plan_info.get("price") or 0)
+    # Pricing parity law (2026-07-12): a booking is a future renewal of a
+    # regular plan — the VIP % applies exactly as in quote_purchase
+    # (VIP-exclusive plans stay at list price).
+    if (
+        price
+        and not plan_info.get("vip_only")
+        and VIP_PURCHASE_DISCOUNT_ENABLED and VIP_PURCHASE_DISCOUNT_PERCENT > 0
+        and is_vip_user
+    ):
+        price -= int(price * (VIP_PURCHASE_DISCOUNT_PERCENT / 100))
 
     charge_req = await crud.create_charge_request(
         session,
@@ -450,9 +530,10 @@ async def _approve_charge_claimed(session: AsyncSession, charge_id: int, *, user
         raise FlowError("sub_inactive")
 
     if getattr(charge_req, "charge_type", "normal") == "booking":
-        # A booking only records paid renewal intent — the plan itself is applied by
-        # the renewal job later. No PasarGuard change now (traffic_bytes is 0; running
-        # the carry-over math would wipe the user's data limit).
+        # A booking only records paid renewal intent — no carry-over math now
+        # (traffic_bytes is 0; running it would wipe the user's data limit).
+        # The plan itself is armed as a native PasarGuard next_plan below and
+        # fires panel-side the moment the current plan runs out.
         await crud.update_charge_request_status(session, charge_id, "approved")
         await crud.update_subscription_renewal(
             session,
@@ -462,6 +543,12 @@ async def _approve_charge_claimed(session: AsyncSession, charge_id: int, *, user
             renewal_price=charge_req.renewal_price,
             renewal_requested_at=datetime.utcnow(),
         )
+        try:
+            from app.services.nextplan import arm_native_next_plan
+            await session.refresh(sub)
+            await arm_native_next_plan(session, sub, plans=PLANS, source="booking_approve")
+        except Exception as e:
+            logger.warning(f"Native next_plan arming failed for sub {sub.id} (watchdog will retry): {e}")
         result = ApproveChargeResult(
             charge_request=charge_req,
             subscription=sub,
@@ -551,12 +638,12 @@ async def _approve_charge_claimed(session: AsyncSession, charge_id: int, *, user
         session_http = await pasarguard_api._get_session()
         headers = await pasarguard_api._get_headers()
         url = f"{pasarguard_api.base_url}/api/user/{sub.marzban_username}"
-        patch_body = {
+        patch_body = await pasarguard_api.with_next_plan_preserved(sub.marzban_username, {
             "data_limit": int(data_limit_after or 0),
             "expire": int(new_expire_ts or 0),
             "status": "active",
             "data_limit_reset_strategy": "no_reset",
-        }
+        })
         await pasarguard_api.invalidate_user_info(sub.marzban_username)
         async with session_http.put(url, headers=headers, json=patch_body) as resp:
             if resp.status not in (200, 204):
@@ -578,6 +665,12 @@ async def _approve_charge_claimed(session: AsyncSession, charge_id: int, *, user
             renewal_price=charge_req.renewal_price,
             renewal_requested_at=datetime.utcnow(),
         )
+        try:
+            from app.services.nextplan import arm_native_next_plan
+            await session.refresh(sub)
+            await arm_native_next_plan(session, sub, plans=PLANS, source="charge_approve")
+        except Exception as e:
+            logger.warning(f"Native next_plan arming failed for sub {sub.id} (watchdog will retry): {e}")
 
     # The reward itself must not depend on a bot being available — only the DM does.
     if sub.referrer_id:

@@ -55,21 +55,28 @@ async def _sub_for_username(session, username: str):
     return res.scalars().first()
 
 
-async def _instant_renew(session, sub, bot) -> bool:
-    """Apply a reserved renewal right now (same lock + entrypoint as the sweep)."""
+async def _instant_reconcile(session, sub, bot) -> bool:
+    """Booked sub hit an exhaustion event: the panel fires the armed next_plan
+    natively, so we only reconcile (mark applied + DM on fire; re-arm if the
+    arm was missed). Returns True when a booking exists — the caller must then
+    suppress "plan ran out" alerts either way, because a fire is done or
+    imminent. Same lock as the watchdog sweep so nothing double-processes."""
     if not (getattr(sub, "renewal_paid", False) and getattr(sub, "renewal_template", None)):
+        return False
+    if getattr(sub, "renewal_applied", False):
         return False
     lock_key = f"lock:renew:{sub.marzban_username}"
     try:
         if await cache.get(lock_key):
-            return False  # sweep (or a previous event) is already on it
+            return True  # sweep (or a previous event) is already on it
         await cache.set(lock_key, True, ttl=60)
     except Exception:
         pass
     try:
-        from app.jobs.renewal import apply_renewal
+        from app.services.nextplan import reconcile_booked_sub
 
-        await apply_renewal(sub.id, session, bot)
+        outcome = await reconcile_booked_sub(session, sub, bot)
+        bot_logger.info(f"[WEBHOOK] booking reconcile: {outcome} for {sub.marzban_username[:3]}***")
         return True
     finally:
         try:
@@ -118,10 +125,8 @@ async def handle_pasarguard_webhook(request: web.Request):
                     continue
 
                 if action in _EXHAUSTED_ACTIONS:
-                    renewed = await _instant_renew(session, sub, bot)
-                    if renewed:
-                        bot_logger.info(f"[WEBHOOK] instant renewal applied: {username[:3]}***")
-                        continue
+                    if await _instant_reconcile(session, sub, bot):
+                        continue  # booking exists: panel fires it natively; no ran-out alert
                     # No booking → tell the user their plan ran out.
                     if action in {"user_expired", "expired"}:
                         await user_alerts.send_expired_alert(bot, session, sub)

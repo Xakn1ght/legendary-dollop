@@ -94,12 +94,12 @@ async def apply_renewal(subscription_id, session, bot: Bot):
     session_http = await pasarguard_api._get_session()
     url = f"{pasarguard_api.base_url}/api/user/{subscription.marzban_username}"
     headers = await pasarguard_api._get_headers()
-    patch_data = {
+    patch_data = await pasarguard_api.with_next_plan_preserved(subscription.marzban_username, {
         "data_limit": new_limit,
         "expire": new_expire,
         "status": "active",
         "data_limit_reset_strategy": "no_reset",
-    }
+    })
     bot_logger.debug("[RENEWAL] PATCH", url=url, payload=str(patch_data))
     async with session_http.put(url, headers=headers, json=patch_data) as response:
         if response.status not in (200, 204):
@@ -130,17 +130,30 @@ async def apply_renewal(subscription_id, session, bot: Bot):
         await bot.send_message(chat_id, "✅ سرویس شما با موفقیت تمدید شد!")
 
 async def renewal_job(bot: Bot):
-    bot_logger.debug("[RENEWAL JOB] Running")
+    """Native next-plan WATCHDOG (full switch, 2026-07-12 — Pasha).
+
+    Bookings are armed as PasarGuard ``next_plan`` at payment approval and the
+    PANEL fires them the moment the current plan runs out (data or expiry) —
+    no early app-side firing anymore. This sweep only reconciles state:
+
+    - booking armed on panel        -> waiting (nothing to do)
+    - armed_at stamped, panel empty -> the panel fired it: mark applied,
+                                       write history, DM the user
+    - never armed (pre-switch rows,
+      or a failed arm at approval)  -> arm it now (the migration path)
+
+    ``apply_renewal`` above stays as the manual/emergency app-side applier
+    (admin tooling), but no automatic path calls it anymore.
+    """
+    bot_logger.debug("[RENEWAL JOB] Watchdog running")
     async with AsyncSessionLocal() as session:
         subs = await crud.get_subscriptions_for_renewal(session)
-        bot_logger.debug("[RENEWAL JOB] Eligible count", count=len(subs))
-        now = datetime.utcnow()
+        bot_logger.debug("[RENEWAL JOB] Booked subs", count=len(subs))
+        counts = {}
         for sub in subs:
-            sub_id = sub.id
             marzban_username = sub.marzban_username
-            bot_logger.debug("[RENEWAL JOB] Checking", subscription_id=sub_id, username=marzban_username)
 
-            # Acquire short-lived lock for idempotency
+            # Short-lived lock — shared with the webhook reconcile path.
             lock_key = f"lock:renew:{marzban_username}"
             try:
                 if await cache.get(lock_key):
@@ -151,56 +164,23 @@ async def renewal_job(bot: Bot):
                 log_error(e, {"operation": "renewal_lock", "username": marzban_username})
 
             try:
-                # Prefer fast read via share-link when available
-                sub_token = getattr(sub, 'sub_token', None)
-                user_info = await pasarguard_api.get_fast_user_info(marzban_username, sub_token)
-                if not user_info:
-                    bot_logger.warning("[RENEWAL JOB] No user info", username=marzban_username)
-                    continue
-
-                expire_ts = user_info.get('expire')
-                if not expire_ts:
-                    bot_logger.warning("[RENEWAL JOB] No expire timestamp", username=marzban_username)
-                    continue
-
-                expire_dt = datetime.utcfromtimestamp(expire_ts)
-                time_remaining = expire_dt - now
-
-                data_limit = user_info.get('data_limit', 0) or 0
-                used_traffic = user_info.get('used_traffic', 0) or 0
-                remaining_bytes = max(data_limit - used_traffic, 0)
-                remaining_gb = remaining_bytes / (1024 ** 3)
-
-                # Calculate percentage of remaining traffic (treat unlimited as 100%)
-                remaining_percent = (remaining_bytes / data_limit * 100) if data_limit > 0 else 100
-
-                bot_logger.debug("[RENEWAL JOB] Decision", username=marzban_username, time_left=str(time_remaining), remaining_gb=f"{remaining_gb:.2f}", pct=f"{remaining_percent:.1f}%")
-
-                # Percent-based low-traffic trigger: if a booking exists and remaining ≤ threshold%, renew immediately
-                has_booking = bool(getattr(sub, 'renewal_paid', False) and getattr(sub, 'renewal_template', None))
-                if has_booking and remaining_percent <= SKIP_RENEW_TRAFFIC_THRESHOLD_PERCENT:
-                    bot_logger.info("[RENEWAL JOB] Trigger: low traffic percent with booking", username=marzban_username, remaining_percent=f"{remaining_percent:.1f}")
-                    await apply_renewal(sub_id, session, bot)
-                    continue
-
-                # Decision: Renew when either condition is critical
-                # - Remaining percent <= threshold OR
-                # - Time remaining <= threshold
-                should_renew = (
-                    remaining_percent <= SKIP_RENEW_TRAFFIC_THRESHOLD_PERCENT or
-                    time_remaining <= SKIP_RENEW_TIME_THRESHOLD
-                ) and has_booking
-
-                if should_renew:
-                    bot_logger.info("[RENEWAL JOB] Triggered by threshold(s)", username=marzban_username, remaining_percent=f"{remaining_percent:.1f}", time_left=str(time_remaining))
-                    await apply_renewal(sub_id, session, bot)
-                else:
-                    bot_logger.debug("[RENEWAL JOB] Skipped", username=marzban_username)
+                from app.services.nextplan import reconcile_booked_sub
+                outcome = await reconcile_booked_sub(session, sub, bot)
+                counts[outcome] = counts.get(outcome, 0) + 1
+                if outcome in ("armed", "adopted"):
+                    bot_logger.warning(
+                        "[RENEWAL JOB] Booking was not armed on panel — reconciled",
+                        username=marzban_username, outcome=outcome,
+                    )
+            except Exception as e:
+                log_error(e, {"operation": "renewal_watchdog", "username": marzban_username})
             finally:
                 try:
                     await cache.delete(lock_key)
                 except Exception:
                     pass
+        if counts:
+            bot_logger.info("[RENEWAL JOB] Watchdog summary", **{k: str(v) for k, v in counts.items()})
 
 if __name__ == "__main__":
     asyncio.run(renewal_job()) 

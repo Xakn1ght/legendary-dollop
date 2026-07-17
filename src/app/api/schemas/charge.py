@@ -21,3 +21,10 @@ class StartChargeRequest(BaseModel):
         if self.auto_renewal and not self.renewal_template:
             raise ValueError("renewal_template is required when auto_renewal is enabled")
         return self
+
+
+class BookPlanRequest(BaseModel):
+    """Schema for booking a next plan (native PasarGuard next_plan at approval)."""
+
+    subscription_id: int = Field(..., ge=1, description="Subscription to book a next plan for")
+    plan_name: str = Field(..., min_length=1, max_length=64, description="Plan template, plan@Nm or custom:<gb>")
