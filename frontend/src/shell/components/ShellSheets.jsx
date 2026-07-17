@@ -4,6 +4,9 @@ import { getWebApp } from '../../shared/telegram.js';
 import { api } from '../api.js';
 import { showToast } from '../toast.js';
 
+// CSS Modules pilot (2026-07-18): the export modal's styles are co-located
+// here instead of index.css — the convention for all new component styles.
+import exp from './ExportModal.module.css';
 import { Sheet } from './Sheet.jsx';
 
 // ---- one-tap app import -----------------------------------------------
@@ -311,18 +314,18 @@ export function ExportModal({ t, open, link, showQRFirst, onClose }) {
 
   return (
     <Sheet open={open} onClose={onClose} panelId="exportModal" backdropId="exportModalBackdrop" labelledBy="exportModalTitle">
-      <div className="exp-head">
+      <div className={exp.head}>
         <h2 id="exportModalTitle">{t('exportTitle')}</h2>
-        <button id="exportModalClose" className="exp-close" type="button" aria-label={t('close')} onClick={onClose}>
+        <button id="exportModalClose" className={exp.close} type="button" aria-label={t('close')} onClick={onClose}>
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" width="16" height="16" aria-hidden="true">
             <path d="M18 6 6 18M6 6l12 12" />
           </svg>
         </button>
       </div>
 
-      <div className="exp-link-row">
-        <div className="exp-link" id="exportLinkText" dir="ltr">{link || '—'}</div>
-        <button className={`exp-copy${copied ? ' ok' : ''}`} type="button" aria-label={t('copyLink')} onClick={copyLink}>
+      <div className={exp.linkRow}>
+        <div className={exp.link} id="exportLinkText" dir="ltr">{link || '—'}</div>
+        <button className={`${exp.copy}${copied ? ` ${exp.ok}` : ''}`} type="button" aria-label={t('copyLink')} onClick={copyLink}>
           {copied
             ? <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" width="16" height="16" aria-hidden="true"><polyline points="20 6 9 17 4 12" /></svg>
             : <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" width="16" height="16" aria-hidden="true"><rect x="9" y="9" width="13" height="13" rx="2" ry="2" /><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" /></svg>}
@@ -330,32 +333,32 @@ export function ExportModal({ t, open, link, showQRFirst, onClose }) {
       </div>
 
       {qrVisible && link && (
-        <div className="exp-qr-wrap" id="exportQRContainer">
+        <div className={exp.qrWrap} id="exportQRContainer">
           {qrDataUrl
-            ? <img id="exportQRImg" className="exp-qr" src={qrDataUrl} alt="QR Code" />
-            : <div className="exp-qr exp-qr-loading" aria-hidden="true" />}
+            ? <img id="exportQRImg" className={exp.qr} src={qrDataUrl} alt="QR Code" />
+            : <div className={`${exp.qr} ${exp.qrLoading}`} aria-hidden="true" />}
         </div>
       )}
 
       {appsVisible && (
-        <div id="exportAppGrid" className="exp-apps">
+        <div id="exportAppGrid" className={exp.apps}>
           {appsForPlatform().map((app) => (
             <button key={app.key} className="btn app-tile" onClick={() => openApp(app)}>
               {app.label}
             </button>
           ))}
           <AppFallbackRow t={t} app={lastTried} />
-          <a className="btn exp-apps-help" href="/webapp/dashboard/apps.html">
+          <a className={`btn ${exp.appsHelp}`} href="/webapp/dashboard/apps.html">
             {t('appGridHelp')}
           </a>
         </div>
       )}
 
-      <div className="exp-actions">
-        <button id="exportAddBtn" className={`btn btn-primary exp-primary${appsVisible ? ' open' : ''}`} onClick={() => setAppsVisible((v) => !v)}>
+      <div className={exp.actions}>
+        <button id="exportAddBtn" className={`btn btn-primary ${exp.primary}`} onClick={() => setAppsVisible((v) => !v)}>
           {t('addToApp')}
         </button>
-        <div className="exp-actions-row">
+        <div className={exp.actionsRow}>
           <button id="exportCopyBtn" className="btn" onClick={copyLink}>{t('copyLink')}</button>
           <button id="exportQRBtn" className="btn" onClick={() => setQrVisible(!qrVisible)}>
             {qrVisible ? t('hideQR') : t('showQR')}

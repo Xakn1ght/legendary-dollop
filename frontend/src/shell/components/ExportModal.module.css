@@ -1,0 +1,130 @@
+/* ExportModal — CSS MODULES PILOT (2026-07-18, Pasha: "i wanted everything
+   to be react … do what is best").
+   Convention proven here, for all future component styles:
+   - component-scoped rules live in a co-located *.module.css;
+   - the GLOBAL layers stay global on purpose: tokens.css (design tokens,
+     light/dark, accents), tier-worlds.css (premium themes), and shared
+     primitives like .btn — modules reference them via var(--*) and
+     :global(.btn) instead of redefining them;
+   - theme variants scope with :global([data-theme="light"]) / accent attrs.
+   Ported 1:1 from index.css's retired .exp-* block (v41). */
+
+.head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+.head h2 { margin: 0; }
+
+.close {
+  appearance: none;
+  flex-shrink: 0;
+  width: 38px;
+  height: 38px;
+  display: grid;
+  place-items: center;
+  border-radius: 12px;
+  border: 1px solid var(--line);
+  background: var(--chip);
+  color: var(--text);
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  transition: transform 0.12s ease, opacity 0.12s ease;
+}
+.close:active { transform: scale(0.92); }
+
+.linkRow {
+  display: flex;
+  gap: 8px;
+  margin-top: 14px;
+  align-items: stretch;
+}
+.link {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  padding: 11px 12px;
+  border-radius: 12px;
+  background: rgba(0, 0, 0, 0.25);
+  border: 1px solid var(--line);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 12px;
+  color: var(--text-soft, var(--muted));
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+:global([data-theme="light"]) .link { background: rgba(15, 23, 42, 0.05); }
+
+/* Same 38px square as .close — the old 42px width left its inner edge 4px
+   proud of the ✕ above it (Pasha 2026-07-17 "align these"). */
+.copy {
+  appearance: none;
+  flex-shrink: 0;
+  width: 38px;
+  border-radius: 12px;
+  display: grid;
+  place-items: center;
+  border: 1px solid var(--line);
+  background: var(--chip);
+  color: var(--text);
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  transition: transform 0.12s ease, color 0.15s ease, border-color 0.15s ease, background 0.15s ease;
+}
+.copy:active { transform: scale(0.92); }
+.copy.ok {
+  color: var(--ok);
+  border-color: rgba(var(--okRgb), 0.45);
+  background: rgba(var(--okRgb), 0.12);
+}
+
+.qrWrap {
+  display: flex;
+  justify-content: center;
+  margin-top: 16px;
+}
+.qr {
+  width: min(260px, 68vw);
+  height: auto;
+  aspect-ratio: 1;
+  border-radius: 16px;
+  background: #fff;
+  padding: 12px;
+  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.30), 0 0 0 1px rgba(255, 255, 255, 0.10);
+}
+:global([data-theme="light"]) .qr {
+  box-shadow: 0 8px 24px rgba(60, 48, 32, 0.12), 0 0 0 1px rgba(45, 38, 30, 0.08);
+}
+.qrLoading { background: linear-gradient(105deg, #f2f2f2 30%, #fff 50%, #f2f2f2 70%); }
+
+.apps {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  margin-top: 14px;
+}
+.apps :global(.btn) { justify-content: center; }
+.appsHelp {
+  grid-column: 1 / -1;
+  font-size: 12.5px;
+  color: var(--muted);
+}
+
+.actions { margin-top: 16px; }
+.primary {
+  width: 100%;
+  justify-content: center;
+  font-weight: 800;
+  font-size: 14.5px;
+  padding: 13px 16px;
+}
+.actionsRow {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  margin-top: 8px;
+}
+.actionsRow :global(.btn) { justify-content: center; }

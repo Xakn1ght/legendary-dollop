@@ -108,6 +108,14 @@ export function Sheet({ open, onClose, labelledBy, children, panelId, backdropId
     if (panel && open) { panel.style.transform = ''; panel.style.transition = ''; }
   }, [open]);
 
+  // Desktop Telegram Web: Escape dismisses like a tap on the backdrop.
+  useEffect(() => {
+    if (!open) return undefined;
+    const onKey = (e) => { if (e.key === 'Escape') { e.stopPropagation(); onClose && onClose(); } };
+    document.addEventListener('keydown', onKey, true);
+    return () => document.removeEventListener('keydown', onKey, true);
+  }, [open, onClose]);
+
   // Portal to <body>: rendered inside the page tree, any transformed/filtered
   // ancestor (page-transition containers) traps the sheet's z-index in its own
   // stacking context and the fixed bottom-nav paints OVER the sheet
