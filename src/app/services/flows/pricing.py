@@ -40,6 +40,7 @@ MAX_TOTAL_DISCOUNT_PERCENT = 90
 # plan-name plumbing around it.
 from app.core.pricing import (  # noqa: E402
     CUSTOM_MAX_GB,
+    CUSTOM_MAX_GB_NONVIP,
     CUSTOM_MIN_GB,
     PLAN_DURATION_DAYS,
     custom_gb_price,
@@ -141,19 +142,32 @@ _FA_DIGITS = str.maketrans("0123456789", "۰۱۲۳۴۵۶۷۸۹")
 def plan_display_name(plan_name: str, lang: str = "fa") -> str:
     """User-facing label; fixed plans keep their configured name.
 
-    Multi-month variants read as «<plan> | ۲ ماهه» / "<plan> | 2 Months",
-    with a stale «| یکماه» segment dropped from the base label.
+    Multi-month variants are rebuilt from the SCALED TOTAL GB («۷۰۰ گیگ VIP |
+    ۲ ماهه», not «۳۵۰ گیگ VIP | ۲ ماهه») so the name never contradicts the
+    quota shown/granted next to it — catalog names embed the per-month
+    number and mixing the two confused users (2026-07-15, Pasha shop
+    screenshot: title said 350, pill said 700).
     """
     base_name, months = parse_plan_months(plan_name)
     gb = parse_custom_plan(base_name)
     if gb is not None:
         return f"{gb} گیگ | سفارشی".translate(_FA_DIGITS) if lang == "fa" else f"{gb} GB | Custom"
-    if not months or months <= 1:
+    info = get_plan_info(plan_name)
+    # Bare VIP names resolve to their min_months package (2-month/700GB), so
+    # the rebuild keys off the RESOLVED months, not just an explicit suffix.
+    resolved_months = int(info.get("months") or 1) if info else int(months or 1)
+    if resolved_months <= 1:
         return plan_name
+    if info and info.get("gb"):
+        vip = " VIP" if info.get("vip_only") else ""
+        if lang == "fa":
+            return f"{int(info['gb'])} گیگ{vip} | {resolved_months} ماهه".translate(_FA_DIGITS)
+        return f"{int(info['gb'])} GB{vip} | {resolved_months} Months"
+    # Unknown/retired plan names (old order rows): fall back to string surgery.
     label = base_name.replace("| یکماه", "").replace("  ", " ").strip()
     if lang == "fa":
-        return f"{label} | {months} ماهه".translate(_FA_DIGITS)
-    return f"{label} | {months} Months"
+        return f"{label} | {resolved_months} ماهه".translate(_FA_DIGITS)
+    return f"{label} | {resolved_months} Months"
 
 # Coupon types spendable at checkout. Other types must be rejected, never silently
 # consumed. free_plan/free_autorenew are valued via the pricing curve and applied as a
@@ -239,6 +253,22 @@ async def quote_purchase(
     vip_only_order = bool(plan_info.get("vip_only")) or bool(renewal_info and renewal_info.get("vip_only"))
     if vip_only_order and not is_vip_user:
         raise QuoteError("vip_only_plan", "This plan is exclusive to VIP members")
+
+    # Multi-month purchasing is a VIP perk, full stop (2026-07-14, Pasha:
+    # "no other user except VIP should have the 2/3 months category and
+    # plans"). Non-VIP orders are 1-month only — any months>1 plan OR renewal
+    # template is rejected here on the money path, not just hidden in the UI.
+    if not is_vip_user and (
+        int(plan_info.get("months") or 1) > 1
+        or (renewal_info and int(renewal_info.get("months") or 1) > 1)
+    ):
+        raise QuoteError("months_vip_only", "Multi-month plans are exclusive to VIP members")
+
+    # Custom builds above the regular cap (300GB) are a VIP perk up to 500GB
+    # (2026-07-12). The catalog price curve already extends to 500; this is
+    # the money-path gate so a non-VIP can't craft custom:400.
+    if plan_info.get("custom") and int(plan_info.get("gb") or 0) > CUSTOM_MAX_GB_NONVIP and not is_vip_user:
+        raise QuoteError("custom_gb_vip_only", "Custom plans above 300 GB are for VIP members")
 
     total_discount_percent = 0
     if (

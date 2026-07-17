@@ -2,6 +2,7 @@ from aiohttp import web
 from sqlalchemy.future import select
 
 from app.api.deps import _verify_webapp_auth, set_tma_session_cookie
+from app.core.pricing import CUSTOM_MAX_GB, CUSTOM_MAX_GB_NONVIP, CUSTOM_MIN_GB
 from app.core.settings import (
     GLOBAL_PURCHASE_DISCOUNTS,
     VIP_PURCHASE_DISCOUNT_ENABLED,
@@ -73,6 +74,11 @@ async def handle_get_user_purchase_info(request: web.Request):
             "discounts": discount_list,
             "is_vip": is_vip,
             "auto_discounts": auto_discounts,
+            # VIP-aware custom-plan bounds so the shop/purchase UI shows the
+            # real ceiling (500 for VIP, 300 otherwise) instead of a hardcoded
+            # "1–300" — server is the single source (core/pricing.py).
+            "custom_min_gb": CUSTOM_MIN_GB,
+            "custom_max_gb": CUSTOM_MAX_GB if is_vip else CUSTOM_MAX_GB_NONVIP,
         }
 
         resp = web.json_response({"ok": True, "info": info})

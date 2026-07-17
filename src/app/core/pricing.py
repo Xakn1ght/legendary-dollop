@@ -16,9 +16,12 @@ Design rules:
 BASE_PLANS = {20: 90_000, 40: 180_000, 60: 250_000, 100: 400_000}
 PLAN_DURATION_DAYS = 35
 
-# Custom GB bounds
+# Custom GB bounds. The ABSOLUTE ceiling is 500 (VIP users, 2026-07-12);
+# regular users cap at CUSTOM_MAX_GB_NONVIP. The VIP gate is enforced in
+# flows/pricing.py (money path) and the custom-quote route (slider max).
 CUSTOM_MIN_GB = 1
-CUSTOM_MAX_GB = 300
+CUSTOM_MAX_GB = 500
+CUSTOM_MAX_GB_NONVIP = 300
 
 # Custom days bounds + pricing split (anchored at PLAN_DURATION_DAYS = ×1.0)
 DAYS_MIN = 15
@@ -51,7 +54,7 @@ def custom_gb_price(gb: int) -> int:
         return round_price(180_000 + (gb - 40) * 3_500)      # → 60 = 250k
     if gb <= 100:
         return round_price(250_000 + (gb - 60) * 3_750)      # → 100 = 400k
-    return round_price(400_000 + (gb - 100) * 4_000)         # → 300 = 1.2M
+    return round_price(400_000 + (gb - 100) * 4_000)         # → 300 = 1.2M, 500 = 2.0M
 
 
 def day_factor(days: int) -> float:

@@ -22,7 +22,8 @@ def test_base_plan_prices():
 
 def test_custom_gb_hits_anchors():
     expected = {1: 5_000, 10: 50_000, 20: 90_000, 40: 180_000,
-                60: 250_000, 80: 325_000, 100: 400_000, 150: 600_000, 300: 1_200_000}
+                60: 250_000, 80: 325_000, 100: 400_000, 150: 600_000,
+                300: 1_200_000, 500: 2_000_000}  # 500 = VIP ceiling (2026-07-12)
     for gb, price in expected.items():
         assert custom_gb_price(gb) == price, f"{gb}GB → {custom_gb_price(gb)} != {price}"
 
@@ -33,17 +34,20 @@ def test_custom_gb_matches_base_plans():
 
 
 def test_custom_gb_monotonic():
-    prices = [custom_gb_price(g) for g in range(1, 301)]
+    prices = [custom_gb_price(g) for g in range(1, 501)]
     assert all(b >= a for a, b in zip(prices, prices[1:]))
 
 
 def test_custom_gb_out_of_range():
-    for bad in (0, 301, -5):
+    # Absolute ceiling is 500 (VIP). 301-500 are valid at the price level;
+    # the 300-vs-500 gate is VIP enforcement in flows/pricing.py, not here.
+    for bad in (0, 501, -5):
         try:
             custom_gb_price(bad)
             assert False, f"{bad} should raise"
         except ValueError:
             pass
+    assert custom_gb_price(301) > 0 and custom_gb_price(500) == 2_000_000
 
 
 def test_custom_days_protective():

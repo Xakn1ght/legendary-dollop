@@ -45,11 +45,12 @@ DASHBOARD_SUBSCRIPTION_DOMAIN_ENFORCE = (
 )
 
 # Purchase: automatic discounts (VIP / global events)
+# 15% since 2026-07-13 (Pasha: "change the vip discount to 15 percent only").
 VIP_PURCHASE_DISCOUNT_ENABLED = os.environ.get("VIP_PURCHASE_DISCOUNT_ENABLED", "true").lower() == "true"
 try:
-    VIP_PURCHASE_DISCOUNT_PERCENT = int(os.environ.get("VIP_PURCHASE_DISCOUNT_PERCENT", "20"))
+    VIP_PURCHASE_DISCOUNT_PERCENT = int(os.environ.get("VIP_PURCHASE_DISCOUNT_PERCENT", "15"))
 except Exception:
-    VIP_PURCHASE_DISCOUNT_PERCENT = 20
+    VIP_PURCHASE_DISCOUNT_PERCENT = 15
 VIP_PURCHASE_DISCOUNT_PERCENT = max(0, min(VIP_PURCHASE_DISCOUNT_PERCENT, 90))
 
 # JSON list of global discounts applied to everyone, e.g.:

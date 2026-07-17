@@ -129,11 +129,23 @@ def test_quotes():
             q = await quote_purchase(db, user, plan_name="۲۰ گیگ | یکماه", renewal_plan="۳۵۰ گیگ VIP")
             assert q.discount_percent == 0 and q.base_total == 90_000 + 1_725_000, vars(q)
 
-        # non-VIP: vip-exclusive rejected outright
+        # non-VIP: vip-exclusive rejected outright; multi-month is a VIP perk
+        # (2026-07-14) so even a REGULAR plan @2m is rejected for non-VIP.
         Session2, user2 = await _quote_env(is_vip=False)
         async with Session2() as db:
-            q = await quote_purchase(db, user2, plan_name="۲۰ گیگ | یکماه@2m")
-            assert (q.plan_price, q.discount_percent) == (180_000, 0), vars(q)
+            q = await quote_purchase(db, user2, plan_name="۲۰ گیگ | یکماه")
+            assert (q.plan_price, q.discount_percent) == (90_000, 0), vars(q)
+            try:
+                await quote_purchase(db, user2, plan_name="۲۰ گیگ | یکماه@2m")
+                assert False, "non-VIP multi-month must be rejected"
+            except QuoteError as e:
+                assert e.code == "months_vip_only", e.code
+            try:
+                await quote_purchase(db, user2, plan_name="۲۰ گیگ | یکماه",
+                                     renewal_plan="۲۰ گیگ | یکماه@2m")
+                assert False, "non-VIP multi-month renewal must be rejected"
+            except QuoteError as e:
+                assert e.code == "months_vip_only", e.code
             try:
                 await quote_purchase(db, user2, plan_name="۳۵۰ گیگ VIP@2m")
                 assert False, "non-VIP must be rejected"
