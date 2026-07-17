@@ -33,6 +33,10 @@ from app.services.flows.errors import FlowError
 
 REWARD_GB = 1
 IN_ORBIT_DAYS = 90
+# deepSpace: 1 TB of LIFETIME traffic on a single subscription. The panel's
+# lifetime_used_traffic survives renewal resets (image-15: "Total: 3.53 TB"),
+# so heavy long-term users hit this across many 100GB refills.
+DEEP_SPACE_GB = 1024
 
 # Subscription rows that reached payment: draft/pending never got approved and
 # denied/cancelled rows are deleted, so anything else was a real purchase.
@@ -79,6 +83,57 @@ async def _account_days(session: AsyncSession, user: User) -> int:
     return max(0, (datetime.datetime.utcnow() - user.created_at).days)
 
 
+async def _lifetime_traffic_gb(session: AsyncSession, user: User) -> int:
+    """Best (max) LIFETIME panel traffic in GB across the user's services.
+
+    Uses the admin user object's ``lifetime_used_traffic`` (survives renewal
+    resets — the "Total" column in the panel). max() with the current-period
+    ``used_traffic`` guards panels that only roll lifetime up at reset time.
+    Panel-shield: one burst per user per hour via a dedicated Redis key; a
+    total read failure is NOT cached so the next view retries.
+    """
+    from app.core.redis_config import cache
+
+    cache_key = f"ach:lifetime_gb:{user.id}"
+    try:
+        cached = await cache.get(cache_key)
+        if cached is not None:
+            return int(cached)
+    except Exception:
+        pass
+
+    usernames = (await session.execute(
+        select(Subscription.marzban_username).where(
+            Subscription.user_id == user.id,
+            Subscription.marzban_username.isnot(None),
+        )
+    )).scalars().all()
+
+    from app.services.pasarguard import pasarguard_api
+
+    best_bytes = 0
+    any_read = False
+    for uname in usernames[:5]:  # hard cap on panel calls per snapshot
+        try:
+            info = await pasarguard_api.get_user_info(uname)
+        except Exception:
+            info = None
+        if not info:
+            continue
+        any_read = True
+        lifetime = int(info.get("lifetime_used_traffic") or 0)
+        used = int(info.get("used_traffic") or 0)
+        best_bytes = max(best_bytes, lifetime, used)
+
+    gb = best_bytes // (1024 ** 3)
+    if any_read or not usernames:
+        try:
+            await cache.set(cache_key, gb, ttl=3600)
+        except Exception:
+            pass
+    return gb
+
+
 async def _evaluate(session: AsyncSession, user: User, key: str) -> tuple[int, int]:
     """Return (progress, target) for one achievement, capped at target."""
     if key == "launch":
@@ -99,6 +154,8 @@ async def _evaluate(session: AsyncSession, user: User, key: str) -> tuple[int, i
         return (1 if await UserRepository.is_user_vip(session, user.id) else 0), 1
     if key == "arcadePilot":
         return min(1, await _arcade_runs(session, user)), 1
+    if key == "deepSpace":
+        return min(DEEP_SPACE_GB, await _lifetime_traffic_gb(session, user)), DEEP_SPACE_GB
     if key == "inOrbit":
         days = min(IN_ORBIT_DAYS, await _account_days(session, user))
         # both legs required: the day counter only "completes" for buyers
@@ -111,7 +168,7 @@ async def _evaluate(session: AsyncSession, user: User, key: str) -> tuple[int, i
 # Order = display order on the profile page.
 ACHIEVEMENT_KEYS = (
     "launch", "refuel", "starHunter", "orbiter", "supernova",
-    "envoy", "fleetCommander", "crew", "arcadePilot", "inOrbit",
+    "envoy", "fleetCommander", "crew", "arcadePilot", "deepSpace", "inOrbit",
 )
 
 # envoy/fleetCommander and star tiers share underlying counters — evaluate the
@@ -127,6 +184,7 @@ async def snapshot(session: AsyncSession, user: User) -> dict:
     arcade = await _arcade_runs(session, user)
     days = await _account_days(session, user)
     is_vip = await UserRepository.is_user_vip(session, user.id)
+    lifetime_gb = await _lifetime_traffic_gb(session, user)
 
     progress = {
         "launch": (min(1, purchases), 1),
@@ -138,6 +196,7 @@ async def snapshot(session: AsyncSession, user: User) -> dict:
         "fleetCommander": (min(20, active_refs), 20),
         "crew": ((1 if is_vip else 0), 1),
         "arcadePilot": (min(1, arcade), 1),
+        "deepSpace": (min(DEEP_SPACE_GB, lifetime_gb), DEEP_SPACE_GB),
         "inOrbit": (
             min(IN_ORBIT_DAYS, days) if (days < IN_ORBIT_DAYS or purchases >= 1) else IN_ORBIT_DAYS - 1,
             IN_ORBIT_DAYS,
