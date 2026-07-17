@@ -3,18 +3,18 @@ import time
 
 from aiogram import F
 from aiogram.exceptions import TelegramBadRequest
-from aiogram.types import BufferedInputFile, CallbackQuery, InputMediaAnimation
+from aiogram.types import BufferedInputFile, CallbackQuery, InputMediaPhoto
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database.models import Subscription
 from app.services.pasarguard import pasarguard_api
 from app.utils.bot_i18n import get_cached_lang, t
-from app.utils.render_manager import render_subscription_gif_async
+from app.utils.render_manager import render_subscription_photo_async
 
 from ..constants import STATUS_MAP_NO_EMOJI
 from ..subscription_details import build_subscription_detail
 from ..utils import convert_to_gb
-from .common import _last_gif_refresh, _last_text_refresh, router
+from .common import _last_image_refresh, _last_text_refresh, router
 
 
 @router.callback_query(F.data.startswith("refresh_"))
@@ -86,13 +86,13 @@ async def refresh_subscription(callback: CallbackQuery, session: AsyncSession):
         except Exception:
             pass
 
-    # If GIF cooldown (1h) has passed, silently regenerate in background
+    # If image cooldown (1h) has passed, silently regenerate in background
     try:
-        key_gif = (callback.from_user.id, sub_id)
+        key_img = (callback.from_user.id, sub_id)
         now2 = time.time()
-        last_gif = _last_gif_refresh.get(key_gif)
-        if not last_gif or now2 - last_gif >= 3600:
-            _last_gif_refresh[key_gif] = now2
+        last_img = _last_image_refresh.get(key_img)
+        if not last_img or now2 - last_img >= 3600:
+            _last_image_refresh[key_img] = now2
             expire_ts = int(user_info.get('expire') or 0)
             if expire_ts > 0:
                 import time as _t
@@ -100,16 +100,17 @@ async def refresh_subscription(callback: CallbackQuery, session: AsyncSession):
                 days_num = secs_left // (60 * 60 * 24)
             else:
                 days_num = "نامحدود"
-            gif_bytes = await render_subscription_gif_async(
+            photo_bytes = await render_subscription_photo_async(
                 used_gb=convert_to_gb(user_info.get('used_traffic', 0)),
                 limit_gb=convert_to_gb(user_info.get('data_limit', 0)),
                 days_remaining=days_num,
                 carry_gb=convert_to_gb(getattr(sub, 'carry_over_bytes', 0) or 0),
                 status_str=STATUS_MAP_NO_EMOJI.get(user_info.get('status', 'unknown'), 'نامشخص'),
                 username=sub.marzban_username,
+                expire_ts=expire_ts,
             )
-            media = InputMediaAnimation(
-                media=BufferedInputFile(file=gif_bytes, filename="chart.gif"),
+            media = InputMediaPhoto(
+                media=BufferedInputFile(file=photo_bytes, filename="chart.png"),
                 caption=text,
                 parse_mode="HTML"
             )
@@ -156,13 +157,13 @@ async def subscription_detail(callback: CallbackQuery, session: AsyncSession):
         except TelegramBadRequest as e:
             if "message is not modified" not in str(e):
                 pass
-    # Auto-regenerate GIF in background on open if 1h cooldown passed (no button press needed)
+    # Auto-regenerate the photo in background on open if 1h cooldown passed (no button press needed)
     try:
-        key_gif = (callback.from_user.id, sub_id)
+        key_img = (callback.from_user.id, sub_id)
         now2 = time.time()
-        last_gif = _last_gif_refresh.get(key_gif)
-        if not last_gif or now2 - last_gif >= 3600:
-            _last_gif_refresh[key_gif] = now2
+        last_img = _last_image_refresh.get(key_img)
+        if not last_img or now2 - last_img >= 3600:
+            _last_image_refresh[key_img] = now2
             expire_ts = int(user_info.get('expire') or 0)
             if expire_ts > 0:
                 import time as _t
@@ -170,16 +171,17 @@ async def subscription_detail(callback: CallbackQuery, session: AsyncSession):
                 days_num = secs_left // (60 * 60 * 24)
             else:
                 days_num = "نامحدود"
-            gif_bytes = await render_subscription_gif_async(
+            photo_bytes = await render_subscription_photo_async(
                 used_gb=convert_to_gb(user_info.get('used_traffic', 0)),
                 limit_gb=convert_to_gb(user_info.get('data_limit', 0)),
                 days_remaining=days_num,
                 carry_gb=convert_to_gb(getattr(sub, 'carry_over_bytes', 0) or 0),
                 status_str=STATUS_MAP_NO_EMOJI.get(user_info.get('status', 'unknown'), 'نامشخص'),
                 username=sub.marzban_username,
+                expire_ts=expire_ts,
             )
-            media = InputMediaAnimation(
-                media=BufferedInputFile(file=gif_bytes, filename="chart.gif"),
+            media = InputMediaPhoto(
+                media=BufferedInputFile(file=photo_bytes, filename="chart.png"),
                 caption=text,
                 parse_mode="HTML"
             )

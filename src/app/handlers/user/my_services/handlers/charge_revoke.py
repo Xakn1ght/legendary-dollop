@@ -3,7 +3,7 @@ from datetime import datetime
 
 from aiogram import F
 from aiogram.fsm.context import FSMContext
-from aiogram.types import CallbackQuery, InputMediaAnimation
+from aiogram.types import CallbackQuery
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import crud
@@ -139,13 +139,10 @@ async def revoke_subscription(callback: CallbackQuery, session: AsyncSession, st
                 try:
                     await callback.message.edit_text(detail_text, parse_mode="HTML", reply_markup=detail_kb.as_markup())
                 except Exception:
-                    # If it's an animation/photo, prefer editing media with the same file_id to keep the GIF and caption
+                    # Media card (photo now; legacy animation cards too): keep the
+                    # media, refresh only the caption + keyboard.
                     try:
-                        if getattr(callback.message, 'animation', None) and getattr(callback.message.animation, 'file_id', None):
-                            media = InputMediaAnimation(media=callback.message.animation.file_id, caption=detail_text, parse_mode="HTML")
-                            await callback.message.edit_media(media=media, reply_markup=detail_kb.as_markup())
-                        else:
-                            await callback.message.edit_caption(detail_text, parse_mode="HTML", reply_markup=detail_kb.as_markup())
+                        await callback.message.edit_caption(detail_text, parse_mode="HTML", reply_markup=detail_kb.as_markup())
                     except Exception:
                         # Last resort: do nothing (keep prior card) to avoid blank captions
                         pass

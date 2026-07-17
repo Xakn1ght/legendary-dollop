@@ -5,7 +5,7 @@ router = Router()
 
 _last_link_click = {}
 _last_text_refresh = {}
-_last_gif_refresh = {}
+_last_image_refresh = {}
 
 
 class ServiceManagementState(StatesGroup):
