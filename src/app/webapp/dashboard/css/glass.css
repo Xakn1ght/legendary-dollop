@@ -4518,11 +4518,19 @@ html.kb-open .picker-panel.active {
 /* Bottom sheets (add-sub / launcher / redeem): lift above the keyboard —
    without this the whole panel (input included) sat buried under it
    (Pasha, add-sub import, 2026-07-08). Keyboard replaces the navbar, so
-   the safe-area bottom padding collapses while it's up. */
+   the safe-area bottom padding collapses while it's up.
+   Lifted-state cap (Pasha, add-sub keyboard, 2026-07-18): the visible
+   strip is 100vh minus --kb — same window.innerHeight reference head-boot
+   measures --kb against (dvh is keyboard-blind here) — and it must keep
+   the base rule's --tg-safe-top term, or the lifted sheet grows under
+   Telegram's floating controls with a cap too generous for the internal
+   scroller to ever engage. No overflow on the panel itself: .sheet-content
+   is the one scroller (flex column contract) — a second scroller kept
+   [data-sheet-scroll] at scrollTop 0, so drag-to-dismiss read every
+   scroll attempt as "at top" and pulled the sheet closed. */
 html.kb-open .sheet-panel.open {
   bottom: var(--kb, 0px) !important;
-  max-height: calc(100dvh - var(--kb, 0px) - 12px);
-  overflow-y: auto;
+  max-height: calc(100vh - var(--kb, 0px) - max(env(safe-area-inset-top, 0px), var(--tg-safe-top, 0px)) - 10px);
 }
 html.kb-open .sheet-panel.open .sheet-content {
   padding-bottom: 16px;
