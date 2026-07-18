@@ -8,7 +8,7 @@ import { PlanRows } from './PlanRows.jsx';
 // of the old number-block grid ("the ui is kinda horrible").
 export function PackageSection({
   t, fmt, lang, packages, packagesStatus, autoDiscounts,
-  selected, isVip, months = 1, onMonthsChange, onSelect, onBack, onContinue,
+  selected, isVip, months = 1, onMonthsChange, onSelect, autoOpenCustom = false, onBack, onContinue,
 }) {
   return (
     <div className="section active" id="section-package">
@@ -59,6 +59,7 @@ export function PackageSection({
             months={months}
             selected={selected}
             onSelect={onSelect}
+            autoOpenCustom={autoOpenCustom}
             idPrefix="chargepkg"
           />
         )}

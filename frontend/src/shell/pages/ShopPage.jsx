@@ -3,6 +3,7 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { PackageIcon } from '../../shared/icons.jsx';
 import { getWebApp, hapticImpact, hapticSelection } from '../../shared/telegram.js';
 import { api, canUseSessionStorage, getUrlAuthToken } from '../api.js';
+import { SubDropdown } from '../components/SubDropdown.jsx';
 import { useShell } from '../ShellContext.js';
 
 import { i18nShop } from './shopI18n.js';
@@ -348,26 +349,19 @@ export function ShopPage() {
         <div className="shop-charge-section">
           <div className="shop-sub-picker" id="shopSubPicker">
             <div className="shop-sub-picker-label">{tt('selectSub')}</div>
-            <select
+            {/* Themed in-page dropdown (2026-07-18) — the native <select>
+                opened the OS sheet, which clashed with the app theme. */}
+            <SubDropdown
               ref={subSelectRef}
-              className="shop-sub-select"
-              id="shopSubSelect"
-              aria-label="Select subscription"
+              subs={subs}
               value={selectedSubId}
-              style={subHighlight ? { borderColor: 'rgba(var(--brandRgb),0.5)' } : undefined}
-              onChange={(e) => setSelectedSubId(String(e.target.value || ''))}
-            >
-              {subs === null && <option value="">{tt('loadingSubs')}</option>}
-              {subs !== null && subs.length === 0 && <option value="">{tt('noActiveSubs')}</option>}
-              {subs !== null && subs.length > 0 && (
-                <>
-                  <option value="">{tt('selectSubPlaceholder')}</option>
-                  {subs.map((s) => (
-                    <option key={s.id} value={s.id}>{s.name || s.username || s.marzban_username || ('#' + s.id)}</option>
-                  ))}
-                </>
-              )}
-            </select>
+              onChange={setSelectedSubId}
+              placeholder={tt('selectSubPlaceholder')}
+              loadingLabel={tt('loadingSubs')}
+              emptyLabel={tt('noActiveSubs')}
+              ariaLabel={tt('selectSub')}
+              highlight={subHighlight}
+            />
             <div className="shop-sub-hint">{tt('subHint')}</div>
           </div>
           <div className="shop-section-head">
@@ -437,6 +431,31 @@ export function ShopPage() {
                 </div>
               );
             })}
+            {/* Build-your-own top-up (2026-07-18, Pasha: "custom doesnt exist
+                here") — same custom row as the purchase tab; deep-links to
+                the charge app which auto-opens the GB editor. */}
+            {chargeStatus === 'ready' && chargePackages.length > 0 && (
+              <div
+                className="shop-plan-card shop-charge-card shop-plan-custom"
+                role="button"
+                tabIndex={0}
+                onClick={() => chooseCharge('custom')}
+                onKeyDown={(e) => { if (e.key === 'Enter') chooseCharge('custom'); }}
+              >
+                <div className="shop-plan-top-row">
+                  <div className="shop-plan-title" style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+                    <PackageIcon size={16} /> {tt('customPlanTitle')}
+                  </div>
+                  <Chevron />
+                </div>
+                <div className="shop-plan-bottom-row">
+                  <div className="shop-plan-badges">
+                    <span className="shop-plan-pill gb">{customPill}</span>
+                  </div>
+                  <div className="shop-plan-price"><span className="new">{tt('customPlanPrice')}</span></div>
+                </div>
+              </div>
+            )}
           </div>
           {chargeStatus === 'error' && <div className="shop-empty" id="shopChargeEmpty">{tt('chargeFailed')}</div>}
           {chargeStatus === 'ready' && chargePackages.length === 0 && <div className="shop-empty" id="shopChargeEmpty">{tt('chargeEmpty')}</div>}

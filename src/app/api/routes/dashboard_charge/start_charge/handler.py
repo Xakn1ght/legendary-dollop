@@ -2,11 +2,12 @@ from aiohttp import web
 
 from app.api.deps import _verify_webapp_auth, set_tma_session_cookie
 from app.api.schemas import StartChargeRequest, validate_request
-from app.core.settings import CHARGE_PRESET_PACKAGES
+from app.core.settings import PLANS
 from app.database import crud
 from app.database.models import AsyncSessionLocal
 from app.services.flows.charge import start_charge_order
 from app.services.flows.errors import FlowError
+from app.services.flows.pricing import get_plan_info
 
 _ERROR_STATUS = {
     "subscription_not_found": 404,
@@ -62,7 +63,10 @@ async def handle_start_charge(request: web.Request):
                 body["remaining_gb"] = getattr(e, "remaining_gb", None)
             return web.json_response(body, status=_ERROR_STATUS.get(e.code, 400))
 
-        pkg_info = CHARGE_PRESET_PACKAGES[validated.package]
+        # Plan parity (2026-07-18): packages ARE the purchase PLANS —
+        # get_plan_info resolves fixed, "@Nm" and "custom:<gb>" names alike
+        # (the old CHARGE_PRESET_PACKAGES[...] lookup KeyError'd on custom).
+        pkg_info = get_plan_info(validated.package, PLANS) or {}
         resp_data = {
             "ok": True,
             "order": {

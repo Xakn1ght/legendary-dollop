@@ -76,7 +76,7 @@ function PriceCol({ price, finalPrice, perGb, t, fmt }) {
 
 // Build-your-own row: inline slider editor, priced by the server curve
 // (/purchase/custom-quote table = the EXACT prices flows/charge.py bills).
-function CustomRow({ t, fmt, lang, autoDiscounts, selected, onSelect, customDays = 35 }) {
+function CustomRow({ t, fmt, lang, autoDiscounts, selected, onSelect, autoOpen = false, customDays = 35 }) {
   const [open, setOpen] = useState(!!selected?.custom);
   const [gb, setGb] = useState(selected?.custom ? selected.gb : 50);
   const [maxGb, setMaxGb] = useState(300); // VIP-aware ceiling from the server (300 / 500)
@@ -135,6 +135,20 @@ function CustomRow({ t, fmt, lang, autoDiscounts, selected, onSelect, customDays
     if (selected && !selected.custom && open) { setOpen(false); setPrice(null); }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selected]);
+
+  // ?package=custom deep link: autoOpen arrives async (after packages + URL
+  // params load) — mirror PlanGrid's CustomPlanCard: open the editor, quote
+  // the current GB (which auto-selects) and bring the row into view.
+  useEffect(() => {
+    if (!autoOpen) return;
+    setOpen(true);
+    loadTable();
+    quote(parseInt(gbRef.current, 10) || 50);
+    setTimeout(() => {
+      try { rowRef.current?.scrollIntoView({ block: 'center', behavior: 'smooth' }); } catch (_) { /* ignore */ }
+    }, 120);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- loadTable/quote are stable per render
+  }, [autoOpen]);
 
   const setGbClamped = (raw) => {
     let v = parseInt(raw, 10);
@@ -217,7 +231,7 @@ function CustomRow({ t, fmt, lang, autoDiscounts, selected, onSelect, customDays
 
 export function PlanRows({
   t, fmt, lang, plans, autoDiscounts,
-  months = 1, selected, onSelect, showCustom = true, customDays = 35, idPrefix = 'planrow',
+  months = 1, selected, onSelect, showCustom = true, autoOpenCustom = false, customDays = 35, idPrefix = 'planrow',
 }) {
   // Month tab governs for everyone: plans below their min_months are hidden
   // (a min_months=2 VIP bundle never sits on the 1-month tab, 2026-07-14).
@@ -277,6 +291,7 @@ export function PlanRows({
           autoDiscounts={autoDiscounts}
           selected={selected}
           onSelect={onSelect}
+          autoOpen={autoOpenCustom}
           customDays={customDays}
         />
       )}

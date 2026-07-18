@@ -68,6 +68,9 @@ export function ChargeApp() {
   // Booking mode (image-6 "book button"): step 2 picks a next PLAN instead of
   // a top-up package; at approval the panel arms it as a native next_plan.
   const [bookingMode, setBookingMode] = useState(false);
+  // ?package=custom deep link (shop charge tab custom row): auto-open the
+  // custom row's GB editor on step 2 — threaded down to PlanRows' CustomRow.
+  const [autoOpenCustom, setAutoOpenCustom] = useState(false);
   const [useCredit, setUseCredit] = useState(false);
   const [autoRenewal, setAutoRenewal] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
@@ -483,18 +486,25 @@ export function ChargeApp() {
           selectedSubRef.current = sub;
           setSelectedSubId(sub.id);
           if (prePkg && pkgs.length > 0) {
-            const match = pkgs.find((p) => String(p.name) === String(prePkg));
-            if (match) {
+            if (String(prePkg) === 'custom') {
+              // Shop's custom row: land on step 2 with the GB editor open —
+              // the editor's quote auto-selects, no package object needed here.
               await goToStep(2);
-              // Build the same scaled selection object PlanRows would hand
-              // back (min_months-aware: a VIP bundle resolves to >= 2).
-              const tDetected = makeT(detected);
-              const fmtDetected = (n) => formatNumber(n, detected);
-              const sel = scaledSelection(match, preMonths, detected, tDetected, fmtDetected);
-              if (sel.months > 1) setMonths(sel.months);
-              selectedPkgRef.current = sel;
-              setSelectedPackage(sel);
-              if (preStep && preStep >= 3) setTimeout(() => goToStep(3), 100);
+              setAutoOpenCustom(true);
+            } else {
+              const match = pkgs.find((p) => String(p.name) === String(prePkg));
+              if (match) {
+                await goToStep(2);
+                // Build the same scaled selection object PlanRows would hand
+                // back (min_months-aware: a VIP bundle resolves to >= 2).
+                const tDetected = makeT(detected);
+                const fmtDetected = (n) => formatNumber(n, detected);
+                const sel = scaledSelection(match, preMonths, detected, tDetected, fmtDetected);
+                if (sel.months > 1) setMonths(sel.months);
+                selectedPkgRef.current = sel;
+                setSelectedPackage(sel);
+                if (preStep && preStep >= 3) setTimeout(() => goToStep(3), 100);
+              }
             }
           } else if (preStep && preStep >= 2) {
             setTimeout(() => goToStep(2), 80);
@@ -592,6 +602,7 @@ export function ChargeApp() {
             months={months}
             onMonthsChange={changeMonths}
             onSelect={selectPackage}
+            autoOpenCustom={autoOpenCustom}
             onBack={() => goToStep(1)}
             onContinue={() => goToStep(3)}
           />

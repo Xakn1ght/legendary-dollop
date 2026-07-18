@@ -138,7 +138,9 @@ html[lang="fa"] .back-btn svg { transform: rotate(180deg); }
   display: flex;
   align-items: center;
   gap: 8px;
-  margin-bottom: 20px;
+  /* .content's flex gap (14px) already separates the bar from the section —
+     the old 20px margin doubled up to a 34px hole under the progress bar. */
+  margin-bottom: 4px;
 }
 .step {
   flex: 1;
@@ -168,23 +170,39 @@ html[lang="fa"] .back-btn svg { transform: rotate(180deg); }
 @media (min-width: 500px) { .card { padding: 20px; } }
 @media (max-width: 380px) { .card { padding: 14px; border-radius: 12px; } }
 
+/* Cohesion pass (2026-07-18, Pasha: "look how clean the purchase and shop
+   pages are"): adopt purchase.css's card-title anatomy — gradient icon chip
+   + 16px title — instead of the old 28px hardcoded-white heading (which was
+   also invisible on the light theme's white cards). */
 .card-title {
-  font-size: 28px;
-  font-weight: 800;
-  margin-bottom: 8px;
-  color: #fff;
-  letter-spacing: -0.5px;
+  font-size: 16px;
+  font-weight: 700;
+  margin-bottom: 16px;
+  color: var(--text);
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  overflow: hidden;
+  word-break: break-word;
 }
-
 
 .card-title .icon {
-  display: none;
+  width: 32px;
+  height: 32px;
+  border-radius: 10px;
+  background: linear-gradient(135deg, var(--brand), var(--brandDark));
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
 }
+.card-title .icon svg { width: 18px; height: 18px; fill: #fff; }
 
 .card-subtitle {
-  font-size: 15px;
-  color: rgba(255, 255, 255, 0.6);
-  margin-bottom: 24px;
+  font-size: 13.5px;
+  color: var(--muted);
+  margin-top: -6px;
+  margin-bottom: 16px;
   line-height: 1.5;
 }
 
@@ -520,20 +538,50 @@ input:checked + .toggle-slider:before { transform: translateX(20px); }
   overflow-x: hidden;
 }
 
+/* The section is the touch scroller for steps 2+. It used to be
+   min-height:100% (100% of .content's CONTENT box) which, stacked with the
+   steps bar + flex gap, overflowed .content by ~38px — .content is
+   overflow:hidden, so that tail was unreachable by touch and the last plan
+   row could never fully scroll out from behind the sticky footer
+   (2026-07-18, Pasha's overlap screenshots). flex:1 + min-height:0 makes it
+   exactly fill the leftover space instead. */
 .section.active {
   display: flex;
   flex-direction: column;
   gap: 14px;
   animation: fadeIn 0.3s ease;
-  min-height: 100%;
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior: contain;
+  scrollbar-width: none;
 }
+.section.active::-webkit-scrollbar { width: 0; height: 0; }
 
+/* Floating action dock: the step buttons used to be bare sticky buttons with
+   a transparent strip — list rows showed through the gaps around them and the
+   last row hid underneath with no clearance. Now they ride a bottom-sheet
+   glass bar (sheet blur is allowed by the design rules; money page, so no
+   ambient motion). Safe area is already cleared by .container's
+   padding-bottom, so the dock only needs a small visual lift. */
 .section > .btn, .section > .btn-container, .section > .bottom-actions {
   position: sticky;
-  bottom: 0;
+  bottom: 8px;
   z-index: 40;
-  padding-top: 16px;
-  padding-bottom: calc(env(safe-area-inset-bottom, 0px) + 16px + var(--astro-safe-bottom-extra, 0px));
+  margin-top: 10px; /* + the section's 14px gap = clearance at full scroll */
+  padding: 10px;
+  border-radius: 18px;
+  background: var(--bottomSheetBg);
+  border: 1px solid var(--bottomSheetBorder);
+  backdrop-filter: blur(16px) saturate(148%);
+  -webkit-backdrop-filter: blur(16px) saturate(148%);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.30);
+}
+[data-theme="light"] .section > .btn,
+[data-theme="light"] .section > .btn-container,
+[data-theme="light"] .section > .bottom-actions {
+  box-shadow: 0 10px 26px rgba(15, 23, 42, 0.14);
 }
 
 /* Step 1: Auto-fit subscription list height */
@@ -585,12 +633,26 @@ body[data-charge-step="1"] .subs-scroll {
   -webkit-overflow-scrolling: touch;
 }
 
+/* Step 1 keeps its approved static footer (the subs list scrolls in
+   .subs-scroll ABOVE it — no overlap there): undo the floating-dock chrome
+   and restore the original paddings. Selector outweighs the dock rules'
+   light-theme shadow variant too. */
+body[data-charge-step="1"] .section > .bottom-actions,
 body[data-charge-step="1"] .bottom-actions {
   flex-shrink: 0;
+  padding-top: 16px;
+  padding-bottom: calc(env(safe-area-inset-bottom, 0px) + 16px + var(--astro-safe-bottom-extra, 0px));
   padding-left: clamp(12px, 3.5vw, 18px);
   padding-right: clamp(12px, 3.5vw, 18px);
   margin-top: 0;
   position: relative;
+  bottom: auto;
+  background: transparent;
+  border: none;
+  border-radius: 0;
+  box-shadow: none;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
 }
 
 body[data-charge-step="1"] .bottom-actions .btn {
