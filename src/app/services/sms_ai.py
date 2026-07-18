@@ -14,9 +14,11 @@ Providers (checked in this order; set whichever key you have in config/.env):
   - GEMINI_API_KEY      Google AI Studio free tier (~1500 req/day on Flash).
     GEMINI_API_KEY2     Optional second key (different Google account) used
                         when the first is quota-exhausted: keys iterate OUTER,
-                        models INNER — HTTP 429 jumps to the next key (same
-                        model list), HTTP 404 tries the next model (same key).
-                        2026-format keys start with "AQ." (old "AIza…" work).
+                        models INNER — 429 tries the NEXT MODEL on the same
+                        key first, then the next key — free-tier quotas are
+                        per model per project. HTTP 404 also tries the next
+                        model (same key). 2026-format keys start with "AQ."
+                        (old "AIza…" work).
   - NVIDIA_API_KEY      NVIDIA NIM (integrate.api.nvidia.com, OpenAI chat
                         format). TEXT ONLY (admin match-hints): ground-truth
                         tests on real Iranian receipts (Jul 2026) showed NIM
@@ -62,7 +64,8 @@ OPENROUTER_API_KEY = _clean('OPENROUTER_API_KEY')
 # Mixed old/new-account list: 2.5-flash is the proven digit-exact reader on
 # older keys but 404s ("not available to new users") on 2026 Google accounts,
 # which get 3-flash-preview / 3.1-flash-lite instead. 404 tries the next
-# model on the same key; 429 jumps to the next key.
+# model on the same key; 429 tries the NEXT MODEL on the same key first,
+# then the next key — free-tier quotas are per model per project.
 GEMINI_MODELS = [m for m in [_clean('SMS_AI_MODEL')] if m] + [
     'gemini-2.5-flash', 'gemini-3-flash-preview',
     'gemini-3.1-flash-lite', 'gemini-2.0-flash',
@@ -106,7 +109,7 @@ async def _gemini(prompt: str, image_bytes: bytes | None = None,
     payload = {'contents': [{'parts': parts}], 'generationConfig': gen_cfg}
     async with aiohttp.ClientSession(timeout=_TIMEOUT) as http:
         for ki, key in enumerate(GEMINI_KEYS):
-            for model in GEMINI_MODELS:
+            for mi, model in enumerate(GEMINI_MODELS):
                 body = payload
                 status: int | None = None
                 text = ''
@@ -133,9 +136,17 @@ async def _gemini(prompt: str, image_bytes: bytes | None = None,
                 if status == 404:
                     continue  # model id not available on this account — next model
                 if status == 429:
-                    bot_logger.warning(f'[SMS-AI] gemini key{ki + 1} {model} quota 429'
-                                       + (' — trying next key' if ki + 1 < len(GEMINI_KEYS) else ''))
-                    break  # this key is exhausted — same model list on the next key
+                    # Free-tier quotas are per model per project: another model
+                    # on this key may still have quota, so try the next model
+                    # first; the next key only once the model list is exhausted.
+                    if mi + 1 < len(GEMINI_MODELS):
+                        nxt = ' — trying next model'
+                    elif ki + 1 < len(GEMINI_KEYS):
+                        nxt = ' — model list exhausted, trying next key'
+                    else:
+                        nxt = ''
+                    bot_logger.warning(f'[SMS-AI] gemini key{ki + 1} {model} quota 429{nxt}')
+                    continue  # next model on the SAME key
                 if status != 200:
                     bot_logger.warning(f'[SMS-AI] gemini {model} HTTP {status}: {text[:200]}')
                     continue  # non-quota HTTP error — next model

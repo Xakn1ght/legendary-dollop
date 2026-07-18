@@ -1,6 +1,7 @@
 """Offline tests for the sms_ai provider chain (items 6-7, bakbot parity).
 
-- Gemini: keys OUTER, models INNER; 429 -> next key (same model list),
+- Gemini: keys OUTER, models INNER; 429 tries the NEXT MODEL on the same key
+  first, then the next key — free-tier quotas are per model per project;
   404 -> next model (same key); timeout / non-quota HTTP -> next model;
   thinkingBudget=0 sent, one retry without it on a 400 that mentions it.
 - NVIDIA NIM: TEXT ONLY — never called when an image is present;
@@ -52,13 +53,23 @@ def _reset(keys, nvidia=''):
     sms_ai.NVIDIA_MODELS[:] = ['n1', 'n2']
 
 
-def test_429_next_key():
-    """Key1 quota-dead -> the SAME model list is retried on key2 immediately."""
+def test_429_next_model_same_key():
+    """429 on model A key1 -> model B on key1 BEFORE touching key2 (free-tier
+    quotas are per model per project)."""
     _reset(['K1', 'K2'])
     sms_ai._post = _fake_post([(429, 'quota'), (200, GEMINI_OK)])
     out = asyncio.run(sms_ai._gemini('p'))
     assert out == '{"ok":1}', out
-    assert [(c[1], c[2]) for c in CALLS] == [('K1', 'm1'), ('K2', 'm1')], CALLS
+    assert [(c[1], c[2]) for c in CALLS] == [('K1', 'm1'), ('K1', 'm2')], CALLS
+
+
+def test_429_full_sweep_then_next_key():
+    """Every model 429s on key1 -> only then does key2 get the model list."""
+    _reset(['K1', 'K2'])
+    sms_ai._post = _fake_post([(429, 'quota'), (429, 'quota'), (200, GEMINI_OK)])
+    out = asyncio.run(sms_ai._gemini('p'))
+    assert out == '{"ok":1}', out
+    assert [(c[1], c[2]) for c in CALLS] == [('K1', 'm1'), ('K1', 'm2'), ('K2', 'm1')], CALLS
 
 
 def test_404_next_model_same_key():
