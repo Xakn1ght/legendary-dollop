@@ -1,6 +1,6 @@
 # AstroByte Liquid Glass Design System — Reusable Template
 
-> **Use this document as a briefing when building UI that matches the AstroByte dashboard aesthetic.**  
+> **Use this document as the briefing for any UI work that must match the AstroByte dashboard aesthetic.**  
 > Source: `src/app/webapp/dashboard/css/tokens.css` + `glass.css` (4473 lines).  
 > North star: **"The Lava Lamp Terminal"** — a precise utility floating on living light.
 

@@ -141,7 +141,7 @@ html[dir="rtl"] .header-content { text-align: left; }
 }
 @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
 .ticket-card:active { transform: scale(0.98); background: var(--bg-elev-2); }
-/* Unread edge stripe removed 2026-07-08 (Pasha: "clutter") — the .unread-pill
+/* Unread edge stripe removed 2026-07-08 — the .unread-pill
    already carries the unread state. */
 .unread-pill {
   position: relative;

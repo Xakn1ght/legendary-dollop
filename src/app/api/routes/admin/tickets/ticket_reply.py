@@ -4,7 +4,6 @@ from .notify import notify_user_after_admin_message
 
 async def handle_admin_ticket_reply(request: web.Request):
     try:
-        # NOTE: indentation normalized (no functional change)
         ticket_id = int(request.match_info['ticket_id'])
     except (ValueError, KeyError):
         return web.json_response({"ok": False, "error": "invalid_ticket_id"}, status=400)

@@ -99,7 +99,7 @@ PYTHONPATH=src .venv/bin/alembic -c config/alembic.ini upgrade head
 - Rotate `WEBAPP_SESSION_SECRET`/DB password later if you want a clean break
   (forces re-login; do it deliberately, not during cutover).
 
-## What I (agent) can do vs. you
+## Division of work
 - **Me, once you give Box A IP/port/key:** Phases 1–3 (provision, ship, deploy,
   staging test) — all reversible, don't touch the live service. I'll pause before
   Phase 4.

@@ -50,13 +50,8 @@ misc/other/network-tab.txt
 # Large archives (keep these out of git history)
 *.zip
 
-# Local editor tooling and scratch configs
-.impeccable/
-skills-lock.json
-
 # Local binaries
 bin/
-
 
 # Database dumps (real customer data — never commit)
 *.sql
