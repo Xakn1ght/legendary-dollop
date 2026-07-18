@@ -50,7 +50,7 @@ misc/other/network-tab.txt
 # Large archives (keep these out of git history)
 *.zip
 
-# Local editor tooling
+# Local editor tooling and scratch configs
 .impeccable/
 skills-lock.json
 
@@ -65,6 +65,7 @@ bin/
 BGs/
 docs/astro/
 handoff.md
+rewards_system_annotated.md
 HANDOFF.md
 FLOWS_HANDOFF.md
 REWARDS_HANDOFF.md

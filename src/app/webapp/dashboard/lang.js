@@ -37,10 +37,8 @@
   let _currentLang = DEFAULT_LANG;
   let _listeners = [];
   let _i18n = {};
-  // #region debug log
-  // Runtime debug logging (no secrets). 
+  // Runtime debug logging (no secrets).
   // Toggle by setting: window.__ASTRO_DEBUG_LANG_LOGS__ = true
-  // #endregion
 
   // ═══════════════════════════════════════════════════════════════════════════
   // TELEGRAM WEBAPP HELPERS

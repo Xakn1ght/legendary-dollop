@@ -5,7 +5,7 @@ are bought once with WALLET CREDIT and land in the same permanent storage the
 season cosmetics use: ``dashboard_prefs.unlocked_themes`` — so the profile
 picker, prefs sync and the accent allow-lists need no new plumbing.
 
-Money rules (thin but real money — enforced in the flows layer):
+Money rules (thin but real money — everything money stays in the flows layer):
 - price is charged from ``User.credit`` atomically via ``crud.deduct_credit``
   (balance-checked; never negative);
 - buying an already-owned theme is a no-op success (idempotent — double taps
