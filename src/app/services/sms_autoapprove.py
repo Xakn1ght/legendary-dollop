@@ -39,6 +39,64 @@ def _card_last4(token: str) -> str | None:
     return digits[-4:] if len(digits) >= 4 else None
 
 
+# ── RTL card-misread guard (bakbot parity round 2, 2026-07-18) ───────────────
+# Iranian receipts print masked cards in print order ("6104 33** **** 2336",
+# real last-4 2336) but some bank apps render the SAME card RTL-FLIPPED:
+# "1781 43** **** 6104" — real last-4 1781, with 6104 (Bank Mellat's BIN) at
+# the visual END. Two live bakbot incidents (Jul 2026): the vision reader
+# returned the BANK PREFIX as "last-4", the bogus card contradicted the
+# deposit's true payer card, and two legitimate payments sat out the full
+# 10-minute veto grace for nothing. A "last-4" equal to a known Iranian BIN
+# prefix is a misread, not a card — drop it entirely. Dropping is fail-safe:
+# no card read means no join and no veto; it can cost a tie-break but can
+# never approve anything.
+IRAN_BIN_PREFIXES = frozenset({
+    '6104', '6221', '6219', '6037', '5859', '6280', '6063', '6273', '6274',
+    '5892', '6362', '5057', '6395', '5022', '6276', '5054', '6055', '5041',
+    '6393', '6369',
+})
+
+
+def normalize_card_last4(value) -> str | None:
+    """Normalize a card token/line coming from an IMAGE reader (AI vision or
+    OCR) into a trustworthy last-4, or None when it cannot be trusted.
+
+    Handles:
+      - a bare last-4 ("2336") or a full PAN ("6219861908723264");
+      - a masked line in print order   "6104 33** **** 2336" -> 2336;
+      - the RTL-FLIPPED rendering      "1781 43** **** 6104" -> 1781
+        (the clear group at the OPPOSITE end from the recognizable bank
+        prefix — this is also how a verbatim card line returned by the AI
+        reader gets resolved);
+      - a misread where the reader returned the BIN itself ("6104") -> None.
+
+    NOT applied to the SMS-side source card: ``parse_bank_sms`` reads
+    machine-formatted bank TEXT in logical character order, where the
+    RTL-vision misread cannot occur — see the comment at that call site.
+    """
+    s = normalize_digits(str(value or ''))
+    groups = re.findall(r'\d+', s)
+    digits = ''.join(groups)
+    if len(digits) < 4:
+        return None
+    last4 = digits[-4:]
+    if len(groups) > 1:
+        # Multi-group (masked / verbatim) line: a recognizable bank prefix
+        # marks the card's BEGINNING; the real last-4 is the clear group at
+        # the other end. Both ends looking like prefixes is untrustworthy.
+        first_bin = groups[0][:4] in IRAN_BIN_PREFIXES
+        last_bin = groups[-1][:4] in IRAN_BIN_PREFIXES
+        if first_bin and last_bin:
+            return None
+        if first_bin or last_bin:
+            chosen = groups[-1] if first_bin else groups[0]
+            if len(chosen) < 4:
+                return None
+            last4 = chosen[-4:]
+        # Neither end recognizable: assume print order (digits[-4:] above).
+    return None if last4 in IRAN_BIN_PREFIXES else last4
+
+
 _CARD_RE = r'([\d][\d*\s]{10,20}[\d*])'
 
 
@@ -71,6 +129,13 @@ def parse_bank_sms(text: str) -> dict | None:
     source_last4 = dest_last4 = dest_card = None
     m_src = re.search(r'از\s*کارت\s*' + _CARD_RE, t)
     if m_src:
+        # SMS-side cards are EXEMPT from the BIN-prefix misread guard
+        # (normalize_card_last4): this is machine-generated bank TEXT whose
+        # digit runs arrive in logical character order, so the RTL visual
+        # flip that makes an IMAGE reader return the bank prefix as "last-4"
+        # cannot happen here. Guarding anyway would drop legitimate last-4s
+        # that merely collide with a BIN and needlessly defer real payments —
+        # the exact failure the guard exists to prevent.
         source_last4 = _card_last4(m_src.group(1))
     m_dst = re.search(r'به\s*کارت\s*' + _CARD_RE, t)
     if m_dst:
@@ -192,5 +257,8 @@ def receipt_card_last4(png_bytes: bytes) -> str | None:
     for m in re.finditer(_CARD_RE, t):
         digits = re.sub(r'\D', '', m.group(1))
         if 12 <= len(digits) <= 19:
-            best = digits[-4:]
+            # Image-derived read: run the RTL/BIN misread guard.
+            cand = normalize_card_last4(m.group(1))
+            if cand:
+                best = cand
     return best

@@ -129,10 +129,18 @@ def test_ai_enrich_classification():
         outcomes[oid] = (learned, sms_ingest._ai_read_cache.get(oid))
 
     sms_ingest._ai_read_cache.clear()
+    sms_ingest._ai_fail_until = 0.0
     try:
-        # AI call failed -> {} cached, NO unreadable flag (outage must not poison)
+        # AI call FAILED -> NOTHING cached (the read marker is only stamped by
+        # a completed read) and the global fail backoff is armed, so the order
+        # can gain evidence on a later retry (bakbot #2406, item-5 parity —
+        # this test previously asserted the old poison-stamp behavior).
         asyncio.run(run("sub:fail", None))
-        assert outcomes["sub:fail"] == (False, {}), outcomes["sub:fail"]
+        assert outcomes["sub:fail"] == (False, None), outcomes["sub:fail"]
+        assert "sub:fail" not in sms_ingest._ai_read_cache
+        import time as _time
+        assert sms_ingest._ai_fail_until > _time.time(), "fail backoff must be armed"
+        sms_ingest._ai_fail_until = 0.0  # clear the backoff for the cases below
 
         # model says NOT a successful transfer -> unreadable
         asyncio.run(run("sub:garbage", {"success": False, "amount": None, "amount_unit": None,
@@ -211,9 +219,15 @@ class _Harness:
                 oid = c["order_id"]
                 if oid in m._ai_read_cache or not c.get("image"):
                     continue
-                entry = self.ai_reads.get(oid) or {}
-                m._ai_read_cache[oid] = entry
+                # Mirror the real _ai_enrich: a missing ai_reads key models the
+                # missing-file degrade ({} stamped); an EXPLICIT None models a
+                # FAILED AI read, which stamps nothing (item 5 — the order must
+                # stay readable on a later retry).
+                entry = self.ai_reads.get(oid, {})
                 self.enriched.append(oid)
+                if entry is None:
+                    continue
+                m._ai_read_cache[oid] = entry
                 learned = learned or bool(entry)
             return learned
         keep("_ai_enrich", _enrich)
@@ -411,7 +425,9 @@ def test_ai_outage_degrades_to_amount_only():
     try:
         asyncio.run(sms_ingest._sweep(None))
         assert h.approved == ["sub:7"], h.approved
-        assert sms_ingest._ai_read_cache.get("sub:7") == {}   # tried, not flagged
+        # Item-5 parity: a FAILED read stamps nothing (harness mirrors the
+        # real _ai_enrich, which leaves the cache empty and arms the backoff).
+        assert sms_ingest._ai_read_cache.get("sub:7") in (None, {})
         assert not h.notified
     finally:
         h.uninstall()

@@ -137,6 +137,48 @@ def test_ref_never_overrides_amount_gate():
     assert s.pick_match(d, cands, 1200, 2700) == ('none', [])
 
 
+def test_normalize_card_last4_rtl_guard():
+    """Item 8 (2026-07-18): image-derived card normalization must survive both
+    masked layouts and drop BIN-prefix misreads entirely."""
+    # Print order: prefix first, real last-4 at the end.
+    assert s.normalize_card_last4('6104 33** **** 2336') == '2336'
+    assert s.normalize_card_last4('6219 86** **** 7804') == '7804'
+    # RTL-FLIPPED rendering: the BIN sits at the visual END; real last-4 is
+    # the clear group at the START (the two live Jul-2026 incidents).
+    assert s.normalize_card_last4('1781 43** **** 6104') == '1781'
+    assert s.normalize_card_last4('7804 86** **** 6219') == '7804'
+    # A bare "last-4" equal to a known Iranian BIN is a misread -> dropped.
+    for bin4 in ('6104', '6221', '6219', '6037', '5892', '5057', '5022'):
+        assert s.normalize_card_last4(bin4) is None, bin4
+    # Bare legit last-4 / full PAN still work.
+    assert s.normalize_card_last4('2336') == '2336'
+    assert s.normalize_card_last4('6219861908723264') == '3264'
+    # Full PAN whose true last-4 collides with a BIN: still dropped (rare,
+    # and a dropped card only costs a tie-break — never a false veto).
+    assert s.normalize_card_last4('6219861908726104') is None
+    # Both ends look like a BIN -> untrustworthy -> dropped.
+    assert s.normalize_card_last4('6104 33** **** 6219') is None
+    # Neither end recognizable -> print-order assumption (last group).
+    assert s.normalize_card_last4('1234 56** **** 5678') == '5678'
+    # Persian digits and junk.
+    assert s.normalize_card_last4('۱۷۸۱ ۴۳** **** ۶۱۰۴') == '1781'
+    assert s.normalize_card_last4(None) is None
+    assert s.normalize_card_last4('12') is None
+    assert s.normalize_card_last4('کارت') is None
+
+
+def test_sms_source_card_exempt_from_bin_guard():
+    """The SMS-side payer card comes from machine-formatted bank TEXT (logical
+    order — the RTL visual flip cannot happen), so a last-4 that merely
+    collides with a BIN must be KEPT there (dropping it would defer real
+    payments, the exact failure the guard prevents)."""
+    sms = ("مبلغ:+850,000\nمانده:1,000\n"
+           "بابت :انتقال از کارت 6219861908726104 به کارت 6221061103953057 "
+           "با شماره پیگیری 424242")
+    d = s.parse_bank_sms(sms)
+    assert d and d['source_last4'] == '6104'
+
+
 if __name__ == '__main__':
     fns = [v for k, v in sorted(globals().items()) if k.startswith('test_')]
     for fn in fns:

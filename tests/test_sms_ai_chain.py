@@ -118,6 +118,47 @@ def test_nvidia_model_advance():
     assert [c[2] for c in CALLS] == ['n1', 'n2'], CALLS
 
 
+def test_receipt_prompt_mentions_rtl_card_layouts():
+    """Item 8a (2026-07-18): the receipt prompt must spell out BOTH masked-card
+    layouts, the bank-prefix rule, and the verbatim fallback."""
+    p = sms_ai._RECEIPT_PROMPT
+    assert '6219 86** **** 7804' in p, 'print-order example missing'
+    assert '1781 43** **** 6104' in p, 'RTL-flipped example missing'
+    assert 'NEVER return the bank prefix as the last-4' in p
+    assert 'OPPOSITE end' in p
+    assert 'VERBATIM' in p, 'unsure -> verbatim card line fallback missing'
+
+
+def test_extract_handles_verbatim_card_line():
+    """Item 8a caller side: when the model returns the whole card line
+    verbatim (its 'unsure' fallback), extract_receipt_fields resolves the
+    real last-4 next to the bank prefix — and drops a bare BIN misread."""
+    import json as _json
+
+    def _run(card_value):
+        async def fake_ask(prompt, image_bytes=None, mime='image/jpeg', want_json=True):
+            return _json.dumps({
+                'success': True, 'amount': 850000, 'amount_unit': 'rial',
+                'source_card_last4': card_value, 'dest_card_last4': None,
+                'ref_numbers': ['123456'], 'time_text': None})
+        orig_ask, orig_avail = sms_ai._ask, sms_ai.ai_available
+        sms_ai._ask, sms_ai.ai_available = fake_ask, lambda: True
+        try:
+            return asyncio.run(sms_ai.extract_receipt_fields(b'img'))
+        finally:
+            sms_ai._ask, sms_ai.ai_available = orig_ask, orig_avail
+
+    # Verbatim print-order line -> last visible group.
+    assert _run('6104 33** **** 2336')['source_card_last4'] == '2336'
+    # Verbatim RTL-FLIPPED line -> the group OPPOSITE the bank prefix.
+    assert _run('1781 43** **** 6104')['source_card_last4'] == '1781'
+    # Bare BIN prefix returned as "last-4" -> dropped (None), refs survive.
+    got = _run('6104')
+    assert got['source_card_last4'] is None and got['ref_numbers'] == ['123456']
+    # Clean last-4 passes through untouched.
+    assert _run('7804')['source_card_last4'] == '7804'
+
+
 def test_model_list_2026():
     """Default model list matches the 2026 account reality (order matters)."""
     import importlib

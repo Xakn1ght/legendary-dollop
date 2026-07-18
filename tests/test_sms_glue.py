@@ -275,6 +275,44 @@ def test_ref_join_stays_instant():
     assert APPROVALS == [("sub:9", "555")], APPROVALS
 
 
+def test_bin_prefix_card_read_dropped_no_false_veto():
+    """Acceptance 6 (item 8, NEW 2026-07-18): the AI reader returns the BANK
+    PREFIX (6104) as 'last-4' on an RTL receipt. The guard drops the card at
+    the cache choke point: no bogus contradiction, the legit amount-only
+    match approves instantly instead of sitting out a 10-minute veto."""
+    cand = {"order_id": "sub:10", "amount": 85000, "receipt_ts": NOW, "image": _img("rtl.png")}
+    _reset(deposits=[_dep(_sms(850_000, "3264", "601"))], cands=[cand])
+    AI_RESULTS["next"] = {"success": True, "amount": 850_000, "amount_unit": "rial",
+                          "source_card_last4": "6104",  # Mellat BIN — a misread
+                          "dest_card_last4": None, "ref_numbers": [], "time_text": None}
+    asyncio.run(_sweep())
+    assert APPROVALS == [("sub:10", "601")], APPROVALS
+    assert NOTICES == [], NOTICES
+    d = _deposits()[0]
+    assert d.get("matched") == "sub:10" and not d.get("veto_since"), d
+    # The bogus card must not survive as trusted OR veto evidence.
+    assert sms_ingest._ai_read_cache["sub:10"] == {"receipt_last4": None, "refs": []}
+
+
+def test_bin_prefix_never_survives_as_veto_evidence():
+    """Item 8 tail: on an amount-MISMATCHED receipt the misread BIN card is
+    dropped from the veto-only fields too (refs stay), so it can never block
+    a foreign pairing on fabricated card evidence."""
+    cand = {"order_id": "sub:11", "amount": 85000, "receipt_ts": NOW, "image": _img("rtl2.png")}
+    _reset(deposits=[_dep(_sms(850_000, "3264", "602"))], cands=[cand])
+    AI_RESULTS["next"] = {"success": True, "amount": 800_000, "amount_unit": "rial",  # 80k != 85k
+                          "source_card_last4": "6037",  # BIN misread
+                          "dest_card_last4": None, "ref_numbers": ["444555"], "time_text": None}
+    asyncio.run(_sweep())
+    assert sms_ingest._ai_read_cache["sub:11"] == {
+        "receipt_mismatch_card_last4": None, "receipt_mismatch_refs": ["444555"]}, \
+        sms_ingest._ai_read_cache
+    # Deposit refs (602) vs veto refs (444555): still a ref contradiction ->
+    # deferred — the guard removes only the fabricated CARD evidence.
+    assert APPROVALS == [], APPROVALS
+    assert _deposits()[0].get("veto_since"), _deposits()[0]
+
+
 if __name__ == "__main__":
     setup_module()
     fns = [v for k, v in sorted(globals().items()) if k.startswith("test_")]

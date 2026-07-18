@@ -39,6 +39,7 @@ import re
 
 import aiohttp
 
+from app.services.sms_autoapprove import normalize_card_last4
 from app.utils.logger import bot_logger
 
 _TIMEOUT = aiohttp.ClientTimeout(total=30, connect=5)
@@ -264,8 +265,16 @@ Rules:
 - success: true only if the receipt clearly shows a SUCCESSFUL transfer (e.g. انتقال موفق).
 - amount: the transferred amount (مبلغ / مبلغ انتقال) as an integer, no separators.
 - amount_unit: "rial" if the receipt says ریال, "toman" if it says تومان; null if unclear.
-- source_card_last4: last 4 REAL digits of the SENDER card (کارت مبدا / از کارت). Cards may be masked like ‎6219 86** **** 7804 — take the last visible 4 digits.
+- source_card_last4: last 4 REAL digits of the SENDER card (کارت مبدا / از کارت).
 - dest_card_last4: same for the RECEIVING card (کارت مقصد / به کارت).
+- CARD LAYOUT (critical): cards are masked and appear in TWO possible orders.
+  Print order: "6219 86** **** 7804" — bank prefix (6219) first, real last-4 (7804) at the end.
+  RTL-FLIPPED order: "1781 43** **** 6104" — the SAME kind of card rendered right-to-left: the recognizable
+  bank prefix (6104, 6219, 6037, 5892, ...) sits at the visual END and the REAL last-4 (1781) is at the visual START.
+  The real last-4 is ALWAYS the clear 4-digit group NEXT TO the masked stars, at the OPPOSITE end from the
+  recognizable Iranian bank prefix (6104=Mellat, 6219=Saman, 6037=Melli/Keshavarzi, 5892=Sepah, 6221=Parsian, ...).
+  NEVER return the bank prefix as the last-4. If you cannot tell which end is which, return the whole card
+  line VERBATIM (all its digit groups and stars) in the field instead of guessing 4 digits.
 - ref_numbers: every reference-like number on the receipt (شماره مرجع، شماره پیگیری، شماره بازیابی، کد رهگیری), digits only, as strings.
 - CRITICAL: transcribe long numbers DIGIT BY DIGIT, exactly as printed — never drop, add or reorder a digit. Re-read each ref number once to verify before answering.
 - time_text: the receipt's own date/time line verbatim, if any.
@@ -282,8 +291,12 @@ async def extract_receipt_fields(image_bytes: bytes, mime: str = 'image/jpeg') -
         return None
 
     def _l4(v):
-        digits = re.sub(r'\D', '', str(v or ''))
-        return digits[-4:] if len(digits) >= 4 else None
+        # Image-derived card fields go through the shared RTL/BIN misread
+        # guard: it resolves masked/verbatim card lines (either RTL layout)
+        # and drops a "last-4" that is really a bank BIN prefix (two live
+        # bakbot incidents, Jul 2026 — a dropped card is only a lost
+        # tie-break, a bogus one falsely vetoes real payments).
+        return normalize_card_last4(v)
 
     refs = []
     for r in (d.get('ref_numbers') or []):

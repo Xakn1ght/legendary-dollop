@@ -275,7 +275,20 @@ async def _ai_enrich(cands: list) -> bool:
                             f'read marker NOT stamped; retrying after {SMS_AI_FAIL_BACKOFF_SEC}s')
             continue
         rec_toman = sms_ai.receipt_amount_toman(fields)
-        extracted_any = bool(fields.get('amount') or fields.get('source_card_last4')
+        # RTL/BIN misread guard at the cache choke point (item 8, 2026-07-18):
+        # every image-derived card — trusted AND veto-only — is re-normalized
+        # here before it can join or veto anything. extract_receipt_fields
+        # already applies the same guard (idempotent for a clean last-4), but
+        # this is the single seam ALL receipt evidence passes through, so a
+        # bogus "last-4" that is really a bank BIN prefix can never enter the
+        # cache no matter which reader produced the fields. The SMS-side
+        # source card is deliberately NOT guarded — see parse_bank_sms.
+        rec_card = sms_autoapprove.normalize_card_last4(fields.get('source_card_last4'))
+        if fields.get('source_card_last4') and not rec_card:
+            bot_logger.info(f'[SMS] receipt of {oid}: card read '
+                            f'{fields.get("source_card_last4")!r} looks like a bank BIN prefix '
+                            f'(RTL misread) — dropped; no card join, no card veto')
+        extracted_any = bool(fields.get('amount') or rec_card
                              or fields.get('ref_numbers'))
         if not fields.get('success') or not extracted_any:
             entry: dict = {'receipt_unreadable': True}
@@ -283,14 +296,14 @@ async def _ai_enrich(cands: list) -> bool:
                             f'(success={fields.get("success")}, extracted_any={extracted_any}) '
                             f'— flagged unreadable; amount-only auto-approval blocked')
         elif rec_toman is not None and rec_toman != int(c.get('amount', -1)):
-            entry = {'receipt_mismatch_card_last4': fields.get('source_card_last4'),
+            entry = {'receipt_mismatch_card_last4': rec_card,
                      'receipt_mismatch_refs': fields.get('ref_numbers') or []}
             bot_logger.info(f'[SMS] receipt of {oid}: amount {rec_toman} toman != order '
                             f'{c.get("amount")} — fields kept as veto-only evidence '
                             f"(card …{entry.get('receipt_mismatch_card_last4') or '—'} "
                             f"refs {entry.get('receipt_mismatch_refs') or '—'})")
         else:
-            entry = {'receipt_last4': fields.get('source_card_last4'),
+            entry = {'receipt_last4': rec_card,
                      'refs': fields.get('ref_numbers') or []}
             bot_logger.info(f"[SMS] receipt of {oid} AI-read: card …{entry.get('receipt_last4') or '—'} "
                             f"refs {entry.get('refs') or '—'}")
