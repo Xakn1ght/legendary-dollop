@@ -130,9 +130,14 @@ CATALOG: dict[NotificationType, CatalogEntry] = {
         dm=True,
         title_fa="درخواست رد شد",
         title_en="Request denied",
-        body_fa="درخواست خرید سرویس شما رد شد.{details}",
-        body_en="Your service purchase request was denied.{details}",
+        body_fa="درخواست خرید سرویس{service_ref} رد شد.{details}",
+        body_en="Your service purchase request{service_ref} was denied.{details}",
         ctx_doc={
+            "service_ref": (
+                "language-matched service identifier fragment starting with a space "
+                "(fa ' «svc» (پلن ۵۰ گیگ)' / en ' for \"svc\" (plan)'); when the "
+                "service is unknown fa callers pass ' شما', en callers pass ''"
+            ),
             "details": (
                 "optional refund/restore lines composed by the caller in the render "
                 "language, starting with a space (e.g. ' اعتبار ۵۰,۰۰۰ تومان به حساب "
@@ -165,14 +170,20 @@ CATALOG: dict[NotificationType, CatalogEntry] = {
         title_fa="شارژ رد شد",
         title_en="Charge denied",
         body_fa=(
-            "درخواست شارژ سرویس «{service_name}» رد شد. "
+            "درخواست شارژ سرویس «{service_name}» رد شد.{details} "
             "در صورت نیاز با پشتیبانی در تماس باشید."
         ),
         body_en=(
-            "Your top-up request for \"{service_name}\" was denied. "
+            "Your top-up request for \"{service_name}\" was denied.{details} "
             "Contact support if you need help."
         ),
-        ctx_doc={"service_name": "PasarGuard service username"},
+        ctx_doc={
+            "service_name": "PasarGuard service username",
+            "details": (
+                "optional refund line composed by the caller in the render language, "
+                "starting with a space; pass '' when nothing was refunded"
+            ),
+        },
     ),
     NotificationType.CASHOUT_PAID: CatalogEntry(
         category="money",
@@ -432,6 +443,50 @@ CATALOG: dict[NotificationType, CatalogEntry] = {
 def template_placeholders(template: str) -> set[str]:
     """Names of the `{placeholder}` fields used in a str.format template."""
     return {name for _, name, _, _ in Formatter().parse(template) if name}
+
+
+# ---------------------------------------------------------------------------
+# Shared ctx builders — language-matched fragments used by more than one call
+# site live here, next to the templates they feed, so the copy stays in one
+# place. `lang` is the recipient's stored language (same normalization as the
+# render path: en* -> en, everything else -> fa).
+# ---------------------------------------------------------------------------
+
+def purchase_denied_ctx(lang: str | None, *, service_name: str | None, plan_name: str | None,
+                        credit_refunded: int = 0, discounts_restored: bool = False,
+                        coupon_restored: bool = False) -> dict:
+    """ctx for PURCHASE_DENIED: service reference + refund/restore details."""
+    if _pick_lang(lang) == "en":
+        service_ref = f' for "{service_name}" ({plan_name})' if service_name else ""
+        details = ""
+        if credit_refunded > 0:
+            details += f" {credit_refunded:,} toman was returned to your account credit."
+        if discounts_restored:
+            details += " Your used discounts were restored."
+        if coupon_restored:
+            details += " Your used coupon was restored."
+    else:
+        service_ref = f" «{service_name}» ({plan_name})" if service_name else " شما"
+        details = ""
+        if credit_refunded > 0:
+            details += f" اعتبار {credit_refunded:,} تومان به حساب شما برگشت."
+        if discounts_restored:
+            details += " تخفیف‌های استفاده‌شده بازگردانده شد."
+        if coupon_restored:
+            details += " کوپن استفاده‌شده به حساب شما بازگردانده شد."
+    return {"service_ref": service_ref, "details": details}
+
+
+def charge_denied_ctx(lang: str | None, *, service_name: str | None, credit_refunded: int = 0) -> dict:
+    """ctx for CHARGE_DENIED: refund detail line when reserved credit came back."""
+    if credit_refunded > 0:
+        if _pick_lang(lang) == "en":
+            details = f" {credit_refunded:,} toman was returned to your account credit."
+        else:
+            details = f" اعتبار {credit_refunded:,} تومان به حساب شما برگشت."
+    else:
+        details = ""
+    return {"service_name": service_name or "-", "details": details}
 
 
 def _pick_lang(lang: str | None) -> str:

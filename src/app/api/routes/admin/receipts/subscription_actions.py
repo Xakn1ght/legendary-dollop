@@ -1,4 +1,7 @@
+from app.core.notification_catalog import NotificationType, purchase_denied_ctx
 from app.services.audit import record_audit
+from app.services.notify import notify
+from app.utils.bot_i18n import normalize_lang
 
 from ..common import *  # noqa: F403
 
@@ -39,19 +42,14 @@ async def handle_admin_approve_receipt(request: web.Request):
             )
             
             if success:
-                # Create dashboard notification
+                # Dashboard notification row; DM suppressed because
+                # process_approved_subscription already sent the rich link DM.
                 if user_id:
                     try:
-                        notif_msg = f'سرویس "{service_name}" ({plan_name}) با موفقیت فعال شد.' if service_name else f'سرویس {plan_name or "شما"} با موفقیت فعال شد.'
-                        notif_msg += ' از داشبورد می‌توانید اطلاعات اتصال را مشاهده کنید.'
-                        await notifications_crud.create_notification(
-                            db=session,
-                            user_id=user_id,
-                            type='purchase_approved',
-                            title='سرویس فعال شد',
-                            message=notif_msg,
-                            sent_to_webapp=True,
-                            sent_to_bot=False
+                        await notify(
+                            session, user_id, NotificationType.PURCHASE_APPROVED,
+                            {"service_name": service_name or "-", "plan_name": plan_name or "-"},
+                            dm_override=False,
                         )
                     except Exception:
                         pass
@@ -82,9 +80,7 @@ async def handle_admin_deny_receipt(request: web.Request):
     except (ValueError, KeyError):
         return web.json_response({"ok": False, "error": "invalid_sub_id"}, status=400)
     try:
-        from app.utils.admin_bot_helper import get_admin_bot, resolve_user_bot
-
-        user_bot = resolve_user_bot(request.app.get("bot"))
+        from app.utils.admin_bot_helper import get_admin_bot
 
         async with AsyncSessionLocal() as session:
             from app.services.flows.errors import FlowError
@@ -100,42 +96,19 @@ async def handle_admin_deny_receipt(request: web.Request):
             credit_refunded = result.credit_refunded
             discounts_restored = result.discounts_restored
 
-            # Notify user via user bot (embedded aiohttp may not set request.app["bot"])
-            if user_bot and user:
-                try:
-                    msg = "❌ درخواست سرویس شما توسط ادمین رد شد."
-                    details = []
-                    if credit_refunded > 0:
-                        details.append(f"بازگشت اعتبار: {credit_refunded:,} تومان")
-                    if discounts_restored:
-                        details.append("تخفیف‌های استفاده‌شده به حساب شما بازگردانده شد.")
-                    if result.coupon_restored:
-                        details.append("کوپن استفاده‌شده به حساب شما بازگردانده شد.")
-                    if details:
-                        msg += "\n" + "\n".join(details)
-                    await user_bot.send_message(user.chat_id, msg)
-                except Exception:
-                    pass
-
-            # Create dashboard notification
+            # Notification row + policy DM through the single write path (the
+            # old ad-hoc plain DM duplicated the row content and is gone).
             if result.user_id:
                 try:
-                    service_name = result.service_name
-                    plan_name = result.plan_name
-                    notif_msg = f'درخواست سرویس "{service_name}" ({plan_name}) رد شد.' if service_name else "درخواست خرید سرویس شما رد شد."
-                    if credit_refunded > 0:
-                        notif_msg += f" اعتبار {credit_refunded:,} تومان به حساب شما برگشت."
-                    if discounts_restored:
-                        notif_msg += " تخفیف‌های استفاده‌شده بازگردانده شد."
-                    await notifications_crud.create_notification(
-                        db=session,
-                        user_id=result.user_id,
-                        type='purchase_denied',
-                        title='درخواست رد شد',
-                        message=notif_msg,
-                        sent_to_webapp=True,
-                        sent_to_bot=False
+                    ctx = purchase_denied_ctx(
+                        normalize_lang(getattr(user, "language", None)),
+                        service_name=result.service_name,
+                        plan_name=result.plan_name,
+                        credit_refunded=credit_refunded,
+                        discounts_restored=discounts_restored,
+                        coupon_restored=result.coupon_restored,
                     )
+                    await notify(session, result.user_id, NotificationType.PURCHASE_DENIED, ctx)
                 except Exception:
                     pass
             

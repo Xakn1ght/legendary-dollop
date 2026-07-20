@@ -60,20 +60,29 @@ async def notify(
     ctx: dict | None = None,
     *,
     ticket_id: int | None = None,
+    dm_override: bool | None = None,
+    dm_reply_markup=None,
 ) -> Notification:
     """Create a notification for a user and deliver it per catalog policy.
 
     - Renders title/body in the user's language (User.language, default fa).
     - Writes the row through the existing crud create (sent_to_webapp=True,
-      sent_to_bot per the catalog DM policy) in the caller's session.
+      sent_to_bot per the effective DM decision) in the caller's session.
     - Sends the plain-text bot DM when the catalog says so and stamps
       bot_message_sent/bot_message_id. A DM failure never blocks the row.
+    - dm_override: None (default) follows the catalog DM policy; False
+      suppresses the DM (call site delivers its own rich transactional DM,
+      or the user is live on the page); True forces it (admin broadcast
+      with "also send to bot").
+    - dm_reply_markup: optional inline keyboard attached to the DM
+      (e.g. the ticket WebApp deep-link button). Ignored when no DM is sent.
     - Publishes to the WS seam after the commit-safe point.
 
     Raises ValueError for an unknown notification type.
     """
     nt = NotificationType(type_)  # ValueError for unknown types
     entry = CATALOG[nt]
+    send_dm = entry.dm if dm_override is None else bool(dm_override)
 
     user = await session.get(User, user_id)
     lang = (user.language if user is not None else None) or "fa"
@@ -87,11 +96,11 @@ async def notify(
         message=body,
         ticket_id=ticket_id,
         sent_to_webapp=True,
-        sent_to_bot=entry.dm,
+        sent_to_bot=send_dm,
     )
 
-    if entry.dm:
-        await _send_dm(session, notification, user, title, body)
+    if send_dm:
+        await _send_dm(session, notification, user, title, body, reply_markup=dm_reply_markup)
 
     # Commit-safe point: the row (and any DM stamps) are persisted; push to
     # open dashboard sessions. Failures here must never undo the notification.
@@ -105,7 +114,7 @@ async def notify(
 
 
 async def _send_dm(session: AsyncSession, notification: Notification, user: User | None,
-                   title: str, body: str) -> None:
+                   title: str, body: str, *, reply_markup=None) -> None:
     """Send the bot DM for a dm=True notification and stamp the row.
 
     On any failure (no bot, no chat_id, Telegram error) the row survives with
@@ -118,7 +127,8 @@ async def _send_dm(session: AsyncSession, notification: Notification, user: User
     try:
         if bot is None or user is None or not user.chat_id:
             raise RuntimeError("user bot or recipient chat_id unavailable")
-        sent = await bot.send_message(chat_id=user.chat_id, text=f"{title}\n\n{body}")
+        sent = await bot.send_message(chat_id=user.chat_id, text=f"{title}\n\n{body}",
+                                      reply_markup=reply_markup)
         notification.bot_message_sent = True
         notification.bot_message_id = getattr(sent, "message_id", None)
     except Exception as e:

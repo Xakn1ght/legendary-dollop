@@ -27,6 +27,8 @@ from app.core.notification_catalog import (  # noqa: E402
     CATALOG,
     CATEGORIES,
     NotificationType,
+    charge_denied_ctx,
+    purchase_denied_ctx,
     render,
     template_placeholders,
 )
@@ -55,6 +57,7 @@ EMOJI_RE = re.compile(
 SAMPLE_CTX = {
     "service_name": "astro_user_42",
     "plan_name": "پلن ۵۰ گیگ",
+    "service_ref": " «astro_user_42» (پلن ۵۰ گیگ)",
     "details": " جزئیات نمونه.",
     "request_id": 17,
     "amount": "150,000",
@@ -78,11 +81,13 @@ class StubBot:
     def __init__(self, fail: bool = False):
         self.fail = fail
         self.sent = []
+        self.markups = []
 
     async def send_message(self, chat_id, text, **kwargs):
         if self.fail:
             raise RuntimeError("telegram unreachable (stub)")
         self.sent.append((chat_id, text))
+        self.markups.append(kwargs.get("reply_markup"))
 
         class _Msg:
             message_id = 4242
@@ -142,6 +147,25 @@ def test_catalog_rendering():
     except ValueError:
         pass
     print("PASS unknown type rejected by render()")
+
+    # shared ctx builders feed their templates completely, in both languages
+    for lang in ("fa", "en"):
+        ctx = purchase_denied_ctx(lang, service_name="svc", plan_name="p50",
+                                  credit_refunded=50000, discounts_restored=True,
+                                  coupon_restored=True)
+        _, body = render(NotificationType.PURCHASE_DENIED, lang, ctx, strict=True)
+        assert "svc" in body and "50,000" in body and not LEFTOVER_PLACEHOLDER_RE.search(body)
+        ctx = purchase_denied_ctx(lang, service_name=None, plan_name=None)
+        _, body = render(NotificationType.PURCHASE_DENIED, lang, ctx, strict=True)
+        assert not LEFTOVER_PLACEHOLDER_RE.search(body)
+
+        ctx = charge_denied_ctx(lang, service_name="svc", credit_refunded=80000)
+        _, body = render(NotificationType.CHARGE_DENIED, lang, ctx, strict=True)
+        assert "svc" in body and "80,000" in body and not LEFTOVER_PLACEHOLDER_RE.search(body)
+        ctx = charge_denied_ctx(lang, service_name=None)
+        _, body = render(NotificationType.CHARGE_DENIED, lang, ctx, strict=True)
+        assert not LEFTOVER_PLACEHOLDER_RE.search(body)
+    print("PASS purchase_denied_ctx / charge_denied_ctx render their templates in fa+en")
 
 
 async def test_notify_paths(Session):
@@ -208,6 +232,39 @@ async def test_notify_paths(Session):
         except ValueError:
             pass
     print("PASS notify() rejects unknown types with ValueError")
+
+    # dm_override=False on a dm=True type: row only, resolver untouched,
+    # sent_to_bot=False (call site delivers its own rich DM instead)
+    async with Session() as db:
+        notify_svc._resolve_bot = forbid_bot
+        assert CATALOG[NotificationType.PURCHASE_APPROVED].dm is True
+        n = await notify(db, 1, NotificationType.PURCHASE_APPROVED,
+                         {"service_name": "svc", "plan_name": "پلن"}, dm_override=False)
+        assert n.id and n.sent_to_webapp is True
+        assert n.sent_to_bot is False and n.bot_message_sent is False and n.bot_message_id is None
+    print("PASS dm_override=False suppresses the DM on a dm=True type (row only)")
+
+    # dm_override=True on a dm=False type: DM sent + stamped (broadcast to bot)
+    async with Session() as db:
+        stub = StubBot()
+        notify_svc._resolve_bot = lambda: stub
+        assert CATALOG[NotificationType.GENERAL].dm is False
+        n = await notify(db, 1, NotificationType.GENERAL,
+                         {"title": "اطلاعیه", "body": "متن"}, dm_override=True)
+        assert n.sent_to_bot is True and n.bot_message_sent is True and n.bot_message_id == 4242
+        assert len(stub.sent) == 1 and stub.markups == [None]
+    print("PASS dm_override=True forces the DM on a dm=False type")
+
+    # dm_reply_markup is passed through to send_message (ticket deep-link button)
+    async with Session() as db:
+        stub = StubBot()
+        notify_svc._resolve_bot = lambda: stub
+        markup = object()
+        n = await notify(db, 1, NotificationType.TICKET_NEW_MESSAGE,
+                         {"ticket_no": 7}, ticket_id=7, dm_reply_markup=markup)
+        assert n.bot_message_sent is True
+        assert stub.markups == [markup]
+    print("PASS dm_reply_markup reaches send_message")
 
 
 async def test_unread_count(Session):

@@ -1,10 +1,12 @@
 from aiohttp import web
 
-from app.database import crud, notifications_crud
+from app.core.notification_catalog import NotificationType, charge_denied_ctx
+from app.database import crud
 from app.database.models import AsyncSessionLocal
 from app.services.flows.charge import deny_charge
 from app.services.flows.errors import FlowError
-from app.utils.admin_bot_helper import resolve_user_bot
+from app.services.notify import notify
+from app.utils.bot_i18n import normalize_lang
 
 try:
     from app.api.routes.admin_ws import broadcast_admin_event
@@ -21,8 +23,6 @@ async def handle_admin_deny_charge(request: web.Request):
     except (ValueError, KeyError):
         return web.json_response({"ok": False, "error": "invalid_charge_id"}, status=400)
     try:
-        user_bot = resolve_user_bot(request.app.get("bot"))
-
         async with AsyncSessionLocal() as session:
             try:
                 result = await deny_charge(session, charge_id)
@@ -31,28 +31,16 @@ async def handle_admin_deny_charge(request: web.Request):
 
             user = await crud.get_user_by_id(session, result.user_id)
 
-            if user_bot and user:
-                try:
-                    msg = "❌ متاسفانه درخواست شارژ شما رد شد.\n\n"
-                    msg += f"📦 سرویس: {result.service_name or 'نامشخص'}\n"
-                    if result.credit_refunded > 0:
-                        msg += f"💰 بازگشت اعتبار: {result.credit_refunded:,} تومان\n"
-                    msg += "لطفاً با پشتیبانی تماس بگیرید."
-                    await user_bot.send_message(user.chat_id, msg)
-                except Exception:
-                    pass
-
+            # Notification row + policy DM through the single write path (the
+            # old ad-hoc plain DM duplicated the row content and is gone).
             try:
                 if user:
-                    await notifications_crud.create_notification(
-                        session,
-                        user_id=user.id,
-                        type="charge_denied",
-                        title="Charge denied",
-                        message=f"❌ Your charge request for {result.service_name or 'your service'} was denied.",
-                        sent_to_webapp=True,
-                        sent_to_bot=False,
+                    ctx = charge_denied_ctx(
+                        normalize_lang(getattr(user, "language", None)),
+                        service_name=result.service_name,
+                        credit_refunded=result.credit_refunded,
                     )
+                    await notify(session, user.id, NotificationType.CHARGE_DENIED, ctx)
             except Exception:
                 pass
 

@@ -6,10 +6,12 @@ from aiogram.utils.keyboard import InlineKeyboardBuilder
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.notification_catalog import NotificationType, purchase_denied_ctx
 from app.database import crud
 
 # Keyboard imports moved to function level to avoid circular imports
 from app.handlers.admin.common import ADMIN_IDS, _send_pending_requests
+from app.services.notify import notify
 from app.services.subscription_processing import process_approved_subscription
 from app.utils.admin_bot_helper import get_user_bot
 from app.utils.bot_i18n import guess_lang_from_telegram, normalize_lang, set_cached_lang, t
@@ -120,20 +122,14 @@ async def approve_subscription(callback: CallbackQuery, session: AsyncSession, b
     success = await process_approved_subscription(sub_id, session, user_bot, approved_by=approver)
 
     if success:
-        # Create dashboard notification for user
+        # Dashboard notification row; the DM is suppressed because
+        # process_approved_subscription already sent the rich link-delivery DM.
         if user_id:
             try:
-                from app.database.notifications_crud import create_notification
-                notif_msg = f'سرویس "{service_name}" ({plan_name}) با موفقیت فعال شد.' if service_name else f'سرویس {plan_name or "شما"} با موفقیت فعال شد.'
-                notif_msg += ' از داشبورد می‌توانید اطلاعات اتصال را مشاهده کنید.'
-                await create_notification(
-                    db=session,
-                    user_id=user_id,
-                    type='purchase_approved',
-                    title='سرویس فعال شد',
-                    message=notif_msg,
-                    sent_to_webapp=True,
-                    sent_to_bot=False
+                await notify(
+                    session, user_id, NotificationType.PURCHASE_APPROVED,
+                    {"service_name": service_name or "-", "plan_name": plan_name or "-"},
+                    dm_override=False,
                 )
             except Exception as e:
                 logging.warning(f"Failed to create approval notification: {e}")
@@ -162,7 +158,6 @@ async def approve_subscription(callback: CallbackQuery, session: AsyncSession, b
 async def deny_subscription(callback: CallbackQuery, session: AsyncSession, bot: Bot):
     lang = await _admin_lang(session, callback.from_user)
     sub_id = int(callback.data.split("_")[2])
-    user_bot = get_user_bot()
 
     from app.services.flows.errors import FlowError
     from app.services.flows.purchase import deny_purchase_order
@@ -183,47 +178,21 @@ async def deny_subscription(callback: CallbackQuery, session: AsyncSession, bot:
     credit_refunded = result.credit_refunded
     discounts_restored = result.discounts_restored
 
-    from app.database.models import User
-    result_chat = await session.execute(select(User.chat_id).filter(User.id == result.user_id))
-    user_chat_id = result_chat.scalar_one_or_none()
-
-    # Try to notify the user if we found their chat_id
-    if user_chat_id and user_bot:
-        try:
-            msg = "❌ درخواست سرویس شما توسط ادمین رد شد."
-            details = []
-            if credit_refunded > 0:
-                details.append(f"بازگشت اعتبار: {credit_refunded:,} تومان")
-            if discounts_restored:
-                details.append("تخفیف‌های استفاده‌شده به حساب شما بازگردانده شد.")
-            if result.coupon_restored:
-                details.append("کوپن استفاده‌شده به حساب شما بازگردانده شد.")
-            if details:
-                msg += "\n" + "\n".join(details)
-            await user_bot.send_message(user_chat_id, msg)
-        except Exception as e:
-            logging.warning(f"Failed to notify user {user_chat_id} about denied subscription {sub_id}: {e}")
-
-    # Create dashboard notification
+    # Notification row + policy DM through the single write path (the old
+    # ad-hoc plain DM duplicated the row content and is gone).
     if result.user_id:
         try:
-            from app.database.notifications_crud import create_notification
-            service_name = result.service_name
-            plan_name = result.plan_name
-            notif_msg = f'درخواست سرویس "{service_name}" ({plan_name}) رد شد.' if service_name else "درخواست خرید سرویس شما رد شد."
-            if credit_refunded > 0:
-                notif_msg += f" اعتبار {credit_refunded:,} تومان به حساب شما برگشت."
-            if discounts_restored:
-                notif_msg += " تخفیف‌های استفاده‌شده بازگردانده شد."
-            await create_notification(
-                db=session,
-                user_id=result.user_id,
-                type='purchase_denied',
-                title='درخواست رد شد',
-                message=notif_msg,
-                sent_to_webapp=True,
-                sent_to_bot=False
+            from app.database.models import User
+            lang_row = await session.execute(select(User.language).filter(User.id == result.user_id))
+            ctx = purchase_denied_ctx(
+                normalize_lang(lang_row.scalar_one_or_none()),
+                service_name=result.service_name,
+                plan_name=result.plan_name,
+                credit_refunded=credit_refunded,
+                discounts_restored=discounts_restored,
+                coupon_restored=result.coupon_restored,
             )
+            await notify(session, result.user_id, NotificationType.PURCHASE_DENIED, ctx)
         except Exception as e:
             logging.warning(f"Failed to create denial notification: {e}")
 
