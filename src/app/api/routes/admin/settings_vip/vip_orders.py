@@ -1,7 +1,8 @@
 from sqlalchemy import update as _sql_update
 
+from app.core.notification_catalog import NotificationType, vip_duration_text
 from app.services.audit import record_audit
-from app.utils.admin_bot_helper import resolve_user_bot
+from app.services.notify import notify
 
 from ..common import *  # noqa: F403
 
@@ -82,33 +83,15 @@ async def handle_admin_approve_vip_order(request: web.Request):
             
             # Mark order as approved
             vip_order.status = 'approved'
-            
-            # Create notification
-            await notifications_crud.create_notification(
-                db=session,
-                user_id=user.id,
-                type='vip_granted',
-                title='تبریک! VIP فعال شد',
-                message=f'اشتراک VIP شما فعال شد ({duration_text}). از مزایای ویژه لذت ببرید!',
-                sent_to_webapp=True,
-                sent_to_bot=True
+
+            # Notification row + policy DM through the single write path (the
+            # old ad-hoc plain DM duplicated the row content and is gone).
+            await notify(
+                session, user.id, NotificationType.VIP_GRANTED,
+                {"duration": vip_duration_text(getattr(user, "language", None), vip_order.days)},
             )
-            
+
             await session.commit()
-            
-            # Send Telegram notification
-            bot = resolve_user_bot(request.app.get('bot'))
-            if bot and user.chat_id:
-                try:
-                    vip_msg = (
-                        f"*تبریک! VIP فعال شد*\n\n"
-                        f"اشتراک VIP شما با موفقیت فعال شد.\n"
-                        f"مدت: {duration_text}\n\n"
-                        f"از مزایای ویژه VIP لذت ببرید!"
-                    )
-                    await bot.send_message(chat_id=user.chat_id, text=vip_msg, parse_mode='Markdown')
-                except Exception as e:
-                    logger.warning(f"[VIP] Failed to send VIP notification: {e}")
             
             # Broadcast to admin UIs
             try:
@@ -152,29 +135,13 @@ async def handle_admin_deny_vip_order(request: web.Request):
             
             # Mark order as denied
             vip_order.status = 'denied'
-            
-            # Create notification for user
+
+            # Notification row + policy DM through the single write path (the
+            # old ad-hoc plain DM duplicated the row content and is gone).
             if user:
-                await notifications_crud.create_notification(
-                    db=session,
-                    user_id=user.id,
-                    type='vip_denied',
-                    title='درخواست VIP رد شد',
-                    message='درخواست خرید VIP شما رد شد. برای اطلاعات بیشتر با پشتیبانی تماس بگیرید.',
-                    sent_to_webapp=True,
-                    sent_to_bot=True
-                )
-            
+                await notify(session, user.id, NotificationType.VIP_DENIED, {})
+
             await session.commit()
-            
-            # Send Telegram notification
-            bot = resolve_user_bot(request.app.get('bot'))
-            if bot and user and user.chat_id:
-                try:
-                    msg = "❌ *درخواست VIP رد شد*\n\nدرخواست خرید VIP شما رد شد.\nبرای اطلاعات بیشتر با پشتیبانی تماس بگیرید."
-                    await bot.send_message(chat_id=user.chat_id, text=msg, parse_mode='Markdown')
-                except Exception:
-                    pass
             
             # Broadcast to admin UIs
             try:

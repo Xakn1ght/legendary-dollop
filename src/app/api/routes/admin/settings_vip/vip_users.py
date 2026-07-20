@@ -1,4 +1,6 @@
-from app.utils.admin_bot_helper import resolve_user_bot
+from app.core.notification_catalog import NotificationType, vip_duration_text
+from app.services.notify import notify
+from app.utils.bot_i18n import normalize_lang
 
 from ..common import *  # noqa: F403
 
@@ -80,58 +82,37 @@ async def handle_admin_set_vip(request: web.Request):
             if not user:
                 return web.json_response({"ok": False, "error": "user_not_found"}, status=404)
             
-            was_vip = user.is_vip
             old_expiry = user.vip_until
             user.is_vip = True
             
             from datetime import timedelta
+            lang = normalize_lang(getattr(user, "language", None))
             if days and days > 0:
                 # If user already has VIP with future expiry, extend from that date
                 # Otherwise start from now
                 if old_expiry and old_expiry > datetime.utcnow():
                     user.vip_until = old_expiry + timedelta(days=days)
-                    duration_text = f"+{days} روز (تا {user.vip_until.strftime('%Y-%m-%d')})"
+                    until = user.vip_until.strftime('%Y-%m-%d')
+                    if lang == "en":
+                        duration_text = f"+{days} days (until {until})"
+                    else:
+                        duration_text = f"+{days} روز (تا {until})"
                 else:
                     user.vip_until = datetime.utcnow() + timedelta(days=days)
-                    duration_text = f"{days} روز"
+                    duration_text = vip_duration_text(lang, days)
             else:
                 # Lifetime VIP
                 user.vip_until = None
-                duration_text = "دائمی"
-            
-            # Create notification for user dashboard
-            notif_title = "⭐ تبریک! شما VIP شدید" if not was_vip else "⭐ اشتراک VIP تمدید شد"
-            notif_message = f"اشتراک VIP شما فعال شد ({duration_text}). از مزایای ویژه لذت ببرید!"
-            
-            await notifications_crud.create_notification(
-                db=session,
-                user_id=user.id,
-                type='vip_granted',
-                title=notif_title,
-                message=notif_message,
-                sent_to_webapp=True,
-                sent_to_bot=True
+                duration_text = vip_duration_text(lang, None)
+
+            # Notification row + policy DM through the single write path (the
+            # old ad-hoc plain DM duplicated the row content and is gone).
+            await notify(
+                session, user.id, NotificationType.VIP_GRANTED,
+                {"duration": duration_text},
             )
-            
+
             await session.commit()
-            
-            # Send Telegram notification
-            bot = resolve_user_bot(request.app.get('bot'))
-            if bot and user.chat_id:
-                try:
-                    vip_msg = (
-                        f"🌟 *تبریک! شما VIP شدید* 🌟\n\n"
-                        f"✨ اشتراک VIP شما با موفقیت فعال شد.\n"
-                        f"⏱ مدت: {duration_text}\n\n"
-                        f"🎁 از مزایای ویژه VIP لذت ببرید!"
-                    )
-                    await bot.send_message(
-                        chat_id=user.chat_id,
-                        text=vip_msg,
-                        parse_mode='Markdown'
-                    )
-                except Exception as e:
-                    logger.warning(f"[VIP] Failed to send VIP notification to {user.chat_id}: {e}")
             
             return web.json_response({
                 "ok": True,
@@ -168,38 +149,12 @@ async def handle_admin_remove_vip(request: web.Request):
             user.is_vip = False
             user.vip_until = None
             
-            # Only notify if user was actually VIP
+            # Only notify if user was actually VIP. Row + policy DM through
+            # the single write path (the old ad-hoc plain DM is gone).
             if was_vip:
-                # Create notification for user dashboard
-                await notifications_crud.create_notification(
-                    db=session,
-                    user_id=user.id,
-                    type='vip_removed',
-                    title='اشتراک VIP پایان یافت',
-                    message='اشتراک VIP شما به پایان رسید. برای تمدید با پشتیبانی تماس بگیرید.',
-                    sent_to_webapp=True,
-                    sent_to_bot=True
-                )
-            
+                await notify(session, user.id, NotificationType.VIP_REMOVED, {})
+
             await session.commit()
-            
-            # Send Telegram notification if was VIP
-            if was_vip:
-                bot = resolve_user_bot(request.app.get('bot'))
-                if bot and user.chat_id:
-                    try:
-                        vip_msg = (
-                            "📢 *اشتراک VIP پایان یافت*\n\n"
-                            "اشتراک VIP شما به پایان رسیده است.\n"
-                            "برای تمدید با پشتیبانی تماس بگیرید."
-                        )
-                        await bot.send_message(
-                            chat_id=user.chat_id,
-                            text=vip_msg,
-                            parse_mode='Markdown'
-                        )
-                    except Exception as e:
-                        logger.warning(f"[VIP] Failed to send VIP removal notification to {user.chat_id}: {e}")
             
             return web.json_response({
                 "ok": True,

@@ -489,6 +489,13 @@ def charge_denied_ctx(lang: str | None, *, service_name: str | None, credit_refu
     return {"service_name": service_name or "-", "details": details}
 
 
+def vip_duration_text(lang: str | None, days) -> str:
+    """VIP_GRANTED `duration` fragment: '{days} روز'/'دائمی' ('{days} days'/'permanent')."""
+    if _pick_lang(lang) == "en":
+        return f"{int(days)} days" if days and int(days) > 0 else "permanent"
+    return f"{int(days)} روز" if days and int(days) > 0 else "دائمی"
+
+
 def _pick_lang(lang: str | None) -> str:
     """Normalize a stored/user language to 'fa' or 'en'; unknown falls back to fa."""
     if lang and lang.strip().lower().startswith("en"):

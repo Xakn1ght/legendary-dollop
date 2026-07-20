@@ -6,10 +6,11 @@ from aiogram.types import CallbackQuery
 from sqlalchemy import update as _sql_update
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.settings import BOT_TOKEN
-from app.database import crud, notifications_crud
+from app.core.notification_catalog import NotificationType, vip_duration_text
+from app.database import crud
 from app.database.models import User, VipOrder
 from app.handlers.admin.common import ADMIN_IDS
+from app.services.notify import notify
 from app.utils.bot_i18n import guess_lang_from_telegram, normalize_lang, set_cached_lang, t
 
 router = Router()
@@ -23,24 +24,6 @@ async def _admin_lang(session: AsyncSession, tg_user) -> str:
         return lang
     except Exception:
         return guess_lang_from_telegram(getattr(tg_user, "language_code", None))
-
-
-async def _notify_user_via_main_bot(chat_id: int, text: str, parse_mode: str = "Markdown") -> None:
-    if not BOT_TOKEN:
-        return
-    try:
-        from aiogram import Bot as _Bot
-
-        b = _Bot(token=BOT_TOKEN)
-        try:
-            await b.send_message(chat_id=chat_id, text=text, parse_mode=parse_mode)
-        finally:
-            try:
-                await b.session.close()
-            except Exception:
-                pass
-    except Exception:
-        return
 
 
 async def claim_pending_vip_order(session: AsyncSession, order_id: int) -> bool:
@@ -77,8 +60,9 @@ async def activate_vip_order(session: AsyncSession, vip_order: VipOrder, *,
 
     Only acts on a still-'pending' order (idempotent), or a 'processing' one
     when the caller already won the atomic claim (``claimed=True``).
-    ``notify_user_bot`` is an optional live user-bot to DM through; falls back
-    to a short-lived bot. Returns True if it flipped the order to approved.
+    ``notify_user_bot`` is kept for signature compatibility (SMS auto-approve
+    passes it) but the DM now goes through notify(), which resolves the user
+    bot itself. Returns True if it flipped the order to approved.
     """
     expected = "processing" if claimed else "pending"
     if vip_order.status != expected:
@@ -88,14 +72,12 @@ async def activate_vip_order(session: AsyncSession, vip_order: VipOrder, *,
         return False
 
     user.is_vip = True
-    duration_text = "دائمی"
     if vip_order.days and vip_order.days > 0:
         now = datetime.utcnow()
         if user.vip_until and user.vip_until > now:
             user.vip_until = user.vip_until + timedelta(days=int(vip_order.days))
         else:
             user.vip_until = now + timedelta(days=int(vip_order.days))
-        duration_text = f"{int(vip_order.days)} روز"
     else:
         user.vip_until = None
 
@@ -110,34 +92,17 @@ async def activate_vip_order(session: AsyncSession, vip_order: VipOrder, *,
         except Exception:
             pass
 
+    # Notification row + policy DM through the single write path (the old
+    # ad-hoc plain DM duplicated the row content and is gone).
     try:
-        await notifications_crud.create_notification(
-            db=session,
-            user_id=user.id,
-            type="vip_granted",
-            title="تبریک! VIP فعال شد",
-            message=f"اشتراک VIP شما فعال شد ({duration_text}). از مزایای ویژه لذت ببرید!",
-            sent_to_webapp=True,
-            sent_to_bot=True,
+        await notify(
+            session, user.id, NotificationType.VIP_GRANTED,
+            {"duration": vip_duration_text(user.language, vip_order.days)},
         )
     except Exception as e:
         logging.warning(f"[VIP] Failed to create notification: {e}")
 
     await session.commit()
-
-    msg = (
-        f"*تبریک! VIP فعال شد*\n\n"
-        f"اشتراک VIP شما با موفقیت فعال شد.\n"
-        f"مدت: {duration_text}\n\n"
-        f"از مزایای ویژه VIP لذت ببرید!"
-    )
-    try:
-        if user.chat_id and notify_user_bot is not None:
-            await notify_user_bot.send_message(chat_id=int(user.chat_id), text=msg, parse_mode="Markdown")
-        elif user.chat_id:
-            await _notify_user_via_main_bot(int(user.chat_id), msg, parse_mode="Markdown")
-    except Exception:
-        pass
     return True
 
 
@@ -188,7 +153,7 @@ async def approve_vip_order(callback: CallbackQuery, session: AsyncSession, bot:
         await callback.answer("User not found", show_alert=True)
         return
 
-    await callback.answer("✅ تایید شد")
+    await callback.answer("تایید شد")
     # Audit trail: stamp the VIP receipt card verified instead of deleting
     # (2026-07-13, Pasha — same rule as purchase/charge receipts).
     try:
@@ -246,31 +211,17 @@ async def deny_vip_order(callback: CallbackQuery, session: AsyncSession, bot: Bo
     except Exception:
         pass
 
+    # Notification row + policy DM through the single write path (the old
+    # ad-hoc plain DM duplicated the row content and is gone).
     if user:
         try:
-            await notifications_crud.create_notification(
-                db=session,
-                user_id=user.id,
-                type="vip_denied",
-                title="درخواست VIP رد شد",
-                message="درخواست خرید VIP شما رد شد. برای اطلاعات بیشتر با پشتیبانی تماس بگیرید.",
-                sent_to_webapp=True,
-                sent_to_bot=True,
-            )
+            await notify(session, user.id, NotificationType.VIP_DENIED, {})
         except Exception as e:
             logging.warning(f"[VIP] Failed to create denial notification: {e}")
 
     await session.commit()
 
-    # Notify user in the main (user-facing) bot (best-effort)
-    try:
-        if user and user.chat_id:
-            msg = "❌ *درخواست VIP رد شد*\n\nدرخواست خرید VIP شما رد شد.\nبرای اطلاعات بیشتر با پشتیبانی تماس بگیرید."
-            await _notify_user_via_main_bot(int(user.chat_id), msg, parse_mode="Markdown")
-    except Exception:
-        pass
-
-    await callback.answer("❌ رد شد")
+    await callback.answer("رد شد")
     try:
         await callback.message.delete()
     except Exception:
