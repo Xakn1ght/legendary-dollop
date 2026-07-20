@@ -4,7 +4,7 @@ CRUD operations for notifications
 from datetime import datetime
 from typing import List, Optional
 
-from sqlalchemy import and_, or_, select, update
+from sqlalchemy import and_, func, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database.models import Notification, Ticket, User
@@ -157,16 +157,16 @@ async def get_unread_count(
         Count of unread notifications
     """
     result = await db.execute(
-        select(Notification).where(
+        select(func.count()).select_from(Notification).where(
             and_(
                 Notification.user_id == user_id,
-                Notification.sent_to_webapp == True,
-                Notification.read == False
+                Notification.sent_to_webapp.is_(True),
+                Notification.read.is_(False)
             )
         )
     )
-    
-    return len(result.scalars().all())
+
+    return int(result.scalar_one() or 0)
 
 
 async def delete_notification(
