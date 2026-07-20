@@ -1,4 +1,5 @@
-from app.utils.admin_bot_helper import resolve_user_bot
+from app.core.notification_catalog import NotificationType
+from app.services.notify import notify
 
 from ..common import *  # noqa: F403
 
@@ -22,27 +23,14 @@ async def handle_admin_subscription_delete(request: web.Request):
         
         success = await pasarguard_api.delete_user(username)
         if success:
-            # Send notification to user
+            # Notification row + policy DM through the single write path (the
+            # old ad-hoc plain DM duplicated the row content and is gone).
             if user_to_notify:
                 async with AsyncSessionLocal() as session:
-                    await notifications_crud.create_notification(
-                        db=session,
-                        user_id=user_to_notify.id,
-                        type='subscription_deleted',
-                        title='اشتراک حذف شد',
-                        message=f'اشتراک {username} توسط ادمین حذف شد.',
-                        sent_to_webapp=True,
-                        sent_to_bot=True
+                    await notify(
+                        session, user_to_notify.id, NotificationType.SUBSCRIPTION_DELETED,
+                        {"service_name": username},
                     )
-                    await session.commit()
-                
-                bot = resolve_user_bot(request.app.get('bot'))
-                if bot and user_to_notify.chat_id:
-                    try:
-                        tg_msg = f"❌ *اشتراک حذف شد*\n\nسرویس `{username}` توسط مدیریت حذف شد.\nبرای اطلاعات بیشتر با پشتیبانی تماس بگیرید."
-                        await bot.send_message(chat_id=user_to_notify.chat_id, text=tg_msg, parse_mode='Markdown')
-                    except Exception:
-                        pass
             
             from app.services.audit import record_audit
 

@@ -1,4 +1,6 @@
-from app.utils.admin_bot_helper import resolve_user_bot
+from app.core.notification_catalog import NotificationType
+from app.services.notify import notify
+from app.utils.bot_i18n import normalize_lang
 
 from ..common import *  # noqa: F403
 
@@ -90,7 +92,8 @@ async def handle_admin_subscription_extend(request: web.Request):
             if not success:
                 return web.json_response({"ok": False, "error": "panel_update_failed"}, status=500)
             
-            # Send notification to user about subscription extension
+            # Notification row + policy DM through the single write path (the
+            # old ad-hoc plain DM duplicated the row content and is gone).
             async with AsyncSessionLocal() as session:
                 # Find subscription and user
                 result = await session.execute(
@@ -101,36 +104,25 @@ async def handle_admin_subscription_extend(request: web.Request):
                 if sub and sub.user_id:
                     user = await session.get(User, sub.user_id)
                     if user:
-                        # Build notification message
+                        # Language-matched summary of what was added
                         changes = []
-                        if days > 0:
-                            changes.append(f"+{days} روز")
-                        if traffic_gb > 0:
-                            changes.append(f"+{traffic_gb} GB ترافیک")
-                        changes_text = " و ".join(changes) if changes else "تنظیمات بروزرسانی شد"
-                        
-                        notif_title = "📦 اشتراک تمدید شد"
-                        notif_message = f"اشتراک {username} تمدید شد: {changes_text}"
-                        
-                        await notifications_crud.create_notification(
-                            db=session,
-                            user_id=user.id,
-                            type='subscription_extended',
-                            title=notif_title,
-                            message=notif_message,
-                            sent_to_webapp=True,
-                            sent_to_bot=True
+                        if normalize_lang(getattr(user, "language", None)) == "en":
+                            if days > 0:
+                                changes.append(f"+{days} days")
+                            if traffic_gb > 0:
+                                changes.append(f"+{traffic_gb} GB")
+                            changes_text = " and ".join(changes) if changes else "settings updated"
+                        else:
+                            if days > 0:
+                                changes.append(f"+{days} روز")
+                            if traffic_gb > 0:
+                                changes.append(f"+{traffic_gb} GB ترافیک")
+                            changes_text = " و ".join(changes) if changes else "تنظیمات بروزرسانی شد"
+
+                        await notify(
+                            session, user.id, NotificationType.SUBSCRIPTION_EXTENDED,
+                            {"service_name": username, "changes": changes_text},
                         )
-                        await session.commit()
-                        
-                        # Send Telegram notification
-                        bot = resolve_user_bot(request.app.get('bot'))
-                        if bot and user.chat_id:
-                            try:
-                                tg_msg = f"📦 *اشتراک تمدید شد*\n\n🔹 سرویس: `{username}`\n✨ {changes_text}"
-                                await bot.send_message(chat_id=user.chat_id, text=tg_msg, parse_mode='Markdown')
-                            except Exception:
-                                pass
         
         if not update_data and traffic_mode != 'reset':
             return web.json_response({"ok": True, "message": "no_changes"})

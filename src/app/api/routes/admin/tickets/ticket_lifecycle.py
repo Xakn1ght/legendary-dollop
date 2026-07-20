@@ -1,4 +1,5 @@
-from app.utils.admin_bot_helper import resolve_user_bot
+from app.core.notification_catalog import NotificationType
+from app.services.notify import notify
 
 from ..common import *  # noqa: F403
 
@@ -22,31 +23,16 @@ async def handle_admin_ticket_close(request: web.Request):
             # Get ticket owner info
             user = await session.get(User, ticket.user_id)
             ticket_owner_chat_id = user.chat_id if user else None
-            
-            # Notify user
-            await notifications_crud.create_notification(
-                db=session,
-                user_id=ticket.user_id,
-                type='ticket_closed',
-                title=f'تیکت #{ticket_id} بسته شد',
-                message='تیکت پشتیبانی شما بسته شد',
+
+            # Notification row + policy DM through the single write path (the
+            # old ad-hoc plain DM duplicated the row content and is gone).
+            await notify(
+                session,
+                ticket.user_id,
+                NotificationType.TICKET_CLOSED,
+                {"ticket_no": ticket.user_ticket_number or ticket_id},
                 ticket_id=ticket.id,
-                sent_to_webapp=True,
-                sent_to_bot=True
             )
-            await session.commit()
-            
-            # Send Telegram notification
-            bot = resolve_user_bot(request.app.get('bot'))
-            if bot and ticket_owner_chat_id:
-                try:
-                    await bot.send_message(
-                        chat_id=ticket_owner_chat_id,
-                        text=f"*تیکت #{ticket_id} بسته شد*\n\nتیکت پشتیبانی شما بسته شد.\nبرای مشکل جدید می‌توانید تیکت جدید ارسال کنید.",
-                        parse_mode='Markdown'
-                    )
-                except Exception:
-                    pass
 
             # Broadcast status update so both admin + user UIs update immediately
             try:
