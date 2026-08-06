@@ -33,6 +33,13 @@ PASARGUARD_WEBHOOK_SECRET = os.environ.get("PASARGUARD_WEBHOOK_SECRET", "")
 # (POST /api/webhook/pasarguard). Empty = receiver disabled (403s everything).
 PASARGUARD_WEBHOOK_SECRET = os.environ.get("PASARGUARD_WEBHOOK_SECRET", "").strip()
 
+# --- Test mode -----------------------------------------------------------------
+# When set, every panel username created by a purchase/charge gets this prefix,
+# so test accounts are distinguishable from the thousands of real ones sharing
+# the panel. `scripts/cleanup_test_panel_users.py` deletes ONLY names carrying
+# it, and refuses to run at all when this is empty. Leave EMPTY in production.
+TEST_PANEL_PREFIX = os.environ.get("TEST_PANEL_PREFIX", "").strip()
+
 # Subscription link details
 SUBLINK = os.environ.get("SUBLINK", "astrobyte.org/sub")
 # Optional: base64 of the public subscription link base (used by some legacy clients/tools)

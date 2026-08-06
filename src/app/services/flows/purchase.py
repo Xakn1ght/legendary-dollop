@@ -79,12 +79,28 @@ async def is_service_name_taken(session: AsyncSession, username: str) -> bool:
     return await pasarguard_api.get_user_info(username) is not None
 
 
+def apply_test_prefix(name: str) -> str:
+    """Tag a panel username as test-only when TEST_PANEL_PREFIX is set.
+
+    The panel is shared with thousands of real accounts, so test runs must be
+    identifiable from the name alone — that prefix is the ONLY thing
+    ``scripts/cleanup_test_panel_users.py`` will ever delete. Empty in
+    production (the default), where this is a no-op. Idempotent: a name that
+    already carries the prefix is returned unchanged."""
+    from app.core.settings import TEST_PANEL_PREFIX
+
+    prefix = (TEST_PANEL_PREFIX or "").strip()
+    if not prefix or not name or name.startswith(prefix):
+        return name
+    return f"{prefix}{name}"
+
+
 async def generate_unique_service_name(session: AsyncSession, base_username: str) -> str:
     """Append a counter until the name is free both in our DB and on PasarGuard.
 
     The seed is sanitized first (gift flow feeds raw Telegram usernames /
     full names here — "YMS_"-style seeds used to reach the panel unchanged)."""
-    base = sanitize_panel_username_seed(base_username)
+    base = apply_test_prefix(sanitize_panel_username_seed(base_username))
     username = base
     i = 1
     while await is_service_name_taken(session, username):
@@ -98,6 +114,9 @@ async def resolve_service_name(session: AsyncSession, service_name: str | None) 
     if service_name:
         if not SERVICE_NAME_RE.fullmatch(service_name):
             raise FlowError("invalid_service_name", "Service name must be 3-20 English letters/digits")
+        # Validate what the user actually typed, then tag it — a chosen name
+        # must not be able to escape test mode (it reaches the panel verbatim).
+        service_name = apply_test_prefix(service_name)
         if await is_service_name_taken(session, service_name):
             raise FlowError("service_name_taken", "This service name is already taken")
         return service_name
