@@ -44,8 +44,8 @@ async def process_receipt(message: Message, state: FSMContext, session: AsyncSes
         pass
 
     builder = InlineKeyboardBuilder()
-    builder.button(text="✅ تایید", callback_data=f"approve_sub_{sub_id}")
-    builder.button(text="❌ رد", callback_data=f"deny_sub_{sub_id}")
+    builder.button(text="تایید", callback_data=f"approve_sub_{sub_id}")
+    builder.button(text="رد", callback_data=f"deny_sub_{sub_id}")
     builder.adjust(2)
 
     from app.core.settings import PLANS

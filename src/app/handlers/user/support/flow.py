@@ -10,6 +10,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.settings import SUPPORT_AVG_HANDLE_MINUTES, TROUBLESHOOTER_STEPS
 from app.database import crud
+from app.utils.bot_i18n import guess_lang_from_telegram, t
 from app.utils.logger import log_user_action
 
 from .common import (

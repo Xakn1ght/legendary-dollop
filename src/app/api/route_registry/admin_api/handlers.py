@@ -1,8 +1,16 @@
-"""Import admin route callables once for registration."""
+"""Import admin route callables once for registration.
+
+Pure re-export hub — register.py consumes every name via
+``from .handlers import ...``, so the imports below are "unused" only
+to the linter.
+"""
+# ruff: noqa: F401
 
 from app.api.routes.admin import (
     handle_admin_analytics_expiring,
+    handle_admin_analytics_online,
     handle_admin_analytics_revenue,
+    handle_admin_approve_cashout,
     handle_admin_approve_charge,
     handle_admin_approve_receipt,
     handle_admin_approve_vip_order,
@@ -12,15 +20,16 @@ from app.api.routes.admin import (
     handle_admin_coupons_list,
     handle_admin_expiring_remind,
     handle_admin_export_transactions,
+    handle_admin_node_reconnect,
     handle_admin_nodes,
     handle_admin_sms_control_get,
     handle_admin_sms_control_set,
     handle_admin_system_health,
     handle_admin_broadcast,
+    handle_admin_deny_cashout,
     handle_admin_deny_charge,
     handle_admin_deny_receipt,
     handle_admin_deny_vip_order,
-    handle_admin_get_charge_packages,
     handle_admin_get_job_schedules,
     handle_admin_get_payment_settings,
     handle_admin_get_plans,
@@ -43,6 +52,7 @@ from app.api.routes.admin import (
     handle_admin_stats,
     handle_admin_set_hwid_limit,
     handle_admin_subscription_delete,
+    handle_admin_subscription_devices,
     handle_admin_subscription_extend,
     handle_admin_subscription_usage,
     handle_admin_subscriptions,
@@ -57,7 +67,6 @@ from app.api.routes.admin import (
     handle_admin_ticket_reply,
     handle_admin_tickets,
     handle_admin_toggle_user,
-    handle_admin_update_charge_packages,
     handle_admin_update_job_schedules,
     handle_admin_update_payment_settings,
     handle_admin_update_plans,

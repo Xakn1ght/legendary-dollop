@@ -25,34 +25,33 @@ async def show_user_profile(callback: CallbackQuery, session: AsyncSession):
     next_tier = next((t for t in sorted(tiers, key=lambda x: x.star_threshold) if t.star_threshold > user.stars), None)
 
     if next_tier:
-        stars_line = f"⭐️ <b>ستاره‌ها:</b> {to_persian_digits(user.stars)} / {to_persian_digits(next_tier.star_threshold)}\n"
+        stars_line = f"<b>ستاره‌ها:</b> {to_persian_digits(user.stars)} / {to_persian_digits(next_tier.star_threshold)}\n"
     else:
-        stars_line = f"⭐️ <b>ستاره‌ها:</b> {to_persian_digits(user.stars)} (حداکثر سطح)\n"
+        stars_line = f"<b>ستاره‌ها:</b> {to_persian_digits(user.stars)}\n"
 
 
     profile_text = (
-        f"👤 <b>پروفایل کاربری</b>\n\n"
-        f"🏷️ <b>نام:</b> {user.full_name or user.username or 'نامشخص'}\n"
-        f"🆔 <b>آی‌دی عددی:</b> <code>{user.chat_id}</code>\n"
-        f"📅 <b>تاریخ عضویت:</b> {to_jalali_date(user.created_at)}\n\n"
-        f"💰 <b>اعتبار:</b> {to_persian_digits(f'{user.credit:,}')} تومان\n"
+        f"<b>پروفایل کاربری</b>\n\n"
+        f"<b>نام:</b> {user.full_name or user.username or 'نامشخص'}\n"
+        f"<b>آی‌دی عددی:</b> <code>{user.chat_id}</code>\n"
+        f"<b>تاریخ عضویت:</b> {to_jalali_date(user.created_at)}\n\n"
+        f"<b>اعتبار:</b> {to_persian_digits(f'{user.credit:,}')} تومان\n"
         + stars_line
     )
     if unclaimed_rewards:
-        profile_text += f"🎁 <b>هدایای ستاره‌ای استفاده‌نشده:</b> {to_persian_digits(len(unclaimed_rewards))} عدد\n"
-    profile_text += "\nℹ️ سیستم XP و امتیاز وفاداری غیرفعال است."
+        profile_text += f"<b>هدایای ستاره‌ای استفاده‌نشده:</b> {to_persian_digits(len(unclaimed_rewards))} عدد\n"
 
     keyboard = InlineKeyboardMarkup(
         inline_keyboard=[
             [
-                InlineKeyboardButton(text="🔄 بروزرسانی", callback_data="enhanced_profile"),
-                InlineKeyboardButton(text="🔙 بازگشت", callback_data="enhanced_rewards_menu"),
+                InlineKeyboardButton(text="بروزرسانی", callback_data="enhanced_profile"),
+                InlineKeyboardButton(text="بازگشت", callback_data="enhanced_rewards_menu"),
             ]
         ]
     )
     if unclaimed_rewards:
         keyboard.inline_keyboard.append([
-            InlineKeyboardButton(text="🎁 دریافت جوایز", callback_data="open_wallet_menu")
+            InlineKeyboardButton(text="دریافت جوایز", callback_data="open_wallet_menu")
         ])
 
     try:

@@ -5,7 +5,6 @@ from sqlalchemy.future import select
 
 from app.api.deps import _verify_webapp_auth, set_tma_session_cookie
 from app.api.schemas import StartPurchaseRequest, validate_request
-from app.core.settings import PLANS
 from app.database import crud
 from app.database.models import AsyncSessionLocal, Referral
 from app.services.flows.errors import FlowError
@@ -110,12 +109,12 @@ async def handle_start_purchase(request: web.Request):
                 if admin_bot:
                     plan_gb = (_get_plan_info(quote.plan_name) or {}).get("gb", 0)
                     admin_text = (
-                        "✅ خرید با اعتبار (خودکار)\n\n"
-                        f"👤 کاربر: {user.full_name} ({user_chat_id})\n"
-                        f"📦 پلن: {quote.plan_name} ({plan_gb} گیگابایت)\n"
-                        f"🔖 نام سرویس: {sub.marzban_username}\n"
-                        f"💰 اعتبار استفاده شده: {quote.credit_used:,} تومان\n"
-                        f"🆔 شماره سفارش: #{sub.id}"
+                        "خرید با اعتبار (خودکار)\n\n"
+                        f"کاربر: {user.full_name} ({user_chat_id})\n"
+                        f"پلن: {quote.plan_name} ({plan_gb} گیگابایت)\n"
+                        f"نام سرویس: {sub.marzban_username}\n"
+                        f"اعتبار استفاده شده: {quote.credit_used:,} تومان\n"
+                        f"شماره سفارش: #{sub.id}"
                     )
                     await admin_bot.send_message(ADMIN_ID, admin_text)
             except Exception:

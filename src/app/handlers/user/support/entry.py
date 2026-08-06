@@ -9,7 +9,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.settings import ADMIN_ID, ADMIN_USERNAME
 from app.database import crud
 
-from .common import SupportStates, router, safe_edit_message
+from .common import SupportStates, _images_step_kb, router, safe_edit_message
 
 
 @router.message(F.text.in_(["💬 پشتیبانی", "💬 Support", "پشتیبانی💬", "📞 پشتیبانی"]))

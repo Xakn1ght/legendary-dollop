@@ -40,6 +40,13 @@ async def node_watch_job(bot) -> None:
     if not isinstance(nodes, list) or not nodes:
         return  # unreachable panel is alerted through its own health checks
 
+    # Keep the Servers-page last-seen map fresh even when nobody is watching it.
+    try:
+        from app.services.node_seen import stamp_and_get
+        stamp_and_get(nodes)
+    except Exception:
+        pass
+
     prev = _load_state()
     state: dict = {}
     changes: list[str] = []
@@ -55,11 +62,11 @@ async def node_watch_job(bot) -> None:
         was = prev.get(name)
         if was is not None and was != state[name]:
             if up:
-                changes.append(f"✅ نود «{name}» دوباره وصل شد.")
+                changes.append(f"نود «{name}» دوباره وصل شد.")
             else:
-                changes.append(f"🔴 نود «{name}» از دسترس خارج شد! (status: {status})")
+                changes.append(f"نود «{name}» از دسترس خارج شد! (status: {status})")
         elif was is None and not up:
-            changes.append(f"🔴 نود «{name}» down است (status: {status}).")
+            changes.append(f"نود «{name}» down است (status: {status}).")
 
     _save_state(state)
     if not changes:
@@ -72,7 +79,7 @@ async def node_watch_job(bot) -> None:
         bot_logger.warning("[NODES] ADMIN_BOT_TOKEN not set — node alert skipped (never sent via user bot)")
         return
 
-    text = "🛰 <b>وضعیت نودها</b>\n\n" + "\n".join(changes)
+    text = "<b>وضعیت نودها</b>\n\n" + "\n".join(changes)
     for admin_id in ADMIN_IDS:
         try:
             await admin_bot.send_message(admin_id, text, parse_mode="HTML")

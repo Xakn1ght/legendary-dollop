@@ -944,9 +944,13 @@
         const capsRes = await fetch('/api/admin/db/capabilities');
         const caps = await capsRes.json();
         if (!caps?.ok) throw new Error(caps?.error || 'capabilities_failed');
+        dbState.allowSql = !!caps.capabilities?.allow_sql;
         dbState.allowWrite = !!caps.capabilities?.allow_write;
         dbState.maxRowsTable = Number(caps.capabilities?.max_rows_table || 200);
         dbState.maxRowsQuery = Number(caps.capabilities?.max_rows_query || 500);
+
+        const sqlCard = dbEl('dbSqlCard');
+        if (sqlCard) sqlCard.style.display = dbState.allowSql ? '' : 'none';
 
         const execBtn = dbEl('dbExecBtn');
         if (execBtn) execBtn.style.display = dbState.allowWrite ? '' : 'none';

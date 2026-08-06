@@ -93,8 +93,8 @@ async def handle_submit_receipt(request: web.Request):
             photo_file = BufferedInputFile(image_data, filename="receipt.jpg")
 
             builder = InlineKeyboardBuilder()
-            builder.button(text="✅ تایید", callback_data=f"approve_sub_{sub.id}")
-            builder.button(text="❌ رد", callback_data=f"deny_sub_{sub.id}")
+            builder.button(text="تایید", callback_data=f"approve_sub_{sub.id}")
+            builder.button(text="رد", callback_data=f"deny_sub_{sub.id}")
             builder.adjust(2)
 
             from app.utils.receipt_captions import purchase_receipt_caption

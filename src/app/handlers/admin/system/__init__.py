@@ -1,11 +1,10 @@
-# Register order: menu & callbacks
-from . import (
-    admin_screens,  # noqa: F401, E402
-    backup,  # noqa: F401, E402
-    commands,  # noqa: F401, E402
-    logs,  # noqa: F401, E402
-    menu,  # noqa: F401, E402
-)
+"""Admin system power commands (/errors, /health, /run_renewal, /renewal_preview).
+
+The system menu and its log/backup/monitoring screens were retired 2026-07-21;
+the admin panel covers them.
+"""
+
+from . import commands  # noqa: F401
 from .common import router
 
 __all__ = ["router"]

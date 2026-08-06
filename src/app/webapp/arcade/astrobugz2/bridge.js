@@ -16,6 +16,9 @@
   var latestScore = 0;
   var latestCoins = 0;
   var submitted = false;
+  var submitOk = false;        // the server confirmed the final submit
+  var gameOverReached = false; // the run actually finished (vs mid-run close)
+  var lastSubmitPayload = null;
   var muted = false;
   var paused = false;
   var isPractice = new URLSearchParams(location.search).get('practice') === '1';
@@ -44,6 +47,7 @@
     tooShortMsg: function (n) { return 'بازی کوتاه بود — حداقل ' + faDigits(n) + ' ثانیه بازی کن تا جایزه بگیری!'; },
     notVerifiedMsg: 'دور بازی تأیید نشد — بازی را ببند و دوباره باز کن.',
     notValidatedMsg: 'امتیاز تأیید نشد.',
+    alreadyRecordedMsg: 'این دور قبلاً ثبت شده است.',
     seeYouTomorrow: 'تا فردا!',
     lockedMsg: 'دور امتیازیِ امروزت رو انجام دادی.<br>فردا یه دور جدید باز می‌شه!',
     credits: 'اعتبار', stars: 'ستاره', xp: 'XP', coins: 'سکه',
@@ -68,6 +72,7 @@
     tooShortMsg: function (n) { return 'Game too short — play at least ' + n + ' seconds for rewards!'; },
     notVerifiedMsg: 'Round could not be verified — reopen the game and try again.',
     notValidatedMsg: 'Score could not be validated.',
+    alreadyRecordedMsg: 'Run already recorded.',
     seeYouTomorrow: 'SEE YOU TOMORROW',
     lockedMsg: 'You already played today\u2019s run.<br>A new rewarded run unlocks tomorrow!',
     credits: 'Credits', stars: 'Stars', xp: 'XP', coins: 'Coins',
@@ -116,7 +121,7 @@
     h.id = 'astro-header';
     h.innerHTML =
       '<div class="ah-score"><div class="ah-label">' + STR.score + '</div><div id="ah-score-val">0</div></div>' +
-      '<div id="ah-coin">🪙 <span id="ah-coin-val">0</span></div>' +
+      '<div id="ah-coin">' + ICON.coin + ' <span id="ah-coin-val">0</span></div>' +
       '<div class="ah-ctrls">' +
       '<button id="ah-mute" class="ah-btn" title="Mute">' + ICON.sound + '</button>' +
       '<button id="ah-pause" class="ah-btn" title="Pause">' + ICON.pause + '</button>' +
@@ -157,6 +162,14 @@
     muted: '<svg viewBox="0 0 24 24"><path d="M3 9v6h4l5 5V4L7 9H3zm16.5 3c0-1.77-1.02-3.29-2.5-4.03v2.21l2.45 2.45c.03-.2.05-.41.05-.63zM4.27 3 3 4.27 7.73 9H3v6h4l5 5v-6.73l4.25 4.25c-.67.52-1.42.93-2.25 1.18v2.06c1.38-.31 2.63-.95 3.69-1.81L19.73 21 21 19.73 4.27 3z"/></svg>',
     pause: '<svg viewBox="0 0 24 24"><path d="M6 4h4v16H6V4zm8 0h4v16h-4V4z"/></svg>',
     play: '<svg viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>',
+    coin: '<svg viewBox="0 0 16 16" width="13" height="13" style="display:inline-block;vertical-align:-2px;"><circle cx="8" cy="8" r="6.4" fill="none" stroke="currentColor" stroke-width="1.7"/><circle cx="8" cy="8" r="2.9" fill="currentColor"/></svg>',
+    moon: '<svg viewBox="0 0 24 24" width="46" height="46" fill="#a5b4fc"><path d="M20.5 14.6A8.6 8.6 0 0 1 9.4 3.5a8.6 8.6 0 1 0 11.1 11.1z"/></svg>',
+    medal: function (tone) {
+      return '<svg viewBox="0 0 16 16" width="14" height="14" style="display:inline-block;vertical-align:-2px;">' +
+             '<path d="M4.6 1h2.6L8 3.8 8.8 1h2.6L9.2 6.6H6.8L4.6 1z" fill="' + tone + '" opacity="0.55"/>' +
+             '<circle cx="8" cy="10.4" r="4.5" fill="' + tone + '"/>' +
+             '<circle cx="8" cy="10.4" r="2.1" fill="rgba(0,0,0,0.30)"/></svg>';
+    },
   };
 
   /* ---- daily lock: reloading the score card must not allow another run ----
@@ -172,7 +185,7 @@
     v.innerHTML =
       '<div class="ah-card"' + (IS_RTL ? ' dir="rtl"' : '') + '>' +
       '<div class="ah-go">' + STR.seeYouTomorrow + '</div>' +
-      '<div style="font-size:46px;line-height:1">🌙</div>' +
+      '<div style="line-height:1">' + ICON.moon + '</div>' +
       '<div class="ah-msg">' + STR.lockedMsg + '</div>' +
       '<button id="ah-locked-back">' + STR.backToArcade + '</button>' +
       '</div>';
@@ -222,6 +235,8 @@
   var roundToken = '';
   function roundStart() {
     roundToken = '';
+    gameOverReached = false;
+    lastCheckpointScore = 0;
     var url = '/api/arcade/round-start';
     var auth = new URLSearchParams(location.search).get('auth');
     if (auth) url += '?auth=' + encodeURIComponent(auth);
@@ -237,6 +252,43 @@
     startMs = (performance && performance.now) ? performance.now() : Date.now();
   }
 
+  /* ---- mid-run checkpoints (v28, reliability + anti-abuse) ----
+   * Every ~10s of active ranked play, snapshot the score to the server
+   * (fire-and-forget: any failure must never touch gameplay). If the run is
+   * interrupted (call, Telegram killed, crash), the server finalizes it from
+   * the last checkpoint — the player keeps the score they earned, and
+   * closing mid-run can no longer be used to grind retries. Paused/hidden
+   * play sends nothing, so long pauses stay resumable. */
+  var lastCheckpointScore = 0;
+  function sendCheckpoint() {
+    if (isPractice || !roundToken || gameOverReached || paused) return;
+    if (document.visibilityState && document.visibilityState !== 'visible') return;
+    if ((latestScore | 0) <= 0 || (latestScore | 0) === lastCheckpointScore) return;
+    var payload = {
+      round_token: roundToken,
+      score: (latestScore | 0),
+      coins: (latestCoins | 0),
+    };
+    try {
+      if (window.AstroGame && window.AstroGame.state) {
+        var st = window.AstroGame.state();
+        if (st && st.level) payload.level = st.level | 0;
+      }
+    } catch (_) {}
+    var url = '/api/arcade/checkpoint';
+    var auth = new URLSearchParams(location.search).get('auth');
+    if (auth) url += '?auth=' + encodeURIComponent(auth);
+    var headers = { 'Content-Type': 'application/json' };
+    if (tg && tg.initData) headers['X-Telegram-Init'] = tg.initData;
+    var sentScore = payload.score;
+    try {
+      fetch(url, { method: 'POST', headers: headers, credentials: 'include', body: JSON.stringify(payload) })
+        .then(function () { lastCheckpointScore = sentScore; })
+        .catch(function () {});
+    } catch (_) {}
+  }
+  setInterval(sendCheckpoint, 10000);
+
   /* ---- submit run ---- */
   function submit() {
     if (submitted) return; submitted = true;
@@ -250,6 +302,7 @@
       coins: (latestCoins | 0),
       display_name: (function () { try { return (localStorage.getItem('astro_display_name') || '').trim().slice(0, 40); } catch (_) { return ''; } })(),
     };
+    lastSubmitPayload = payload;
     var headers = { 'Content-Type': 'application/json' };
     if (tg && tg.initData) headers['X-Telegram-Init'] = tg.initData;
     var url = '/api/arcade/submit';
@@ -259,6 +312,7 @@
       fetch(url, { method: 'POST', headers: headers, credentials: 'include', body: JSON.stringify(payload) })
         .then(function (r) { return r.json(); })
         .then(function (data) {
+          submitOk = true;
           try {
             window.dispatchEvent(new CustomEvent('astro:submitted', {
               detail: { score: payload.score, practice: payload.practice, rewards: data.rewards || null, rewarded: data.rewarded || false, message: data.message || '' },
@@ -281,7 +335,7 @@
     if (stars) chips.push('<div class="ah-chip stars"><b>+' + stars + '</b><span>' + STR.stars + '</span></div>');
     if (xp) chips.push('<div class="ah-chip xp"><b>+' + xp + '</b><span>' + STR.xp + '</span></div>');
     var coins = rewards.coins | 0;
-    if (coins) chips.push('<div class="ah-chip coins"><b>+' + coins + '</b><span>🪙 ' + STR.coins + '</span></div>');
+    if (coins) chips.push('<div class="ah-chip coins"><b>+' + coins + '</b><span>' + STR.coins + '</span></div>');
     var html = chips.length ? '<div class="ah-rewards">' + chips.join('') + '</div>' : '';
     var per = (rewards.pieces_per_star != null) ? rewards.pieces_per_star : 10;
     var prog = (rewards.pieces_progress != null) ? rewards.pieces_progress
@@ -301,6 +355,7 @@
     if (short) return STR.tooShortMsg(short[1]);
     if (/could not be verified/i.test(m)) return STR.notVerifiedMsg;
     if (/could not be validated/i.test(m)) return STR.notValidatedMsg;
+    if (/already recorded/i.test(m)) return STR.alreadyRecordedMsg;
     if (LANG === 'en') return m;
     if (data.practice || /practice/i.test(m)) return STR.practiceMsg;
     if (/daily limit/i.test(m)) return STR.dailyLimitMsg;
@@ -373,15 +428,17 @@
         if (!card) return;
         var el = document.createElement('div');
         el.className = 'ah-race';
-        var medal = d.me.rank === 1 ? '🥇' : d.me.rank === 2 ? '🥈' : d.me.rank === 3 ? '🥉' : '🏁';
-        var txt = medal + ' ' + STR.raceRank(d.me.rank);
+        var medal = d.me.rank === 1 ? ICON.medal('#ffd23f')
+                  : d.me.rank === 2 ? ICON.medal('#cbd5e1')
+                  : d.me.rank === 3 ? ICON.medal('#f59e0b') : '';
+        var txt = (medal ? medal + ' ' : '') + STR.raceRank(d.me.rank);
         if (d.me.rank > 1 && d.me.gap_to_next > 0) {
           txt += STR.raceGap(d.me.gap_to_next.toLocaleString(), d.me.rank - 1);
         }
         txt += '<br><small>' +
                (d.days_left === 0 ? STR.raceLastDay : STR.raceDaysLeft(d.days_left)) +
                ' — ' + STR.racePrizes + '</small>' +
-               '<br><small>🤖 ' + STR.raceAuto + '</small>';
+               '<br><small>' + STR.raceAuto + '</small>';
         el.innerHTML = txt;
         var msg = card.querySelector('.ah-msg');
         card.insertBefore(el, msg ? msg.nextSibling : card.children[2]);
@@ -410,11 +467,33 @@
       }
     },
     roundStart: roundStart,
-    gameOver: function () { submit(); },
+    gameOver: function () { gameOverReached = true; submit(); },
   };
 
-  // safety: submit if the user closes the tab mid-run (only counts if already over)
-  window.addEventListener('beforeunload', function () { if (latestScore > 0) submit(); });
+  /* Close-tab safety (v28): ONLY retry a FINISHED run whose final submit was
+   * not confirmed (network hiccup / closed during the fetch) — via
+   * sendBeacon, which survives page teardown. A mid-run close submits
+   * NOTHING: the server finalizes the round from its last checkpoint, so the
+   * player keeps the earned score and the daily attempt can't be burned by a
+   * half-score accidental submit (the old behavior). */
+  function finalRetryBeacon() {
+    if (!gameOverReached || submitOk || !lastSubmitPayload) return;
+    if (!navigator.sendBeacon) return;
+    try {
+      var url = '/api/arcade/submit';
+      var auth = new URLSearchParams(location.search).get('auth');
+      if (auth) url += '?auth=' + encodeURIComponent(auth);
+      var blob = new Blob([JSON.stringify(lastSubmitPayload)], { type: 'application/json' });
+      navigator.sendBeacon(url, blob);
+      submitOk = true; // one shot is enough; the server tombstones duplicates
+    } catch (_) {}
+  }
+  window.addEventListener('beforeunload', finalRetryBeacon);
+  document.addEventListener('visibilitychange', function () {
+    // Telegram WebApps are usually killed without beforeunload — the hidden
+    // transition is the reliable last chance for the final-submit retry.
+    if (document.visibilityState === 'hidden') finalRetryBeacon();
+  });
 
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', buildHeader);
   else buildHeader();

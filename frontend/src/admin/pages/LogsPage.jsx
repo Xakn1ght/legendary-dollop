@@ -1,7 +1,52 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 
 import { apiJson } from '../api.js';
+import { Icons } from '../icons.jsx';
 import { fmtNum } from '../util.js';
+
+const LEVEL_CHIPS = [
+  { id: 'all', label: 'All' },
+  { id: 'info', label: 'Info' },
+  { id: 'warn', label: 'Warn' },
+  { id: 'error', label: 'Error' },
+];
+
+// An entry is a raw string (current backend) or a legacy {timestamp, level,
+// message} object — normalize both into one shape for filtering/rendering.
+function normalizeEntry(l) {
+  const text = (l && typeof l === 'object')
+    ? [l.timestamp || '', l.level ? `[${l.level}]` : '', l.message || ''].filter(Boolean).join(' ')
+    : String(l);
+  let level = 'info';
+  if (l && typeof l === 'object' && l.level) {
+    const lv = String(l.level).toUpperCase();
+    level = lv === 'ERROR' || lv === 'CRITICAL' ? 'error' : (lv.startsWith('WARN') ? 'warn' : 'info');
+  } else if (/\b(ERROR|CRITICAL|Traceback)\b/.test(text)) {
+    level = 'error';
+  } else if (/\bWARN(ING)?\b/.test(text)) {
+    level = 'warn';
+  }
+  return { text, level };
+}
+
+// Calm mono palette (audit leftover): default ink for the line, tint only the
+// level tag — warning accent for WARN, danger for ERROR. No terminal green.
+function LogLine({ entry }) {
+  const { text, level } = entry;
+  const tagColor = level === 'error' ? 'var(--danger)' : level === 'warn' ? 'var(--warning)' : null;
+  const m = tagColor ? /\b(ERROR|CRITICAL|WARNING|WARN)\b/.exec(text) : null;
+  return (
+    <div style={{ marginBottom: 4, color: 'var(--text)', whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>
+      {m ? (
+        <>
+          {text.slice(0, m.index)}
+          <span style={{ color: tagColor, fontWeight: 700 }}>{m[0]}</span>
+          {text.slice(m.index + m[0].length)}
+        </>
+      ) : text}
+    </div>
+  );
+}
 
 // Logs + arcade cheat flags. Audit fix (JS#6): the backend /api/admin/logs
 // returns raw strings, but the legacy code read l.timestamp/l.level/l.message →
@@ -10,6 +55,8 @@ export function LogsPage() {
   const [logs, setLogs] = useState([]);
   const [flags, setFlags] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [q, setQ] = useState('');
+  const [level, setLevel] = useState('all');
 
   const load = async () => {
     setLoading(true);
@@ -24,33 +71,43 @@ export function LogsPage() {
   };
   useEffect(() => { load(); }, []);
 
-  function renderLog(l, i) {
-    if (l && typeof l === 'object') {
-      const level = l.level || 'INFO';
-      return (
-        <div key={i} style={{ marginBottom: 6 }}>
-          <span style={{ color: 'var(--text-muted)' }}>{l.timestamp || ''} </span>
-          <span style={{ color: level === 'ERROR' ? 'var(--danger)' : 'var(--success)', fontWeight: 700 }}>[{level}] </span>
-          <span>{l.message || ''}</span>
-        </div>
-      );
-    }
-    const line = String(l);
-    const isErr = /error|traceback|critical/i.test(line);
-    return <div key={i} style={{ marginBottom: 4, color: isErr ? 'var(--danger)' : 'var(--text)' }}>{line}</div>;
-  }
+  const entries = useMemo(() => logs.map(normalizeEntry), [logs]);
+  const view = useMemo(() => {
+    const query = q.trim().toLowerCase();
+    return entries.filter((e) => (level === 'all' || e.level === level)
+      && (!query || e.text.toLowerCase().includes(query)));
+  }, [entries, q, level]);
 
   return (
     <>
       <div className="glass-card" style={{ padding: 0 }}>
         <div className="table-header" style={{ padding: '16px 20px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <h3 style={{ margin: 0, fontSize: 16 }}>System Logs</h3>
-          <button className="refresh-btn" onClick={load} title="Refresh" disabled={loading}>⟳</button>
+          <button className="refresh-btn" onClick={load} title="Refresh" disabled={loading}>
+            <Icons.refresh width={15} height={15} />
+          </button>
         </div>
-        <div style={{ padding: 16, fontFamily: 'ui-monospace, Menlo, monospace', fontSize: 12, maxHeight: '48vh', overflow: 'auto' }}>
+        <div style={{ padding: '0 20px 12px', display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
+          <input
+            className="input-field" placeholder="Search logs…" value={q}
+            onChange={(e) => setQ(e.target.value)}
+            style={{ flex: '1 1 180px', minWidth: 140 }}
+          />
+          <div style={{ display: 'flex', gap: 6 }}>
+            {LEVEL_CHIPS.map((c) => (
+              <button
+                key={c.id} type="button"
+                className={'chip-btn' + (level === c.id ? ' on' : '')}
+                onClick={() => setLevel(c.id)}
+              >{c.label}</button>
+            ))}
+          </div>
+        </div>
+        <div style={{ padding: '0 16px 16px', fontFamily: 'ui-monospace, Menlo, monospace', fontSize: 12, maxHeight: '48vh', overflow: 'auto' }}>
           {loading && <div style={{ color: 'var(--text-muted)' }}>Loading…</div>}
-          {!loading && logs.length === 0 && <div style={{ color: 'var(--text-muted)' }}>No logs</div>}
-          {logs.map(renderLog)}
+          {!loading && entries.length === 0 && <div style={{ color: 'var(--text-muted)' }}>No logs</div>}
+          {!loading && entries.length > 0 && view.length === 0 && <div style={{ color: 'var(--text-muted)' }}>No lines match the current filter</div>}
+          {view.map((e, i) => <LogLine key={i} entry={e} />)}
         </div>
       </div>
 

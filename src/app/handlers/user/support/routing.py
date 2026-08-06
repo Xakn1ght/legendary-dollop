@@ -10,7 +10,7 @@ from app.core.settings import ADMIN_ID, ADMIN_USERNAME, ISPS, SUPPORT_CATEGORIES
 from app.database import crud
 from app.utils.bot_i18n import guess_lang_from_telegram, t
 
-from .common import SupportStates, router, safe_edit_message
+from .common import SupportStates, _images_step_kb, router, safe_edit_message
 
 
 @router.message(SupportStates.choosing_subscription)

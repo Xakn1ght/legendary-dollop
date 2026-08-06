@@ -12,6 +12,12 @@ PASARGUARD_BASE_URL = (
     or os.environ.get("MARZBAN_BASE_URL", "https://home.afffb.com:9443")
 )
 
+# Static panel API key (PasarGuard 5.1+ "API Keys"). When set, every panel
+# request authenticates via the X-Api-Key header and the admin-token
+# login/refresh dance is skipped entirely (keys never expire unless created
+# with an expire_date). Empty -> classic username/password bearer flow.
+PASARGUARD_API_KEY = (os.environ.get("PASARGUARD_API_KEY") or "").strip()
+
 # PasarGuard groups: users get their inbounds via group membership (the old
 # per-user inbounds dict is gone). New users are created in these groups —
 # must match where the migrated users live (group 1 as of the 2026-07 move).

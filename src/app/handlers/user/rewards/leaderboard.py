@@ -11,17 +11,17 @@ router = Router()
 async def show_leaderboard_menu(callback: CallbackQuery, session: AsyncSession):
     kb = InlineKeyboardMarkup(inline_keyboard=[
         [
-            InlineKeyboardButton(text="👥 معرفی", callback_data="leaderboard_referrals"),
-            InlineKeyboardButton(text="📊 مصرف", callback_data="leaderboard_usage"),
+            InlineKeyboardButton(text="معرفی", callback_data="leaderboard_referrals"),
+            InlineKeyboardButton(text="مصرف", callback_data="leaderboard_usage"),
         ],
         [
-            InlineKeyboardButton(text="🔥 فعالیت", callback_data="leaderboard_activity"),
-            InlineKeyboardButton(text="💰 خرید", callback_data="leaderboard_spending"),
+            InlineKeyboardButton(text="فعالیت", callback_data="leaderboard_activity"),
+            InlineKeyboardButton(text="خرید", callback_data="leaderboard_spending"),
         ],
-        [InlineKeyboardButton(text="🔙 بازگشت", callback_data="enhanced_rewards_menu")],
+        [InlineKeyboardButton(text="بازگشت", callback_data="enhanced_rewards_menu")],
     ])
     await callback.message.edit_text(
-        "📈 **جدول امتیازات**\n\nانتخاب کنید که کدام جدول امتیازات را مشاهده کنید:",
+        "**جدول امتیازات**\n\nانتخاب کنید که کدام جدول امتیازات را مشاهده کنید:",
         reply_markup=kb,
     )
 
@@ -38,16 +38,16 @@ async def show_leaderboard(callback: CallbackQuery, session: AsyncSession):
     board = await get_leaderboard(session, category, limit=10)
 
     if not board:
-        text = f"📈 **جدول امتیازات {names.get(category, category)}**\n\nهنوز هیچ امتیازی ثبت نشده است!"
+        text = f"**جدول امتیازات {names.get(category, category)}**\n\nهنوز هیچ امتیازی ثبت نشده است!"
     else:
-        text = f"📈 **جدول امتیازات {names.get(category, category)}**\n\n"
+        text = f"**جدول امتیازات {names.get(category, category)}**\n\n"
         for i, entry in enumerate(board, 1):
             username = entry.user.username or entry.user.full_name or f"کاربر {entry.user.chat_id}"
             text += f"{i}. {username} - {entry.score:,} امتیاز\n"
 
     kb = InlineKeyboardMarkup(inline_keyboard=[[
-        InlineKeyboardButton(text="🔄 بروزرسانی", callback_data=callback.data),
-        InlineKeyboardButton(text="🔙 بازگشت", callback_data="enhanced_rewards_menu"),
+        InlineKeyboardButton(text="بروزرسانی", callback_data=callback.data),
+        InlineKeyboardButton(text="بازگشت", callback_data="enhanced_rewards_menu"),
     ]])
 
     try:

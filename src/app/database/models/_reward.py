@@ -252,7 +252,12 @@ class SeasonalEvent(Base):
 
 
 class UserGift(Base):
-    """Peer-to-peer gift system."""
+    """DORMANT — the peer-to-peer gift feature was deleted (2026-07-21).
+
+    All handlers/crud around this model are gone; the model and its empty
+    user_gifts table are kept so no migration/data loss happens. Drop both
+    in a future DB cleanup.
+    """
     __tablename__ = "user_gifts"
 
     id = Column(Integer, primary_key=True)

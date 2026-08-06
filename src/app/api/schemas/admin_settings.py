@@ -29,24 +29,6 @@ class AdminUpdatePlansRequest(BaseModel):
     )
 
 
-class ChargePackageSchema(BaseModel):
-    """Schema for a charge package"""
-    name: str = Field(..., min_length=1, max_length=50)
-    price: int = Field(..., ge=0, le=100_000_000)
-    gb: int = Field(..., ge=0, le=10000)
-    days: int = Field(default=0, ge=0, le=365)
-
-
-class AdminUpdateChargePackagesRequest(BaseModel):
-    """Schema for updating charge packages"""
-    packages: List[ChargePackageSchema] = Field(
-        ..., 
-        min_length=1, 
-        max_length=50,
-        description="List of charge packages"
-    )
-
-
 class AdminUpdatePaymentSettingsRequest(BaseModel):
     """Schema for updating payment settings"""
     model_config = ConfigDict(str_strip_whitespace=True)

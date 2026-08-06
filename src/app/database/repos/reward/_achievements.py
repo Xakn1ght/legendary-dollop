@@ -20,6 +20,15 @@ class _AchievementsMixin:
     async def check_and_award_achievements(
         db: AsyncSession, user_id: int, achievement_type: str, current_value: int
     ):
+        """Grant newly-reached legacy achievements — XP ONLY (2026-07-19 seal).
+
+        The old credit/loyalty/stars branches are gone for good: this runs
+        from the hourly analytics job, so a single edited Achievement row
+        could otherwise mint money for every user, every hour. Any non-XP
+        reward_type still in the table grants nothing but the badge row.
+        (The NEW mission achievements in services/achievements.py — 1GB
+        coupons for paying customers — are a separate, gated path.)
+        """
         from app.database.repos.reward import RewardRepository as _RR
 
         result = await db.execute(
@@ -45,16 +54,12 @@ class _AchievementsMixin:
                 db.add(ua)
 
                 if achievement.reward_type == "xp":
-                    await _RR.add_experience_points(db, user_id, achievement.reward_value, "achievement")
-                elif achievement.reward_type == "loyalty_points":
-                    await _RR.add_loyalty_points(db, user_id, achievement.reward_value, "achievement")
-                elif achievement.reward_type == "credit":
-                    from app.database.repos.user import UserRepository
-
-                    await UserRepository.add_credit(db, user_id, achievement.reward_value)
-                    await _RR.add_reward_history(db, user_id, "credit", achievement.reward_value, "achievement", achievement.id)
-                elif achievement.reward_type == "stars":
-                    await _RR.add_stars(db, user_id, achievement.reward_value, "achievement", achievement.id)
+                    try:
+                        xp = int(achievement.reward_value)
+                    except (TypeError, ValueError):
+                        xp = 0
+                    if xp > 0:
+                        await _RR.add_experience_points(db, user_id, xp, "achievement")
 
                 earned.append(achievement)
 

@@ -576,7 +576,9 @@
       border-bottom: 1px dashed rgba(255,255,255,0.09);
     }
     .power-row:last-child { border-bottom: none; }
-    .power-ico { font-size: 20px; flex: none; width: 30px; text-align: center; }
+    .power-ico { font-size: 20px; flex: none; width: 30px; text-align: center; color: var(--gold); }
+    .power-ico svg { width: 20px; height: 20px; vertical-align: middle; }
+    .ico-coin, .ico-medal { display: inline-block; vertical-align: -2px; }
     .power-info { flex: 1; min-width: 0; }
     .power-info b { display: block; font-size: 13px; }
     .power-info small { display: block; color: var(--text-muted); font-size: 11px; line-height: 1.5; }
@@ -859,7 +861,7 @@
       <div class="sec-head">
         <span class="sec-bullet" style="background: var(--gold);"></span>
         <span class="sec-title" style="color: var(--gold);" data-i18n="hangarTitle">HANGAR</span>
-        <span class="coin-balance" id="coinBalance">🪙 <b>0</b></span>
+        <span class="coin-balance" id="coinBalance"><svg class="ico-coin" viewBox="0 0 16 16" width="13" height="13" aria-hidden="true"><circle cx="8" cy="8" r="6.4" fill="none" stroke="currentColor" stroke-width="1.7"/><circle cx="8" cy="8" r="2.9" fill="currentColor"/></svg> <b>0</b></span>
       </div>
       <p class="hangar-note" data-i18n="hangarNote">Golden coins drop rarely during ranked missions. Spend them on your ship — they never expire.</p>
 
@@ -903,7 +905,7 @@
         <span id="raceCountdown" class="sec-side"></span>
       </div>
       <!-- one-line rule: how + when winners are decided -->
-      <div class="race-note"><span aria-hidden="true">🏁</span><span data-i18n="raceNote">Every daily mission adds to your monthly total. Top 3 win 50 / 25 / 10 GB + hangar coins (40 / 25 / 15, ranks 4-10 get 8) — winners are picked automatically on the 1st of next month.</span></div>
+      <div class="race-note"><span aria-hidden="true"><svg viewBox="0 0 16 16" width="14" height="14" fill="currentColor" style="display:block;margin-top:2px;"><path d="M3 1.5h1.4v13H3v-13zm2.4.7c1.5-.8 3-.8 4.5 0s3 .8 4.5 0v6.4c-1.5.8-3 .8-4.5 0s-3-.8-4.5 0V2.2z"/></svg></span><span data-i18n="raceNote">Every daily mission adds to your monthly total. Top 3 win 50 / 25 / 10 GB + hangar coins (40 / 25 / 15, ranks 4-10 get 8) — winners are picked automatically on the 1st of next month.</span></div>
       <div class="race-prizes" id="racePrizes">
         <div class="race-prize gold"><b>#1</b><span>50GB</span></div>
         <div class="race-prize silver"><b>#2</b><span>25GB</span></div>
@@ -990,7 +992,7 @@
         daysLeft: n => n + ' days left',
         youRank: (r, s) => `You're <b>#${r}</b> with <b>${s}</b> pts`,
         gapTxt: (g, r) => ` — ${g} behind #${r}`,
-        crown: ' — defend your crown! 👑',
+        crown: ' — defend your crown!',
         raceEmpty: 'No scores this month yet.<br>The 50GB is up for grabs!',
         hofTitle: 'HALL OF FAME',
         acesTitle: 'DAILY ACES',
@@ -1013,7 +1015,7 @@
         powersTitle: 'UPGRADES',
         retryTitle: 'SECOND CHANCE',
         retryWarn: "Today's score is wiped first — the new run replaces it, higher or lower.",
-        retryBtn: c => `RESET TODAY'S RUN — ${c} 🪙`,
+        retryBtn: c => `RESET TODAY'S RUN — ${c} COINS`,
         retryConfirmTitle: 'Reset today\'s run?',
         retryConfirmMsg: (c, s) => `This costs ${c} coins and ERASES today's score (${s}). Your next run counts instead — even if it's lower. Fly again?`,
         retryDone: 'Run reset! Hit LAUNCH MISSION when ready.',
@@ -1038,9 +1040,9 @@
           bullet_speed: ['Fast shots', 'Passive: bullets fly 25% faster.'],
           shield_cap:   ['3 shields', 'Passive: stack up to 3 shields instead of 2.'],
           cheat_death:  ['Cheat death', 'Passive: once per mission, ghost through a killing blow.'],
-          scythe:       ['⚡ Scythe', 'ABILITY: wipe every enemy shot and hit all bugs. Charge it by destroying enemies, fire with the button.'],
-          overdrive:    ['⚡ Overdrive', 'ABILITY: 3s of triple fire rate + piercing shots. Charge it by destroying enemies.'],
-          bastion:      ['⚡ Bastion', 'ABILITY: 4s invulnerable + magnet pull. Charge it by destroying enemies.'],
+          scythe:       ['Scythe', 'ABILITY: wipe every enemy shot and hit all bugs. Charge it by destroying enemies, fire with the button.'],
+          overdrive:    ['Overdrive', 'ABILITY: 3s of triple fire rate + piercing shots. Charge it by destroying enemies.'],
+          bastion:      ['Bastion', 'ABILITY: 4s invulnerable + magnet pull. Charge it by destroying enemies.'],
         },
         powerNames: {
           shield_start: ['Guardian Shield', 'Start every mission with 1 shield'],
@@ -1066,7 +1068,7 @@
         daysLeft: n => n + ' روز مانده',
         youRank: (r, s) => `رتبه‌ات <b>\u200e#${r}\u200e</b> با <b>${s}</b> امتیاز`,
         gapTxt: (g, r) => ` — ${g} امتیاز تا رتبه ${r}`,
-        crown: ' — از تاجت دفاع کن! 👑',
+        crown: ' — از تاجت دفاع کن!',
         raceEmpty: 'این ماه هنوز امتیازی ثبت نشده.<br>جایزه ۵۰ گیگی منتظر یه قهرمانه!',
         hofTitle: 'تالار افتخار',
         acesTitle: 'برترین‌های امروز',
@@ -1089,7 +1091,7 @@
         powersTitle: 'ارتقاها',
         retryTitle: 'شانس دوباره',
         retryWarn: 'اول امتیاز امروزت پاک می‌شه — دور جدید جاش می‌شینه، چه بالاتر چه پایین‌تر.',
-        retryBtn: c => `ریست دور امروز — ${c} 🪙`,
+        retryBtn: c => `ریست دور امروز — ${c} سکه`,
         retryConfirmTitle: 'دور امروز ریست بشه؟',
         retryConfirmMsg: (c, s) => `این کار ${c} سکه خرج داره و امتیاز امروزت (${s}) رو پاک می‌کنه. دور بعدی جاش حساب می‌شه — حتی اگه کمتر باشه. بریم؟`,
         retryDone: 'دور ریست شد! هر وقت آماده بودی «شروع مأموریت» رو بزن.',
@@ -1112,9 +1114,9 @@
           bullet_speed: ['تیر سریع', 'همیشگی: تیرهات ۲۵٪ سریع‌تر می‌رن.'],
           shield_cap:   ['۳ سپر', 'همیشگی: به‌جای ۲ تا، ۳ تا سپر روی هم.'],
           cheat_death:  ['فرار از مرگ', 'همیشگی: یه بار در هر مأموریت، از ضربه‌ی کشنده شبح‌وار رد می‌شی.'],
-          scythe:       ['⚡ داس', 'قابلیت ویژه: همه‌ی تیرهای دشمن پاک می‌شن و به همه ضربه می‌خوره. با کشتن حشره‌ها شارژ می‌شه، با دکمه شلیک کن.'],
-          overdrive:    ['⚡ رگبار', 'قابلیت ویژه: ۳ ثانیه شلیک سه‌برابر + تیر نافذ. با کشتن حشره‌ها شارژ می‌شه.'],
-          bastion:      ['⚡ حباب', 'قابلیت ویژه: ۴ ثانیه شکست‌ناپذیری + آهن‌ربای آیتم. با کشتن حشره‌ها شارژ می‌شه.'],
+          scythe:       ['داس', 'قابلیت ویژه: همه‌ی تیرهای دشمن پاک می‌شن و به همه ضربه می‌خوره. با کشتن حشره‌ها شارژ می‌شه، با دکمه شلیک کن.'],
+          overdrive:    ['رگبار', 'قابلیت ویژه: ۳ ثانیه شلیک سه‌برابر + تیر نافذ. با کشتن حشره‌ها شارژ می‌شه.'],
+          bastion:      ['حباب', 'قابلیت ویژه: ۴ ثانیه شکست‌ناپذیری + آهن‌ربای آیتم. با کشتن حشره‌ها شارژ می‌شه.'],
         },
         powerNames: {
           shield_start: ['سپر نگهبان', 'هر مأموریت رو با ۱ سپر شروع کن'],
@@ -1600,8 +1602,18 @@
       window.location.href = url;
     });
 
+    // inline SVG icons (owner rule: no emojis anywhere user-facing)
+    const COIN_SVG = '<svg class="ico-coin" viewBox="0 0 16 16" width="13" height="13" aria-hidden="true"><circle cx="8" cy="8" r="6.4" fill="none" stroke="currentColor" stroke-width="1.7"/><circle cx="8" cy="8" r="2.9" fill="currentColor"/></svg>';
+    const CHECK_SVG = '<svg viewBox="0 0 16 16" width="13" height="13" aria-hidden="true"><path d="M2.5 8.5l3.5 3.5 7.5-8" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+    function medalSvg(tone){
+      return '<svg class="ico-medal" viewBox="0 0 16 16" width="15" height="15" aria-hidden="true">' +
+             '<path d="M4.6 1h2.6L8 3.8 8.8 1h2.6L9.2 6.6H6.8L4.6 1z" fill="' + tone + '" opacity="0.55"/>' +
+             '<circle cx="8" cy="10.4" r="4.5" fill="' + tone + '"/>' +
+             '<circle cx="8" cy="10.4" r="2.1" fill="rgba(0,0,0,0.30)"/></svg>';
+    }
+    const RANK_MEDALS = { 1: medalSvg('#ffd23f'), 2: medalSvg('#cbd5e1'), 3: medalSvg('#f59e0b') };
     function rankMedal(rank){
-      return rank === 1 ? '🥇' : rank === 2 ? '🥈' : rank === 3 ? '🥉' : rank;
+      return RANK_MEDALS[rank] || rank;
     }
 
     function daysLeftText(n){
@@ -1797,7 +1809,7 @@
     function renderHangar(){
       if(!shopCatalog || !shopWallet) return;
       document.getElementById('hangarCard').style.display = 'block';
-      document.getElementById('coinBalance').innerHTML = '🪙 <b>' + faN(shopWallet.coins) + '</b>';
+      document.getElementById('coinBalance').innerHTML = COIN_SVG + ' <b>' + faN(shopWallet.coins) + '</b>';
 
       // ---- skins ----
       const grid = document.getElementById('skinGrid');
@@ -1814,7 +1826,7 @@
         const power = (T('skinPowers') || {})[skin.ability || skin.perk] || null;
         const state = equipped ? T('equipped')
                     : owned ? T('ownedTap')
-                    : faN(skin.price) + ' 🪙';
+                    : faN(skin.price) + ' ' + COIN_SVG;
         cell.innerHTML = '<canvas></canvas>' +
           '<span class="skin-name">' + escapeHtml(name) + '</span>' +
           (power ? '<span class="skin-power">' + escapeHtml(power[0]) + '</span>' : '') +
@@ -1834,14 +1846,17 @@
       // ---- powers + hull ----
       const list = document.getElementById('powerList');
       list.innerHTML = '';
+      const ICO_SHIELD = '<svg viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><path d="M8 1l5.5 2v4.2c0 3.4-2.2 6.1-5.5 7.8C4.7 13.3 2.5 10.6 2.5 7.2V3L8 1z"/></svg>';
+      const ICO_SPREAD = '<svg viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><path d="M7.3 15V6.8L4 10V6.6L7.3 3.3V15h1.4V3.3L12 6.6V10L8.7 6.8V15H7.3z"/><path d="M8 0.6l1.6 2.2H6.4L8 0.6z"/></svg>';
+      const ICO_HEART = '<svg viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><path d="M8 14.2C4.2 11.4 1.8 9 1.8 6.2 1.8 4.2 3.3 2.8 5.1 2.8c1.1 0 2.2.5 2.9 1.4.7-.9 1.8-1.4 2.9-1.4 1.8 0 3.3 1.4 3.3 3.4 0 2.8-2.4 5.2-6.2 8z"/></svg>';
       const rows = shopCatalog.powers.map(p => ({
         item: 'power:' + p.key, key: p.key, price: p.price,
         owned: shopWallet.owned_powers.includes(p.key),
-        ico: p.key === 'shield_start' ? '🛡️' : '🔱',
+        ico: p.key === 'shield_start' ? ICO_SHIELD : ICO_SPREAD,
       }));
       rows.push({
         item: 'extra_life', key: 'extra_life', price: shopCatalog.extra_life.price,
-        owned: (shopWallet.extra_lives || 0) >= 1, ico: '❤️',
+        owned: (shopWallet.extra_lives || 0) >= 1, ico: ICO_HEART,
       });
       rows.forEach(r => {
         const [name, desc] = (T('powerNames') || {})[r.key] || [r.key, ''];
@@ -1851,7 +1866,7 @@
           '<span class="power-ico">' + r.ico + '</span>' +
           '<span class="power-info"><b>' + escapeHtml(name) + '</b><small>' + escapeHtml(desc) + '</small></span>' +
           '<button type="button" class="buy-btn' + (r.owned ? ' owned' : shopWallet.coins < r.price ? ' poor' : '') + '">' +
-          (r.owned ? '✓' : faN(r.price) + ' 🪙') + '</button>';
+          (r.owned ? CHECK_SVG : faN(r.price) + ' ' + COIN_SVG) + '</button>';
         const btn = row.querySelector('.buy-btn');
         if(!r.owned){
           btn.addEventListener('click', () => {

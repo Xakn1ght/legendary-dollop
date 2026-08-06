@@ -110,17 +110,6 @@ def get_level_rewards(level: int) -> dict:
     """Get rewards for reaching a specific level."""
     return LEVEL_REWARDS.get(level, {})
 
-def get_streak_bonus(streak_days: int) -> dict:
-    """Get bonus rewards for a specific streak length."""
-    # Find the highest streak bonus that applies
-    applicable_bonuses = {days: bonus for days, bonus in STREAK_BONUSES.items() 
-                         if streak_days >= days}
-    if not applicable_bonuses:
-        return {}
-    
-    max_streak = max(applicable_bonuses.keys())
-    return applicable_bonuses[max_streak]
-
 def get_premium_features(level: int) -> list:
     """Get premium features available at a specific level."""
     features = []

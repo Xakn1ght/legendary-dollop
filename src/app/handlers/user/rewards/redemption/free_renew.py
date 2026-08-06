@@ -71,7 +71,7 @@ async def _apply_free_renew(
         return
 
     await crud.StarManager.reset_stars(session, user.id, reason="free_renewal", source_id=sub_id)
-    await callback.answer("✅ تمدید رایگان انجام شد!", show_alert=True)
+    await callback.answer("تمدید رایگان انجام شد!", show_alert=True)
     await bot.send_message(
         user.chat_id,
         f"سرویس {subscription.marzban_username} برای ۳۰ روز دیگر تمدید و {plan_info['gb']}GB ترافیک افزوده شد. ستاره‌های شما ریست شد.",

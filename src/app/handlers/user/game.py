@@ -1,6 +1,6 @@
 from aiogram import F, Router
 from aiogram.exceptions import TelegramBadRequest
-from aiogram.types import CallbackQuery, InlineKeyboardButton, InlineKeyboardMarkup, Message
+from aiogram.types import CallbackQuery, InlineKeyboardButton, InlineKeyboardMarkup
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.settings import GAME_PUBLIC_BASE_URL, GAME_WEBAPP_BASE_PATH
@@ -14,21 +14,21 @@ def _game_menu_kb(play_url: str) -> InlineKeyboardMarkup:
     if play_url.startswith("https://"):
         return InlineKeyboardMarkup(
             inline_keyboard=[
-                [InlineKeyboardButton(text="🎮 شروع بازی روزانه", web_app={"url": play_url})],
-                [InlineKeyboardButton(text="🌐 باز کردن در مرورگر (تمرینی)", url=f"{GAME_PUBLIC_BASE_URL}{GAME_WEBAPP_BASE_PATH}?practice=1")],
-                [InlineKeyboardButton(text="🏅 جدول روزانه", callback_data="game_lb_daily"),
-                 InlineKeyboardButton(text="🏆 جدول هفتگی", callback_data="game_lb_weekly")],
-                [InlineKeyboardButton(text="🔙 بازگشت", callback_data="enhanced_rewards_menu")],
+                [InlineKeyboardButton(text="شروع بازی روزانه", web_app={"url": play_url})],
+                [InlineKeyboardButton(text="باز کردن در مرورگر (تمرینی)", url=f"{GAME_PUBLIC_BASE_URL}{GAME_WEBAPP_BASE_PATH}?practice=1")],
+                [InlineKeyboardButton(text="جدول روزانه", callback_data="game_lb_daily"),
+                 InlineKeyboardButton(text="جدول هفتگی", callback_data="game_lb_weekly")],
+                [InlineKeyboardButton(text="بازگشت", callback_data="enhanced_rewards_menu")],
             ]
         )
     else:
         practice_url = f"{GAME_PUBLIC_BASE_URL}{GAME_WEBAPP_BASE_PATH}?practice=1"
         return InlineKeyboardMarkup(
             inline_keyboard=[
-                [InlineKeyboardButton(text="🔗 لینک تمرینی (بدون پاداش)", url=practice_url)],
-                [InlineKeyboardButton(text="🏅 جدول روزانه", callback_data="game_lb_daily"),
-                 InlineKeyboardButton(text="🏆 جدول هفتگی", callback_data="game_lb_weekly")],
-                [InlineKeyboardButton(text="🔙 بازگشت", callback_data="enhanced_rewards_menu")],
+                [InlineKeyboardButton(text="لینک تمرینی (بدون پاداش)", url=practice_url)],
+                [InlineKeyboardButton(text="جدول روزانه", callback_data="game_lb_daily"),
+                 InlineKeyboardButton(text="جدول هفتگی", callback_data="game_lb_weekly")],
+                [InlineKeyboardButton(text="بازگشت", callback_data="enhanced_rewards_menu")],
             ]
         )
 
@@ -42,11 +42,11 @@ async def open_daily_game(callback: CallbackQuery, session: AsyncSession):
     status = await can_play_daily_game(session, user.id)
     allowed = status.get("allowed", True)
     play_url = f"{GAME_PUBLIC_BASE_URL}{GAME_WEBAPP_BASE_PATH}?practice={'0' if allowed else '1'}"
-    https_note = "" if play_url.startswith("https://") else "\n\n⚠️ برای باز شدن داخل تلگرام باید لینک HTTPS باشد. فعلاً می‌توانید حالت تمرینی را با لینک معمولی باز کنید."
+    https_note = "" if play_url.startswith("https://") else "\n\nبرای باز شدن داخل تلگرام باید لینک HTTPS باشد. فعلاً می‌توانید حالت تمرینی را با لینک معمولی باز کنید."
     text = (
-        "🚀 <b>بازی روزانه AstroByte Blaster</b>\n\n"
-        + ("✅ امروز می‌توانید بازی کنید و پاداش بگیرید!\n" if allowed else "⏳ امروز پاداش گرفته‌اید؛ حالت تمرینی فعال است.\n")
-        + f"✨ بهترین امتیاز امروز: {to_persian_digits(status.get('best_score', 0))}" + https_note + "\n\n"
+        "<b>بازی روزانه AstroBugz</b>\n\n"
+        + ("امروز می‌توانید بازی کنید و پاداش بگیرید!\n" if allowed else "امروز پاداش گرفته‌اید؛ حالت تمرینی فعال است.\n")
+        + f"بهترین امتیاز امروز: {to_persian_digits(status.get('best_score', 0))}" + https_note + "\n\n"
         "- با فلش‌ها حرکت کنید و شلیک کنید.\n- هر روز یک بار پاداش می‌گیرید."
     )
 
@@ -58,17 +58,17 @@ async def open_daily_game(callback: CallbackQuery, session: AsyncSession):
 
 async def _render_leaderboard(callback: CallbackQuery, session: AsyncSession, period: str):
     data = await get_game_leaderboard(session, period=period, limit=10)
-    title = "🏅 جدول روزانه" if period == "daily" else "🏆 جدول هفتگی"
+    title = "جدول روزانه" if period == "daily" else "جدول هفتگی"
     if not data:
         text = f"{title}\n\nرکوردی یافت نشد."
     else:
         lines = [title, ""]
         for row in data:
             name = row["name"]
-            score = to_persian_digits(row["score"]) 
+            score = to_persian_digits(row["score"])
             lines.append(f"{row['rank']}. {name} — {score}")
         text = "\n".join(lines)
-    kb = InlineKeyboardMarkup(inline_keyboard=[[InlineKeyboardButton(text="🔙 بازگشت", callback_data="open_daily_game")]])
+    kb = InlineKeyboardMarkup(inline_keyboard=[[InlineKeyboardButton(text="بازگشت", callback_data="open_daily_game")]])
     try:
         await callback.message.edit_text(text, reply_markup=kb)
     except TelegramBadRequest:
@@ -82,5 +82,3 @@ async def game_lb_daily(callback: CallbackQuery, session: AsyncSession):
 @router.callback_query(F.data == "game_lb_weekly")
 async def game_lb_weekly(callback: CallbackQuery, session: AsyncSession):
     await _render_leaderboard(callback, session, period="weekly")
-
-

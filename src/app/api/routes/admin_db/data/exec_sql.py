@@ -1,11 +1,21 @@
 from aiohttp import web
 from sqlalchemy import text
 
-from app.api.routes.admin_db.common import _is_dangerous_sql_enabled
+from app.api.routes.admin_db.common import (
+    _is_dangerous_sql_enabled,
+    _is_sql_runner_enabled,
+    _sql_disabled_response,
+)
 from app.database.models import AsyncSessionLocal
+from app.services.audit import record_audit
 
 
 async def handle_admin_db_exec(request: web.Request):
+    if not _is_sql_runner_enabled():
+        await record_audit(request, "db.sql_blocked", target_type="endpoint", target_id="db/exec",
+                           summary="SQL runner disabled (ADMIN_DB_SQL_ENABLED off)")
+        return _sql_disabled_response()
+
     if not _is_dangerous_sql_enabled():
         return web.json_response({"ok": False, "error": "write_disabled"}, status=403)
 

@@ -241,18 +241,22 @@ async def _initialize_default_achievements(conn):
     if result.scalar_one_or_none():
         return
 
+    # XP-ONLY seeds (2026-07-19 economy seal): the old "bundle" rewards
+    # carried credit/stars/cashback — one row edit away from arming money
+    # minting in the hourly analytics job. Achievements now pay status XP
+    # only (old credit folded in at roughly credit/10). No emoji icons.
     default_achievements = [
-        {"name": "بلند پرواز", "description": "اولین بازی خود را انجام دهید", "icon": "🚀", "requirement_type": "game_plays", "requirement_value": 1, "reward_type": "bundle", "reward_value": "credit:500|xp:100"},
-        {"name": "اولین تماس", "description": "اولین دوست خود را معرفی کنید", "icon": "🎯", "requirement_type": "referrals", "requirement_value": 1, "reward_type": "bundle", "reward_value": "credit:2000|xp:200"},
-        {"name": "رهبر گروه", "description": "۵ نفر را معرفی کنید", "icon": "👥", "requirement_type": "referrals", "requirement_value": 5, "reward_type": "bundle", "reward_value": "credit:10000|xp:500|stars:1"},
-        {"name": "امپراتوری کهکشانی", "description": "۲۰ معرفی فعال (خرید پلن ۲۰GB+)", "icon": "🌌", "requirement_type": "active_referrals", "requirement_value": 20, "reward_type": "bundle", "reward_value": "credit:50000|xp:1200|stars:3"},
-        {"name": "مسافر داده", "description": "۵۰ گیگابایت داده مصرف کنید", "icon": "📡", "requirement_type": "usage", "requirement_value": 50, "reward_type": "bundle", "reward_value": "credit:5000|xp:300"},
-        {"name": "فرمانده داده", "description": "۲۰۰ گیگابایت داده مصرف کنید", "icon": "📊", "requirement_type": "usage", "requirement_value": 200, "reward_type": "bundle", "reward_value": "credit:20000|xp:800"},
-        {"name": "جنگجوی نوار", "description": "۷ روز متوالی بازی کنید", "icon": "🔥", "requirement_type": "play_streak", "requirement_value": 7, "reward_type": "bundle", "reward_value": "credit:5000|xp:400"},
-        {"name": "مسافر زمان", "description": "۳۰ روز متوالی بازی کنید", "icon": "⏰", "requirement_type": "play_streak", "requirement_value": 30, "reward_type": "bundle", "reward_value": "credit:25000|xp:1200|stars:2"},
-        {"name": "خریدار بزرگ", "description": "۵ اشتراک خریداری کنید", "icon": "💎", "requirement_type": "purchases", "requirement_value": 5, "reward_type": "bundle", "reward_value": "xp:800|stars:1|cashback:5"},
-        {"name": "حامی", "description": "۱۰ اشتراک خریداری کنید", "icon": "👑", "requirement_type": "purchases", "requirement_value": 10, "reward_type": "bundle", "reward_value": "xp:2000|stars:2|cashback:10"},
-        {"name": "امتیاز کامل", "description": "در بازی به ۱۵۰۰۰+ امتیاز برسید", "icon": "🏆", "requirement_type": "high_score", "requirement_value": 15000, "reward_type": "bundle", "reward_value": "credit:5000|xp:500|stars:1"},
+        {"name": "بلند پرواز", "description": "اولین بازی خود را انجام دهید", "icon": None, "requirement_type": "game_plays", "requirement_value": 1, "reward_type": "xp", "reward_value": "150"},
+        {"name": "اولین تماس", "description": "اولین دوست خود را معرفی کنید", "icon": None, "requirement_type": "referrals", "requirement_value": 1, "reward_type": "xp", "reward_value": "250"},
+        {"name": "رهبر گروه", "description": "۵ نفر را معرفی کنید", "icon": None, "requirement_type": "referrals", "requirement_value": 5, "reward_type": "xp", "reward_value": "600"},
+        {"name": "امپراتوری کهکشانی", "description": "۲۰ معرفی فعال (خرید پلن ۲۰GB+)", "icon": None, "requirement_type": "active_referrals", "requirement_value": 20, "reward_type": "xp", "reward_value": "1500"},
+        {"name": "مسافر داده", "description": "۵۰ گیگابایت داده مصرف کنید", "icon": None, "requirement_type": "usage", "requirement_value": 50, "reward_type": "xp", "reward_value": "350"},
+        {"name": "فرمانده داده", "description": "۲۰۰ گیگابایت داده مصرف کنید", "icon": None, "requirement_type": "usage", "requirement_value": 200, "reward_type": "xp", "reward_value": "1000"},
+        {"name": "جنگجوی نوار", "description": "۷ روز متوالی بازی کنید", "icon": None, "requirement_type": "play_streak", "requirement_value": 7, "reward_type": "xp", "reward_value": "450"},
+        {"name": "مسافر زمان", "description": "۳۰ روز متوالی بازی کنید", "icon": None, "requirement_type": "play_streak", "requirement_value": 30, "reward_type": "xp", "reward_value": "1500"},
+        {"name": "خریدار بزرگ", "description": "۵ اشتراک خریداری کنید", "icon": None, "requirement_type": "purchases", "requirement_value": 5, "reward_type": "xp", "reward_value": "900"},
+        {"name": "حامی", "description": "۱۰ اشتراک خریداری کنید", "icon": None, "requirement_type": "purchases", "requirement_value": 10, "reward_type": "xp", "reward_value": "2000"},
+        {"name": "امتیاز کامل", "description": "در بازی به ۱۵۰۰۰+ امتیاز برسید", "icon": None, "requirement_type": "high_score", "requirement_value": 15000, "reward_type": "xp", "reward_value": "600"},
     ]
     for data in default_achievements:
         await conn.execute(sqlalchemy.insert(Achievement).values(**data))
@@ -271,11 +275,12 @@ async def _initialize_default_challenges(conn):
     week_start = now - timedelta(days=now.weekday())
     week_end = week_start + timedelta(days=7)
 
+    # XP-ONLY seeds (2026-07-19): challenge rewards never carry money —
+    # the live definitions match repos/reward/_challenges.py ensure_* helpers.
     default_challenges = [
-        {"title": "ورود روزانه", "description": "امروز وارد شوید", "challenge_type": "daily", "requirement_type": "logins", "requirement_value": 1, "reward_type": "xp", "reward_value": 10, "start_date": now.replace(hour=0, minute=0, second=0, microsecond=0), "end_date": now.replace(hour=23, minute=59, second=59, microsecond=999999)},
-        {"title": "معرفی هفتگی", "description": "۳ نفر را این هفته معرفی کنید", "challenge_type": "weekly", "requirement_type": "referrals", "requirement_value": 3, "reward_type": "loyalty_points", "reward_value": 100, "start_date": week_start, "end_date": week_end},
-        {"title": "بازی روزانه", "description": "یک بار بازی روزانه انجام دهید", "challenge_type": "daily", "requirement_type": "daily_game", "requirement_value": 1, "reward_type": "xp", "reward_value": 20, "start_date": now.replace(hour=0, minute=0, second=0, microsecond=0), "end_date": now.replace(hour=23, minute=59, second=59, microsecond=999999)},
-        {"title": "امتیاز بازی هفتگی", "description": "این هفته به امتیاز مشخصی در بازی برسید", "challenge_type": "weekly", "requirement_type": "weekly_game_score", "requirement_value": 3000, "reward_type": "loyalty_points", "reward_value": 150, "start_date": week_start, "end_date": week_end},
+        {"title": "بازی روزانه", "description": "امروز یک دور امتیازی بازی کن", "challenge_type": "daily", "requirement_type": "daily_game", "requirement_value": 1, "reward_type": "xp", "reward_value": 20, "start_date": now.replace(hour=0, minute=0, second=0, microsecond=0), "end_date": now.replace(hour=23, minute=59, second=59, microsecond=999999)},
+        {"title": "معرفی هفتگی", "description": "۳ نفر را این هفته معرفی کنید", "challenge_type": "weekly", "requirement_type": "referrals", "requirement_value": 3, "reward_type": "xp", "reward_value": 50, "start_date": week_start, "end_date": week_end},
+        {"title": "امتیاز هفتگی آرکید", "description": "این هفته در مجموع ۱۰ هزار امتیاز در بازی جمع کن", "challenge_type": "weekly", "requirement_type": "weekly_game_score", "requirement_value": 10000, "reward_type": "xp", "reward_value": 75, "start_date": week_start, "end_date": week_end},
     ]
     for data in default_challenges:
         await conn.execute(sqlalchemy.insert(Challenge).values(**data))

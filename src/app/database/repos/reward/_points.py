@@ -164,42 +164,8 @@ class _PointsMixin:
 
         return user, False
 
-    @staticmethod
-    async def calculate_and_award_cashback(db: AsyncSession, user_id: int, milestone: int) -> int:
-        from app.database.repos.reward import RewardRepository as _RR
-        from app.database.repos.subscription import SubscriptionRepository
-
-        subs = await SubscriptionRepository.get_user_subscriptions(db, user_id)
-        if len(subs) < milestone:
-            return 0
-
-        last_subs = subs[-milestone:]
-        total_cashback = 0
-        for sub in last_subs:
-            if not sub.price:
-                continue
-            plan_name = sub.plan_name or ""
-            if "20" in plan_name or sub.price <= 70000:
-                rate = 0.03
-            elif "40" in plan_name or sub.price <= 140000:
-                rate = 0.04
-            elif "60" in plan_name or sub.price <= 200000:
-                rate = 0.05
-            else:
-                rate = 0.06
-            total_cashback += int(sub.price * rate)
-
-        if total_cashback > 0:
-            from app.database.repos.user import UserRepository
-
-            await UserRepository.add_credit(db, user_id, total_cashback)
-            await _RR.add_reward_history(
-                db,
-                user_id,
-                "credit",
-                total_cashback,
-                "purchase_cashback",
-                notes=f"Cashback for {milestone} purchases",
-            )
-
-        return total_cashback
+    # calculate_and_award_cashback was DELETED (2026-07-19 economy seal):
+    # dead per-5-purchases credit minting that NO live code called, with
+    # rates that never matched the spec. The live promoter cashout system
+    # (services/flows/cashout.py, User.cashback_balance) is unrelated and
+    # untouched.

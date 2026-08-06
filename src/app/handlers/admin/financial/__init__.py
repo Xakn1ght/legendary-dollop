@@ -1,16 +1,11 @@
-"""Admin financial dashboard and reports (split from former ``financial.py``).
+"""Admin financial handlers — cash-out approvals only.
 
-``app.admin_bot.handlers.financial`` re-exports :attr:`router` from here.
+The financial menus (revenue/analysis/transactions) were retired 2026-07-21;
+the admin panel's ops/analytics pages replaced them. Cash-out payout cards and
+the receipt-photo handler stay on the bot.
 """
 
-# menu first (entry text handlers); remainder order is non-critical after revenue filter fix.
-from . import (
-    analysis,  # noqa: F401
-    cashout,  # noqa: F401
-    menu,  # noqa: F401
-    revenue,  # noqa: F401
-    transactions,  # noqa: F401
-)
+from . import cashout  # noqa: F401
 from .common import router
 
 __all__ = ["router"]

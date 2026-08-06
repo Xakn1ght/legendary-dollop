@@ -11,7 +11,7 @@ function fmtCell(v) {
 
 export function DatabasePage() {
   const modal = useModal();
-  const [caps, setCaps] = useState({ allow_write: false });
+  const [caps, setCaps] = useState({ allow_sql: false, allow_write: false });
   const [dialect, setDialect] = useState('');
   const [tables, setTables] = useState([]);
   const [tableQuery, setTableQuery] = useState('');
@@ -95,7 +95,7 @@ export function DatabasePage() {
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
           <div>
             <h3 style={{ margin: 0, fontSize: 16 }}>Database Explorer</h3>
-            <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 6 }}>Read-only by default. {caps.allow_write ? <b style={{ color: 'var(--danger)' }}>Danger mode enabled</b> : 'Writes disabled.'} {dialect && `· ${dialect}`}</div>
+            <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 6 }}>{caps.allow_sql ? <>Read-only by default. {caps.allow_write ? <b style={{ color: 'var(--danger)' }}>Danger mode enabled</b> : 'Writes disabled.'}</> : 'Browse only. SQL runner disabled.'} {dialect && `· ${dialect}`}</div>
           </div>
           <button className="btn btn-secondary" onClick={reload}>Refresh</button>
         </div>
@@ -139,7 +139,7 @@ export function DatabasePage() {
             </div>
           </div>
 
-          <div className="glass-card" style={{ padding: 14 }}>
+          {caps.allow_sql && <div className="glass-card" style={{ padding: 14 }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
               <div style={{ fontWeight: 700 }}>SQL Runner</div>
               <div style={{ display: 'flex', gap: 10 }}>
@@ -160,7 +160,7 @@ export function DatabasePage() {
                 </tbody>
               </table>
             </div>
-          </div>
+          </div>}
         </div>
       </div>
     </>

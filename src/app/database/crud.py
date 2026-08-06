@@ -123,7 +123,6 @@ get_user_star_reward_claim_by_id = RewardRepository.get_user_star_reward_claim_b
 get_pending_extradays_claim = RewardRepository.get_pending_extradays_claim
 get_or_create_daily_game_play = RewardRepository.get_or_create_daily_game_play
 can_play_daily_game = RewardRepository.can_play_daily_game
-submit_daily_game_score = RewardRepository.submit_daily_game_score
 check_daily_game_play = RewardRepository.check_daily_game_play
 save_game_play = RewardRepository.save_game_play
 get_monthly_arcade_ranking = RewardRepository.get_monthly_arcade_ranking
@@ -138,10 +137,13 @@ admin_arcade_adjust = RewardRepository.admin_arcade_adjust
 get_active_challenges = RewardRepository.get_active_challenges
 get_user_challenge_progress = RewardRepository.get_user_challenge_progress
 update_challenge_progress = RewardRepository.update_challenge_progress
+record_challenge_event = RewardRepository.record_challenge_event
 ensure_current_weekly_challenge = RewardRepository.ensure_current_weekly_challenge
+ensure_current_weekly_challenges = RewardRepository.ensure_current_weekly_challenges
 ensure_today_daily_challenge = RewardRepository.ensure_today_daily_challenge
 record_daily_login = RewardRepository.record_daily_login
-calculate_and_award_cashback = RewardRepository.calculate_and_award_cashback
+# calculate_and_award_cashback was DELETED (2026-07-19): dead per-5-purchases
+# cashback that no live code called — see repos/reward/_points.py.
 get_user_achievements = RewardRepository.get_user_achievements
 check_and_award_achievements = RewardRepository.check_and_award_achievements
 add_reward_history = RewardRepository.add_reward_history
@@ -152,10 +154,9 @@ add_loyalty_points = RewardRepository.add_loyalty_points
 deduct_loyalty_points = RewardRepository.deduct_loyalty_points
 get_reward_config = RewardRepository.get_reward_config
 update_reward_config = RewardRepository.update_reward_config
-create_user_gift = RewardRepository.create_user_gift
-set_gift_payment_status = RewardRepository.set_gift_payment_status
-accept_user_gift = RewardRepository.accept_user_gift
-get_user_gifts = RewardRepository.get_user_gifts
+# Peer-to-peer gift crud (create/accept/get/set_payment_status) was DELETED
+# (2026-07-21) with the whole gift feature; the UserGift model/table stays
+# dormant (see models/_reward.py).
 add_user_discount = RewardRepository.add_user_discount
 get_active_user_discounts = RewardRepository.get_active_user_discounts
 mark_user_discounts_used = RewardRepository.mark_user_discounts_used
@@ -186,11 +187,17 @@ get_star_reward_tier_by_threshold = _get_star_reward_tier_by_threshold
 
 # Helper for game leaderboard if it differs
 async def _get_game_leaderboard(db, period="daily", limit=10):
-    # This was specific to DailyGamePlay in original crud
-    # Re-implementing briefly here or in AnalyticsRepository
+    """Arcade leaderboard, one row per user (2026-07-19 fix).
+
+    Only validated rewarded runs count (rewarded=True, best_score>0 — same
+    rule as the monthly race), and users must have opted in. Periods roll
+    over at IRAN midnight. daily = that day's best_score; weekly/all_time =
+    SUM of daily best_scores per user (consistent with the monthly ranking),
+    ties broken by whoever played earlier.
+    """
     from datetime import timedelta
 
-    from sqlalchemy import select
+    from sqlalchemy import func, select
 
     from app.database.models import DailyGamePlay, User
     from app.utils.tehran_time import tehran_now
@@ -203,11 +210,27 @@ async def _get_game_leaderboard(db, period="daily", limit=10):
     elif period == "weekly":
         start_play_date = (now - timedelta(days=now.weekday())).date()
 
+    name = func.coalesce(
+        func.nullif(User.custom_username, ""),
+        func.nullif(User.username, ""),
+        func.nullif(User.full_name, ""),
+    )
+    score = func.sum(DailyGamePlay.best_score) if period != "daily" else func.max(DailyGamePlay.best_score)
     query = (
-        select(DailyGamePlay, User.username, User.full_name, User.custom_username)
+        select(
+            DailyGamePlay.user_id,
+            score.label("score"),
+            func.min(DailyGamePlay.play_date).label("first_play"),
+            func.max(name).label("display_name"),
+        )
         .join(User, User.id == DailyGamePlay.user_id)
-        .filter(User.show_on_leaderboard == True)  # Only show users who opted in
-        .order_by(DailyGamePlay.best_score.desc())
+        .filter(
+            DailyGamePlay.rewarded == True,  # noqa: E712 — only validated runs rank
+            DailyGamePlay.best_score > 0,
+            User.show_on_leaderboard == True,  # noqa: E712 — opt-in only
+        )
+        .group_by(DailyGamePlay.user_id)
+        .order_by(score.desc(), func.min(DailyGamePlay.play_date).asc(), DailyGamePlay.user_id.asc())
         .limit(limit)
     )
 
@@ -215,17 +238,14 @@ async def _get_game_leaderboard(db, period="daily", limit=10):
         query = query.filter(DailyGamePlay.play_date >= start_play_date)
 
     result = await db.execute(query)
-    rows = result.all()
     leaderboard = []
-    rank = 1
-    for play, username, full_name, custom_username in rows:
+    for rank, row in enumerate(result.all(), start=1):
         leaderboard.append({
             "rank": rank,
-            "user_id": play.user_id,
-            "name": (custom_username or username or full_name or str(play.user_id)),
-            "score": play.best_score,
+            "user_id": row.user_id,
+            "name": row.display_name or str(row.user_id),
+            "score": int(row.score or 0),
         })
-        rank += 1
     return leaderboard
 
 get_game_leaderboard = _get_game_leaderboard

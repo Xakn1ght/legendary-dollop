@@ -1,11 +1,22 @@
 from aiohttp import web
 from sqlalchemy import text
 
-from app.api.routes.admin_db.common import _is_read_only_sql, _json_safe
+from app.api.routes.admin_db.common import (
+    _is_read_only_sql,
+    _is_sql_runner_enabled,
+    _json_safe,
+    _sql_disabled_response,
+)
 from app.database.models import AsyncSessionLocal
+from app.services.audit import record_audit
 
 
 async def handle_admin_db_query(request: web.Request):
+    if not _is_sql_runner_enabled():
+        await record_audit(request, "db.sql_blocked", target_type="endpoint", target_id="db/query",
+                           summary="SQL runner disabled (ADMIN_DB_SQL_ENABLED off)")
+        return _sql_disabled_response()
+
     try:
         payload = await request.json()
     except Exception:

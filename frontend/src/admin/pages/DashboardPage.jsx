@@ -4,8 +4,9 @@ import { apiJson } from '../api.js';
 import { DashboardHero } from '../components/DashboardHero.jsx';
 import { ExpiryCard } from '../components/ExpiryCard.jsx';
 import { HealthCard } from '../components/HealthCard.jsx';
+import { OnlineCard } from '../components/OnlineCard.jsx';
 import { RevenueCard } from '../components/RevenueCard.jsx';
-import { fmtNum, parseTs } from '../util.js';
+import { fmtDateTime, fmtNum, parseTs } from '../util.js';
 
 // Stats + recent-activity, ported from loadDashboard/displayStats/loadRecentActivity.
 // Audit fix: legacy read stats.total_revenue / stats.active_servers which the
@@ -40,10 +41,13 @@ export function DashboardPage() {
     { label: 'Pending Tickets', value: fmtNum(stats?.pending_tickets), color: 'var(--warning)' },
   ];
 
+  // .dash-page flips to flex on phones so CSS `order` puts the decision
+  // surfaces (money, health, expiring) above the vanity stats — the audit
+  // measured 3-4 scrolls before any actionable data on a 390px viewport.
   return (
-    <>
+    <div className="dash-page">
       <DashboardHero />
-      <div className="stats-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 16, marginTop: 20 }}>
+      <div className="stats-grid dash-stats dash-sec-stats" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 16, marginTop: 20 }}>
         {cards.map((c) => (
           <div className="glass-card stat-card" key={c.label} style={{ padding: 20 }}>
             <div className="stat-label">{c.label}</div>
@@ -52,16 +56,20 @@ export function DashboardPage() {
         ))}
       </div>
 
-      <div style={{ marginTop: 20 }}>
+      <div className="dash-sec-rev" style={{ marginTop: 20 }}>
         <RevenueCard />
       </div>
 
-      <div className="dash-duo">
+      <div className="dash-duo dash-sec-duo">
         <HealthCard />
         <ExpiryCard />
       </div>
 
-      <div className="glass-card act-card">
+      <div className="dash-sec-online" style={{ marginTop: 20 }}>
+        <OnlineCard />
+      </div>
+
+      <div className="glass-card act-card dash-sec-act">
         <div className="act-head">
           <h3>Recent Activity</h3>
           <a className="chip-btn" href="/admin/support.html">Open inbox</a>
@@ -75,7 +83,7 @@ export function DashboardPage() {
           </div>
         )}
       </div>
-    </>
+    </div>
   );
 }
 
@@ -123,7 +131,7 @@ function ActivityRow({ t }) {
         </span>
         <span className="act-snippet" dir="auto">{snippet}</span>
       </span>
-      <time className="act-time" title={when ? when.toLocaleString() : ''}>{agoShort(when)}</time>
+      <time className="act-time" title={when ? fmtDateTime(t.updated_at || t.created_at) : ''}>{agoShort(when)}</time>
     </a>
   );
 }

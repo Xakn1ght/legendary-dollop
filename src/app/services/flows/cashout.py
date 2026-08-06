@@ -123,3 +123,47 @@ async def create_cashout(
     if int(getattr(user, "cashback_balance", 0) or 0) < int(amount):
         raise FlowError("insufficient_credit")
     raise FlowError("cannot_create")
+
+
+async def approve_cashout(
+    session: AsyncSession,
+    request_id: int,
+    *,
+    processed_by: int | None = None,
+    receipt_file_id: str | None = None,
+    receipt_message_id: int | None = None,
+    admin_note: str | None = None,
+) -> CashoutRequest:
+    """Mark a pending cash-out as paid (the admin has transferred the money).
+
+    Raises FlowError("not_found_or_handled") when the request is missing or no
+    longer pending — the repo's status guard is the idempotency gate.
+    """
+    req = await crud.mark_cashout_paid(
+        session,
+        request_id,
+        admin_user_id=processed_by,
+        receipt_file_id=receipt_file_id,
+        receipt_message_id=receipt_message_id,
+        admin_note=admin_note,
+    )
+    if not req:
+        raise FlowError("not_found_or_handled")
+    return req
+
+
+async def deny_cashout(
+    session: AsyncSession,
+    request_id: int,
+    *,
+    processed_by: int | None = None,
+    admin_note: str | None = None,
+) -> CashoutRequest:
+    """Deny a pending cash-out; the reserved amount returns to the user's
+    cashback balance (repo behavior). Raises FlowError("not_found_or_handled")."""
+    req = await crud.deny_cashout_request(
+        session, request_id, admin_user_id=processed_by, admin_note=admin_note
+    )
+    if not req:
+        raise FlowError("not_found_or_handled")
+    return req

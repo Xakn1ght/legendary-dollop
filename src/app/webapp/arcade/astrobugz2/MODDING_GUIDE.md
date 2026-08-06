@@ -21,7 +21,7 @@ This is the "how do I change things" manual for the whole arcade stack._
 | Wallet/difficulty/retry repo logic | `src/app/database/repos/reward/_game.py` | **restart** |
 | Anti-cheat submit + round tokens | `src/app/api/routes/game/arcade_submit/`, `round_start.py` | **restart** |
 | Monthly prize job (coupons + coins) | `src/app/jobs/arcade_prizes.py` | **restart** |
-| Admin tools (grant coins, difficulty, daily reset) | `src/app/api/routes/admin/arcade_flags.py` + Users page 🎮 | **restart** + React rebuild |
+| Admin tools (grant coins, difficulty, daily reset) | `src/app/api/routes/admin/arcade_flags.py` + Users page arcade button | **restart** + React rebuild |
 | Iran-clock day math | `src/app/utils/tehran_time.py` | **restart** |
 
 Load order in index.html: `config.js → bridge.js → engine.js`. The game
@@ -61,7 +61,7 @@ that space. The grid cell is 48px; playfield rows 1–14, worm band rows
 | Change | Where |
 |---|---|
 | Make the game easier/harder globally | `config.js` — enemy `hp`, `delayMin/Max`, `CRITTERS.globalMax`, `SHAKE` |
-| Per-USER difficulty | Admin panel → Users → 🎮 → dropdown (easy/normal/hard/boss test) |
+| Per-USER difficulty | Admin panel → Users → arcade button → dropdown (easy/normal/hard/boss test) |
 | Change a price | `web_game.py` `ARCADE_SHOP` (+ restart) |
 | Change coin scarcity | `web_game.py` `ARCADE_COINS.max_per_run` + `config.js` `COINS.dropChance` |
 | Change monthly prizes | `web_game.py` `ARCADE_MONTHLY_PRIZES` (gb/discount/`coins` per rank) |
@@ -74,7 +74,7 @@ that space. The grid cell is 48px; playfield rows 1–14, worm band rows
 | Change daily backgrounds | replace `sprites/bg_dayNN.png` (720×1280) + bust via `themes30.json` `"bg": "...png?v=2"` |
 | Change lobby copy | `arcade/index.html` `I18N` dict (en + fa) |
 | Change in-game overlay copy | `bridge.js` i18n block |
-| Reset/grant for a tester | Admin Users → 🎮 (grant coins, difficulty, daily reset — all audited) |
+| Reset/grant for a tester | Admin Users → arcade button (grant coins, difficulty, daily reset — all audited) |
 
 ## 4. Tuning reference — every config.js block
 
@@ -272,7 +272,7 @@ Files go in `../astrobugz/media/` as `.ogg` (+ `.m4a` unless added to
 - **Screenshots** go to `previews/ui-review/` (untracked).
 - **On-device**: movement/feel changes must be eyeballed on a real phone —
   headless can't judge feel (project rule since the first failed attempt).
-- **Boss test difficulty**: set your own user via admin Users → 🎮 → play
+- **Boss test difficulty**: set your own user via admin Users → arcade button → play
   at level 2 with everything unlocked. Set back to normal after.
 
 ## 10. Trap list (learned the hard way)

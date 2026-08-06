@@ -61,18 +61,18 @@ async def show_enhanced_rewards_menu(target, session: AsyncSession):
     next_ms = next((m for m in sorted(STAR_SEASON_MILESTONES) if m > season_stars), None)
     if next_ms:
         stars_line = (
-            f"⭐ <b>ستاره‌های فصل:</b> {fmt_num(season_stars)} / {fmt_num(next_ms)}\n"
+            f"<b>ستاره‌های فصل:</b> {fmt_num(season_stars)} / {fmt_num(next_ms)}\n"
             if lang == "fa"
-            else f"⭐ <b>Season stars:</b> {fmt_num(season_stars)} / {fmt_num(next_ms)}\n"
+            else f"<b>Season stars:</b> {fmt_num(season_stars)} / {fmt_num(next_ms)}\n"
         )
     else:
         stars_line = (
-            f"⭐ <b>ستاره‌های فصل:</b> {fmt_num(season_stars)} (همه باز شد)\n"
+            f"<b>ستاره‌های فصل:</b> {fmt_num(season_stars)} (همه باز شد)\n"
             if lang == "fa"
-            else f"⭐ <b>Season stars:</b> {fmt_num(season_stars)} (all unlocked)\n"
+            else f"<b>Season stars:</b> {fmt_num(season_stars)} (all unlocked)\n"
         )
 
-    discount_line = "🏷️ <b>تخفیف‌های فعال:</b> ندارد" if lang == "fa" else "🏷️ <b>Active discounts:</b> none"
+    discount_line = "<b>تخفیف‌های فعال:</b> ندارد" if lang == "fa" else "<b>Active discounts:</b> none"
     if discounts:
         try:
             # Sort by nearest expiry, then by percent desc
@@ -89,28 +89,28 @@ async def show_enhanced_rewards_menu(target, session: AsyncSession):
                 exp = _format_jalali(getattr(d, 'expiration', None)) if lang == "fa" else (getattr(d, 'expiration', None).strftime('%Y-%m-%d %H:%M') if getattr(d, 'expiration', None) else "-")
                 preview_items.append((f"{perc}% تا {exp}") if lang == "fa" else f"{perc}% until {exp}")
             suffix = "، …" if len(sorted_discounts) > 3 else ""
-            discount_line = (f"🏷️ <b>تخفیف‌های فعال:</b> " if lang == "fa" else "🏷️ <b>Active discounts:</b> ") + "، ".join(preview_items) + suffix
+            discount_line = ("<b>تخفیف‌های فعال:</b> " if lang == "fa" else "<b>Active discounts:</b> ") + "، ".join(preview_items) + suffix
         except Exception:
-            discount_line = f"🏷️ <b>تخفیف‌های فعال:</b> {len(discounts)} عدد" if lang == "fa" else f"🏷️ <b>Active discounts:</b> {len(discounts)}"
+            discount_line = f"<b>تخفیف‌های فعال:</b> {len(discounts)} عدد" if lang == "fa" else f"<b>Active discounts:</b> {len(discounts)}"
 
     menu_text = (
         t(lang, "rewards_title")
         + "\n\n"
         + (
-        f"💰 <b>اعتبار:</b> {to_persian_digits(f'{credit:,}')} تومان\n"
+        f"<b>اعتبار:</b> {to_persian_digits(f'{credit:,}')} تومان\n"
             if lang == "fa"
-            else f"💰 <b>Credit:</b> {credit:,} Toman\n"
+            else f"<b>Credit:</b> {credit:,} Toman\n"
         )
         + stars_line
         + (
-        f"🎁 <b>کوپن‌های فعال:</b> {to_persian_digits(len(coupons))} عدد\n"
+        f"<b>کوپن‌های فعال:</b> {to_persian_digits(len(coupons))} عدد\n"
             if lang == "fa"
-            else f"🎁 <b>Active coupons:</b> {len(coupons)}\n"
+            else f"<b>Active coupons:</b> {len(coupons)}\n"
         )
         + (
-        f"🎟️ <b>بن‌های استفاده‌نشده:</b> {to_persian_digits(len(vouchers))} عدد\n"
+        f"<b>بن‌های استفاده‌نشده:</b> {to_persian_digits(len(vouchers))} عدد\n"
             if lang == "fa"
-            else f"🎟️ <b>Unused vouchers:</b> {len(vouchers)}\n"
+            else f"<b>Unused vouchers:</b> {len(vouchers)}\n"
         )
         + f"{discount_line}\n"
     )
@@ -119,16 +119,22 @@ async def show_enhanced_rewards_menu(target, session: AsyncSession):
         inline_keyboard=[
             [
                 InlineKeyboardButton(
-                    text=("🎟️ بن‌های من" if lang == "fa" else "🎟️ My vouchers"),
+                    text=("بن‌های من" if lang == "fa" else "My vouchers"),
                     callback_data="enhanced_wallet_rewards",
                 ),
                 InlineKeyboardButton(
-                    text=("🎁 کوپن‌های من" if lang == "fa" else "🎁 My coupons"),
+                    text=("کوپن‌های من" if lang == "fa" else "My coupons"),
                     callback_data="show_season_coupons",
                 ),
             ],
             [
-                InlineKeyboardButton(text=("🔄 بروزرسانی" if lang == "fa" else "🔄 Refresh"), callback_data="enhanced_rewards_menu"),
+                InlineKeyboardButton(
+                    text=("چالش‌ها" if lang == "fa" else "Challenges"),
+                    callback_data="active_challenges",
+                ),
+            ],
+            [
+                InlineKeyboardButton(text=("بروزرسانی" if lang == "fa" else "Refresh"), callback_data="enhanced_rewards_menu"),
                 InlineKeyboardButton(text=t(lang, "rewards_close"), callback_data="enhanced_close"),
             ],
         ]
@@ -176,8 +182,8 @@ def _coupon_label(coupon, lang):
     if ct == "free_autorenew":
         return ("تمدید خودکار رایگان" if lang == "fa" else "Free auto-renewal")
     if ct == "vip_days":
-        return (f"🎖 {_to_persian_digits(p.get('days', 30))} روز VIP رایگان" if lang == "fa"
-                else f"🎖 {p.get('days', 30)} days of free VIP")
+        return (f"{_to_persian_digits(p.get('days', 30))} روز VIP رایگان" if lang == "fa"
+                else f"{p.get('days', 30)} days of free VIP")
     return ct
 
 
@@ -191,7 +197,7 @@ async def show_season_coupons(callback: CallbackQuery, session: AsyncSession):
     lang = normalize_lang(getattr(user, "language", None))
     coupons = await get_active_coupons(session, user.id)
 
-    title = "🎁 <b>کیف کوپن شما</b>" if lang == "fa" else "🎁 <b>Your coupon wallet</b>"
+    title = "<b>کیف کوپن شما</b>" if lang == "fa" else "<b>Your coupon wallet</b>"
     vip_rows = []
     if not coupons:
         body = ("\n\nهنوز کوپنی ندارید. با دعوت دوستان ستاره جمع کنید تا کوپن باز شود."
@@ -202,20 +208,20 @@ async def show_season_coupons(callback: CallbackQuery, session: AsyncSession):
             exp = _format_jalali(c.expires_at) if lang == "fa" else (c.expires_at.strftime('%Y-%m-%d') if c.expires_at else "-")
             star = _to_persian_digits(c.milestone_stars or 0) if lang == "fa" else (c.milestone_stars or 0)
             if lang == "fa":
-                lines.append(f"• {_coupon_label(c, lang)} — ⭐{star} — تا {exp}")
+                lines.append(f"• {_coupon_label(c, lang)} — ستاره {star} — تا {exp}")
             else:
-                lines.append(f"• {_coupon_label(c, lang)} — ⭐{star} — exp {exp}")
+                lines.append(f"• {_coupon_label(c, lang)} — star {star} — exp {exp}")
             if c.coupon_type == "vip_days":
                 vip_rows.append([InlineKeyboardButton(
-                    text=("🎖 فعال‌سازی VIP رایگان" if lang == "fa" else "🎖 Activate free VIP"),
+                    text=("فعال‌سازی VIP رایگان" if lang == "fa" else "Activate free VIP"),
                     callback_data=f"redeem_vip_days:{c.id}",
                 )])
         body = "\n\n" + "\n".join(lines)
-        body += ("\n\nℹ️ هر کوپن فقط یک‌بار قابل استفاده است. کوپن VIP از همین‌جا فعال می‌شود؛ بقیه هنگام خرید." if lang == "fa"
-                 else "\n\nℹ️ Each coupon is one-time. The VIP coupon activates right here; the rest apply at checkout.")
+        body += ("\n\nهر کوپن فقط یک‌بار قابل استفاده است. کوپن VIP از همین‌جا فعال می‌شود؛ بقیه هنگام خرید." if lang == "fa"
+                 else "\n\nEach coupon is one-time. The VIP coupon activates right here; the rest apply at checkout.")
 
     kb = InlineKeyboardMarkup(inline_keyboard=vip_rows + [[
-        InlineKeyboardButton(text=("⬅️ بازگشت" if lang == "fa" else "⬅️ Back"), callback_data="enhanced_rewards_menu"),
+        InlineKeyboardButton(text=("بازگشت" if lang == "fa" else "Back"), callback_data="enhanced_rewards_menu"),
     ]])
     try:
         await callback.message.edit_text(title + body, reply_markup=kb, parse_mode="HTML")
@@ -261,8 +267,8 @@ async def redeem_vip_days_cb(callback: CallbackQuery, session: AsyncSession):
         await callback.answer("خطا — دوباره تلاش کنید" if lang == "fa" else "Error — try again", show_alert=True)
         return
     await callback.answer(
-        (f"🎖 VIP شما {_to_persian_digits(days)} روز فعال شد!" if lang == "fa"
-         else f"🎖 VIP activated for {days} days!"),
+        (f"VIP شما {_to_persian_digits(days)} روز فعال شد!" if lang == "fa"
+         else f"VIP activated for {days} days!"),
         show_alert=True,
     )
     await show_season_coupons(callback, session)

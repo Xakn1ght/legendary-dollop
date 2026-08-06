@@ -64,7 +64,7 @@ async def show_client_errors(message: Message):
         rows.append(f"<b>{ts}</b> [{kind}/{platform}] {page}\n{msg}")
 
     total = len(lines)
-    text = f"🧾 آخرین خطاهای کلاینت ({len(rows)} از {total}):\n\n" + "\n\n".join(rows)
+    text = f"آخرین خطاهای کلاینت ({len(rows)} از {total}):\n\n" + "\n\n".join(rows)
     # Telegram message cap is 4096 chars.
     await message.answer(text[:4000])
 
@@ -76,14 +76,14 @@ async def run_renewal_now(message: Message):
         return
     user_bot = get_user_bot()
     if not user_bot:
-        await message.answer("❌ BOT_TOKEN تنظیم نشده؛ نمی‌توان به کاربران پیام داد.")
+        await message.answer("BOT_TOKEN تنظیم نشده؛ نمی‌توان به کاربران پیام داد.")
         return
     try:
-        await message.answer("⏱ اجرای فوری Job تمدید آغاز شد...")
+        await message.answer("اجرای فوری Job تمدید آغاز شد...")
         await renewal_job(user_bot)
-        await message.answer("✅ Job تمدید اجرا شد. (نتایج در لاگ‌ها)")
+        await message.answer("Job تمدید اجرا شد. (نتایج در لاگ‌ها)")
     except Exception as e:
-        await message.answer(f"❌ خطا در اجرای Job تمدید: {e}")
+        await message.answer(f"خطا در اجرای Job تمدید: {e}")
 
 
 @router.message(F.text == "/renewal_preview")
@@ -118,7 +118,7 @@ async def renewal_preview(message: Message, session: AsyncSession):
             and (pct > SKIP_RENEW_TRAFFIC_THRESHOLD_PERCENT)
         )
         lines.append(
-            f"{s.id}:{s.marzban_username} — left {pct:.1f}% | time_left: {time_left} | eligible: {'✅' if eligible else '❌'}"
+            f"{s.id}:{s.marzban_username} — left {pct:.1f}% | time_left: {time_left} | eligible: {'yes' if eligible else 'no'}"
         )
     out = "\n".join(lines)
     if len(out) > 3500:

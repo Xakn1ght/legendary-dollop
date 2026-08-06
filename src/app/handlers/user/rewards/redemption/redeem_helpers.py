@@ -1,12 +1,10 @@
 from aiogram import Bot
-from aiogram.types import CallbackQuery, InlineKeyboardButton, InlineKeyboardMarkup
-from sqlalchemy import select
+from aiogram.types import CallbackQuery
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import crud
-from app.database.models import ReferralReward, UserStarRewardClaim
+from app.database.models import ReferralReward
 from app.services.pasarguard import pasarguard_api
-from app.utils.logger import bot_logger
 from app.utils.text_format import to_persian_digits
 
 from .common import _patch_panel_user
@@ -32,16 +30,16 @@ async def _redeem_traffic(
 
     await crud.spend_reward(session, reward.id)
 
-    await callback.answer("✅ ترافیک شما افزایش یافت!", show_alert=True)
+    await callback.answer("ترافیک شما افزایش یافت!", show_alert=True)
     try:
         await callback.message.edit_text(
-            f"🎁 بن استفاده شد: +{to_persian_digits(f'{reward.traffic_bytes/(1024**3):.0f}')} گیگابایت افزوده شد."
+            f"بن استفاده شد: +{to_persian_digits(f'{reward.traffic_bytes/(1024**3):.0f}')} گیگابایت افزوده شد."
         )
     except Exception:
         pass
     await bot.send_message(
         user.chat_id,
-        f"🎉 +{to_persian_digits(f'{reward.traffic_bytes/(1024**3):.0f}')} گیگابایت به سرویس {sub.marzban_username} افزوده شد.",
+        f"+{to_persian_digits(f'{reward.traffic_bytes/(1024**3):.0f}')} گیگابایت به سرویس {sub.marzban_username} افزوده شد.",
     )
 
 
@@ -64,16 +62,16 @@ async def _redeem_days(
         await callback.answer("خطا در افزایش زمان اعتبار.", show_alert=True)
         return
     await crud.spend_reward(session, reward.id)
-    await callback.answer("✅ مدت اعتبار سرویس افزایش یافت!", show_alert=True)
+    await callback.answer("مدت اعتبار سرویس افزایش یافت!", show_alert=True)
     try:
         await callback.message.edit_text(
-            f"🎁 بن استفاده شد: +{to_persian_digits(reward.extra_days)} روز افزوده شد."
+            f"بن استفاده شد: +{to_persian_digits(reward.extra_days)} روز افزوده شد."
         )
     except Exception:
         pass
     await bot.send_message(
         user.chat_id,
-        f"🎉 {to_persian_digits(reward.extra_days)} روز به اعتبار سرویس {sub.marzban_username} افزوده شد.",
+        f"{to_persian_digits(reward.extra_days)} روز به اعتبار سرویس {sub.marzban_username} افزوده شد.",
     )
 
 
@@ -129,12 +127,12 @@ async def _redeem_star(
     new_total, unlocked = await crud.add_season_stars(session, user.id, amount)
     await crud.spend_reward(session, reward.id)
     await callback.answer(
-        f"⭐ +{to_persian_digits(amount)} ستاره فصلی (مجموع: {to_persian_digits(new_total)})",
+        f"+{to_persian_digits(amount)} ستاره فصلی (مجموع: {to_persian_digits(new_total)})",
         show_alert=True,
     )
     try:
         await callback.message.edit_text(
-            f"🎁 بن استفاده شد: +{to_persian_digits(amount)} ستاره فصلی. "
+            f"بن استفاده شد: +{to_persian_digits(amount)} ستاره فصلی. "
             f"مجموع امتیاز فصل شما: {to_persian_digits(new_total)}."
         )
     except Exception:
@@ -143,7 +141,7 @@ async def _redeem_star(
         try:
             await bot.send_message(
                 user.chat_id,
-                f"🎉 به {to_persian_digits(coupon['milestone'])} ستاره رسیدید! "
+                f"به {to_persian_digits(coupon['milestone'])} ستاره رسیدید! "
                 f"«{coupon['name']}» در کیف کوپن شما ذخیره شد.",
             )
         except Exception:

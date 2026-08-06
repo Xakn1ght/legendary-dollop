@@ -1,6 +1,6 @@
 from aiogram import Router
 from aiogram.filters import Command
-from aiogram.types import Message, WebAppInfo
+from aiogram.types import Message, ReplyKeyboardRemove, WebAppInfo
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 
 from app.core.settings import DASHBOARD_PUBLIC_BASE_URL
@@ -11,7 +11,7 @@ router = Router()
 
 def _admin_kb():
     kb = InlineKeyboardBuilder()
-    kb.button(text="👑 باز کردن پنل ادمین", web_app=WebAppInfo(url=f"{DASHBOARD_PUBLIC_BASE_URL}/admin/"))
+    kb.button(text="باز کردن پنل ادمین", web_app=WebAppInfo(url=f"{DASHBOARD_PUBLIC_BASE_URL}/admin/"))
     kb.adjust(1)
     return kb.as_markup()
 
@@ -23,6 +23,12 @@ async def open_admin_webapp(message: Message):
     """Admin WebApp entry: same behavior on main bot and isolated admin bot."""
     if not is_admin_user(message.from_user):
         return
+    # The old reply-keyboard menu is retired; clear any stale keyboard still
+    # persisted on the chat so its dead buttons disappear.
+    await message.answer(
+        "منوی قدیمی ربات جمع شد؛ مدیریت از طریق پنل انجام می‌شود.",
+        reply_markup=ReplyKeyboardRemove(),
+    )
     await message.answer(
         "پنل ادمین فقط از طریق وب‌اپ در دسترس است.\n"
         "برای ورود به پنل ادمین، روی دکمه زیر بزنید:",

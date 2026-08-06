@@ -68,7 +68,7 @@ async def process_confirmation(message: Message, state: FSMContext, session: Asy
             reply_markup=get_main_keyboard(message.chat.id, lang=lang),
         )
         admin_msg = (
-            f"✅ سفارش جدید با پرداخت کامل توسط اعتبار/تخفیف (پردازش خودکار):\n"
+            f"سفارش جدید با پرداخت کامل توسط اعتبار/تخفیف (پردازش خودکار):\n"
             f"کاربر: {user.full_name} ({user.chat_id})\n"
             f"پلن: {quote.plan_name} ({plan_info['gb']} گیگابایت)\n"
             f"نام سرویس: {sub.marzban_username}\n"

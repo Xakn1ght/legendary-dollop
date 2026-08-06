@@ -39,8 +39,8 @@ async def show_charge_request(callback: CallbackQuery, session: AsyncSession, bo
             logging.warning(f"Failed to copy receipt #{req_id}: {e}")
 
     kb = InlineKeyboardBuilder()
-    kb.button(text="✅ تایید", callback_data=f"approve_charge_{req_id}")
-    kb.button(text="❌ رد", callback_data=f"deny_charge_{req_id}")
+    kb.button(text="تایید", callback_data=f"approve_charge_{req_id}")
+    kb.button(text="رد", callback_data=f"deny_charge_{req_id}")
     kb.adjust(2)
 
     pkg_parts: list[str] = []

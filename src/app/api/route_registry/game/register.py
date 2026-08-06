@@ -8,6 +8,7 @@ from app.core.settings import GAME_SUBMIT_API_PATH, GAME_WEBAPP_BASE_PATH
 
 from .handlers import (
     handle_arcade_buy,
+    handle_arcade_checkpoint,
     handle_arcade_equip,
     handle_arcade_game2_index,
     handle_arcade_game_index,
@@ -34,6 +35,7 @@ def register_game_routes(app: web.Application, wd: Path) -> None:
     app.router.add_post(GAME_SUBMIT_API_PATH, handle_submit)
     app.router.add_post("/api/arcade/submit", handle_arcade_submit)
     app.router.add_post("/api/arcade/round-start", handle_arcade_round_start)
+    app.router.add_post("/api/arcade/checkpoint", handle_arcade_checkpoint)
     app.router.add_get("/api/arcade/race", handle_arcade_race)
     app.router.add_get("/api/arcade/hall-of-fame", handle_arcade_hall_of_fame)
     app.router.add_get("/api/arcade/leaderboard", handle_leaderboard)

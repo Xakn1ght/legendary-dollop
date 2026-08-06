@@ -15,12 +15,16 @@ async def handle_admin_servers(request: web.Request):
         # If we got nodes, format them
         if nodes:
             for node in nodes:
+                # PasarGuard 5.1.0 dropped the nested usage{} dict; uplink and
+                # downlink are top-level counters on each node now.
+                uplink = node.get("uplink") or 0
+                downlink = node.get("downlink") or 0
                 servers.append({
                     "id": node.get("id", 0),
                     "name": node.get("name", "Unknown"),
                     "location": node.get("address", "Unknown"),
                     "ip": node.get("address", "N/A"),
-                    "traffic": format_bytes(node.get("usage", {}).get("uplink", 0) + node.get("usage", {}).get("downlink", 0)) if node.get("usage") else "N/A",
+                    "traffic": format_bytes(uplink + downlink) if (uplink or downlink) else "N/A",
                     "active": node.get("status") == "connected" or node.get("status") is None,
                     "status": node.get("status", "unknown")
                 })

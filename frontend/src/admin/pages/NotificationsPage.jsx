@@ -71,6 +71,25 @@ export function NotificationsPage() {
     if (!message) return modal.alert('Missing Message', 'Please enter a message for your broadcast.');
     if (!toWebApp && !toBot) return modal.alert('No Channel Selected', 'Select at least one channel (Dashboard or Telegram).');
     if (target === 'specific' && selectedIds.size === 0) return modal.alert('No Users Selected', 'Select at least one user to send to.');
+
+    // Guard the send: one tap used to DM every user with no way back.
+    const channels = [toWebApp && 'Dashboard', toBot && 'Telegram'].filter(Boolean).join(' and ');
+    let audience = 'all users';
+    if (target === 'specific') {
+      if (selectedIds.size === 1) {
+        const only = users.find((u) => selectedIds.has(u.id));
+        audience = only ? (only.full_name || only.username || String(only.chat_id)) : '1 selected user';
+      } else {
+        audience = `${selectedIds.size} selected users`;
+      }
+    }
+    const ok = await modal.confirm(
+      'Send broadcast',
+      `This will send the message to ${audience} via ${channels}. This cannot be undone.`,
+      { okText: 'Send', danger: true },
+    );
+    if (!ok) return;
+
     setBusy(true);
     try {
       const { data } = await postJson('/api/admin/notifications/send', {

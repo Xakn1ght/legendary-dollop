@@ -2,6 +2,7 @@
 
 from app.api.routes.game import (
     handle_arcade_buy,
+    handle_arcade_checkpoint,
     handle_arcade_equip,
     handle_arcade_game2_index,
     handle_arcade_game_index,
@@ -21,6 +22,7 @@ from app.api.routes.game import (
 
 __all__ = [
     "handle_arcade_buy",
+    "handle_arcade_checkpoint",
     "handle_arcade_equip",
     "handle_arcade_game2_index",
     "handle_arcade_game_index",

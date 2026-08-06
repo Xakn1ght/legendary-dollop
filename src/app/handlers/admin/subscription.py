@@ -56,8 +56,8 @@ async def show_sub_request(callback: CallbackQuery, session: AsyncSession):
     await session.refresh(sub, attribute_names=["user"])
 
     kb = InlineKeyboardBuilder()
-    kb.button(text="✅ تایید", callback_data=f"approve_sub_{sub_id}")
-    kb.button(text="❌ رد", callback_data=f"deny_sub_{sub_id}")
+    kb.button(text="تایید", callback_data=f"approve_sub_{sub_id}")
+    kb.button(text="رد", callback_data=f"deny_sub_{sub_id}")
     kb.adjust(2)
 
     details = t(lang, "admin_sub_request_details").format(
@@ -94,7 +94,7 @@ async def approve_subscription(callback: CallbackQuery, session: AsyncSession, b
     if existing_sub.status != 'pending':
         await callback.answer(t(lang, "admin_sub_already_processed"), show_alert=True)
         try:
-            await callback.message.edit_text("✅ این درخواست قبلاً پردازش شده است.")
+            await callback.message.edit_text("این درخواست قبلاً پردازش شده است.")
         except Exception:
             pass
         return
@@ -170,7 +170,7 @@ async def deny_subscription(callback: CallbackQuery, session: AsyncSession, bot:
         else:
             await callback.answer(t(lang, "admin_sub_already_processed"), show_alert=True)
             try:
-                await callback.message.edit_text("✅ این درخواست قبلاً پردازش شده است.")
+                await callback.message.edit_text("این درخواست قبلاً پردازش شده است.")
             except Exception:
                 pass
         return

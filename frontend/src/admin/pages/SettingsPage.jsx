@@ -6,9 +6,10 @@ import { useToast } from '../components/Toast.jsx';
 import { Icons } from '../icons.jsx';
 import { fmtDateTime, fmtNum } from '../util.js';
 
+// ONE catalog (2026-07-18): a top-up IS a purchase plan, so the separate
+// "Charge Packages" editor is gone — Plans is the only product list.
 const SECTIONS = [
-  { id: 'plans', label: 'Plans', desc: 'VPN subscription plans and prices', icon: 'subscriptions' },
-  { id: 'charge', label: 'Charge Packages', desc: 'Top-up packages', icon: 'receipts' },
+  { id: 'plans', label: 'Plans', desc: 'Subscription and top-up catalog', icon: 'subscriptions' },
   { id: 'payment', label: 'Payment', desc: 'Card shown to buyers', icon: 'crown' },
   { id: 'sms', label: 'SMS Auto-Approve', desc: 'Bank-SMS receipt matching', icon: 'check' },
   { id: 'jobs', label: 'Job Schedules', desc: 'Background job intervals', icon: 'refresh' },
@@ -43,7 +44,7 @@ export function SettingsPage() {
   }
   const setDirty = (id, v) => setDirtyMap((m) => (m[id] === v ? m : { ...m, [id]: v }));
 
-  const Section = { plans: PlansEditor, charge: ChargeEditor, payment: PaymentEditor, sms: SmsControlEditor, jobs: JobsEditor, sessions: SessionsEditor }[active];
+  const Section = { plans: PlansEditor, payment: PaymentEditor, sms: SmsControlEditor, jobs: JobsEditor, sessions: SessionsEditor }[active];
 
   const nav = (
     <nav className="set-nav">
@@ -165,7 +166,7 @@ function SmsControlEditor() {
             {deposits.length === 0 && <tr><td colSpan={5} style={{ textAlign: 'center', color: 'var(--text-muted)', padding: 20 }}>No pooled deposits</td></tr>}
             {deposits.map((d, i) => (
               <tr key={i}>
-                <td>{d.ts ? new Date(d.ts * 1000).toLocaleString() : '—'}</td>
+                <td>{d.ts ? fmtDateTime(d.ts * 1000) : '—'}</td>
                 <td style={{ fontVariantNumeric: 'tabular-nums' }}>{Number(d.amount_rial || 0).toLocaleString()}</td>
                 <td>{d.tracking || '—'}</td>
                 <td>{d.card_last4 ? `…${d.card_last4}` : '—'}</td>
@@ -247,7 +248,7 @@ function CatalogEditor({ endpoint, listKey, kind, defaultDays, onDirty }) {
                 <label>Name</label>
                 <input className={'input-field' + (bad ? ' set-invalid' : '')} value={p.name} placeholder="e.g. 60 گیگ | یکماه" onChange={(e) => update(i, 'name', e.target.value)} />
               </div>
-              <div className="set-field"><label>Price (T)</label><input className="input-field" type="number" min="0" value={p.price} onChange={(e) => update(i, 'price', num(e.target.value))} /></div>
+              <div className="set-field set-field-price"><label>Price (T)</label><input className="input-field" type="number" min="0" value={p.price} onChange={(e) => update(i, 'price', num(e.target.value))} /></div>
               <div className="set-field"><label>GB</label><input className="input-field" type="number" min="0" value={p.gb} onChange={(e) => update(i, 'gb', num(e.target.value))} /></div>
               <div className="set-field"><label>Days</label><input className="input-field" type="number" min="0" value={p.days} onChange={(e) => update(i, 'days', num(e.target.value))} /></div>
               <button className="set-row-del" title="Remove" onClick={() => setItems((arr) => arr.filter((_, idx) => idx !== i))}>
@@ -265,7 +266,6 @@ function CatalogEditor({ endpoint, listKey, kind, defaultDays, onDirty }) {
   );
 }
 const PlansEditor = ({ onDirty }) => <CatalogEditor endpoint="/api/admin/settings/plans" listKey="plans" kind="plans" defaultDays={35} onDirty={onDirty} />;
-const ChargeEditor = ({ onDirty }) => <CatalogEditor endpoint="/api/admin/settings/charge-packages" listKey="packages" kind="charge" defaultDays={35} onDirty={onDirty} />;
 
 /* ---- payment ------------------------------------------------------------ */
 function PaymentEditor({ onDirty }) {
@@ -322,6 +322,18 @@ function PaymentEditor({ onDirty }) {
 }
 
 /* ---- job schedules ------------------------------------------------------ */
+// The GET payload is raw JOB_SCHEDULES: APScheduler interval kwargs
+// (`minutes` / `seconds` / `hours`), NOT `interval_minutes` — the old reads
+// left every input empty (audit finding). Display converts any unit to
+// minutes; an edit rewrites the job with a single clean `minutes` key so the
+// saved config stays valid add_job kwargs (untouched jobs keep their shape).
+function jobEveryMinutes(s) {
+  if (Number.isFinite(s?.minutes)) return s.minutes;
+  if (Number.isFinite(s?.seconds)) return Math.round((s.seconds / 60) * 100) / 100;
+  if (Number.isFinite(s?.hours)) return s.hours * 60;
+  return '';
+}
+
 function JobsEditor({ onDirty }) {
   const modal = useModal();
   const toast = useToast();
@@ -340,6 +352,10 @@ function JobsEditor({ onDirty }) {
   const dirty = jobs !== null && JSON.stringify(jobs) !== orig;
   useEffect(() => { onDirty(dirty); }, [dirty, onDirty]);
   const setJob = (k, patch) => setJobs((j) => ({ ...j, [k]: { ...j[k], ...patch } }));
+  const setJobMinutes = (k, v) => setJobs((j) => {
+    const { minutes: _m, seconds: _s, hours: _h, ...rest } = j[k] || {};
+    return { ...j, [k]: { ...rest, minutes: v } };
+  });
 
   async function save() {
     setSaving(true);
@@ -360,7 +376,7 @@ function JobsEditor({ onDirty }) {
           <div className="set-job" key={key}>
             <div className="set-job-name">{key.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase())}</div>
             <div className="set-job-ctl">
-              <div className="set-field set-field-sm"><label>Every (min)</label><input className="input-field" type="number" min="0" value={s.interval_minutes ?? s.interval ?? ''} onChange={(e) => setJob(key, { interval_minutes: parseInt(e.target.value, 10) || 0 })} /></div>
+              <div className="set-field set-field-sm"><label>Every (min)</label><input className="input-field" type="number" min="0" step="any" value={jobEveryMinutes(s)} onChange={(e) => setJobMinutes(key, parseFloat(e.target.value) || 0)} /></div>
               <label className="set-toggle">
                 <input type="checkbox" checked={s.enabled !== false} onChange={(e) => setJob(key, { enabled: e.target.checked })} />
                 <span className="set-toggle-track"><span className="set-toggle-knob" /></span>

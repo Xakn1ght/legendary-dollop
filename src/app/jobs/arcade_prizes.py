@@ -1,8 +1,9 @@
 """Monthly arcade leaderboard prizes (2026-07-03).
 
 Once per calendar month, the top players of the PREVIOUS month receive prize
-coupons (config: ARCADE_MONTHLY_PRIZES in settings/web_game.py — 50GB / 10GB /
-5GB free-traffic for ranks 1-3, 10% discount for ranks 4-10).
+coupons (config: ARCADE_MONTHLY_PRIZES in settings/web_game.py — 50GB / 25GB /
+10GB free-traffic for ranks 1-3, 10% discount for ranks 4-10, plus arcade
+coins 40 / 25 / 15 / 8).
 
 Fairness guarantees (matching the hardened submit path):
 - Ranking is the SUM of DailyGamePlay.best_score over the month — and
@@ -117,16 +118,16 @@ async def award_monthly_arcade_prizes(session, month_start, month_end, month_key
                     select(User).filter(User.id == user_id)
                 )).scalars().first()
                 if user and user.chat_id:
-                    coin_line = f"🪙 <b>{coins} arcade coins</b> for the hangar\n" if coins else ""
+                    coin_line = f"به‌علاوه <b>{coins} سکه آرکید</b> برای آشیانه\n" if coins else ""
                     await bot.send_message(
                         chat_id=user.chat_id,
                         text=(
-                            f"🏆 <b>AstroBugz {month_key} — Rank #{rank}!</b>\n\n"
-                            f"Your month total of <b>{top_score}</b> points earned you:\n"
-                            f"🎁 <b>{prize['name']}</b>\n"
+                            f"<b>AstroBugz {month_key} — رتبه {rank}</b>\n\n"
+                            f"با مجموع <b>{top_score}</b> امتیاز این ماه، جایزه شما:\n"
+                            f"<b>{prize['name']}</b>\n"
                             f"{coin_line}\n"
-                            "The coupon is in your rewards wallet — use it on your next purchase. "
-                            f"It expires in {ARCADE_PRIZE_COUPON_EXPIRY_DAYS} days."
+                            "کوپن در کیف جوایز شماست — هنگام خرید بعدی استفاده کنید. "
+                            f"مهلت استفاده {ARCADE_PRIZE_COUPON_EXPIRY_DAYS} روز است."
                         ),
                         parse_mode="HTML",
                     )

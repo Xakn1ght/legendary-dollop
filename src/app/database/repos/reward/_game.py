@@ -5,7 +5,6 @@ from sqlalchemy import func
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
 
-from app.core.settings import GAME_REWARDS
 from app.database.models import ArcadeFlag, ArcadeWallet, DailyGamePlay, User
 from app.utils.tehran_time import tehran_now, tehran_today
 
@@ -274,166 +273,10 @@ class _GameMixin:
         play = await _RR.get_or_create_daily_game_play(db, user_id)
         return {"allowed": not play.rewarded, "best_score": play.best_score}
 
-    @staticmethod
-    async def submit_daily_game_score(
-        db: AsyncSession,
-        user_id: int,
-        score: int,
-        duration_seconds: int,
-        is_practice: bool = False,
-    ) -> dict:
-        from app.database.repos.reward import RewardRepository as _RR
-
-        result = await db.execute(select(User).filter(User.id == user_id))
-        user = result.scalars().first()
-        if not user:
-            raise ValueError("User not found")
-
-        play = await _RR.get_or_create_daily_game_play(db, user_id)
-        if score > play.best_score:
-            play.best_score = score
-
-        awarded = False
-        rewards = {"credit": 0, "stars": 0, "xp": 0, "star_pieces": 0}
-
-        if not is_practice and not play.rewarded:
-            prev_streak = max(int(getattr(user, "login_streak", 0) or 0), 0)
-            now = tehran_now()
-            last = getattr(user, "last_daily_login", None)
-
-            if not last:
-                next_streak = 1
-            elif last.date() == now.date():
-                next_streak = max(prev_streak, 1) if prev_streak else 1
-            else:
-                days_since = (now.date() - last.date()).days
-                next_streak = (prev_streak + 1) if days_since == 1 else 1
-
-            min_duration = GAME_REWARDS.get("min_session_seconds", 20)
-            if duration_seconds >= min_duration:
-                thresholds = GAME_REWARDS.get("thresholds", [])
-                credit = 0
-                xp = 0
-                star_pieces = 0
-
-                for threshold in thresholds:
-                    if score >= threshold.get("min_score", 0):
-                        credit = threshold.get("credits", 0)
-                        xp = threshold.get("xp", 0)
-                        star_pieces = threshold.get("star_pieces", 0)
-                        break
-
-                streak_bonus_per_day = GAME_REWARDS.get("streak_bonus_percent_per_day", 5)
-                streak_bonus_max = GAME_REWARDS.get("streak_bonus_max_percent", 25)
-                streak_bonus_percent = min(prev_streak * streak_bonus_per_day, streak_bonus_max)
-                multiplier = 1.0 + (streak_bonus_percent / 100.0)
-
-                credit = int(credit * multiplier)
-                xp = int(xp * multiplier)
-
-                stars_awarded = 0
-                pieces_per_star = GAME_REWARDS.get("pieces_per_star", 10)
-                monthly_cap = GAME_REWARDS.get("monthly_star_cap", 6)
-
-                current_month = tehran_today().replace(day=1)
-                if user.arcade_stars_month_reset is None or user.arcade_stars_month_reset < current_month:
-                    user.arcade_stars_this_month = 0
-                    user.arcade_stars_month_reset = current_month
-
-                if star_pieces > 0:
-                    user.star_pieces += star_pieces
-                    if user.star_pieces >= pieces_per_star:
-                        potential_stars = user.star_pieces // pieces_per_star
-                        remaining_pieces = user.star_pieces % pieces_per_star
-                        stars_can_award = min(potential_stars, monthly_cap - user.arcade_stars_this_month)
-                        if stars_can_award > 0:
-                            user.star_pieces = remaining_pieces + ((potential_stars - stars_can_award) * pieces_per_star)
-                            user.arcade_stars_this_month += stars_can_award
-                            stars_awarded = stars_can_award
-                            await _RR.add_stars(db, user_id, stars_can_award, "arcade_game")
-
-                if credit > 0:
-                    user.credit += credit
-                if xp > 0:
-                    await _RR.add_experience_points(db, user_id, xp, "arcade_play")
-
-                loyalty_rate = GAME_REWARDS.get("loyalty_points_per_1000_credits", 1)
-                loyalty_points = (credit // 1000) * loyalty_rate
-                if loyalty_points > 0:
-                    user.loyalty_points += loyalty_points
-
-                play.rewarded = True
-                play.duration_seconds = duration_seconds
-                play.reward_credit = credit
-                play.reward_stars = stars_awarded
-                play.reward_xp = xp
-                play.streak_on_play = next_streak
-                awarded = True
-                rewards = {"credit": credit, "stars": stars_awarded, "xp": xp, "star_pieces": star_pieces}
-
-                user.login_streak = next_streak
-                user.last_daily_login = now
-
-                if credit:
-                    await _RR.add_reward_history(db, user_id, "credit", credit, "arcade", notes=f"Score: {score}")
-                if stars_awarded:
-                    await _RR.add_reward_history(
-                        db, user_id, "stars", stars_awarded, "arcade",
-                        notes=f"Converted from {star_pieces} pieces",
-                    )
-                if xp:
-                    await _RR.add_reward_history(db, user_id, "xp", xp, "arcade", notes=f"Score: {score}")
-
-                active_challenges = await _RR.get_active_challenges(db)
-                user_progress = {
-                    p.challenge_id: p
-                    for p in await _RR.get_user_challenge_progress(db, user_id)
-                }
-                for c in active_challenges:
-                    if c.requirement_type in ("daily_game", "play_daily_game"):
-                        prev = user_progress.get(c.id).progress if user_progress.get(c.id) else 0
-                        await _RR.update_challenge_progress(db, user_id, c.id, prev + 1)
-                    if c.requirement_type in ("weekly_game_score", "game_score"):
-                        prev = user_progress.get(c.id).progress if user_progress.get(c.id) else 0
-                        await _RR.update_challenge_progress(db, user_id, c.id, prev + score)
-                    if c.requirement_type == "high_score" and score >= c.requirement_value:
-                        await _RR.update_challenge_progress(db, user_id, c.id, score)
-
-        await db.commit()
-        await db.refresh(play)
-
-        pieces_per_star = int(GAME_REWARDS.get("pieces_per_star", 10) or 10)
-        monthly_cap = int(GAME_REWARDS.get("monthly_star_cap", 6) or 6)
-        current_pieces = int(getattr(user, "star_pieces", 0) or 0) if user else 0
-        monthly_stars = int(getattr(user, "arcade_stars_this_month", 0) or 0) if user else 0
-        cap_reached = bool(monthly_stars >= monthly_cap) if user else False
-
-        if pieces_per_star > 0:
-            pieces_progress = current_pieces % pieces_per_star
-            has_ready_star = (current_pieces >= pieces_per_star) and (pieces_progress == 0)
-            if has_ready_star:
-                pieces_progress = pieces_per_star
-                to_next_star = 0
-            else:
-                to_next_star = pieces_per_star - pieces_progress
-        else:
-            pieces_progress = 0
-            to_next_star = 0
-
-        return {
-            "awarded": awarded,
-            "play": play,
-            "rewards": rewards,
-            "best_score": play.best_score,
-            "already_rewarded": play.rewarded and not awarded,
-            "star_pieces_total": user.star_pieces if user else 0,
-            "star_pieces_progress": pieces_progress,
-            "monthly_stars": monthly_stars,
-            "monthly_star_cap": monthly_cap,
-            "monthly_star_cap_reached": cap_reached,
-            "pieces_per_star": pieces_per_star,
-            "pieces_to_next_star": to_next_star,
-        }
+    # submit_daily_game_score was DELETED (2026-07-19): it was a dead
+    # duplicate of the live HTTP submit path (api/routes/game/reward_core.py)
+    # that still minted credit/stars per play — never called, but one import
+    # away from re-arming the farming hole the 2026-06-02 audit closed.
 
     @staticmethod
     async def check_daily_game_play(db: AsyncSession, user_id: int, play_date: date):

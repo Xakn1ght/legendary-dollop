@@ -48,9 +48,11 @@ async def issue_round_token(user_id: int) -> str:
     return token
 
 
-async def consume_round_token(token: str, user_id: int) -> int | None:
-    """Atomically consume the token. Returns server-side elapsed seconds for
-    this round, or None if the token is missing/expired/foreign/reused."""
+async def consume_round_token_any(token: str) -> tuple[int, int] | None:
+    """Atomically consume the token regardless of claimer. Returns
+    (owner_user_id, issued_ts) or None if missing/expired/reused. Used by the
+    submit path (which then checks ownership) and by server-side finalization
+    of abandoned rounds (which acts on behalf of the owner)."""
     if not token or len(token) > 64:
         return None
     value = None
@@ -74,13 +76,48 @@ async def consume_round_token(token: str, user_id: int) -> int | None:
         value = value.decode()
     try:
         owner_id, issued_ts = value.split(":")
-        if int(owner_id) != int(user_id):
-            logger.warning(f"[ARCADE] Round token user mismatch: owner={owner_id} claimer={user_id}")
-            return None
-        elapsed = int(time.time()) - int(issued_ts)
-        return max(0, elapsed)
+        return int(owner_id), int(issued_ts)
     except Exception:
         return None
+
+
+async def peek_round_token(token: str) -> tuple[int, int] | None:
+    """Read a round token WITHOUT consuming it. Returns (owner_user_id,
+    issued_ts) or None. Used by the checkpoint endpoint."""
+    if not token or len(token) > 64:
+        return None
+    value = None
+    redis = await get_redis_client()
+    if redis is not None:
+        try:
+            value = await redis.get(_KEY_PREFIX + token)
+        except Exception as e:
+            logger.warning(f"[ARCADE] Redis round-token peek failed: {e}")
+    if value is None:
+        value = _memory_tokens.get(token)
+    if value is None:
+        return None
+    if isinstance(value, bytes):
+        value = value.decode()
+    try:
+        owner_id, issued_ts = value.split(":")
+        return int(owner_id), int(issued_ts)
+    except Exception:
+        return None
+
+
+async def consume_round_token(token: str, user_id: int) -> int | None:
+    """Atomically consume the token. Returns server-side elapsed seconds for
+    this round, or None if the token is missing/expired/foreign/reused."""
+    consumed = await consume_round_token_any(token)
+    if consumed is None:
+        return None
+    owner_id, issued_ts = consumed
+    if int(owner_id) != int(user_id):
+        logger.warning(f"[ARCADE] Round token user mismatch: owner={owner_id} claimer={user_id}")
+        return None
+    elapsed = int(time.time()) - issued_ts
+    return max(0, elapsed)
 
 
 async def handle_arcade_round_start(request: web.Request):
@@ -91,6 +128,16 @@ async def handle_arcade_round_start(request: web.Request):
     if not user_chat_id:
         return web.json_response({"ok": False, "error": "unauthorized"}, status=403)
     token = await issue_round_token(user_chat_id)
+
+    # Anti-abandon (2026-07-19): settle the user's previous open round before
+    # this one starts. With >= min_session_seconds of checkpoints it consumes
+    # the daily attempt at the last checkpointed score; with none it dies
+    # silently (free, same as today). Never blocks round issuance.
+    try:
+        from app.api.routes.game.round_lifecycle import finalize_previous_round_of
+        await finalize_previous_round_of(user_chat_id, token)
+    except Exception as e:
+        logger.warning(f"[ARCADE] previous-round finalize failed: {e}")
 
     loadout = None
     try:

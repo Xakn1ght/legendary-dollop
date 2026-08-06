@@ -5,7 +5,7 @@ Admin commands for Redis cache management
 import time
 
 from aiogram import F, Router
-from aiogram.types import CallbackQuery, Message
+from aiogram.types import Message
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.redis_config import cache, close_redis, get_redis_client, init_redis
@@ -33,21 +33,21 @@ async def cache_stats_command(message: Message):
             return
         
         if lang == "fa":
-            response = "📊 **آمار کش Redis**\n\n"
-            response += f"🔗 کلاینت‌های متصل: {stats.get('connected_clients', 0)}\n"
-            response += f"💾 مصرف حافظه: {stats.get('used_memory_human', '0B')}\n"
-            response += f"⚡ تعداد دستورات: {stats.get('total_commands_processed', 0):,}\n"
-            response += f"🎯 هیت کش: {stats.get('keyspace_hits', 0):,}\n"
-            response += f"❌ میس کش: {stats.get('keyspace_misses', 0):,}\n"
-            response += f"⏱️ زمان کارکرد: {stats.get('uptime_in_seconds', 0):,} ثانیه\n"
+            response = "**آمار کش Redis**\n\n"
+            response += f"کلاینت‌های متصل: {stats.get('connected_clients', 0)}\n"
+            response += f"مصرف حافظه: {stats.get('used_memory_human', '0B')}\n"
+            response += f"تعداد دستورات: {stats.get('total_commands_processed', 0):,}\n"
+            response += f"هیت کش: {stats.get('keyspace_hits', 0):,}\n"
+            response += f"میس کش: {stats.get('keyspace_misses', 0):,}\n"
+            response += f"زمان کارکرد: {stats.get('uptime_in_seconds', 0):,} ثانیه\n"
         else:
-            response = "📊 **Redis Cache Statistics**\n\n"
-            response += f"🔗 Connected Clients: {stats.get('connected_clients', 0)}\n"
-            response += f"💾 Memory Usage: {stats.get('used_memory_human', '0B')}\n"
-            response += f"⚡ Total Commands: {stats.get('total_commands_processed', 0):,}\n"
-            response += f"🎯 Cache Hits: {stats.get('keyspace_hits', 0):,}\n"
-            response += f"❌ Cache Misses: {stats.get('keyspace_misses', 0):,}\n"
-            response += f"⏱️ Uptime: {stats.get('uptime_in_seconds', 0):,} seconds\n"
+            response = "**Redis Cache Statistics**\n\n"
+            response += f"Connected Clients: {stats.get('connected_clients', 0)}\n"
+            response += f"Memory Usage: {stats.get('used_memory_human', '0B')}\n"
+            response += f"Total Commands: {stats.get('total_commands_processed', 0):,}\n"
+            response += f"Cache Hits: {stats.get('keyspace_hits', 0):,}\n"
+            response += f"Cache Misses: {stats.get('keyspace_misses', 0):,}\n"
+            response += f"Uptime: {stats.get('uptime_in_seconds', 0):,} seconds\n"
         
         # Calculate hit rate
         hits = stats.get('keyspace_hits', 0)
@@ -56,12 +56,12 @@ async def cache_stats_command(message: Message):
         
         if total_requests > 0:
             hit_rate = (hits / total_requests) * 100
-            response += (f"📈 نرخ هیت: {hit_rate:.1f}%\n" if lang == "fa" else f"📈 Hit Rate: {hit_rate:.1f}%\n")
+            response += (f"نرخ هیت: {hit_rate:.1f}%\n" if lang == "fa" else f"Hit Rate: {hit_rate:.1f}%\n")
         
         await message.answer(response, parse_mode='Markdown')
         
     except Exception as e:
-        error_msg = (f"❌ خطا در دریافت آمار کش: {str(e)}" if lang == "fa" else f"❌ Failed to get cache stats: {str(e)}")
+        error_msg = (f"خطا در دریافت آمار کش: {str(e)}" if lang == "fa" else f"Failed to get cache stats: {str(e)}")
         await message.answer(error_msg)
         log_error(e, {"operation": "cache_stats_command"})
 
@@ -98,7 +98,7 @@ async def cache_clear_command(message: Message):
         
     except Exception as e:
         duration = time.time() - start_time
-        error_msg = (f"❌ خطا در پاک‌سازی کش: {str(e)}" if lang == "fa" else f"❌ Failed to clear cache: {str(e)}")
+        error_msg = (f"خطا در پاک‌سازی کش: {str(e)}" if lang == "fa" else f"Failed to clear cache: {str(e)}")
         await message.answer(error_msg)
         
         log_database_operation("cache_clear", "redis", False, duration, error=str(e))
@@ -120,22 +120,22 @@ async def cache_keys_command(message: Message):
         # Get keys by pattern
         patterns = ["user:*", "subscription:*", "reward:*", "leaderboard:*", "analytics:*"]
         
-        response = ("🔑 **کلیدهای کش بر اساس الگو**\n\n" if lang == "fa" else "🔑 **Cache Keys by Pattern**\n\n")
+        response = ("**کلیدهای کش بر اساس الگو**\n\n" if lang == "fa" else "**Cache Keys by Pattern**\n\n")
         
         for pattern in patterns:
             keys = await client.keys(pattern)
             count = len(keys)
-            response += f"📁 {pattern}: {count} keys\n"
+            response += f"{pattern}: {count} keys\n"
         
         # Get total keys
         all_keys = await client.keys("*")
         total_count = len(all_keys)
-        response += (f"\n📊 **مجموع کلیدها: {total_count}**" if lang == "fa" else f"\n📊 **Total Keys: {total_count}**")
+        response += (f"\n**مجموع کلیدها: {total_count}**" if lang == "fa" else f"\n**Total Keys: {total_count}**")
         
         await message.answer(response, parse_mode='Markdown')
         
     except Exception as e:
-        error_msg = (f"❌ خطا در دریافت کلیدهای کش: {str(e)}" if lang == "fa" else f"❌ Failed to get cache keys: {str(e)}")
+        error_msg = (f"خطا در دریافت کلیدهای کش: {str(e)}" if lang == "fa" else f"Failed to get cache keys: {str(e)}")
         await message.answer(error_msg)
         log_error(e, {"operation": "cache_keys_command"})
 
@@ -155,36 +155,36 @@ async def cache_info_command(message: Message):
         info = await client.info()
         
         if lang == "fa":
-            response = "ℹ️ **اطلاعات Redis**\n\n"
-            response += f"🆔 نسخه Redis: {info.get('redis_version', 'نامشخص')}\n"
-            response += f"🏗️ معماری: {info.get('arch_bits', 'نامشخص')} بیت\n"
-            response += f"💾 مصرف حافظه: {info.get('used_memory_human', '0B')}\n"
-            response += f"📊 بیشترین مصرف حافظه: {info.get('used_memory_peak_human', '0B')}\n"
-            response += f"🔗 کلاینت‌های متصل: {info.get('connected_clients', 0)}\n"
-            response += f"📡 کلاینت‌های بلاک‌شده: {info.get('blocked_clients', 0)}\n"
-            response += f"⚡ تعداد دستورات: {info.get('total_commands_processed', 0):,}\n"
-            response += f"🎯 هیت کش: {info.get('keyspace_hits', 0):,}\n"
-            response += f"❌ میس کش: {info.get('keyspace_misses', 0):,}\n"
-            response += f"⏱️ زمان کارکرد: {info.get('uptime_in_seconds', 0):,} ثانیه\n"
-            response += f"🔄 فضای کلیدها: {info.get('db0', 'بدون داده')}\n"
+            response = "**اطلاعات Redis**\n\n"
+            response += f"نسخه Redis: {info.get('redis_version', 'نامشخص')}\n"
+            response += f"معماری: {info.get('arch_bits', 'نامشخص')} بیت\n"
+            response += f"مصرف حافظه: {info.get('used_memory_human', '0B')}\n"
+            response += f"بیشترین مصرف حافظه: {info.get('used_memory_peak_human', '0B')}\n"
+            response += f"کلاینت‌های متصل: {info.get('connected_clients', 0)}\n"
+            response += f"کلاینت‌های بلاک‌شده: {info.get('blocked_clients', 0)}\n"
+            response += f"تعداد دستورات: {info.get('total_commands_processed', 0):,}\n"
+            response += f"هیت کش: {info.get('keyspace_hits', 0):,}\n"
+            response += f"میس کش: {info.get('keyspace_misses', 0):,}\n"
+            response += f"زمان کارکرد: {info.get('uptime_in_seconds', 0):,} ثانیه\n"
+            response += f"فضای کلیدها: {info.get('db0', 'بدون داده')}\n"
         else:
-            response = "ℹ️ **Redis Cache Information**\n\n"
-            response += f"🆔 Redis Version: {info.get('redis_version', 'Unknown')}\n"
-            response += f"🏗️ Architecture: {info.get('arch_bits', 'Unknown')} bits\n"
-            response += f"💾 Memory Usage: {info.get('used_memory_human', '0B')}\n"
-            response += f"📊 Peak Memory: {info.get('used_memory_peak_human', '0B')}\n"
-            response += f"🔗 Connected Clients: {info.get('connected_clients', 0)}\n"
-            response += f"📡 Blocked Clients: {info.get('blocked_clients', 0)}\n"
-            response += f"⚡ Total Commands: {info.get('total_commands_processed', 0):,}\n"
-            response += f"🎯 Cache Hits: {info.get('keyspace_hits', 0):,}\n"
-            response += f"❌ Cache Misses: {info.get('keyspace_misses', 0):,}\n"
-            response += f"⏱️ Uptime: {info.get('uptime_in_seconds', 0):,} seconds\n"
-            response += f"🔄 Keyspace: {info.get('db0', 'No data')}\n"
+            response = "**Redis Cache Information**\n\n"
+            response += f"Redis Version: {info.get('redis_version', 'Unknown')}\n"
+            response += f"Architecture: {info.get('arch_bits', 'Unknown')} bits\n"
+            response += f"Memory Usage: {info.get('used_memory_human', '0B')}\n"
+            response += f"Peak Memory: {info.get('used_memory_peak_human', '0B')}\n"
+            response += f"Connected Clients: {info.get('connected_clients', 0)}\n"
+            response += f"Blocked Clients: {info.get('blocked_clients', 0)}\n"
+            response += f"Total Commands: {info.get('total_commands_processed', 0):,}\n"
+            response += f"Cache Hits: {info.get('keyspace_hits', 0):,}\n"
+            response += f"Cache Misses: {info.get('keyspace_misses', 0):,}\n"
+            response += f"Uptime: {info.get('uptime_in_seconds', 0):,} seconds\n"
+            response += f"Keyspace: {info.get('db0', 'No data')}\n"
         
         await message.answer(response, parse_mode='Markdown')
         
     except Exception as e:
-        error_msg = (f"❌ خطا در دریافت اطلاعات کش: {str(e)}" if lang == "fa" else f"❌ Failed to get cache info: {str(e)}")
+        error_msg = (f"خطا در دریافت اطلاعات کش: {str(e)}" if lang == "fa" else f"Failed to get cache info: {str(e)}")
         await message.answer(error_msg)
         log_error(e, {"operation": "cache_info_command"})
 
@@ -377,24 +377,24 @@ async def cache_health_command(message: Message):
         hit_rate = (hits / total_requests * 100) if total_requests > 0 else 0.0
 
         if lang == "fa":
-            response = "🏥 **گزارش سلامت کش**\n\n"
+            response = "**گزارش سلامت کش**\n\n"
             if health_score >= 90:
-                response += "🟢 **وضعیت: عالی**\n"
+                response += "**وضعیت: عالی**\n"
             elif health_score >= 70:
-                response += "🟡 **وضعیت: خوب**\n"
+                response += "**وضعیت: خوب**\n"
             elif health_score >= 50:
-                response += "🟠 **وضعیت: متوسط**\n"
+                response += "**وضعیت: متوسط**\n"
             else:
-                response += "🔴 **وضعیت: ضعیف**\n"
+                response += "**وضعیت: ضعیف**\n"
 
-            response += f"🏆 **امتیاز سلامت: {health_score}/100**\n\n"
-            response += "📊 **شاخص‌های عملکرد:**\n"
+            response += f"**امتیاز سلامت: {health_score}/100**\n\n"
+            response += "**شاخص‌های عملکرد:**\n"
             response += f"• نرخ هیت: {hit_rate:.1f}% ({hits:,} هیت، {misses:,} میس)\n"
             response += f"• مصرف حافظه: {stats.get('used_memory_human', '0B')}\n"
             response += f"• کلاینت‌های متصل: {stats.get('connected_clients', 0)}\n"
             response += f"• زمان کارکرد: {uptime:,} ثانیه\n"
 
-            response += "\n💡 **پیشنهادها:**\n"
+            response += "\n**پیشنهادها:**\n"
             if health_score < 70:
                 response += "• TTL کش را بیشتر کنید\n"
                 response += "• الگوهای پاک‌سازی کش را بررسی کنید\n"
@@ -403,24 +403,24 @@ async def cache_health_command(message: Message):
                 response += "• کش عملکرد خوبی دارد\n"
                 response += "• مانیتورینگ را ادامه دهید\n"
         else:
-            response = "🏥 **Cache Health Report**\n\n"
+            response = "**Cache Health Report**\n\n"
             if health_score >= 90:
-                response += "🟢 **Status: Excellent**\n"
+                response += "**Status: Excellent**\n"
             elif health_score >= 70:
-                response += "🟡 **Status: Good**\n"
+                response += "**Status: Good**\n"
             elif health_score >= 50:
-                response += "🟠 **Status: Fair**\n"
+                response += "**Status: Fair**\n"
             else:
-                response += "🔴 **Status: Poor**\n"
+                response += "**Status: Poor**\n"
 
-            response += f"🏆 **Health Score: {health_score}/100**\n\n"
-            response += "📊 **Performance Metrics:**\n"
+            response += f"**Health Score: {health_score}/100**\n\n"
+            response += "**Performance Metrics:**\n"
             response += f"• Hit Rate: {hit_rate:.1f}% ({hits:,} hits, {misses:,} misses)\n"
             response += f"• Memory Usage: {stats.get('used_memory_human', '0B')}\n"
             response += f"• Connected Clients: {stats.get('connected_clients', 0)}\n"
             response += f"• Uptime: {uptime:,} seconds\n"
 
-            response += "\n💡 **Recommendations:**\n"
+            response += "\n**Recommendations:**\n"
             if health_score < 70:
                 response += "• Consider increasing cache TTL\n"
                 response += "• Review cache invalidation patterns\n"

@@ -4,10 +4,10 @@ Integrates Redis caching with database operations
 """
 
 import time
-from datetime import datetime, timedelta
+from datetime import datetime
 from typing import Any, Dict, List, Optional
 
-from sqlalchemy.exc import IntegrityError, OperationalError, SQLAlchemyError
+from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
 from sqlalchemy.orm import selectinload
@@ -18,20 +18,14 @@ from app.utils.logger import DatabaseError, log_database_operation, log_error
 from .models import (
     Achievement,
     Challenge,
-    ChargeRequest,
     Leaderboard,
     Referral,
     ReferralReward,
-    RenewalHistory,
-    RewardEffectiveness,
-    RewardHistory,
-    SeasonalEvent,
     Subscription,
     User,
     UserAchievement,
     UserAnalytics,
     UserChallenge,
-    UserGift,
 )
 
 # ========================================

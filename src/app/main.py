@@ -1,5 +1,4 @@
 import asyncio
-import logging
 
 from aiogram import Bot, Dispatcher
 from aiogram.client.default import DefaultBotProperties
@@ -7,10 +6,9 @@ from aiogram.enums import ParseMode
 from aiogram.fsm.storage.memory import MemoryStorage
 from aiogram.types import BotCommand
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
-from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.redis_config import close_redis, init_redis
-from app.core.settings import BOT_TOKEN, DATABASE_URL, JOB_SCHEDULES, USER_STATE_FILE, security_sanity_warnings
+from app.core.settings import BOT_TOKEN, DATABASE_URL, JOB_SCHEDULES, security_sanity_warnings
 from app.database.models import AsyncSessionLocal, engine, init_db
 from app.handlers.user import (
     add_subscription,
@@ -30,8 +28,9 @@ from app.handlers.user.rewards import challenges as challenges_router
 from app.handlers.user.rewards import router as rewards_router
 from app.handlers.user.rewards import star_levels as star_levels_router
 from app.jobs.arcade_prizes import arcade_monthly_prizes_job
+from app.jobs.arcade_rounds import arcade_round_sweep_job
 from app.jobs.cleanup_draft_orders import cleanup_draft_orders_job
-from app.jobs.enhanced_rewards import reminder_unclaimed_star_rewards_job, update_user_analytics_job
+from app.jobs.enhanced_rewards import update_user_analytics_job
 from app.jobs.expire_claims import expire_star_reward_claims_job
 from app.jobs.node_watch import node_watch_job
 from app.jobs.notifications import check_low_data_job
@@ -311,10 +310,12 @@ async def main():
         (renewal_job, 'renewal_job'),
         (update_user_analytics_job, 'update_user_analytics_job'),
         (expire_star_reward_claims_job, 'expire_claims_job'),
-        (reminder_unclaimed_star_rewards_job, 'reminder_unclaimed_star_rewards_job'),
+        # reminder_unclaimed_star_rewards_job removed 2026-07-19: legacy star
+        # tiers are retired — no more 12h DMs about unclaimable rewards.
         (cleanup_draft_orders_job, 'cleanup_draft_orders_job'),
         (season_reset_job, 'season_reset_job'),
         (arcade_monthly_prizes_job, 'arcade_monthly_prizes_job'),
+        (arcade_round_sweep_job, 'arcade_round_sweep_job'),
         (sms_sweep_job, 'sms_sweep_job'),
         (node_watch_job, 'node_watch_job'),
     ]
@@ -324,7 +325,13 @@ async def main():
         try:
             schedule_config = JOB_SCHEDULES[job_name]
             job_type = schedule_config['type']
-            job_args = {k: v for k, v in schedule_config.items() if k != 'type'}
+            # The admin panel saves an `enabled` flag (and older saves may carry
+            # a legacy `interval_minutes` key) alongside the APScheduler kwargs;
+            # passing those to add_job() would TypeError and drop the job.
+            if schedule_config.get('enabled') is False:
+                bot_logger.info(f"Job '{job_name}' is disabled via schedule config; skipping")
+                continue
+            job_args = {k: v for k, v in schedule_config.items() if k not in ('type', 'enabled', 'interval_minutes')}
             
             # Wrap job with error handling
             async def wrapped_job(bot, original_job=job_func, name=job_name):

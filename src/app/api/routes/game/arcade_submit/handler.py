@@ -1,13 +1,21 @@
 from aiohttp import web
 
-from app.api.deps import _verify_webapp_auth
+from app.api.deps import _extract_user_id_from_init, _verify_webapp_auth
 from app.api.routes.game.common import logger
+from app.api.routes.game.reward_core import grant_validated_run
+from app.api.routes.game.round_lifecycle import (
+    clear_open_round,
+    is_round_done,
+    mark_round_done,
+    pop_round_meta,
+)
 from app.api.routes.game.round_start import consume_round_token
 from app.api.schemas import ArcadeSubmitRequest, validate_request
-from app.core.settings import ARCADE_COINS, GAME_REWARDS
+from app.core.settings import BOT_TOKEN, GAME_REWARDS
 from app.database import crud
 from app.database.models import AsyncSessionLocal
 from app.utils.tehran_time import tehran_today
+from app.utils.webapp_verify import verify_init_data
 
 
 async def handle_arcade_submit(request: web.Request):
@@ -30,6 +38,12 @@ async def handle_arcade_submit(request: web.Request):
     coins_reported = validated.coins or 0
 
     user_chat_id, _new_session_token = _verify_webapp_auth(request)
+    if not user_chat_id:
+        # sendBeacon retries (final-submit safety net) cannot set headers or
+        # rely on cookies — fall back to the HMAC-verified initData that the
+        # payload already carries (same trust level as the header path).
+        if init_data and verify_init_data(init_data, BOT_TOKEN):
+            user_chat_id = _extract_user_id_from_init(init_data) or None
     if not user_chat_id:
         auth_from_query = request.query.get("auth", "")[:20]
         logger.warning(
@@ -74,6 +88,18 @@ async def handle_arcade_submit(request: web.Request):
         #    the client cannot lie about duration or replay a submit.
         server_elapsed = await consume_round_token(round_token, user_chat_id)
         if server_elapsed is None:
+            # Friendly path (2026-07-19): the round was already settled — the
+            # server finalized it (abandon/sweep) or a duplicate submit
+            # (sendBeacon retry) landed after the real one. Not cheating.
+            if round_token and await is_round_done(round_token):
+                return web.json_response(
+                    {
+                        "ok": True,
+                        "already_recorded": True,
+                        "score": score,
+                        "message": "Run already recorded.",
+                    }
+                )
             logger.warning(f"[ARCADE] Rejected submit without valid round token: user={user_chat_id} score={score}")
             await crud.add_arcade_flag(session, user.id, score, duration, None, "no_token")
             await crud.save_game_play(
@@ -89,12 +115,22 @@ async def handle_arcade_submit(request: web.Request):
                 }
             )
 
+        # The token is consumed: tombstone it so late duplicates stay friendly,
+        # collect checkpoint meta (v28+ clients), release the open-round marker.
+        meta = await pop_round_meta(round_token)
+        await mark_round_done(round_token)
+        await clear_open_round(user_chat_id, round_token)
+
         # 2. Plausibility: server-side elapsed time bounds the duration, and
-        #    the score is capped by a generous points-per-second ceiling.
+        #    the score is capped. Checkpoint-aware clients are judged on their
+        #    per-window history; legacy (no-checkpoint) clients keep the exact
+        #    old session-average gate.
         min_duration = GAME_REWARDS.get("min_session_seconds", 20)
         duration_slack = GAME_REWARDS.get("duration_slack_seconds", 30)
         max_rate = GAME_REWARDS.get("max_points_per_second", 500)
         max_score = GAME_REWARDS.get("max_score_absolute", 500_000)
+        burst = GAME_REWARDS.get("checkpoint_burst_allowance", 8000)
+        max_anomalies = GAME_REWARDS.get("checkpoint_max_anomalies", 1)
         effective_duration = min(duration, server_elapsed + duration_slack)
 
         if server_elapsed < min_duration:
@@ -111,12 +147,36 @@ async def handle_arcade_submit(request: web.Request):
                 }
             )
 
-        if score > max_score or score > max_rate * max(server_elapsed, 1):
+        implausible = False
+        flag_reason = "implausible_score"
+        if score > max_score:
+            implausible = True
+        elif meta:
+            # v28+ checkpoint curve: the final score may only exceed the last
+            # checkpoint by what the remaining window allows, and the recorded
+            # per-window history must be (nearly) clean.
+            import time as _time
+            last_score = int(meta.get("last_score") or 0)
+            last_ts = int(meta.get("last_ts") or 0)
+            tail_window = max(1, int(_time.time()) - last_ts)
+            anomalies = int(meta.get("anomalies") or 0)
+            if score > last_score + max_rate * tail_window + burst:
+                implausible = True
+                flag_reason = "checkpoint_curve"
+            elif anomalies > max_anomalies:
+                implausible = True
+                flag_reason = "checkpoint_curve"
+        else:
+            # legacy client (no checkpoints): exact old gate, unchanged
+            if score > max_rate * max(server_elapsed, 1):
+                implausible = True
+
+        if implausible:
             logger.warning(
                 f"[ARCADE] Rejected implausible score: user={user_chat_id} score={score} "
-                f"server_elapsed={server_elapsed}s client_duration={duration}s"
+                f"server_elapsed={server_elapsed}s client_duration={duration}s reason={flag_reason}"
             )
-            await crud.add_arcade_flag(session, user.id, score, duration, server_elapsed, "implausible_score")
+            await crud.add_arcade_flag(session, user.id, score, duration, server_elapsed, flag_reason)
             await crud.save_game_play(
                 session, user.id, 0, effective_duration, display_name,
                 rewarded=False, count_for_leaderboard=False,
@@ -130,121 +190,12 @@ async def handle_arcade_submit(request: web.Request):
                 }
             )
 
-        duration = effective_duration
-
-        thresholds = GAME_REWARDS.get("thresholds", [])
-        credits = 0
-        xp = 0
-        star_pieces = 0
-
-        for threshold in thresholds:
-            if score >= threshold.get("min_score", 0):
-                credits = threshold.get("credits", 0)
-                xp = threshold.get("xp", 0)
-                star_pieces = threshold.get("star_pieces", 0)
-                break
-
-        streak = user.login_streak or 0
-        streak_bonus_per_day = GAME_REWARDS.get("streak_bonus_percent_per_day", 5)
-        streak_bonus_max = GAME_REWARDS.get("streak_bonus_max_percent", 25)
-        streak_bonus_percent = min(streak * streak_bonus_per_day, streak_bonus_max)
-        multiplier = 1.0 + (streak_bonus_percent / 100.0)
-
-        credits = int(credits * multiplier)
-        xp = int(xp * multiplier)
-
-        stars_awarded = 0
-        pieces_per_star = GAME_REWARDS.get("pieces_per_star", 10)
-        monthly_cap = GAME_REWARDS.get("monthly_star_cap", 6)
-
-        current_month = tehran_today().replace(day=1)
-        if user.arcade_stars_month_reset is None or user.arcade_stars_month_reset < current_month:
-            user.arcade_stars_this_month = 0
-            user.arcade_stars_month_reset = current_month
-
-        if star_pieces > 0:
-            user.star_pieces += star_pieces
-
-            if user.star_pieces >= pieces_per_star:
-                potential_stars = user.star_pieces // pieces_per_star
-                remaining_pieces = user.star_pieces % pieces_per_star
-
-                stars_can_award = min(potential_stars, monthly_cap - user.arcade_stars_this_month)
-
-                if stars_can_award > 0:
-                    user.star_pieces = remaining_pieces + ((potential_stars - stars_can_award) * pieces_per_star)
-                    user.arcade_stars_this_month += stars_can_award
-                    stars_awarded = stars_can_award
-
-                    await crud.StarManager.add_stars(
-                        session,
-                        user.id,
-                        count=stars_can_award,
-                        reason="arcade_game",
-                        notes=f"Converted {stars_can_award * pieces_per_star} pieces to {stars_can_award} stars",
-                    )
-
-        # Arcade coins: only the validated run mints them, hard-capped per
-        # run server-side. Coins are arcade-only — never money-adjacent.
-        coins_award = min(coins_reported, int(ARCADE_COINS.get("max_per_run", 3)))
-        coin_balance = await crud.award_arcade_coins(session, user.id, coins_award)
-
-        user.credit += credits
-        user.experience_points += xp
-
-        loyalty_rate = GAME_REWARDS.get("loyalty_points_per_1000_credits", 1)
-        loyalty_points = (credits // 1000) * loyalty_rate
-        if loyalty_points > 0:
-            user.loyalty_points += loyalty_points
-
-        await crud.add_reward_history(
+        payload = await grant_validated_run(
             session,
-            user_id=user.id,
-            reward_type="arcade_game",
-            reward_value=credits,
-            source="arcade",
-            notes=f"Score: {score} | {credits} Cr, {xp} XP, {star_pieces} pieces, {stars_awarded} stars",
+            user,
+            score=score,
+            duration=effective_duration,
+            display_name=display_name,
+            coins_reported=coins_reported,
         )
-
-        # The single validated daily run is the ONLY thing that sets
-        # best_score — leaderboards and monthly prizes rank exactly this.
-        await crud.save_game_play(
-            session,
-            user.id,
-            score,
-            duration,
-            display_name,
-            rewarded=True,
-            reward_credit=credits,
-            reward_stars=stars_awarded,
-            reward_xp=xp,
-            count_for_leaderboard=True,
-        )
-
-        await session.commit()
-
-        return web.json_response(
-            {
-                "ok": True,
-                "awarded": True,
-                "rewarded": True,
-                "score": score,
-                "streak_bonus": streak_bonus_percent,
-                "message": f"Earned {xp} XP!",  # arcade is XP-only now (see web_game.py)
-                "rewards": {
-                    "credits": credits,
-                    "xp": xp,
-                    "star_pieces": star_pieces,
-                    "stars_converted": stars_awarded,
-                    "total_pieces": user.star_pieces,
-                    "loyalty_points": loyalty_points,
-                    "coins": coins_award,
-                    "coin_balance": coin_balance,
-                },
-                "monthly_stars": {
-                    "earned": user.arcade_stars_this_month,
-                    "cap": monthly_cap,
-                    "remaining": monthly_cap - user.arcade_stars_this_month,
-                },
-            }
-        )
+        return web.json_response(payload)

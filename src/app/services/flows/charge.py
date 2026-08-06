@@ -286,8 +286,8 @@ async def _notify_admin_credit_paid_charge(session: AsyncSession, charge_req: Ch
             return
         sub = await session.get(Subscription, charge_req.subscription_id)
         kb = InlineKeyboardBuilder()
-        kb.button(text="✅ تایید شارژ", callback_data=f"approve_charge_{charge_req.id}")
-        kb.button(text="❌ رد", callback_data=f"deny_charge_{charge_req.id}")
+        kb.button(text="تایید شارژ", callback_data=f"approve_charge_{charge_req.id}")
+        kb.button(text="رد", callback_data=f"deny_charge_{charge_req.id}")
         kb.adjust(2)
         from app.utils.receipt_captions import charge_receipt_caption
         text_msg = (
@@ -750,6 +750,19 @@ async def _grant_charge_referral_reward(session: AsyncSession, charge_req: Charg
         await crud.add_experience_points(session, ref_user.id, REFERRAL_BONUS_XP, "referral")
     except Exception:
         pass
+
+    # Weekly referral challenge progress (XP-only payout; owned by the
+    # rewards workstream — single hook call, never blocking).
+    try:
+        await crud.record_challenge_event(session, ref_user.id, kind="referral")
+    except Exception:
+        # A mid-flush failure would leave the session pending-rollback and
+        # silently break later same-session writes — reset it. Safe: all
+        # money state is committed before this hook.
+        try:
+            await session.rollback()
+        except Exception:
+            pass
 
     from app.keyboards.inline import get_enhanced_reward_voucher_keyboard
 

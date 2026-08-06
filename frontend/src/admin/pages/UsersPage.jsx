@@ -1,10 +1,10 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 
 import { apiJson, postJson } from '../api.js';
 import { useModal } from '../components/Modal.jsx';
 import { useToast } from '../components/Toast.jsx';
 import { Icons } from '../icons.jsx';
-import { fmtNum } from '../util.js';
+import { fmtDateTime, fmtNum } from '../util.js';
 
 const PER_PAGE = 50;
 
@@ -150,10 +150,18 @@ function agoShort(v) {
   return `${Math.floor(s / (86400 * 30))}mo`;
 }
 
+// Server-driven pagination (audit leftover, 2026-07-21): one 50-row request
+// per page with native search — replaces the old fetch-1000-then-filter-in-JS
+// page, same pattern as SubscriptionsPage. The backend orders newest-first and
+// has no sort param, so the old client-side sort select is gone; the old
+// Active/Banned/New(7d) overview cards needed the full list and are gone too
+// (Total Users survives via /api/admin/stats).
 export function UsersPage() {
   const modal = useModal();
   const toast = useToast();
   const [users, setUsers] = useState([]);
+  const [total, setTotal] = useState(0);
+  const [grandTotal, setGrandTotal] = useState(null);
   const [loading, setLoading] = useState(true);
   const [arcadeUser, setArcadeUser] = useState(null);
   // command palette can hand us a prefilled search (sessionStorage, one-shot)
@@ -164,42 +172,49 @@ export function UsersPage() {
       return v;
     } catch (_) { return ''; }
   });
-  const [sortBy, setSortBy] = useState('created');
   const [page, setPage] = useState(0);
+  const searchTimer = useRef(null);
+  const reqSeq = useRef(0);
 
-  const load = async () => {
+  const load = async (search = q.trim(), pageIdx = page) => {
+    const seq = ++reqSeq.current;
     setLoading(true);
     try {
-      const { data } = await apiJson('/api/admin/users?limit=1000');
-      if (data.ok) setUsers(data.users || []);
-    } catch (_) { /* ignore */ } finally { setLoading(false); }
-  };
-  useEffect(() => { load(); }, []);
-
-  const view = useMemo(() => {
-    let out = users.slice();
-    const query = q.trim().toLowerCase();
-    if (query) {
-      out = out.filter((u) => (u.username || '').toLowerCase().includes(query)
-        || (u.full_name || '').toLowerCase().includes(query)
-        || String(u.chat_id || '').includes(query));
-    }
-    out.sort((a, b) => {
-      switch (sortBy) {
-        case 'credit': return (b.credit || 0) - (a.credit || 0);
-        case 'credit_asc': return (a.credit || 0) - (b.credit || 0);
-        case 'username': return (a.username || '').localeCompare(b.username || '');
-        case 'level': return (b.level || 1) - (a.level || 1);
-        default: return new Date(b.created_at || 0) - new Date(a.created_at || 0);
+      const params = new URLSearchParams({ page: String(pageIdx + 1), limit: String(PER_PAGE) });
+      if (search) params.set('search', search);
+      const { data } = await apiJson(`/api/admin/users?${params}`);
+      if (seq !== reqSeq.current) return; // a newer request superseded this one
+      if (data.ok) {
+        setUsers(data.users || []);
+        setTotal(Number(data.total) || 0);
       }
-    });
-    return out;
-  }, [users, q, sortBy]);
+    } catch (_) { /* ignore */ } finally { if (seq === reqSeq.current) setLoading(false); }
+  };
+  useEffect(() => {
+    load(q.trim(), 0);
+    (async () => {
+      try {
+        const { data } = await apiJson('/api/admin/stats');
+        if (data.ok && data.stats) setGrandTotal(data.stats.total_users);
+      } catch (_) { /* ignore */ }
+    })();
+  }, []);
 
-  const totalPages = Math.max(1, Math.ceil(view.length / PER_PAGE));
+  const totalPages = Math.max(1, Math.ceil(total / PER_PAGE));
   const curPage = Math.min(page, totalPages - 1);
   const start = curPage * PER_PAGE;
-  const pageUsers = view.slice(start, start + PER_PAGE);
+  const pageUsers = users;
+
+  function onSearch(v) {
+    setQ(v); setPage(0);
+    if (searchTimer.current) clearTimeout(searchTimer.current);
+    searchTimer.current = setTimeout(() => { load(v.trim(), 0); }, 350);
+  }
+
+  function goPage(idx) {
+    setPage(idx);
+    load(q.trim(), idx);
+  }
 
   async function editCredit(u) {
     const val = await modal.prompt('Edit user credit', `@${u.username || u.chat_id}`, String(u.credit ?? ''));
@@ -208,49 +223,31 @@ export function UsersPage() {
     if (!isFinite(credit)) { await modal.alert('Invalid value', 'Please enter a valid number.'); return; }
     await postJson(`/api/admin/users/${u.id}`, { credit });
     toast('Credit updated', 'success');
-    load();
+    load(q.trim(), curPage);
   }
   async function toggleBan(u) {
     const ok = await modal.confirm(u.banned ? 'Unban user?' : 'Ban user?', `@${u.username || u.chat_id}`, { danger: !u.banned });
     if (!ok) return;
     await postJson(`/api/admin/users/${u.id}`, { banned: !u.banned });
     toast(u.banned ? 'User unbanned' : 'User banned', 'success');
-    load();
+    load(q.trim(), curPage);
   }
   // gamepad button → full arcade panel (coins / difficulty / daily reset)
-
-  // Overview stats like the VIP page header (computed client-side — the
-  // page already holds the full user list).
-  const overview = useMemo(() => {
-    const banned = users.filter((u) => u.banned).length;
-    const week = Date.now() - 7 * 86400e3;
-    const fresh = users.filter((u) => new Date(u.created_at || 0).getTime() >= week).length;
-    return { total: users.length, active: users.length - banned, banned, fresh };
-  }, [users]);
 
   return (
     <>
       <div className="stats-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: 12, marginBottom: 16 }}>
-        <div className="glass-card stat-card" style={{ padding: 16 }}><div className="stat-label">Total Users</div><div className="stat-value">{loading ? '…' : fmtNum(overview.total)}</div></div>
-        <div className="glass-card stat-card" style={{ padding: 16 }}><div className="stat-label">Active</div><div className="stat-value" style={{ color: 'var(--success)' }}>{loading ? '…' : fmtNum(overview.active)}</div></div>
-        <div className="glass-card stat-card" style={{ padding: 16 }}><div className="stat-label">Banned</div><div className="stat-value" style={{ color: 'var(--danger)' }}>{loading ? '…' : fmtNum(overview.banned)}</div></div>
-        <div className="glass-card stat-card" style={{ padding: 16 }}><div className="stat-label">New (7d)</div><div className="stat-value" style={{ color: 'var(--brand)' }}>{loading ? '…' : fmtNum(overview.fresh)}</div></div>
+        <div className="glass-card stat-card" style={{ padding: 16 }}><div className="stat-label">Total Users</div><div className="stat-value">{grandTotal == null ? '…' : fmtNum(grandTotal)}</div></div>
+        <div className="glass-card stat-card" style={{ padding: 16 }}><div className="stat-label">Matching</div><div className="stat-value" style={{ color: 'var(--brand)' }}>{loading ? '…' : fmtNum(total)}</div></div>
       </div>
 
       <div className="filter-bar glass-card rcp-bar">
         <div className="search-wrapper rcp-search">
-          <input className="search-input input-field" placeholder="Search users…" value={q} onChange={(e) => { setQ(e.target.value); setPage(0); }} />
+          <input className="search-input input-field" placeholder="Search users…" value={q} onChange={(e) => onSearch(e.target.value)} />
         </div>
         <div className="rcp-bar-row">
-          <select className="input-field" value={sortBy} onChange={(e) => { setSortBy(e.target.value); setPage(0); }}>
-            <option value="created">Newest</option>
-            <option value="credit">Credit: high first</option>
-            <option value="credit_asc">Credit: low first</option>
-            <option value="username">Username</option>
-            <option value="level">Level</option>
-          </select>
-          <span className="rcp-count">{fmtNum(view.length)} shown</span>
-          <button className="refresh-btn" onClick={load} title="Refresh" disabled={loading}>
+          <span className="rcp-count">{fmtNum(total)}</span>
+          <button className="refresh-btn" onClick={() => load(q.trim(), curPage)} title="Refresh" disabled={loading}>
             <Icons.refresh width={15} height={15} />
           </button>
         </div>
@@ -279,7 +276,7 @@ export function UsersPage() {
                 <div className="rcp-sub">
                   <span className="rcp-service" dir="ltr">{u.chat_id}</span>
                   <span className="rcp-dot" aria-hidden="true" />
-                  <time title={u.created_at ? new Date(u.created_at).toLocaleString() : ''}>joined {agoShort(u.created_at)}</time>
+                  <time title={u.created_at ? fmtDateTime(u.created_at) : ''}>joined {agoShort(u.created_at)}</time>
                 </div>
               </div>
               <div className="rcp-price" title="Store credit">{fmtNum(u.credit)}<span> T</span></div>
@@ -298,13 +295,13 @@ export function UsersPage() {
 
       {totalPages > 1 && (
         <div className="pagination-bar glass-card usr-pager">
-          <span className="usr-pager-info">{view.length ? start + 1 : 0}–{Math.min(start + PER_PAGE, view.length)} of {fmtNum(view.length)}</span>
+          <span className="usr-pager-info">{total ? start + 1 : 0}–{Math.min(start + pageUsers.length, total)} of {fmtNum(total)}</span>
           <div className="usr-pager-nav">
-            <button className="btn btn-secondary" disabled={curPage === 0} onClick={() => setPage(curPage - 1)}>Prev</button>
-            <select className="input-field" value={curPage} onChange={(e) => setPage(Number(e.target.value))}>
+            <button className="btn btn-secondary" disabled={curPage === 0 || loading} onClick={() => goPage(curPage - 1)}>Prev</button>
+            <select className="input-field" value={curPage} onChange={(e) => goPage(Number(e.target.value))} disabled={loading}>
               {Array.from({ length: totalPages }, (_, i) => <option key={i} value={i}>Page {i + 1}</option>)}
             </select>
-            <button className="btn btn-secondary" disabled={start + PER_PAGE >= view.length} onClick={() => setPage(curPage + 1)}>Next</button>
+            <button className="btn btn-secondary" disabled={start + PER_PAGE >= total || loading} onClick={() => goPage(curPage + 1)}>Next</button>
           </div>
         </div>
       )}

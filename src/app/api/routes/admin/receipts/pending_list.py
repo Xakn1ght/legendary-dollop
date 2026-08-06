@@ -4,6 +4,14 @@ from ..common import *  # noqa: F403
 async def handle_admin_pending_receipts(request: web.Request):
     """Get pending subscription receipts and VIP orders for admin approval"""
     try:
+        # Verify aid: last-4 of OUR payment card so the admin can check the
+        # receipt was sent to the right destination. Imported inside the
+        # handler because save_payment_settings() rebinds the module global.
+        from app.core.settings import PAYMENT_CARD_NUMBER
+        _card_digits = "".join(ch for ch in str(PAYMENT_CARD_NUMBER or "") if ch.isdigit())
+        # the env fallback is "6037-xxxx-xxxx-xxxx" (4 digits) — never surface it
+        payto_last4 = _card_digits[-4:] if len(_card_digits) >= 8 else None
+
         async with AsyncSessionLocal() as session:
             receipts_data = []
             
@@ -17,88 +25,75 @@ async def handle_admin_pending_receipts(request: web.Request):
             result = await session.execute(stmt)
             pending_subs = result.scalars().all()
             
+            from app.services.flows.pricing import get_plan_info, plan_display_name
+
+            # Buyer history (verify aid): approve/deny track record per unique
+            # buyer, two aggregate queries total — never one per order.
+            sub_uids = {s.user_id for s in pending_subs if s.user_id is not None}
+            sub_hist = {}
+            if sub_uids:
+                hist_rows = await session.execute(
+                    select(
+                        Subscription.user_id,
+                        # "approved-ish": anything that made it past payment review
+                        func.count(Subscription.id).filter(
+                            Subscription.status.not_in(("draft", "pending", "cancelled"))
+                        ),
+                        # denied purchase orders are deleted by deny_purchase_order,
+                        # so in practice this bucket counts cancellations
+                        func.count(Subscription.id).filter(
+                            Subscription.status.in_(("denied", "cancelled"))
+                        ),
+                    )
+                    .where(Subscription.user_id.in_(sub_uids))
+                    .group_by(Subscription.user_id)
+                )
+                sub_hist = {row[0]: (int(row[1] or 0), int(row[2] or 0)) for row in hist_rows}
+
             for sub in pending_subs:
-                # Init before the try so the except-fallback and later code never
-                # read an unbound name or a previous iteration's stale values
-                # (audit fix: mis-attributed user/price, or a whole-list 500).
+                # Invoice numbers come from the STORED order fields — the same
+                # figures the admin-bot caption shows (receipt_captions.py) and
+                # the SMS auto-approver matches on. Never re-derive them from
+                # today's catalog/discount config: custom («custom:<gb>») and
+                # «@Nm» renewal templates aren't PLANS keys (a 1.2M booking used
+                # to vanish from the total), and percentages drift over time.
                 user = None
                 plan_info = {}
                 try:
-                    # Get user info
                     user = await session.get(User, sub.user_id)
-                    
-                    from app.core.settings import PLANS
-                    from app.services.flows.pricing import get_plan_info
                     plan_info = get_plan_info(sub.plan_name) or {}
-                    
-                    # Calculate original price (before discounts)
-                    original_price = plan_info.get("price", 0)
-                    if sub.renewal_paid and sub.renewal_template:
-                        renewal_plan_info = PLANS.get(sub.renewal_template, {})
-                        original_price += renewal_plan_info.get("price", 0)
-                    
-                    # Check if user is/was VIP (VIP discounts are automatic and not stored in applied_discount_ids)
-                    from app.core.settings import VIP_PURCHASE_DISCOUNT_ENABLED, VIP_PURCHASE_DISCOUNT_PERCENT
-                    is_vip = user.is_vip if user else False
-                    has_vip_discount = is_vip and VIP_PURCHASE_DISCOUNT_ENABLED and VIP_PURCHASE_DISCOUNT_PERCENT > 0
-                    
-                    # Check if any discounts were applied
-                    has_any_discount = bool(sub.applied_discount_ids) or has_vip_discount
-                    
-                    # Calculate discount amount
-                    discount_amount = 0
-                    if has_any_discount:
-                        # Calculate total discount percentage
-                        total_discount_percent = 0
-                        if has_vip_discount:
-                            total_discount_percent += VIP_PURCHASE_DISCOUNT_PERCENT
-                        # Add other discounts if any
-                        if sub.applied_discount_ids and str(sub.applied_discount_ids).strip():
-                            try:
-                                from app.database.models import UserDiscount
-                                discount_ids = [int(x.strip()) for x in str(sub.applied_discount_ids).split(',') if x.strip() and x.strip().isdigit()]
-                                if discount_ids:
-                                    discount_result = await session.execute(
-                                        select(UserDiscount).where(UserDiscount.id.in_(discount_ids))
-                                    )
-                                    discounts = discount_result.scalars().all()
-                                    for d in discounts:
-                                        if d and d.percent:
-                                            total_discount_percent += d.percent
-                            except Exception as e:
-                                # If discount lookup fails, continue without it
-                                import logging
-                                logging.warning(f"Failed to load discounts for subscription {sub.id}: {e}")
-                                pass
-                        
-                        total_discount_percent = max(0, min(int(total_discount_percent), 90))
-                        if total_discount_percent > 0:
-                            discount_amount = int(original_price * (total_discount_percent / 100))
-                    
-                    # Calculate price after discount
-                    price_after_discount = original_price - discount_amount
-                    
-                    # Calculate final paid price (after discount and credit)
-                    credit_used = sub.credit_used or 0
-                    total = price_after_discount - credit_used
-                    
-                    # Only show original_price if there was a discount
-                    if not has_any_discount or discount_amount == 0:
-                        original_price = None
-                except Exception as e:
-                    import logging
-                    import traceback
-                    logging.error(f"Error processing subscription {sub.id}: {e}")
-                    traceback.print_exc()
-                    # Fallback to simple calculation if discount calculation fails
-                    original_price = plan_info.get("price", 0)
-                    if sub.renewal_paid and sub.renewal_price:
-                        original_price += sub.renewal_price
-                    total = (sub.price or original_price) + (sub.renewal_price or 0) - (sub.credit_used or 0)
-                    discount_amount = 0
-                    has_any_discount = False
-                    is_vip = user.is_vip if user else False
-                
+                except Exception:
+                    pass
+
+                is_vip = user.is_vip if user else False
+
+                plan_price = sub.price if sub.price is not None else int(plan_info.get("price", 0) or 0)
+                renewal_price = int(sub.renewal_price or 0) if sub.renewal_paid else 0
+                base_total = int(plan_price or 0) + renewal_price
+                credit_used = int(sub.credit_used or 0)
+                # paid_amount = final_price stamped at order time (after discounts
+                # AND credit) — the exact figure that must appear on the receipt.
+                if sub.paid_amount is not None:
+                    paid_total = int(sub.paid_amount)
+                else:
+                    paid_total = max(base_total - credit_used, 0)
+                discount_amount = max(base_total - credit_used - paid_total, 0)
+                has_any_discount = discount_amount > 0 or bool(sub.applied_discount_ids) or bool(sub.applied_coupon_id)
+
+                renewal_plan_label = None
+                if sub.renewal_paid and sub.renewal_template:
+                    try:
+                        renewal_plan_label = plan_display_name(sub.renewal_template)
+                    except Exception:
+                        renewal_plan_label = str(sub.renewal_template)
+
+                # Same label the bot caption shows: «@Nm» keys render as the
+                # scaled total («۱۸۰ گیگ | ۳ ماهه»), custom keys as «N گیگ | سفارشی».
+                try:
+                    plan_label = plan_display_name(sub.plan_name)
+                except Exception:
+                    plan_label = sub.plan_name
+
                 # Count notifications for this receipt (purchase_approved type)
                 from app.database.models import Notification
                 notification_count = 0
@@ -122,22 +117,27 @@ async def handle_admin_pending_receipts(request: web.Request):
                     "user_chat_id": user.chat_id if user else None,
                     "user_name": user.full_name if user else "Unknown User",
                     "username": user.username if user else None,
-                    "plan_name": sub.plan_name,
+                    "plan_name": plan_label,
                     "plan_gb": plan_info.get("gb", 0),
                     "service_name": sub.marzban_username,
-                    "price": total,
-                    "original_price": original_price,
+                    "price": paid_total,
+                    "plan_price": plan_price,
+                    "base_total": base_total,
+                    "original_price": base_total if has_any_discount else None,
                     "discount_amount": discount_amount,
-                    "credit_used": sub.credit_used or 0,
+                    "credit_used": credit_used,
                     "has_discounts": has_any_discount,
                     "is_vip": is_vip,
                     "auto_renewal": sub.renewal_paid,
-                    "renewal_plan": sub.renewal_template,
-                    "renewal_price": sub.renewal_price,
+                    "renewal_plan": renewal_plan_label,
+                    "renewal_price": renewal_price or None,
                     "notification_count": notification_count,
                     "is_web_receipt": sub.receipt_message_id == -1,
                     "receipt_image_url": getattr(sub, "receipt_image_url", None),
                     "receipt_message_id": sub.receipt_message_id if sub.receipt_message_id != -1 else None,
+                    "payto_last4": payto_last4,
+                    "buyer_approved_count": (sub_hist.get(sub.user_id) or (0, 0))[0],
+                    "buyer_denied_count": (sub_hist.get(sub.user_id) or (0, 0))[1],
                     "created_at": sub.created_at.isoformat() if sub.created_at else None
                 })
             
@@ -166,6 +166,8 @@ async def handle_admin_pending_receipts(request: web.Request):
                     "plan_gb": None,
                     "service_name": None,
                     "price": vip_order.price,
+                    "plan_price": vip_order.price,
+                    "base_total": vip_order.price,
                     "credit_used": 0,
                     "has_discounts": False,
                     "auto_renewal": False,
@@ -174,6 +176,7 @@ async def handle_admin_pending_receipts(request: web.Request):
                     "receipt_image_url": vip_order.receipt_image_url,
                     "receipt_message_id": None,
                     "vip_days": vip_order.days,
+                    "payto_last4": payto_last4,
                     "created_at": vip_order.created_at.isoformat() if vip_order.created_at else None
                 })
             
@@ -187,21 +190,26 @@ async def handle_admin_pending_receipts(request: web.Request):
             charge_result = await session.execute(charge_stmt)
             pending_charges = charge_result.scalars().all()
             
-            from app.core.settings import CHARGE_PRESET_PACKAGES, VIP_DISCOUNT_PERCENT
+            # second (and last) buyer-history aggregate: charge track record
+            charge_uids = {c.user_id for c in pending_charges if c.user_id is not None}
+            charge_hist = {}
+            if charge_uids:
+                hist_rows = await session.execute(
+                    select(
+                        ChargeRequest.user_id,
+                        func.count(ChargeRequest.id).filter(ChargeRequest.status == "approved"),
+                        func.count(ChargeRequest.id).filter(ChargeRequest.status == "denied"),
+                    )
+                    .where(ChargeRequest.user_id.in_(charge_uids))
+                    .group_by(ChargeRequest.user_id)
+                )
+                charge_hist = {row[0]: (int(row[1] or 0), int(row[2] or 0)) for row in hist_rows}
+
             for charge in pending_charges:
                 user = await session.get(User, charge.user_id)
                 sub = await session.get(Subscription, charge.subscription_id)
                 
-                # Check VIP status and discount
                 is_vip = user.is_vip if user else False
-                has_vip_discount = is_vip and VIP_DISCOUNT_PERCENT > 0
-                
-                # Calculate discount if VIP
-                discount_amount = 0
-                original_price = charge.price
-                if has_vip_discount:
-                    discount_amount = int(charge.price * (VIP_DISCOUNT_PERCENT / 100))
-                    original_price = charge.price + discount_amount  # Show original before discount
                 
                 # Find package name
                 traffic_gb = charge.traffic_bytes / (1024 * 1024 * 1024) if charge.traffic_bytes else 0
@@ -212,30 +220,85 @@ async def handle_admin_pending_receipts(request: web.Request):
                     else:
                         package_name = f"{charge.extra_days} Days"
                 
+                # What the user actually transferred: the flow stores the net on
+                # paid_amount (price minus reserved credit). Never re-derive
+                # discounts here with today's percentages — charges price through
+                # PLANS server-side and the stored numbers are the truth.
+                credit_used = int(charge.credit_used or 0)
+                base_total = int(charge.price or 0)
+                paid_total = charge.paid_amount if charge.paid_amount is not None else max(base_total - credit_used, 0)
+
+                # Bookings carry the next plan on renewal_template — surface it
+                # like the purchase auto-renewal line so the drawer reads the same.
+                booking_plan = None
+                if getattr(charge, "charge_type", "") == "booking" and charge.renewal_template:
+                    try:
+                        booking_plan = plan_display_name(charge.renewal_template)
+                    except Exception:
+                        booking_plan = str(charge.renewal_template)
+
                 receipts_data.append({
                     "id": charge.id,
                     "type": "charge",
+                    "charge_type": getattr(charge, "charge_type", None) or "normal",
                     "user_id": user.id if user else None,
                     "user_chat_id": user.chat_id if user else None,
                     "user_name": user.full_name if user else "Unknown User",
                     "username": user.username if user else None,
-                    "plan_name": package_name,
+                    "plan_name": package_name or booking_plan or "Top-up",
                     "plan_gb": traffic_gb,
                     "service_name": sub.marzban_username if sub else None,
-                    "price": charge.price,
-                    "original_price": original_price if has_vip_discount else None,
-                    "discount_amount": discount_amount,
-                    "credit_used": 0,
-                    "has_discounts": has_vip_discount,
+                    "price": paid_total,
+                    "plan_price": base_total,
+                    "base_total": base_total,
+                    "original_price": None,
+                    "discount_amount": 0,
+                    "credit_used": credit_used,
+                    "has_discounts": False,
                     "is_vip": is_vip,
-                    "auto_renewal": False,
-                    "renewal_plan": None,
+                    "auto_renewal": bool(booking_plan),
+                    "renewal_plan": booking_plan,
                     "is_web_receipt": charge.receipt_message_id == -1,
                     "receipt_image_url": getattr(charge, "receipt_image_url", None),
                     "receipt_message_id": charge.receipt_message_id if charge.receipt_message_id != -1 else None,
                     "charge_traffic_bytes": charge.traffic_bytes,
                     "charge_extra_days": charge.extra_days,
+                    "payto_last4": payto_last4,
+                    "buyer_approved_count": (charge_hist.get(charge.user_id) or (0, 0))[0],
+                    "buyer_denied_count": (charge_hist.get(charge.user_id) or (0, 0))[1],
                     "created_at": charge.created_at.isoformat() if charge.created_at else None
+                })
+            
+            # Pending cash-outs (wallet withdrawals) — money decisions belong in
+            # the same queue as receipts so nothing waits invisible in the bot.
+            pending_cashouts = await crud.list_cashout_requests(session, status="pending", limit=100)
+            for co in pending_cashouts:
+                user = await session.get(User, co.user_id)
+                receipts_data.append({
+                    "id": co.id,
+                    "type": "cashout",
+                    "user_id": user.id if user else None,
+                    "user_chat_id": user.chat_id if user else None,
+                    "user_name": user.full_name if user else "Unknown User",
+                    "username": user.username if user else None,
+                    "plan_name": "Wallet cash-out",
+                    "plan_gb": None,
+                    "service_name": None,
+                    "cashout_destination": co.destination,
+                    "price": co.amount,
+                    "plan_price": co.amount,
+                    "base_total": co.amount,
+                    "original_price": None,
+                    "discount_amount": 0,
+                    "credit_used": 0,
+                    "has_discounts": False,
+                    "is_vip": user.is_vip if user else False,
+                    "auto_renewal": False,
+                    "renewal_plan": None,
+                    "is_web_receipt": True,
+                    "receipt_image_url": None,
+                    "receipt_message_id": None,
+                    "created_at": co.requested_at.isoformat() if co.requested_at else None
                 })
             
             # Sort all by created_at descending

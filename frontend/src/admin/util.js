@@ -14,10 +14,39 @@ export function parseTs(value) {
   return isNaN(d.getTime()) ? null : d;
 }
 
+// All admin timestamps render in Tehran time, unambiguous `YYYY-MM-DD HH:mm`
+// (audit finding: bare toLocaleString() produced US "7/10/2026, 4:32 AM" that
+// depended on the admin device's locale AND timezone).
+const TEHRAN_TZ = 'Asia/Tehran';
+const _dtfCache = {};
+function _tehranParts(d, withTime) {
+  const key = withTime ? 't' : 'd';
+  if (!_dtfCache[key]) {
+    _dtfCache[key] = new Intl.DateTimeFormat('en-CA', {
+      timeZone: TEHRAN_TZ,
+      year: 'numeric', month: '2-digit', day: '2-digit',
+      ...(withTime ? { hour: '2-digit', minute: '2-digit', hour12: false } : {}),
+    });
+  }
+  const p = {};
+  for (const part of _dtfCache[key].formatToParts(d)) p[part.type] = part.value;
+  return p;
+}
+
 export function fmtDateTime(value) {
   const d = parseTs(value);
   if (!d) return '—';
-  return d.toLocaleString();
+  const p = _tehranParts(d, true);
+  // some engines emit "24:00" for midnight under hour12:false
+  const hh = p.hour === '24' ? '00' : p.hour;
+  return `${p.year}-${p.month}-${p.day} ${hh}:${p.minute}`;
+}
+
+export function fmtDate(value) {
+  const d = parseTs(value);
+  if (!d) return '—';
+  const p = _tehranParts(d, false);
+  return `${p.year}-${p.month}-${p.day}`;
 }
 
 export function timeAgo(value) {

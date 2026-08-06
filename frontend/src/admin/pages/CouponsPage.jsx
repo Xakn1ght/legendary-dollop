@@ -4,7 +4,7 @@ import { apiJson, postJson } from '../api.js';
 import { useModal } from '../components/Modal.jsx';
 import { useToast } from '../components/Toast.jsx';
 import { Icons } from '../icons.jsx';
-import { parseTs } from '../util.js';
+import { fmtDateTime, parseTs } from '../util.js';
 
 // "expires in 9d" / "expired 3d ago" — full date lives in the title attr.
 function expiresLabel(v) {
@@ -204,7 +204,7 @@ export function CouponsPage() {
                     <span className="rcp-dot" aria-hidden="true" />
                     <span>{c.source}</span>
                     <span className="rcp-dot" aria-hidden="true" />
-                    <time className={exp.soon ? 'soon' : ''} title={parseTs(c.expires_at)?.toLocaleString() || ''}>{exp.text}</time>
+                    <time className={exp.soon ? 'soon' : ''} title={c.expires_at ? fmtDateTime(c.expires_at) : ''}>{exp.text}</time>
                   </div>
                 </div>
                 {c.status === 'active' && (

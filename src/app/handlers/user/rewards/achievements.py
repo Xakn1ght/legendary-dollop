@@ -4,6 +4,7 @@ from aiogram.types import CallbackQuery, InlineKeyboardButton, InlineKeyboardMar
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database.crud import get_active_challenges, get_user, get_user_achievements, get_user_challenge_progress
+from app.database.repos.reward._challenges import challenge_xp_value
 
 router = Router()
 
@@ -21,7 +22,7 @@ async def show_achievements(callback: CallbackQuery, session: AsyncSession):
     achievements = await get_user_achievements(session, user.id)
     if not achievements:
         text = (
-            "🏆 **دستاوردها**\n\n"
+            "**دستاوردها**\n\n"
             "هنوز هیچ دستاوردی کسب نکرده‌اید!\n\n"
             "برای کسب دستاورد:\n"
             "• دوستان خود را معرفی کنید\n"
@@ -30,21 +31,20 @@ async def show_achievements(callback: CallbackQuery, session: AsyncSession):
             "• از VPN استفاده کنید"
         )
     else:
-        text = "🏆 **دستاوردهای کسب شده**\n\n"
+        text = "**دستاوردهای کسب شده**\n\n"
         for i, user_achievement in enumerate(achievements, 1):
             ach = user_achievement.achievement
             earned = user_achievement.earned_at.strftime('%Y/%m/%d')
             text += (
-                f"{i}. {ach.icon} **{ach.name}**\n"
-                f"   📝 {ach.description}\n"
-                f"   🎁 پاداش: {ach.reward_value} {ach.reward_type}\n"
-                f"   📅 {earned}\n\n"
+                f"{i}. **{ach.name}**\n"
+                f"   {ach.description}\n"
+                f"   {earned}\n\n"
             )
 
     keyboard = InlineKeyboardMarkup(
         inline_keyboard=[[
-            InlineKeyboardButton(text="🔄 بروزرسانی", callback_data="enhanced_achievements"),
-            InlineKeyboardButton(text="🔙 بازگشت", callback_data="enhanced_rewards_menu"),
+            InlineKeyboardButton(text="بروزرسانی", callback_data="enhanced_achievements"),
+            InlineKeyboardButton(text="بازگشت", callback_data="enhanced_rewards_menu"),
         ]]
     )
     try:
@@ -72,36 +72,36 @@ async def show_challenges(callback: CallbackQuery, session: AsyncSession):
 
     if not active_chals:
         text = (
-            "🎯 **چالش‌ها**\n\n"
+            "**چالش‌ها**\n\n"
             "در حال حاضر هیچ چالش فعالی وجود ندارد.\n"
             "به زودی چالش‌های جدید اضافه خواهند شد!"
         )
     else:
-        text = "🎯 **چالش‌های فعال**\n\n"
+        text = "**چالش‌های فعال**\n\n"
         for i, chal in enumerate(active_chals, 1):
             uc = progress_map.get(chal.id)
             prog = uc.progress if uc else 0
             completed = uc.completed if uc else False
 
-            percent = min(1.0, prog / chal.requirement_value)
+            percent = min(1.0, prog / chal.requirement_value) if chal.requirement_value else 1.0
             bar_len = 15
             filled = int(percent * bar_len)
             bar = "█" * filled + "░" * (bar_len - filled)
-            status = "✅" if completed else "🔄" if prog > 0 else "⏳"
+            status = "انجام شد" if completed else "در جریان" if prog > 0 else "شروع نشده"
 
+            xp = challenge_xp_value(chal.reward_type, chal.reward_value)
             text += (
-                f"{i}. {status} **{chal.title}**\n"
-                f"   📝 {chal.description}\n"
-                f"   📊 پیشرفت: {prog}/{chal.requirement_value}\n"
-                f"   `{bar}` {percent:.1%}\n"
-                f"   🎁 پاداش: {chal.reward_value} {chal.reward_type}\n"
-                f"   ⏰ نوع: {chal.challenge_type}\n\n"
+                f"{i}. **{chal.title}** ({status})\n"
+                f"   {chal.description}\n"
+                f"   پیشرفت: {min(prog, chal.requirement_value)}/{chal.requirement_value}\n"
+                f"   `{bar}` {percent:.0%}\n"
+                f"   پاداش: {xp} امتیاز تجربه\n\n"
             )
 
     keyboard = InlineKeyboardMarkup(
         inline_keyboard=[[
-            InlineKeyboardButton(text="🔄 بروزرسانی", callback_data="enhanced_challenges"),
-            InlineKeyboardButton(text="🔙 بازگشت", callback_data="enhanced_rewards_menu"),
+            InlineKeyboardButton(text="بروزرسانی", callback_data="enhanced_challenges"),
+            InlineKeyboardButton(text="بازگشت", callback_data="enhanced_rewards_menu"),
         ]]
     )
 
@@ -111,4 +111,4 @@ async def show_challenges(callback: CallbackQuery, session: AsyncSession):
         if "message is not modified" in str(e):
             await callback.answer("قبلاً بروزرسانی شده است!", show_alert=False)
         else:
-            raise 
+            raise

@@ -221,7 +221,7 @@ async def process_approved_subscription(sub_id: int, session: AsyncSession, bot:
                 )
                 await bot.send_message(
                     user.chat_id,
-                    f"🎁 جایزه {days_to_add} روز اعتبار هدیه شما با موفقیت به اشتراک جدیدتان اضافه شد!",
+                    f"جایزه {days_to_add} روز اعتبار هدیه شما با موفقیت به اشتراک جدیدتان اضافه شد!",
                 )
             else:
                 logging.error(f"Failed to auto-apply {days_to_add} days to sub {subscription.id} for user {user.id}")
@@ -342,6 +342,19 @@ async def process_approved_subscription(sub_id: int, session: AsyncSession, bot:
                     await crud.add_experience_points(session, ref_user.id, REFERRAL_BONUS_XP, "referral")
                 except Exception:
                     pass
+
+                # Weekly referral challenge progress (XP-only payout; owned by
+                # the rewards workstream — single hook call, never blocking).
+                try:
+                    await crud.record_challenge_event(session, ref_user.id, kind="referral")
+                except Exception:
+                    # A mid-flush failure would leave the session pending-rollback
+                    # and silently break later same-session writes — reset it.
+                    # Safe: all money state is committed before this hook.
+                    try:
+                        await session.rollback()
+                    except Exception:
+                        pass
 
                 from app.keyboards.inline import get_enhanced_reward_voucher_keyboard
 

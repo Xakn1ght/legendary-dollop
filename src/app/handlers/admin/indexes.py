@@ -5,9 +5,8 @@ Admin commands for managing database indexes
 import time
 
 from aiogram import F, Router
-from aiogram.types import CallbackQuery, Message
+from aiogram.types import Message
 from sqlalchemy import text
-from sqlalchemy.engine import Result
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database.indexes import analyze_table_performance, create_all_indexes, get_index_usage_stats

@@ -181,7 +181,8 @@ async def handle_admin_analytics_expiring(request: web.Request):
                         "renewal_paid": bool(sub.renewal_paid) if sub else False,
                         "user_id": user.id if user else None,
                         "chat_id": user.chat_id if user else None,
-                        "user_name": (user.first_name or user.username) if user else None,
+                        # User has full_name, NOT first_name (same 500 as ops/coupons.py)
+                        "user_name": (user.full_name or user.username) if user else None,
                         "inactive_days": inactive_days,
                         "likely_churned": bool(inactive_days is not None and inactive_days >= 5),
                     }
@@ -194,6 +195,69 @@ async def handle_admin_analytics_expiring(request: web.Request):
             "expiring": expiring[:100], "expired": expired[:100],
             "counts": {"expiring": len(expiring), "expired": len(expired)},
         })
+    except Exception:
+        import traceback
+
+        traceback.print_exc()
+        return web.json_response({"ok": False, "error": "server_error"}, status=500)
+
+
+async def handle_admin_analytics_online(request: web.Request):
+    """GET /api/admin/analytics/online?hours=24 — hourly online-user counts
+    straight from the panel (GET /api/users/counts/online, PasarGuard 5.1.0).
+
+    The panel computes this from connection logs and needs ~13s for a 24h
+    hourly window (probed live 2026-07-21), so results are Redis-cached for
+    10 minutes — the chart is a trend view, not a live gauge.
+    """
+    from app.core.redis_config import cache
+    from app.services.pasarguard import pasarguard_api
+
+    try:
+        try:
+            hours = min(72, max(6, int(request.query.get("hours", 24))))
+        except (TypeError, ValueError):
+            hours = 24
+
+        cache_key = f"admin:online_series:{hours}"
+        try:
+            cached = await cache.get(cache_key)
+            if isinstance(cached, dict) and cached.get("series"):
+                return web.json_response({"ok": True, "cached": True, **cached})
+        except Exception:
+            pass
+
+        end = datetime.datetime.now(datetime.timezone.utc).replace(minute=0, second=0, microsecond=0)
+        start = end - datetime.timedelta(hours=hours - 1)
+        data = await pasarguard_api.get_online_users_series(
+            period="hour",
+            start_iso=start.isoformat(),
+            end_iso=(end + datetime.timedelta(hours=1)).isoformat(),
+        )
+        if not isinstance(data, dict):
+            return web.json_response({"ok": False, "error": "panel_unavailable"}, status=502)
+
+        # stats is keyed by node id ("-1" = aggregated master view when no
+        # group_by_node is requested); sum across keys to stay shape-proof.
+        merged: dict[str, int] = {}
+        for points in (data.get("stats") or {}).values():
+            for p in points or []:
+                ts = str(p.get("period_start") or "")
+                if ts:
+                    merged[ts] = merged.get(ts, 0) + int(p.get("count") or 0)
+        series = [{"t": ts, "count": merged[ts]} for ts in sorted(merged)]
+
+        payload = {
+            "hours": hours,
+            "series": series,
+            "peak": max((x["count"] for x in series), default=0),
+            "unique_in_window": int(data.get("count_during_period") or 0),
+        }
+        try:
+            await cache.set(cache_key, payload, ttl=600)
+        except Exception:
+            pass
+        return web.json_response({"ok": True, "cached": False, **payload})
     except Exception:
         import traceback
 

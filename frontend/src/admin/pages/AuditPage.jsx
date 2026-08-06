@@ -1,8 +1,8 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 
 import { apiJson } from '../api.js';
 import { Icons } from '../icons.jsx';
-import { parseTs } from '../util.js';
+import { fmtDateTime } from '../util.js';
 
 const ACTION_GROUPS = ['', 'receipt', 'charge', 'vip', 'subscription', 'user', 'coupon', 'broadcast', 'sms', 'auth', 'expiry'];
 
@@ -18,6 +18,7 @@ export function AuditPage() {
   const [action, setAction] = useState('');
   const [q, setQ] = useState('');
   const [page, setPage] = useState(1);
+  const [expanded, setExpanded] = useState(() => new Set());
 
   const load = useCallback(async () => {
     try {
@@ -25,13 +26,34 @@ export function AuditPage() {
       if (action) params.set('action', action);
       if (q.trim()) params.set('q', q.trim());
       const { data: d } = await apiJson(`/api/admin/audit?${params}`);
-      if (d.ok) setData(d);
+      if (d.ok) { setData(d); setExpanded(new Set()); }
     } catch (_) { /* ignore */ }
   }, [page, action, q]);
 
   useEffect(() => { load(); }, [load]);
 
   const pages = data ? Math.max(1, Math.ceil(data.total / data.limit)) : 1;
+
+  // Collapse CONSECUTIVE identical action+target rows (job retries flood the
+  // trail with dozens of e.g. sms.multi_deposit_deferred for one target) into
+  // one row with an xN badge and the run's latest timestamp. Entries arrive
+  // newest-first, so items[0] is the latest of each run. Click expands the run.
+  const groups = useMemo(() => {
+    const out = [];
+    for (const e of (data?.entries || [])) {
+      const key = `${e.action}|${e.target_type || ''}|${e.target_id || ''}`;
+      const last = out[out.length - 1];
+      if (last && last.key === key) last.items.push(e);
+      else out.push({ key, items: [e] });
+    }
+    return out;
+  }, [data]);
+
+  const toggleRun = (id) => setExpanded((s) => {
+    const n = new Set(s);
+    if (n.has(id)) n.delete(id); else n.add(id);
+    return n;
+  });
 
   return (
     <div className="glass-card">
@@ -59,18 +81,46 @@ export function AuditPage() {
                 No audit entries yet — they appear as soon as admin actions run.
               </td></tr>
             )}
-            {data && data.entries.map((e) => (
-              <tr key={e.id}>
-                <td style={{ whiteSpace: 'nowrap', fontVariantNumeric: 'tabular-nums' }}>
-                  {parseTs(e.created_at)?.toLocaleString() || '—'}
-                </td>
-                <td><span style={{ color: ACTION_COLOR(e.action), fontWeight: 700 }}>{e.action}</span></td>
-                <td>{e.target_type ? `${e.target_type}${e.target_id ? ` #${e.target_id}` : ''}` : '—'}</td>
-                <td style={{ maxWidth: 420, overflow: 'hidden', textOverflow: 'ellipsis' }}>{e.summary || '—'}</td>
-                <td>{e.admin_name || e.admin_chat_id || '—'}</td>
-                <td style={{ color: 'var(--text-muted)', fontSize: 12 }}>{e.ip || '—'}</td>
-              </tr>
-            ))}
+            {data && groups.map((g) => {
+              const e = g.items[0];
+              const n = g.items.length;
+              const open = expanded.has(e.id);
+              const rows = [(
+                <tr
+                  key={e.id}
+                  onClick={n > 1 ? () => toggleRun(e.id) : undefined}
+                  style={n > 1 ? { cursor: 'pointer' } : undefined}
+                  title={n > 1 ? `Run of ${n} identical entries — click to ${open ? 'collapse' : 'expand'}` : undefined}
+                >
+                  <td style={{ whiteSpace: 'nowrap', fontVariantNumeric: 'tabular-nums' }}>
+                    {fmtDateTime(e.created_at)}
+                  </td>
+                  <td>
+                    <span style={{ color: ACTION_COLOR(e.action), fontWeight: 700 }}>{e.action}</span>
+                    {n > 1 && <span className="audit-run-badge">x{n}</span>}
+                  </td>
+                  <td>{e.target_type ? `${e.target_type}${e.target_id ? ` #${e.target_id}` : ''}` : '—'}</td>
+                  <td style={{ maxWidth: 420, overflow: 'hidden', textOverflow: 'ellipsis' }}>{e.summary || '—'}</td>
+                  <td>{e.admin_name || e.admin_chat_id || '—'}</td>
+                  <td style={{ color: 'var(--text-muted)', fontSize: 12 }}>{e.ip || '—'}</td>
+                </tr>
+              )];
+              if (open && n > 1) {
+                for (const it of g.items.slice(1)) {
+                  rows.push(
+                    <tr key={it.id} className="audit-run-item">
+                      <td style={{ whiteSpace: 'nowrap', fontVariantNumeric: 'tabular-nums' }}>{fmtDateTime(it.created_at)}</td>
+                      <td><span style={{ color: ACTION_COLOR(it.action), fontWeight: 700 }}>{it.action}</span></td>
+                      <td>{it.target_type ? `${it.target_type}${it.target_id ? ` #${it.target_id}` : ''}` : '—'}</td>
+                      <td style={{ maxWidth: 420, overflow: 'hidden', textOverflow: 'ellipsis' }}>{it.summary || '—'}</td>
+                      <td>{it.admin_name || it.admin_chat_id || '—'}</td>
+                      <td style={{ color: 'var(--text-muted)', fontSize: 12 }}>{it.ip || '—'}</td>
+                    </tr>,
+                  );
+                }
+              }
+              return rows;
+            })}
           </tbody>
         </table>
       </div>

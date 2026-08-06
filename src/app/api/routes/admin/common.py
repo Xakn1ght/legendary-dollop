@@ -15,7 +15,6 @@ from app.api.schemas import (
     AdminSendNotificationRequest,
     AdminTicketReplyRequest,
     AdminToggleUserStatusRequest,
-    AdminUpdateChargePackagesRequest,
     AdminUpdatePaymentSettingsRequest,
     AdminUpdatePlansRequest,
     AdminUserUpdateRequest,

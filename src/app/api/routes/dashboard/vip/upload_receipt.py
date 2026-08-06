@@ -104,15 +104,15 @@ async def handle_vip_upload_receipt(request: web.Request):
                     plan_info = VIP_PLANS.get(order.plan_id, {})
 
                     caption = (
-                        f"🆕 <b>درخواست خرید VIP جدید</b>\n\n"
-                        f"👤 کاربر: {user.full_name or user.username or user.chat_id}\n"
-                        f"📦 پلن: {plan_info.get('label_fa', order.plan_id)}\n"
-                        f"💰 مبلغ: {order.price:,} تومان\n"
-                        f"🔢 شماره سفارش: #VIP{order.id}"
+                        f"<b>درخواست خرید VIP جدید</b>\n\n"
+                        f"کاربر: {user.full_name or user.username or user.chat_id}\n"
+                        f"پلن: {plan_info.get('label_fa', order.plan_id)}\n"
+                        f"مبلغ: {order.price:,} تومان\n"
+                        f"شماره سفارش: #VIP{order.id}"
                     )
                     kb = InlineKeyboardBuilder()
-                    kb.button(text="✅ تایید", callback_data=f"approve_vip_{order.id}")
-                    kb.button(text="❌ رد", callback_data=f"deny_vip_{order.id}")
+                    kb.button(text="تایید", callback_data=f"approve_vip_{order.id}")
+                    kb.button(text="رد", callback_data=f"deny_vip_{order.id}")
                     kb.adjust(2)
                     # ONE message: photo + details + approve/deny buttons
                     await admin_bot.send_photo(

@@ -56,12 +56,14 @@ JOB_SCHEDULES = {
     "renewal_job": {"type": "interval", "seconds": 60, "max_instances": 1, "coalesce": True},
     "update_user_analytics_job": {"type": "interval", "hours": 1},
     "expire_claims_job": {"type": "interval", "minutes": 15},
-    "reminder_unclaimed_star_rewards_job": {"type": "interval", "hours": 12},
     "cleanup_draft_orders_job": {"type": "interval", "minutes": 10},
     "season_reset_job": {"type": "interval", "hours": 12},  # rotate season + expire coupons
     # Idempotent: no-ops until a new month starts, then mints last month's
     # arcade leaderboard prize coupons exactly once.
     "arcade_monthly_prizes_job": {"type": "interval", "hours": 6},
+    # Finalize abandoned arcade rounds from their last checkpoint (>=30 min
+    # idle). No-op when Redis is down or nothing is stale.
+    "arcade_round_sweep_job": {"type": "interval", "minutes": 10, "max_instances": 1, "coalesce": True},
     # Re-check pooled bank-SMS deposits vs pending orders (SMS-before-receipt case).
     # Inert unless SMS auto-approval is armed; cheap when there's nothing pooled.
     "sms_sweep_job": {"type": "interval", "seconds": 60, "max_instances": 1, "coalesce": True},

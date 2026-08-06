@@ -142,6 +142,10 @@ class CashoutRequest(Base):
     # Telegram admin id (see VipOrder.approved_by) — int32 overflows
     processed_by = Column(BigInteger, nullable=True)
     admin_note = Column(String, nullable=True)
+    # Payout proof sent by the admin (bot flow); mark_cashout_paid always wrote
+    # these but the columns were missing, so the receipt was silently dropped.
+    receipt_file_id = Column(String, nullable=True)
+    receipt_message_id = Column(Integer, nullable=True)
 
     user = relationship("User")
 

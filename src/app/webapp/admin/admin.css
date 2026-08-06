@@ -4735,6 +4735,28 @@ body.admin-panel.hero3d-dragging .content-scroll { overflow: hidden !important; 
 @media (max-width: 720px) { .hero3d { flex-direction: column; padding: 20px; } .hero3d-canvas-wrap { width: 100%; min-height: 200px; } }
 @media (prefers-reduced-motion: reduce) { .hero3d-orb { animation: none; } }
 
+/* ---- Dashboard phone layout (2026-07-20) ----------------------------------
+   The React component skips the hero entirely on <=640px; here the remaining
+   sections reorder so the daily decisions (money, health, expiring users)
+   sit above the vanity counters, and the stat cards compact to a 2-up grid
+   (they rendered one per row and ate a full screen). Desktop keeps normal
+   block flow — this media query is the only place the order changes. */
+@media (max-width: 640px) {
+  body.admin-panel .dash-page { display: flex; flex-direction: column; }
+  body.admin-panel .dash-page .dash-sec-rev { order: 1; margin-top: 0 !important; }
+  body.admin-panel .dash-page .dash-sec-duo { order: 2; }
+  body.admin-panel .dash-page .dash-sec-stats { order: 3; }
+  body.admin-panel .dash-page .dash-sec-online { order: 4; }
+  body.admin-panel .dash-page .dash-sec-act { order: 5; }
+  body.admin-panel .dash-page .dash-stats {
+    grid-template-columns: 1fr 1fr !important;
+    gap: 10px !important;
+    margin-bottom: 0;
+  }
+  body.admin-panel .dash-page .dash-stats .stat-card { padding: 14px !important; }
+  body.admin-panel .dash-page .dash-stats .stat-value { font-size: 22px; margin: 4px 0; }
+}
+
 /* =============================================================================
    V7 — SETTINGS REWORK (two-pane nav + pane, drill-in on mobile)
    ============================================================================= */
@@ -5399,6 +5421,93 @@ body.admin-panel .receipt-hotkeys kbd {
   font-family: inherit; font-size: 10px; font-weight: 700; padding: 2px 6px; border-radius: 6px;
   background: rgba(255,255,255,0.07); border: 1px solid rgba(255,255,255,0.14);
 }
+
+/* ---- Receipt drawer: invoice view -----------------------------------------
+   Money surface — calm, tabular, one accent. The breakdown mirrors the bot
+   caption 1:1 and ends on the ONE number the admin matches against the bank
+   receipt. */
+body.admin-panel .rcp-drawer { width: min(560px, calc(100vw - 28px)); max-height: min(86vh, 760px); }
+body.admin-panel .rcp-d-title { display: flex; align-items: center; gap: 6px; min-width: 0; }
+body.admin-panel .rcp-d-title bdi { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+body.admin-panel .inv {
+  border: 1px solid rgba(255,255,255,0.10);
+  background: rgba(0,0,0,0.22);
+  border-radius: 16px;
+  padding: 2px 14px;
+  margin-bottom: 12px;
+}
+body.admin-panel .inv-row {
+  display: flex; align-items: baseline; justify-content: space-between; gap: 14px;
+  padding: 11px 0;
+  border-bottom: 1px dashed rgba(255,255,255,0.09);
+}
+body.admin-panel .inv-row:last-child { border-bottom: none; }
+body.admin-panel .inv-l {
+  display: flex; flex-direction: column; gap: 3px; min-width: 0;
+  font-size: 11px; font-weight: 800; letter-spacing: 0.4px;
+  color: rgba(232,238,252,0.55);
+}
+body.admin-panel .inv-name { font-size: 13.5px; font-weight: 800; letter-spacing: 0; color: rgba(232,238,252,0.92); min-width: 0; }
+body.admin-panel .inv-name bdi { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+body.admin-panel .inv-v {
+  font-size: 14px; font-weight: 800; white-space: nowrap;
+  color: rgba(232,238,252,0.92);
+  font-variant-numeric: tabular-nums; font-feature-settings: "tnum" 1;
+}
+body.admin-panel .inv-minus { color: rgba(232,238,252,0.52); }
+body.admin-panel .inv-total { border-top: 1px solid rgba(255,255,255,0.16); margin-top: 1px; }
+body.admin-panel .inv-total .inv-l { font-size: 10px; letter-spacing: 0.9px; text-transform: uppercase; }
+body.admin-panel .inv-total .inv-v { font-size: 24px; letter-spacing: -0.02em; line-height: 1.05; color: rgba(var(--brandRgb),0.98); }
+body.admin-panel .inv-cur { font-size: 12px; font-weight: 800; opacity: 0.75; }
+
+body.admin-panel .rcp-meta-grid {
+  display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px;
+  margin-bottom: 12px;
+}
+body.admin-panel .rcp-mg-item {
+  border: 1px solid rgba(255,255,255,0.08);
+  background: rgba(0,0,0,0.16);
+  border-radius: 12px; padding: 8px 10px; min-width: 0;
+}
+body.admin-panel .rcp-mg-k {
+  font-size: 9.5px; font-weight: 800; letter-spacing: 0.8px; text-transform: uppercase;
+  color: rgba(232,238,252,0.48); margin-bottom: 3px;
+}
+body.admin-panel .rcp-mg-v {
+  font-size: 12.5px; font-weight: 700; color: rgba(232,238,252,0.90);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+
+body.admin-panel .rcp-noimg {
+  display: flex; align-items: center; gap: 8px;
+  font-size: 12px; line-height: 1.5; color: rgba(232,238,252,0.55);
+  border: 1px dashed rgba(255,255,255,0.14); border-radius: 12px; padding: 10px 12px;
+}
+body.admin-panel .rcp-noimg svg { flex: 0 0 auto; }
+
+body.admin-panel .rcp-booking {
+  display: inline-flex; align-items: center; gap: 5px; margin-top: 3px;
+  font-size: 11px; font-weight: 700; color: rgba(232,238,252,0.62);
+  min-width: 0; max-width: 100%;
+}
+body.admin-panel .rcp-booking svg { flex: 0 0 auto; opacity: 0.7; }
+body.admin-panel .rcp-booking bdi { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* Phones: the money drawer docks as a bottom sheet instead of a squeezed
+   centered modal (tracks --app-vh so the Telegram keyboard/viewport is safe) */
+@media (max-width: 640px) {
+  body.admin-panel .rcp-drawer-wrap { align-items: flex-end; padding: 0; }
+  body.admin-panel .rcp-drawer {
+    width: 100vw; max-width: 100vw;
+    max-height: calc(var(--app-vh, 100dvh) - 34px);
+    border-radius: 22px 22px 0 0;
+    border-bottom: none;
+  }
+  body.admin-panel .rcp-drawer .v3-modal-actions { padding-bottom: calc(14px + env(safe-area-inset-bottom, 0px)); }
+  body.admin-panel .rcp-drawer .v3-modal-actions .btn { flex: 1; min-width: 0; }
+}
 body.admin-panel .lightbox-backdrop {
   position: fixed; inset: 0; z-index: 3000;
   background: rgba(4,7,12,0.9);
@@ -5845,4 +5954,79 @@ body.admin-panel aside.sup-ctx:hover { transform: none; }
   .page-two-col.aside-left { grid-template-columns: 1fr; gap: 14px; }
   /* recent/list panes read better after the form on phones */
   .page-two-col.aside-right > :last-child { order: 2; }
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   v75 — AUDIT POLISH BATCH (2026-07-21)
+   Plans price width, node IP reveal, receipts verify aids, audit run badge,
+   keyboard focus for sidebar/receipt cards.
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+/* Settings ▸ Plans: 6+ digit prices clipped in the 82px field (audit).
+   Price gets its own width and compact padding so 8 digits fit. */
+.set-field-price { width: 118px; }
+.set-field-price .input-field {
+  padding-left: 10px;
+  padding-right: 10px;
+  font-variant-numeric: tabular-nums;
+}
+@media (max-width: 480px) {
+  /* phone: Name takes the full row, the numeric trio + delete share the next
+     row proportionally instead of overflowing the card */
+  .set-row-card .set-field-grow { flex: 1 1 100%; }
+  .set-row-card .set-field { flex: 1 1 0; width: auto; min-width: 0; }
+  .set-row-card .set-field-price { flex-grow: 1.5; }
+}
+
+/* Servers: per-card eye toggle for masked node addresses */
+.srv-reveal {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 22px; height: 22px; padding: 0; flex-shrink: 0;
+  background: none; border: 0; border-radius: 6px;
+  color: var(--text-muted); cursor: pointer;
+}
+.srv-reveal:hover { color: var(--text); background: rgba(255,255,255,0.08); }
+.srv-reveal:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(var(--brandRgb),0.16), 0 0 0 1px rgba(var(--brandRgb),0.35);
+}
+
+/* Receipts drawer: buyer approve/deny track record under the meta grid */
+.rcp-buyer-history {
+  margin: 10px 0 12px;
+  font-size: 12px;
+  color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
+}
+.rcp-buyer-history.warn { color: var(--warning, #fbbf24); }
+
+/* Audit trail: collapsed-run count badge + expanded run rows */
+.audit-run-badge {
+  display: inline-block; margin-left: 8px; padding: 1px 7px;
+  border-radius: 999px; font-size: 10.5px; font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  color: var(--text);
+  background: rgba(var(--brandRgb),0.12);
+  border: 1px solid rgba(var(--brandRgb),0.28);
+}
+body.admin-panel tr.audit-run-item td { opacity: 0.72; }
+
+/* Sidebar nav items are real <button>s now — flatten UA styles, keep layout */
+body.admin-panel .sidebar button.nav-item {
+  width: 100%;
+  background: none;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+/* keyboard focus ring, same recipe as .mini-close:focus-visible */
+body.admin-panel .nav-item:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(var(--brandRgb),0.16), 0 0 0 1px rgba(var(--brandRgb),0.35);
+}
+/* cards keep their glass shadows — ring via outline (matches .sb-card.sel) */
+body.admin-panel .receipt-card:focus-visible,
+body.admin-panel .sb-card:focus-visible {
+  outline: 2px solid rgba(var(--brandRgb),0.65);
+  outline-offset: 2px;
 }

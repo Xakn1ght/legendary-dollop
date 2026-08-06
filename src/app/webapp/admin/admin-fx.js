@@ -137,8 +137,8 @@
      Telegram's Close/⋯ chrome floats over the webview top (published as
      --tg-safe-top so the header can clear it). We also:
        - expand() + requestFullscreen() so the app opens locked to full height
-         (mobile only — desktop Telegram has no true fullscreen and it just
-         makes the window jump);
+         (mobile only — on desktop clients fullscreen is stubbed out and
+         actively exited, see the isDesktop block below);
        - disableVerticalSwipes() so dragging down from the top no longer
          minimizes/closes the mini app (the reported bug). */
   function initTelegramSafeArea() {
@@ -151,15 +151,55 @@
       /tdesktop|macos|linux|web|windows|desktop/.test(platform) ||
       (!/android|iphone|ipad|ipod/.test(ua) && window.innerWidth > 768);
 
+    /* Outside Telegram (plain browser) or on old webviews the SDK still
+       defines every method but console.errors "not supported in version 6.0"
+       when called — try/catch can't silence that. Gate each feature on the
+       Bot API version that introduced it (fullscreen 8.0, vertical swipes
+       7.7, header/background colors 6.1) so unsupported calls never happen. */
+    const supports = (ver) => {
+      try { return typeof tg.isVersionAtLeast === "function" && tg.isVersionAtLeast(ver); }
+      catch (_) { return false; }
+    };
+
     try { tg.ready(); } catch (_) { /* ignore */ }
 
     const expand = () => { try { if (typeof tg.expand === "function") tg.expand(); } catch (_) { /* ignore */ } };
-    const stopSwipes = () => { try { if (typeof tg.disableVerticalSwipes === "function") tg.disableVerticalSwipes(); } catch (_) { /* ignore */ } };
+    const stopSwipes = () => {
+      if (!supports("7.7")) return;
+      try { if (typeof tg.disableVerticalSwipes === "function") tg.disableVerticalSwipes(); } catch (_) { /* ignore */ }
+    };
+    const exitFullscreen = () => {
+      if (!supports("8.0")) return;
+      try { if (typeof tg.exitFullscreen === "function") tg.exitFullscreen(); } catch (_) { /* ignore */ }
+      try { if (tg.viewport && typeof tg.viewport.exitFullscreen === "function") tg.viewport.exitFullscreen(); } catch (_) { /* ignore */ }
+    };
     const goFullscreen = () => {
       if (isDesktop) return;
+      if (!supports("8.0")) return;
       try { if (typeof tg.requestFullscreen === "function") tg.requestFullscreen(); } catch (_) { /* ignore */ }
       try { if (tg.viewport && typeof tg.viewport.requestFullscreen === "function") tg.viewport.requestFullscreen(); } catch (_) { /* ignore */ }
     };
+
+    /* Desktop Telegram (tdesktop/macOS/web): mini-app fullscreen is a mobile
+       concept. On Windows the WebView2 fullscreen window composites wrong —
+       giant black expanse, content off-center, chat list bleeding through.
+       Same policy as the dashboard's head-boot.js: neuter requestFullscreen
+       so nothing can trigger fullscreen later, and actively EXIT if the
+       client entered (or remembered) fullscreen from a previous session. */
+    if (isDesktop) {
+      try {
+        tg.requestFullscreen = function () {};
+        if (tg.viewport && tg.viewport.requestFullscreen) {
+          tg.viewport.requestFullscreen = function () {};
+        }
+      } catch (_) { /* ignore */ }
+      if (tg.isFullscreen) exitFullscreen();
+      try {
+        if (typeof tg.onEvent === "function") {
+          tg.onEvent("fullscreenChanged", () => { if (tg.isFullscreen) exitFullscreen(); });
+        }
+      } catch (_) { /* ignore */ }
+    }
 
     expand();
     setTimeout(expand, 300);      // some clients ignore the first expand pre-ready
@@ -167,8 +207,10 @@
     goFullscreen();
 
     // blend the Telegram header/background into our dark canvas
-    try { if (typeof tg.setBackgroundColor === "function") tg.setBackgroundColor("#0a141b"); } catch (_) { /* ignore */ }
-    try { if (typeof tg.setHeaderColor === "function") tg.setHeaderColor("#0a141b"); } catch (_) { /* ignore */ }
+    if (supports("6.1")) {
+      try { if (typeof tg.setBackgroundColor === "function") tg.setBackgroundColor("#0a141b"); } catch (_) { /* ignore */ }
+      try { if (typeof tg.setHeaderColor === "function") tg.setHeaderColor("#0a141b"); } catch (_) { /* ignore */ }
+    }
 
     const apply = () => {
       const c = (tg.contentSafeAreaInset && tg.contentSafeAreaInset.top) || 0;
@@ -188,7 +230,13 @@
       document.body.classList.add("in-telegram");
     };
     apply();
-    const reassert = () => { apply(); expand(); stopSwipes(); };
+    /* Desktop: never re-expand() on viewport events — it fights manual window
+       resizing (the mini-app window keeps snapping back to max height). The
+       aggressive re-assert exists to counter swipe-collapse, a mobile-only
+       problem, so mobile keeps it. */
+    const reassert = isDesktop
+      ? () => { apply(); }
+      : () => { apply(); expand(); stopSwipes(); };
     ["safeAreaChanged", "contentSafeAreaChanged", "viewportChanged", "fullscreenChanged"].forEach((ev) => {
       try { tg.onEvent(ev, reassert); } catch (_) { /* ignore */ }
     });

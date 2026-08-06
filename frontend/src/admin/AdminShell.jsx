@@ -144,10 +144,12 @@ export function AdminShell({ user }) {
                   const Icon = Icons[it.page];
                   const count = it.badge ? badges[it.badge] : 0;
                   return (
-                    <div
+                    <button
                       key={it.page}
+                      type="button"
                       className={'nav-item' + (page === it.page ? ' active' : '')}
                       data-page={it.page}
+                      aria-current={page === it.page ? 'page' : undefined}
                       onClick={() => navigate(it.page)}
                     >
                       {Icon && <Icon />}
@@ -157,7 +159,7 @@ export function AdminShell({ user }) {
                           {count > 99 ? '99+' : count}
                         </span>
                       )}
-                    </div>
+                    </button>
                   );
                 })}
               </div>

@@ -20,10 +20,8 @@ from app.api.schemas.admin_messaging import (
 )
 from app.api.schemas.admin_settings import (
     AdminIPWhitelistRequest,
-    AdminUpdateChargePackagesRequest,
     AdminUpdatePaymentSettingsRequest,
     AdminUpdatePlansRequest,
-    ChargePackageSchema,
     PlanSchema,
 )
 from app.api.schemas.admin_users import AdminToggleUserStatusRequest, AdminUserUpdateRequest
@@ -70,7 +68,6 @@ __all__ = [
     "AdminSendNotificationRequest",
     "AdminTicketReplyRequest",
     "AdminToggleUserStatusRequest",
-    "AdminUpdateChargePackagesRequest",
     "AdminUpdatePaymentSettingsRequest",
     "AdminUpdatePlansRequest",
     "AdminUserUpdateRequest",
@@ -78,7 +75,6 @@ __all__ = [
     "ArcadeSubmitRequest",
     "BaseResponse",
     "CancelOrderRequest",
-    "ChargePackageSchema",
     "CheckServiceNameRequest",
     "DashboardLoginRequest",
     "DashboardMarkNotificationReadRequest",

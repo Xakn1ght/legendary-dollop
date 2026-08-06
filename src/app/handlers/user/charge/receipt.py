@@ -80,8 +80,8 @@ async def process_receipt(message: Message, state: FSMContext, session: AsyncSes
 
     from aiogram.utils.keyboard import InlineKeyboardBuilder
     kb = InlineKeyboardBuilder()
-    kb.button(text='✅ تایید', callback_data=f'approve_charge_{charge_req.id}')
-    kb.button(text='❌ رد', callback_data=f'deny_charge_{charge_req.id}')
+    kb.button(text='تایید', callback_data=f'approve_charge_{charge_req.id}')
+    kb.button(text='رد', callback_data=f'deny_charge_{charge_req.id}')
     kb.adjust(2)
 
     # Fetch subscription username explicitly to avoid lazy-load problems

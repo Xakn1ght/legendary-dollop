@@ -6,11 +6,9 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.settings import DASHBOARD_PUBLIC_BASE_URL
 from app.database.crud import (
-    add_credit,
     get_unspent_rewards_by_referrer,
     get_user,
     get_user_active_subscriptions,
-    get_user_unclaimed_rewards,
 )
 from app.keyboards.inline import get_reward_voucher_keyboard
 from app.utils.text_format import to_jalali_date, to_persian_digits
@@ -28,7 +26,11 @@ def _build_rewards_webapp_url(user_chat_id: int) -> str:
 
 @router.callback_query(F.data.in_({"enhanced_wallet", "open_wallet_menu"}))
 async def show_wallet(callback: CallbackQuery, session: AsyncSession):
-    """Show detailed wallet information with all financial assets."""
+    """Show detailed wallet information with all financial assets.
+
+    2026-07-19: the legacy star-tier ladder sections (progress line, pending
+    claims, claim buttons) are gone — that system is retired; season coupons
+    live in the rewards menu's coupon wallet."""
     user = await get_user(session, callback.from_user.id)
     if not user:
         await callback.answer("کاربر یافت نشد!")
@@ -40,10 +42,10 @@ async def show_wallet(callback: CallbackQuery, session: AsyncSession):
     vouchers = await get_unspent_rewards_by_referrer(session, user.id)
 
     wallet_text = (
-        "💰 <b>کیف پول شما</b>\n\n"
-        f"💵 <b>اعتبار:</b> {to_persian_digits(f'{credit:,}')} تومان\n"
-        f"⭐ <b>ستاره‌ها:</b> {to_persian_digits(stars)}\n"
-        f"🎟️ <b>بن‌های استفاده‌نشده:</b> {to_persian_digits(len(vouchers))} عدد\n"
+        "<b>کیف پول شما</b>\n\n"
+        f"<b>اعتبار:</b> {to_persian_digits(f'{credit:,}')} تومان\n"
+        f"<b>ستاره‌ها:</b> {to_persian_digits(stars)}\n"
+        f"<b>بن‌های استفاده‌نشده:</b> {to_persian_digits(len(vouchers))} عدد\n"
     )
 
     # Display active discount(s)
@@ -51,63 +53,23 @@ async def show_wallet(callback: CallbackQuery, session: AsyncSession):
     discounts = await get_active_user_discounts(session, user.id)
     if discounts:
         for d in discounts:
-            wallet_text += f"🏷️ <b>تخفیف فعال:</b> {to_persian_digits(d.percent)}٪ (تا {to_jalali_date(d.expiration)})\n"
-
-    # No need to show claimed rewards again, they are part of credit/discounts
-    # wallet_text += f"📊 <b>ارزش کل:</b> {to_persian_digits(f'{total_value:,}')} تومان\n\n"
-    
-    wallet_text += f"\n<b>سطوح ستاره‌ها:</b>\n"
-
-
-    # Show progress towards next reward tier
-    from app.database.crud import get_all_star_reward_tiers
-    tiers = await get_all_star_reward_tiers(session)
-    next_tier = next((t for t in tiers if t.star_threshold > stars), None)
-    if next_tier:
-        remaining_stars = next_tier.star_threshold - stars
-        wallet_text += f"📈 {to_persian_digits(remaining_stars)} ستاره دیگر تا جایزهٔ بعدی ({next_tier.title} - {next_tier.description}).\n"
-    else:
-        wallet_text += "🏆 همهٔ جوایز ستاره‌ای را گرفته‌اید!\n"
-
-    wallet_text += "\n<b>نکته:</b>\n"
-    wallet_text += "• سیستم امتیاز وفاداری و XP غیرفعال است.\n"
-
-    # Check for unclaimed star rewards
-    unclaimed_rewards = await get_user_unclaimed_rewards(session, user.id)
-    if unclaimed_rewards:
-        wallet_text += "\n<b>🎁 جوایز ستاره‌ای در انتظار:</b>\n"
-        for claim in unclaimed_rewards:
-            if claim.status == 'pending_subscription':
-                wallet_text += f"• <b>{claim.tier.title}</b>: {claim.tier.description} (در انتظار خرید اشتراک)\n"
-            else:
-                wallet_text += f"• <b>{claim.tier.title}</b>: {claim.tier.description}\n"
+            wallet_text += f"<b>تخفیف فعال:</b> {to_persian_digits(d.percent)}٪ (تا {to_jalali_date(d.expiration)})\n"
 
     # Create wallet action keyboard
     keyboard = InlineKeyboardMarkup(inline_keyboard=[])
 
-    # Add claim buttons for 'offered' rewards
-    for claim in unclaimed_rewards:
-        if claim.status == 'offered':
-            keyboard.inline_keyboard.append([
-                InlineKeyboardButton(
-                    text=f"🎁 دریافت {claim.tier.title}",
-                    callback_data=f"claim_star_reward_{claim.id}"
-                )
-            ])
-
     keyboard.inline_keyboard.append([
-        InlineKeyboardButton(text="🎟️ بن‌های من", callback_data="enhanced_wallet_rewards"),
+        InlineKeyboardButton(text="بن‌های من", callback_data="enhanced_wallet_rewards"),
     ])
 
-
     keyboard.inline_keyboard.append([
-        InlineKeyboardButton(text="🔙 بازگشت", callback_data="enhanced_rewards_menu")
+        InlineKeyboardButton(text="بازگشت", callback_data="enhanced_rewards_menu")
     ])
 
     # WebApp-first: prepend a link to the Rewards page so users can manage everything there.
     try:
         web_kb = InlineKeyboardBuilder()
-        web_kb.button(text="⭐ پاداش‌ها (وب‌اپ)", web_app=WebAppInfo(url=_build_rewards_webapp_url(callback.from_user.id)))
+        web_kb.button(text="پاداش‌ها (وب‌اپ)", web_app=WebAppInfo(url=_build_rewards_webapp_url(callback.from_user.id)))
         web_kb.adjust(1)
         keyboard.inline_keyboard = web_kb.as_markup().inline_keyboard + (keyboard.inline_keyboard or [])
     except Exception:
@@ -161,7 +123,7 @@ async def show_wallet_rewards(callback: CallbackQuery, session: AsyncSession):
         )
 
         await callback.message.answer(
-            text=f"🎟️ بن #{rw.id}: {desc}",
+            text=f"بن #{rw.id}: {desc}",
             reply_markup=kb,
         )
 
@@ -210,18 +172,18 @@ async def show_free_renewal_options(callback: CallbackQuery, session: AsyncSessi
     for sub in subs:
         keyboard.inline_keyboard.append([
             InlineKeyboardButton(
-                text=f"⭐ تمدید {sub.marzban_username}",
+                text=f"تمدید {sub.marzban_username}",
                 callback_data=f"enhanced_free_renew_{sub.id}"
             )
         ])
 
     keyboard.inline_keyboard.append([
-        InlineKeyboardButton(text="🔙 بازگشت", callback_data="enhanced_wallet")
+        InlineKeyboardButton(text="بازگشت", callback_data="enhanced_wallet")
     ])
 
     await callback.message.edit_text(
-        "⭐ <b>تمدید رایگان با ستاره‌ها</b>\n\n"
+        "<b>تمدید رایگان با ستاره‌ها</b>\n\n"
         "سرویس مورد نظر برای تمدید رایگان را انتخاب کنید:",
         reply_markup=keyboard,
         parse_mode="HTML"
-    ) 
+    )

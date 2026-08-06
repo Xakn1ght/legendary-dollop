@@ -5,7 +5,7 @@ import { useModal } from '../components/Modal.jsx';
 import { useToast } from '../components/Toast.jsx';
 import { Icons } from '../icons.jsx';
 import { useShell } from '../ShellContext.js';
-import { fmtNum, parseTs, saveImageLocally } from '../util.js';
+import { fmtDateTime, fmtNum, parseTs, saveImageLocally } from '../util.js';
 
 // Purchase / charge / VIP receipt approvals. Money-critical — approve/deny
 // endpoints and their accepted response messages are ported 1:1 from
@@ -72,6 +72,7 @@ export function ReceiptsPage() {
   function endpointFor(type, id, action) {
     if (type === 'vip') return `/api/admin/vip-orders/${id}/${action}`;
     if (type === 'charge') return `/api/admin/charges/${id}/${action}`;
+    if (type === 'cashout') return `/api/admin/cashouts/${id}/${action}`;
     return `/api/admin/receipts/${id}/${action}`;
   }
 
@@ -118,11 +119,16 @@ export function ReceiptsPage() {
     if (inFlight.current.has(key)) return;
     const isVip = type === 'vip';
     const isCharge = type === 'charge';
-    const verb = action === 'approve' ? 'Approve' : 'Deny';
+    const isCashout = type === 'cashout';
+    const verb = action === 'approve' ? (isCashout ? 'Mark paid' : 'Approve') : 'Deny';
     const msg = action === 'approve'
-      ? (isVip ? 'Approve this VIP purchase and activate VIP membership?' : isCharge ? 'Approve this charge request and add data/days?' : 'Approve this receipt and activate the service?')
-      : (isVip ? 'Deny this VIP purchase?' : isCharge ? 'Deny this charge request?' : 'Deny this receipt? (Service will not be activated)');
-    const ok = await modal.confirm(`${verb} receipt`, msg, { okText: verb, danger: action === 'deny' });
+      ? (isCashout
+        ? 'Mark this cash-out as PAID? Confirm only after you have transferred the money to the user.'
+        : isVip ? 'Approve this VIP purchase and activate VIP membership?' : isCharge ? 'Approve this charge request and add data/days?' : 'Approve this receipt and activate the service?')
+      : (isCashout
+        ? 'Deny this cash-out? The reserved amount returns to the user\u2019s wallet.'
+        : isVip ? 'Deny this VIP purchase?' : isCharge ? 'Deny this charge request?' : 'Deny this receipt? (Service will not be activated)');
+    const ok = await modal.confirm(isCashout ? `${verb}: cash-out` : `${verb} receipt`, msg, { okText: verb, danger: action === 'deny' });
     if (!ok) return;
 
     inFlight.current.add(key);
@@ -132,7 +138,7 @@ export function ReceiptsPage() {
       try { data = await res.json(); } catch (_) { data = {}; }
       const good = action === 'approve' ? 'approved' : 'denied';
       if (data.ok && (data.message === good || data.message === 'already_processed')) {
-        toast(`Receipt ${good}`, 'success');
+        toast(type === 'cashout' ? `Cash-out ${action === 'approve' ? 'marked paid' : 'denied'}` : `Receipt ${good}`, 'success');
         if (drawer && drawer.id === r.id && (drawer.type || 'subscription') === type) setDrawer(null);
         await rc.reload();
         return;
@@ -182,11 +188,19 @@ export function ReceiptsPage() {
           const type = r.type || 'subscription';
           const isVip = type === 'vip';
           const isCharge = type === 'charge';
-          const sourceLabel = isVip ? 'VIP' : isCharge ? 'CHARGE' : (r.is_web_receipt ? 'WEB' : 'TELEGRAM');
-          const service = isVip ? 'VIP Membership' : isCharge ? `Charge: ${r.service_name || '—'}` : (r.service_name || '—');
+          const isCashout = type === 'cashout';
+          const sourceLabel = isVip ? 'VIP' : isCharge ? 'CHARGE' : isCashout ? 'CASH-OUT' : (r.is_web_receipt ? 'WEB' : 'TELEGRAM');
+          const service = isVip ? 'VIP Membership' : isCharge ? `Charge: ${r.service_name || '—'}` : isCashout ? `To: ${r.cashout_destination || '—'}` : (r.service_name || '—');
           const when = parseTs(r.created_at);
           return (
-            <div className="glass-card receipt-card fx-tilt" key={`${type}-${r.id}`} onClick={() => setDrawer(r)}>
+            <div
+              className="glass-card receipt-card fx-tilt"
+              key={`${type}-${r.id}`}
+              role="button"
+              tabIndex={0}
+              onClick={() => setDrawer(r)}
+              onKeyDown={(e) => { if (e.key === 'Enter') setDrawer(r); }}
+            >
               <div className="rcp-head">
                 <div className="receipt-avatar">{(r.user_name || 'U').trim().charAt(0).toUpperCase()}</div>
                 <div className="rcp-who">
@@ -203,13 +217,18 @@ export function ReceiptsPage() {
                 <div className="rcp-meta-l">
                   {/* bdi keeps Persian plan names from garbling against the GB suffix */}
                   <div className="rcp-plan"><bdi>{r.plan_name || 'Plan'}</bdi>{Number(r.plan_gb) ? <span className="rcp-gb">{Number(r.plan_gb)}GB</span> : null}</div>
+                  {r.renewal_plan && (
+                    <div className="rcp-booking" title="Paid auto-renew booking included in the total">
+                      <Icons.refresh width={11} height={11} /> <bdi>{r.renewal_plan}</bdi>
+                    </div>
+                  )}
                   <div className="rcp-sub">
                     <span className="rcp-service" dir="ltr">{service}</span>
                     <span className="rcp-dot" aria-hidden="true" />
-                    <time title={when ? when.toLocaleString() : ''}>{agoShort(when)}</time>
+                    <time title={when ? fmtDateTime(r.created_at) : ''}>{agoShort(when)}</time>
                   </div>
                 </div>
-                <div className="rcp-price" title="Total">{fmtNum(r.price)}<span> T</span></div>
+                <div className="rcp-price" title="Amount that must appear on the bank receipt">{fmtNum(r.price)}<span> T</span></div>
               </div>
 
               {(dupes.img(r) || dupes.user(r) || r.receipt_image_url) && (
@@ -231,54 +250,136 @@ export function ReceiptsPage() {
 
               <div className="receipt-actions rcp-actions">
                 <button onClick={(e) => { e.stopPropagation(); act(r, 'deny'); }} className="btn btn-secondary receipt-deny">Deny</button>
-                <button onClick={(e) => { e.stopPropagation(); act(r, 'approve'); }} className="btn btn-primary">Approve</button>
+                <button onClick={(e) => { e.stopPropagation(); act(r, 'approve'); }} className="btn btn-primary">{isCashout ? 'Mark paid' : 'Approve'}</button>
               </div>
             </div>
           );
         })}
       </div>
 
-      {drawer && (
-        <div className="v3-modal-backdrop open" onClick={(e) => { if (e.target === e.currentTarget) setDrawer(null); }}>
-          <div className="v3-modal" role="dialog" aria-modal="true" style={{ maxWidth: 520 }}>
-            <div className="v3-modal-head">
-              <div>
-                <div className="v3-modal-title">{drawer.user_name || 'Receipt'}</div>
-                <div className="v3-modal-sub">{drawer.username ? '@' + drawer.username : ''} · {(drawer.type || 'subscription').toUpperCase()}</div>
-              </div>
-              <button className="mini-close" type="button" onClick={() => setDrawer(null)}>✕</button>
-            </div>
-            <div className="v3-modal-body">
-              <div className="receipt-kv"><div className="receipt-k">Plan</div><div className="receipt-v"><bdi>{drawer.plan_name || '—'}</bdi>{Number(drawer.plan_gb) ? ` • ${Number(drawer.plan_gb)}GB` : ''}</div></div>
-              <div className="receipt-kv"><div className="receipt-k">Service</div><div className="receipt-v" dir="ltr">{drawer.service_name || '—'}</div></div>
-              <div className="receipt-kv"><div className="receipt-k">Total</div><div className="receipt-v receipt-price">{fmtNum(drawer.price)} T</div></div>
-              {Number(drawer.credit_used) > 0 && <div className="receipt-kv"><div className="receipt-k">Credit used</div><div className="receipt-v">−{fmtNum(drawer.credit_used)}</div></div>}
-              <div className="receipt-kv"><div className="receipt-k">Submitted</div><div className="receipt-v">{parseTs(drawer.created_at)?.toLocaleString() || '—'}</div></div>
-              {dupes.img(drawer) && (
-                <div className="receipt-fraud-note">
-                  <Icons.alert width={14} height={14} /> This exact receipt image is attached to more than one pending order — verify before approving.
+      {drawer && (() => {
+        const dType = drawer.type || 'subscription';
+        const dCashout = dType === 'cashout';
+        const dCharge = dType === 'charge';
+        const dVip = dType === 'vip';
+        const srcLabel = dVip ? 'VIP' : dCashout ? 'CASH-OUT' : dCharge ? 'CHARGE' : (drawer.is_web_receipt ? 'WEB' : 'TELEGRAM');
+        const when = parseTs(drawer.created_at);
+
+        // Invoice line items — mirrors the bot receipt caption 1:1: plan,
+        // booking, deductions, then the single number to match on the receipt.
+        const items = [];
+        if (dCashout) {
+          items.push({ key: 'amount', label: 'Withdrawal amount', name: null, value: drawer.plan_price });
+        } else {
+          items.push({ key: 'plan', label: dCharge ? 'Top-up' : dVip ? 'Membership' : 'Plan', name: drawer.plan_name, value: drawer.plan_price });
+          if (dType === 'subscription' && drawer.renewal_plan) {
+            items.push({ key: 'renewal', label: 'Auto-renew booking', name: drawer.renewal_plan, value: drawer.renewal_price });
+          }
+          if (Number(drawer.discount_amount) > 0) {
+            items.push({ key: 'discount', label: 'Discount / coupon', name: null, value: -drawer.discount_amount, minus: true });
+          }
+          if (Number(drawer.credit_used) > 0) {
+            items.push({ key: 'credit', label: 'Wallet credit', name: null, value: -drawer.credit_used, minus: true });
+          }
+        }
+
+        const meta = [
+          { k: 'Order', v: '#' + drawer.id },
+          { k: 'Source', v: srcLabel },
+          dCashout
+            ? { k: 'Destination', v: drawer.cashout_destination || '—', ltr: true }
+            : { k: 'Service', v: drawer.service_name || '—', ltr: true },
+          { k: 'User ID', v: drawer.user_chat_id || '—', ltr: true },
+          Number(drawer.plan_gb) ? { k: 'Volume', v: `${Number(drawer.plan_gb)} GB` } : null,
+          dVip && drawer.vip_days ? { k: 'VIP days', v: drawer.vip_days } : null,
+          dCharge && drawer.charge_type === 'booking' ? { k: 'Type', v: 'Plan booking' } : null,
+          dCharge && drawer.charge_type === 'normal_5gb_limit' ? { k: 'Type', v: '5GB-transfer charge' } : null,
+          // Verify aid: last-4 of OUR card — the receipt must show money sent here.
+          !dCashout && drawer.payto_last4 ? { k: 'Pay-to card', v: `•••• ${drawer.payto_last4}`, ltr: true } : null,
+          { k: 'Submitted', v: fmtDateTime(drawer.created_at) },
+        ].filter(Boolean);
+
+        // Buyer history (approved/denied counts from the backend) — a first-time
+        // buyer or a deny-heavy history deserves a closer look at the receipt.
+        const bhA = Number(drawer.buyer_approved_count);
+        const bhD = Number(drawer.buyer_denied_count);
+        const hasHistory = Number.isFinite(bhA) && Number.isFinite(bhD);
+
+        return (
+          <div className="v3-modal-backdrop open rcp-drawer-wrap" onClick={(e) => { if (e.target === e.currentTarget) setDrawer(null); }}>
+            <div className="v3-modal rcp-drawer" role="dialog" aria-modal="true">
+              <div className="v3-modal-head">
+                <div style={{ minWidth: 0 }}>
+                  <div className="v3-modal-title rcp-d-title">
+                    <bdi>{drawer.user_name || 'Receipt'}</bdi>
+                    {drawer.is_vip ? <span className="receipt-vip" title="VIP"><Icons.crown width={14} height={14} /></span> : null}
+                  </div>
+                  <div className="v3-modal-sub">{drawer.username ? '@' + drawer.username + ' · ' : ''}Order #{drawer.id} · {srcLabel}</div>
                 </div>
-              )}
-              {drawer.receipt_image_url && (
-                <button
-                  type="button"
-                  className="receipt-img-btn"
-                  onClick={() => setLightbox({ url: drawer.receipt_image_url, zoom: false })}
-                  title="Click to zoom"
-                >
-                  <img src={drawer.receipt_image_url} alt="receipt" style={{ width: '100%', borderRadius: 12, marginTop: 12, border: '1px solid var(--border-subtle)', display: 'block' }} />
-                  <span className="receipt-img-zoom"><Icons.zoom width={14} height={14} /></span>
-                </button>
-              )}
-              <div className="receipt-hotkeys">hotkeys: <kbd>j</kbd>/<kbd>k</kbd> next/prev · <kbd>A</kbd> approve · <kbd>D</kbd> deny · <kbd>Esc</kbd> close</div>
-            </div>
-            <div className="v3-modal-actions">
-              <button className="btn btn-secondary btn-danger" onClick={() => act(drawer, 'deny')}>Deny</button>
-              <button className="btn btn-primary" onClick={() => act(drawer, 'approve')}>Approve</button>
+                <button className="mini-close" type="button" onClick={() => setDrawer(null)}>✕</button>
+              </div>
+              <div className="v3-modal-body">
+                <div className="inv">
+                  {items.map((it) => (
+                    <div className="inv-row" key={it.key}>
+                      <div className="inv-l">
+                        {it.label}
+                        {it.name ? <span className="inv-name"><bdi>{it.name}</bdi></span> : null}
+                      </div>
+                      <div className={'inv-v' + (it.minus ? ' inv-minus' : '')}>{it.minus ? '−' : ''}{fmtNum(Math.abs(Number(it.value) || 0))}</div>
+                    </div>
+                  ))}
+                  <div className="inv-row inv-total">
+                    <div className="inv-l">{dCashout ? 'Pay to user' : 'Amount on receipt'}</div>
+                    <div className="inv-v">{fmtNum(drawer.price)}<span className="inv-cur"> T</span></div>
+                  </div>
+                </div>
+
+                <div className="rcp-meta-grid">
+                  {meta.map((m) => (
+                    <div className="rcp-mg-item" key={m.k}>
+                      <div className="rcp-mg-k">{m.k}</div>
+                      <div className="rcp-mg-v" dir={m.ltr ? 'ltr' : undefined}><bdi>{m.v}</bdi></div>
+                    </div>
+                  ))}
+                </div>
+
+                {hasHistory && (
+                  <div className={'rcp-buyer-history' + (bhD > bhA ? ' warn' : '')}>
+                    Buyer history: {bhA} approved · {bhD} denied
+                  </div>
+                )}
+
+                {dupes.img(drawer) && (
+                  <div className="receipt-fraud-note">
+                    <Icons.alert width={14} height={14} /> This exact receipt image is attached to more than one pending order — verify before approving.
+                  </div>
+                )}
+                {drawer.receipt_image_url ? (
+                  <button
+                    type="button"
+                    className="receipt-img-btn"
+                    onClick={() => setLightbox({ url: drawer.receipt_image_url, zoom: false })}
+                    title="Click to zoom"
+                  >
+                    <img src={drawer.receipt_image_url} alt="receipt" style={{ width: '100%', borderRadius: 12, border: '1px solid var(--border-subtle)', display: 'block' }} />
+                    <span className="receipt-img-zoom"><Icons.zoom width={14} height={14} /></span>
+                  </button>
+                ) : (!dCashout && (
+                  <div className="rcp-noimg">
+                    <Icons.camera width={14} height={14} /> Receipt photo was sent in Telegram — check the bot card for order #{drawer.id}.
+                  </div>
+                ))}
+                <div className="receipt-hotkeys">hotkeys: <kbd>j</kbd>/<kbd>k</kbd> next/prev · <kbd>A</kbd> approve · <kbd>D</kbd> deny · <kbd>Esc</kbd> close</div>
+              </div>
+              <div className="v3-modal-actions">
+                <button className="btn btn-secondary btn-danger" onClick={() => act(drawer, 'deny')}>Deny</button>
+                <button className="btn btn-primary" onClick={() => act(drawer, 'approve')}>{dCashout ? 'Mark paid' : 'Approve'}</button>
+              </div>
             </div>
           </div>
-        </div>
-      )}
+        );
+      })()}
 
       {lightbox && (
         <div className="lightbox-backdrop">

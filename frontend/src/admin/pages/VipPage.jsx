@@ -4,7 +4,7 @@ import { apiFetch, apiJson, postJson } from '../api.js';
 import { useModal } from '../components/Modal.jsx';
 import { useToast } from '../components/Toast.jsx';
 import { Icons } from '../icons.jsx';
-import { parseTs } from '../util.js';
+import { fmtDate, parseTs } from '../util.js';
 
 export function VipPage() {
   const modal = useModal();
@@ -82,9 +82,9 @@ export function VipPage() {
     if (!u.vip_until) return { cls: 'lifetime', text: 'LIFETIME', lifetime: true, date: '∞' };
     const exp = parseTs(u.vip_until);
     const daysLeft = exp ? Math.ceil((exp - new Date()) / 86400000) : null;
-    if (daysLeft !== null && daysLeft <= 0) return { cls: 'expiring', text: 'EXPIRED', date: exp.toLocaleDateString() };
-    if (daysLeft !== null && daysLeft <= 7) return { cls: 'expiring', text: `${daysLeft}d left`, date: exp.toLocaleDateString() };
-    return { cls: 'active', text: `${daysLeft}d left`, date: exp ? exp.toLocaleDateString() : '∞' };
+    if (daysLeft !== null && daysLeft <= 0) return { cls: 'expiring', text: 'EXPIRED', date: fmtDate(u.vip_until) };
+    if (daysLeft !== null && daysLeft <= 7) return { cls: 'expiring', text: `${daysLeft}d left`, date: fmtDate(u.vip_until) };
+    return { cls: 'active', text: `${daysLeft}d left`, date: exp ? fmtDate(u.vip_until) : '∞' };
   }
 
   return (

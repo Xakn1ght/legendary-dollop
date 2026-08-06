@@ -114,7 +114,6 @@ async def main():
 #### handlers/rewards/
 - **menu.py:** Main rewards menu, wallet, profile, navigation.
 - **achievements.py:** Achievements earned, progress, display.
-- **gifts.py:** Peer-to-peer gift FSM.
 - **redemption.py:** Voucher redemption logic.
 - **leaderboard.py:** Rankings by referrals, usage, etc.
 - **profile.py:** User profile, XP, streaks, analytics.
@@ -207,7 +206,7 @@ stateDiagram-v2
   - Bot: "Choose your device: Android, iOS, Windows."
 
 #### 8. Enhanced Rewards
-- Wallet, loyalty points, achievements, daily/weekly challenges, send/receive gifts.
+- Wallet, loyalty points, achievements, daily/weekly challenges.
 - **Example:**
   - User: "Rewards"
   - Bot: "Wallet: 10,000 Toman, 3 stars, 50 loyalty points."
@@ -275,7 +274,6 @@ erDiagram
     USER ||--o{ USERCHALLENGE : participates
     USER ||--o{ REWARDHISTORY : receives
     USER ||--o{ USERANALYTICS : logs
-    USER ||--o{ USERGIFT : sends/receives
     SUBSCRIPTION ||--o{ RECEIPT : has
     SUBSCRIPTION ||--o{ REFERRALREWARD : triggers
     SUBSCRIPTION ||--o{ CHARGEREQUEST : topup
@@ -320,7 +318,7 @@ erDiagram
 - **RewardHistory:** All rewards
 - **UserAnalytics:** Daily activity
 - **Leaderboard:** Rankings
-- **UserGift:** Peer-to-peer gifts
+- **UserGift:** DORMANT — gift feature deleted, empty table kept for a future DB cleanup
 
 ---
 
@@ -374,17 +372,8 @@ def log_error(error: Exception, context: Optional[Dict[str, Any]] = None, user_i
 - **Achievements:** Earned for referrals, purchases, logins, usage, etc.
 - **Challenges:** Daily/weekly/seasonal, with progress bars and rewards
 - **Leaderboard:** Rankings for referrals, usage, activity, spending
-- **Gifts:** Send/receive credit or loyalty points to/from other users
 - **Reward History:** Full log of all rewards
 - **Profile:** Level, XP, streaks, analytics
-
-### Example: Sending a Gift
-```python
-@router.callback_query(F.data == "enhanced_send_gift")
-async def start_gift_process(callback: CallbackQuery, state: FSMContext):
-    await callback.message.edit_text("Enter receiver chat_id:")
-    await state.set_state(GiftStates.waiting_for_receiver)
-```
 
 ### Achievements Example
 ```python

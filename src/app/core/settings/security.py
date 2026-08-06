@@ -44,6 +44,16 @@ ADMIN_2FA_ENABLED = os.environ.get("ADMIN_2FA_ENABLED", "true").lower() == "true
 # Trust proxy headers like X-Forwarded-For (set to true only behind a trusted proxy)
 TRUST_PROXY_HEADERS = os.environ.get("TRUST_PROXY_HEADERS", "false").lower() == "true"
 
+# ===========================================
+# ADMIN DB SQL RUNNER KILL SWITCH
+# ===========================================
+# The Database page's free-text SQL runner (/api/admin/db/query + /db/exec) is
+# an exfiltration surface on a publicly reachable panel, so it is OFF unless
+# explicitly enabled: both endpoints 404 and the UI hides the SQL section.
+# Table browsing / row viewer / schema stay available either way. Writes
+# additionally require ADMIN_DB_DANGEROUS_SQL (see routes/admin_db/common.py).
+ADMIN_DB_SQL_ENABLED = str(os.environ.get("ADMIN_DB_SQL_ENABLED", "")).strip().lower() in {"1", "true", "yes", "on"}
+
 # Admin IP whitelist storage (used by admin-only access control)
 ADMIN_IP_WHITELIST_PATH = data_path("admin_ip_whitelist.json")
 

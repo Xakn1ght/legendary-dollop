@@ -1,6 +1,10 @@
 import React, { useEffect, useRef, useState } from 'react';
 
-import { apiJson } from '../api.js';
+import { apiJson, postJson } from '../api.js';
+import { useModal } from '../components/Modal.jsx';
+import { useToast } from '../components/Toast.jsx';
+import { Icons } from '../icons.jsx';
+import { timeAgo } from '../util.js';
 
 // PasarGuard realtime stats refresh every few seconds on the panel; 10s here
 // keeps the page feeling live without hammering it. Paused while hidden.
@@ -22,6 +26,15 @@ function fmtSpeed(bps) {
   return n + ' B/s';
 }
 
+// Lifetime totals reach TB scale (probed: 10+ TB downlink on busy nodes).
+function fmtTotal(bytes) {
+  const b = Number(bytes) || 0;
+  if (b >= 1024 ** 4) return (b / 1024 ** 4).toFixed(2) + ' TB';
+  if (b >= 1024 ** 3) return (b / 1024 ** 3).toFixed(1) + ' GB';
+  if (b >= 1024 ** 2) return (b / 1024 ** 2).toFixed(0) + ' MB';
+  return b + ' B';
+}
+
 function fmtUptime(sec) {
   const s = Number(sec) || 0;
   if (s >= 86400) return Math.floor(s / 86400) + 'd ' + Math.floor((s % 86400) / 3600) + 'h';
@@ -29,9 +42,21 @@ function fmtUptime(sec) {
   return Math.floor(s / 60) + 'm';
 }
 
+// Public node IPs stay masked (first octet + last octet) unless the admin
+// reveals them per card — display-only, screenshots/shoulder-surfing guard.
+function maskAddr(addr) {
+  const s = String(addr || '');
+  const m = s.match(/^(\d{1,3})\.\d{1,3}\.\d{1,3}\.(\d{1,3})$/);
+  return m ? `${m[1]}.\u2022.\u2022.${m[2]}` : s;
+}
+
 export function ServersPage() {
+  const modal = useModal();
+  const toast = useToast();
   const [nodes, setNodes] = useState(null);
   const [system, setSystem] = useState(null);
+  const [revealed, setRevealed] = useState({}); // node id -> true
+  const [reconnecting, setReconnecting] = useState({}); // node id -> true
   const timerRef = useRef(null);
 
   const load = async () => {
@@ -46,6 +71,25 @@ export function ServersPage() {
     timerRef.current = setInterval(() => { if (!document.hidden) load(); }, REFRESH_MS);
     return () => clearInterval(timerRef.current);
   }, []);
+
+  // Panel-side reconnect (audited server-side as node.reconnect). Danger
+  // confirm names the node — this pokes live infrastructure.
+  async function reconnect(n) {
+    const ok = await modal.confirm(
+      `Reconnect "${n.name}"?`,
+      `The panel will drop and re-establish its connection to node "${n.name}". Users on this node may blip for a few seconds.`,
+      { danger: true, okText: 'Reconnect' },
+    );
+    if (!ok) return;
+    setReconnecting((m) => ({ ...m, [n.id]: true }));
+    try {
+      const { data } = await postJson(`/api/admin/nodes/${encodeURIComponent(n.id)}/reconnect`, {});
+      if (data.ok) toast(`Reconnect requested for ${data.name || n.name}`, 'success');
+      else toast(data.error === 'node_not_found' ? 'Node no longer exists on the panel' : 'Reconnect failed', 'error');
+    } catch (_) { toast('Reconnect failed', 'error'); }
+    setReconnecting((m) => ({ ...m, [n.id]: false }));
+    setTimeout(load, 1500); // give the panel a beat before re-reading status
+  }
 
   const list = nodes || [];
   const live = list.filter((n) => n.up);
@@ -68,6 +112,7 @@ export function ServersPage() {
         <div className="glass-card stat-card" style={{ padding: 20 }}>
           <div className="stat-label">Panel Users</div>
           <div className="stat-value">{system?.total_user ?? '—'}</div>
+          {system?.online_users != null && <div className="stat-change positive">{system.online_users} online now</div>}
         </div>
       </div>
 
@@ -78,15 +123,36 @@ export function ServersPage() {
           const color = STATUS_COLOR[n.status] || 'var(--muted, #6b7684)';
           const memPct = n.mem_total ? Math.round((n.mem_used / n.mem_total) * 100) : null;
           const cpuPct = n.cpu_usage != null ? Math.round(n.cpu_usage) : null;
+          const masked = maskAddr(n.address);
+          const maskable = masked !== String(n.address || '');
+          const shown = revealed[n.id] ? n.address : masked;
+          const EyeIcon = revealed[n.id] ? Icons.eyeOff : Icons.eye;
+          const versions = [
+            n.xray_version || n.core_version ? 'xray ' + (n.xray_version || n.core_version) : null,
+            n.node_version ? 'node ' + n.node_version : null,
+          ].filter(Boolean).join(' · ');
+          const hasLifetime = (Number(n.lifetime_uplink) || 0) + (Number(n.lifetime_downlink) || 0) > 0;
           return (
             <div className="glass-card" key={n.id} style={{ padding: 22, position: 'relative', overflow: 'hidden' }}>
               <div style={{ position: 'absolute', top: 0, left: 0, width: 4, height: '100%', background: color }} />
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start', marginBottom: 12 }}>
                 <div>
                   <h3 style={{ margin: 0, fontSize: 16 }}>{n.name}</h3>
-                  <div style={{ fontSize: 11.5, color: 'var(--text-muted)', fontVariantNumeric: 'tabular-nums' }}>
-                    {n.address}{n.port ? ':' + n.port : ''}{n.xray_version ? ' · xray ' + n.xray_version : ''}
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 11.5, color: 'var(--text-muted)', fontVariantNumeric: 'tabular-nums' }}>
+                    <span>{shown}{n.port ? ':' + n.port : ''}</span>
+                    {maskable && (
+                      <button
+                        type="button"
+                        className="srv-reveal"
+                        title={revealed[n.id] ? 'Hide address' : 'Reveal address'}
+                        aria-label={revealed[n.id] ? 'Hide address' : 'Reveal address'}
+                        onClick={() => setRevealed((m) => ({ ...m, [n.id]: !m[n.id] }))}
+                      >
+                        <EyeIcon width={13} height={13} />
+                      </button>
+                    )}
                   </div>
+                  {versions && <div style={{ fontSize: 11, color: 'var(--text-muted)', fontVariantNumeric: 'tabular-nums' }}>{versions}</div>}
                 </div>
                 <span style={{
                   fontSize: 10, fontWeight: 700, letterSpacing: '0.06em', textTransform: 'uppercase',
@@ -125,8 +191,34 @@ export function ServersPage() {
                   )}
                 </>
               )}
-              {!n.up && n.message && (
-                <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>{String(n.message).slice(0, 120)}</div>
+
+              {!n.up && (
+                <div style={{ fontSize: 12, color: 'var(--text-muted)', display: 'grid', gap: 3 }}>
+                  <span>{n.last_seen ? 'Last seen online ' + timeAgo(n.last_seen * 1000) : 'Not seen online since tracking began'}</span>
+                  {n.message && <span>{String(n.message).slice(0, 120)}</span>}
+                </div>
+              )}
+
+              {hasLifetime && (
+                <div style={{ display: 'flex', gap: 18, marginTop: 10, fontVariantNumeric: 'tabular-nums' }}>
+                  <div><div style={{ fontSize: 10.5, color: 'var(--text-muted)' }}>LIFETIME DOWN</div><div style={{ fontWeight: 600 }}>{fmtTotal(n.lifetime_downlink)}</div></div>
+                  <div><div style={{ fontSize: 10.5, color: 'var(--text-muted)' }}>LIFETIME UP</div><div style={{ fontWeight: 600 }}>{fmtTotal(n.lifetime_uplink)}</div></div>
+                </div>
+              )}
+
+              {n.status !== 'disabled' && (
+                <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 12 }}>
+                  <button
+                    type="button"
+                    className="btn btn-secondary btn-danger"
+                    style={{ fontSize: 12, padding: '5px 12px' }}
+                    disabled={!!reconnecting[n.id]}
+                    onClick={() => reconnect(n)}
+                    title="Panel-side reconnect; users on this node may blip"
+                  >
+                    {reconnecting[n.id] ? 'Reconnecting…' : 'Reconnect'}
+                  </button>
+                </div>
               )}
             </div>
           );

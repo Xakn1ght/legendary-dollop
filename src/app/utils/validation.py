@@ -3,12 +3,10 @@ Input validation utilities for ASSTRO bot
 """
 
 import re
-from datetime import datetime, timedelta
-from typing import Any, Dict, List, Optional, Union
+from typing import Any, Dict, Union
 
 from aiogram.types import CallbackQuery, Message
 
-from app.utils.logger import ValidationError, log_error
 
 
 class InputValidator:
@@ -37,8 +35,7 @@ class InputValidator:
         'message': (1, 4096),
         'description': (1, 1000),
         'note': (0, 500),
-        'custom_username': (3, 20),
-        'gift_message': (0, 200)
+        'custom_username': (3, 20)
     }
     
     # Numeric limits
@@ -157,13 +154,6 @@ class InputValidator:
             return False
         # Must be alphanumeric with underscores, 3-20 characters
         return bool(re.match(r'^[a-zA-Z0-9_]{3,20}$', username))
-    
-    @classmethod
-    def validate_gift_message(cls, message: str) -> bool:
-        """Validate gift message"""
-        if not message:
-            return True  # Empty messages are allowed
-        return cls.validate_safe_text(message) and cls.validate_length(message, 'gift_message')
     
     @classmethod
     def sanitize_text(cls, text: str, max_length: int = 1000) -> str:

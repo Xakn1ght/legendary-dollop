@@ -43,12 +43,12 @@ async def _send_pending_requests(
 
     for sub in subs_pending:
         kb.button(
-            text=f"🆕 Sub #{sub.id} – {sub.user.full_name[:10]}",
+            text=f"Sub #{sub.id} – {sub.user.full_name[:10]}",
             callback_data=f"show_sub_{sub.id}"
         )
 
     for sub in toggles_pending:
-        label = "🚫 Disable" if sub.status == "pending_disable" else "✅ Enable"
+        label = "Disable" if sub.status == "pending_disable" else "Enable"
         kb.button(
             text=f"{label} #{sub.id} – {sub.user.full_name[:10]}",
             callback_data=f"show_toggle_{sub.id}"

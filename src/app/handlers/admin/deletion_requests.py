@@ -11,7 +11,7 @@ from app.database.models import PendingDeletionRequest, Subscription, User
 from app.handlers.admin.common import ADMIN_IDS
 from app.services.pasarguard import pasarguard_api
 from app.utils.admin_bot_helper import get_user_bot
-from app.utils.logger import bot_logger, log_error
+from app.utils.logger import log_error
 
 router = Router()
 
@@ -34,13 +34,13 @@ async def show_deletion_requests(callback: CallbackQuery, session: AsyncSession)
     
     if not pending_requests:
         await callback.message.edit_text(
-            "📋 <b>درخواست‌های حذف</b>\n\n"
+            "<b>درخواست‌های حذف</b>\n\n"
             "هیچ درخواست حذفی در انتظار تایید وجود ندارد.",
             parse_mode="HTML"
         )
         return
     
-    text = "📋 <b>درخواست‌های حذف در انتظار تایید</b>\n\n"
+    text = "<b>درخواست‌های حذف در انتظار تایید</b>\n\n"
     kb = InlineKeyboardBuilder()
     
     for req in pending_requests:
@@ -50,24 +50,23 @@ async def show_deletion_requests(callback: CallbackQuery, session: AsyncSession)
             continue
             
         text += (
-            f"🆔 <b>درخواست #{req.id}</b>\n"
-            f"👤 کاربر: {user_info.full_name} (@{user_info.username or 'بدون یوزرنیم'})\n"
-            f"📱 سرویس: {req.subscription_username}\n"
-            f"📅 تاریخ: {req.created_at.strftime('%Y-%m-%d %H:%M')}\n"
-            f"📝 دلیل: {req.reason or 'درخواست کاربر'}\n\n"
+            f"<b>درخواست #{req.id}</b>\n"
+            f"کاربر: {user_info.full_name} (@{user_info.username or 'بدون یوزرنیم'})\n"
+            f"سرویس: {req.subscription_username}\n"
+            f"تاریخ: {req.created_at.strftime('%Y-%m-%d %H:%M')}\n"
+            f"دلیل: {req.reason or 'درخواست کاربر'}\n\n"
         )
         
         kb.button(
-            text=f"✅ تایید #{req.id}",
+            text=f"تایید #{req.id}",
             callback_data=f"approve_deletion_{req.id}"
         )
         kb.button(
-            text=f"❌ رد #{req.id}",
+            text=f"رد #{req.id}",
             callback_data=f"deny_deletion_{req.id}"
         )
     
-    kb.button(text="🔙 بازگشت", callback_data="admin_main")
-    kb.adjust(2, 1)
+    kb.adjust(2)
     
     await callback.message.edit_text(text, parse_mode="HTML", reply_markup=kb.as_markup())
     await callback.answer()
@@ -120,12 +119,12 @@ async def approve_deletion_request(callback: CallbackQuery, session: AsyncSessio
             try:
                 await (get_user_bot() or callback.bot).send_message(
                     user_info.chat_id,
-                    f"✅ درخواست حذف سرویس {subscription.marzban_username} تایید و حذف شد."
+                    f"درخواست حذف سرویس {subscription.marzban_username} تایید و حذف شد."
                 )
             except Exception as e:
                 log_error(e, {"operation": "notify_user_deletion_approved", "user_id": user_info.id})
         
-        await callback.answer("درخواست حذف تایید و سرویس حذف شد ✅")
+        await callback.answer("درخواست حذف تایید و سرویس حذف شد")
         
         # Refresh the deletion requests list
         await show_deletion_requests(callback, session)
@@ -165,12 +164,12 @@ async def deny_deletion_request(callback: CallbackQuery, session: AsyncSession):
             try:
                 await (get_user_bot() or callback.bot).send_message(
                     user_info.chat_id,
-                    f"❌ درخواست حذف سرویس {deletion_request.subscription_username} رد شد."
+                    f"درخواست حذف سرویس {deletion_request.subscription_username} رد شد."
                 )
             except Exception as e:
                 log_error(e, {"operation": "notify_user_deletion_denied", "user_id": user_info.id})
         
-        await callback.answer("درخواست حذف رد شد ❌")
+        await callback.answer("درخواست حذف رد شد")
         
         # Refresh the deletion requests list
         await show_deletion_requests(callback, session)

@@ -52,7 +52,8 @@ async def handle_admin_export_transactions(request: web.Request):
                 if uid not in users:
                     users[uid] = await session.get(User, uid)
                 u = users.get(uid)
-                return f"{u.first_name or u.username or ''} ({u.chat_id})" if u else str(uid)
+                # User has full_name, NOT first_name (same 500 as ops/coupons.py)
+                return f"{u.full_name or u.username or ''} ({u.chat_id})" if u else str(uid)
 
             subs = (await session.execute(
                 select(Subscription).filter(

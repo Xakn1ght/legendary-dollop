@@ -13,7 +13,6 @@ VALIDATION_RULES = {
         "description": (1, 1000),
         "note": (0, 500),
         "custom_username": (3, 20),
-        "gift_message": (0, 200),
         "admin_note": (0, 1000)
     },
     

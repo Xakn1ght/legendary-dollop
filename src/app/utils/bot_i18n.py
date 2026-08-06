@@ -184,11 +184,7 @@ STRINGS: dict[str, dict[str, str]] = {
         "fa": "ابتدا مینی‌اپ را ببندید تا ربات فعال شود.",
         "en": "Close the Mini App first to use the bot.",
     },
-    "invalid_number_try_again": {"fa": "❌ عدد نامعتبر است. دوباره تلاش کنید یا /cancel را بزنید.", "en": "❌ Invalid number. Try again or /cancel."},
-
-    # User - Gifts (rewards)
-    "gift_user_not_found_hint": {"fa": "❌ کاربر یافت نشد! لطفاً @username یا شناسه عددی صحیح وارد کنید.", "en": "❌ User not found. Please enter a valid @username or numeric ID."},
-    "gift_cannot_gift_self": {"fa": "❌ نمی‌توانید به خودتان هدیه بفرستید.", "en": "❌ You can't send a gift to yourself."},
+    "invalid_number_try_again": {"fa": "عدد نامعتبر است. دوباره تلاش کنید یا /cancel را بزنید.", "en": "Invalid number. Try again or /cancel."},
 
     # Admin - Support tickets
     "admin_support_ticket_id_missing": {"fa": "خطا: شناسه تیکت یافت نشد. لطفا دوباره از منوی تیکت استفاده کنید.", "en": "Error: ticket id not found. Please open the ticket menu again."},
@@ -199,16 +195,16 @@ STRINGS: dict[str, dict[str, str]] = {
     "admin_support_mode_saved": {"fa": "حالت ثبت شد", "en": "Mode saved"},
 
     # Admin - System tools
-    "admin_system_health_failed": {"fa": "❌ خطا در بررسی سلامت سیستم: {err}", "en": "❌ Failed to check system health: {err}"},
+    "admin_system_health_failed": {"fa": "خطا در بررسی سلامت سیستم: {err}", "en": "Failed to check system health: {err}"},
 
     # Admin - User management
-    "admin_um_traffic_updated": {"fa": "✅ حجم اشتراک {username} با موفقیت به {gb} گیگابایت تغییر یافت.", "en": "✅ Traffic limit for {username} updated to {gb} GB."},
-    "user_traffic_updated_by_admin": {"fa": "📈 حجم اشتراک شما ({username}) توسط ادمین به {gb} گیگابایت تغییر یافت.", "en": "📈 Your subscription traffic ({username}) was updated to {gb} GB by an admin."},
+    "admin_um_traffic_updated": {"fa": "حجم اشتراک {username} با موفقیت به {gb} گیگابایت تغییر یافت.", "en": "Traffic limit for {username} updated to {gb} GB."},
+    "user_traffic_updated_by_admin": {"fa": "حجم اشتراک شما ({username}) توسط ادمین به {gb} گیگابایت تغییر یافت.", "en": "Your subscription traffic ({username}) was updated to {gb} GB by an admin."},
 
     # Admin - Charge approvals
     "admin_charge_request_details": {
         "fa": (
-            "🔋 درخواست شارژ #{id}\n"
+            "درخواست شارژ #{id}\n"
             "کاربر: {user} (id={user_id})\n"
             "شناسه اشتراک: {subscription_id}\n"
             "پکیج: {package}\n"
@@ -216,7 +212,7 @@ STRINGS: dict[str, dict[str, str]] = {
             "لطفا یکی از گزینه‌های زیر را انتخاب کنید:"
         ),
         "en": (
-            "🔋 Charge request #{id}\n"
+            "Charge request #{id}\n"
             "User: {user} (id={user_id})\n"
             "Subscription ID: {subscription_id}\n"
             "Package: {package}\n"
@@ -232,24 +228,24 @@ STRINGS: dict[str, dict[str, str]] = {
     "admin_charge_fetch_panel_failed": {"fa": "خطا در دریافت اطلاعات از پنل.", "en": "Failed to fetch account info from the panel."},
     "admin_charge_panel_reset_failed": {"fa": "خطا در ریست/آپدیت پنل.", "en": "Panel reset/update failed."},
     "admin_charge_panel_update_failed": {"fa": "خطا در آپدیت پنل.", "en": "Panel update failed."},
-    "admin_charge_approved": {"fa": "شارژ تایید شد ✅", "en": "Charge approved!"},
+    "admin_charge_approved": {"fa": "شارژ تایید شد", "en": "Charge approved!"},
     "admin_charge_denied": {"fa": "درخواست رد شد.", "en": "Request denied."},
     "admin_booking_invalid_payload": {"fa": "اطلاعات رزرو نامعتبر است.", "en": "Invalid booking payload."},
     "admin_booking_not_found_or_handled": {"fa": "درخواست رزرو یافت نشد یا قبلاً پردازش شده است.", "en": "Booking request not found or already handled."},
     "admin_booking_related_missing": {"fa": "اطلاعات مرتبط یافت نشد.", "en": "Related records missing."},
-    "admin_booking_approved": {"fa": "رزرو تایید شد ✅", "en": "Booking approved!"},
+    "admin_booking_approved": {"fa": "رزرو تایید شد", "en": "Booking approved!"},
 
     # Admin - Subscription approvals
     "admin_sub_request_details": {
         "fa": (
-            "🆕 درخواست اشتراک #{id}\n"
+            "درخواست اشتراک #{id}\n"
             "کاربر: {user}\n"
             "پلن: {plan}\n"
             "نام سرویس: {username}\n\n"
             "لطفاً تایید یا رد کنید:"
         ),
         "en": (
-            "🆕 Subscription request #{id}\n"
+            "Subscription request #{id}\n"
             "User: {user}\n"
             "Plan: {plan}\n"
             "Service name: {username}\n\n"
@@ -258,29 +254,29 @@ STRINGS: dict[str, dict[str, str]] = {
     },
     "admin_sub_not_found": {"fa": "اشتراک یافت نشد.", "en": "Subscription not found."},
     "admin_sub_already_handled": {"fa": "این درخواست قبلاً پردازش شده است.", "en": "This request has already been handled."},
-    "admin_sub_no_longer_available": {"fa": "❌ این درخواست دیگر در دسترس نیست.", "en": "❌ This request is no longer available."},
+    "admin_sub_no_longer_available": {"fa": "این درخواست دیگر در دسترس نیست.", "en": "This request is no longer available."},
     "admin_sub_already_processed": {"fa": "قبلاً پردازش شده است.", "en": "Already processed."},
-    "admin_sub_approved": {"fa": "اشتراک تایید شد ✅", "en": "Subscription approved!"},
+    "admin_sub_approved": {"fa": "اشتراک تایید شد", "en": "Subscription approved!"},
     "admin_sub_denied": {"fa": "اشتراک رد شد.", "en": "Subscription denied!"},
     "admin_sub_process_failed": {"fa": "خطا در پردازش اشتراک.", "en": "Failed to process subscription."},
 
     # Admin - Reward settings
     "admin_rewards_current": {
-        "fa": "🔧 درصدهای پاداش (فعلی):\n• ترافیک: {traffic}%\n• روزها: {days}%\n• اعتبار: {credit}% از مبلغ",
-        "en": "🔧 Reward percentages (current):\n• Traffic: {traffic}%\n• Days   : {days}%\n• Credit : {credit}% of price",
+        "fa": "درصدهای پاداش (فعلی):\n• ترافیک: {traffic}%\n• روزها: {days}%\n• اعتبار: {credit}% از مبلغ",
+        "en": "Reward percentages (current):\n• Traffic: {traffic}%\n• Days   : {days}%\n• Credit : {credit}% of price",
     },
     "admin_rewards_set_traf_btn": {"fa": "تنظیم % ترافیک", "en": "Set Traffic %"},
     "admin_rewards_set_days_btn": {"fa": "تنظیم % روزها", "en": "Set Days %"},
     "admin_rewards_set_credit_btn": {"fa": "تنظیم % اعتبار", "en": "Set Credit %"},
-    "admin_rewards_prompt_traf": {"fa": "🔸 درصد جدید ترافیک را ارسال کنید (مثلاً 5 یعنی 5%)", "en": "🔸 Send new traffic percentage (e.g. 5 for 5%)"},
-    "admin_rewards_prompt_days": {"fa": "🔸 درصد جدید روزها را ارسال کنید (مثلاً 1 یعنی 1%)", "en": "🔸 Send new days percentage (e.g. 1 for 1%)"},
-    "admin_rewards_prompt_credit": {"fa": "🔸 درصد جدید اعتبار را ارسال کنید (مثلاً 10 یعنی 10%)", "en": "🔸 Send new credit percentage (e.g. 10 for 10%)"},
-    "admin_rewards_set_traf_ok": {"fa": "✅ پاداش ترافیک روی {val}% تنظیم شد", "en": "✅ Traffic reward set to {val}%"},
-    "admin_rewards_set_days_ok": {"fa": "✅ پاداش روزها روی {val}% تنظیم شد", "en": "✅ Days reward set to {val}%"},
-    "admin_rewards_set_credit_ok": {"fa": "✅ پاداش اعتبار روی {val}% تنظیم شد", "en": "✅ Credit reward set to {val}%"},
+    "admin_rewards_prompt_traf": {"fa": "درصد جدید ترافیک را ارسال کنید (مثلاً 5 یعنی 5%)", "en": "Send new traffic percentage (e.g. 5 for 5%)"},
+    "admin_rewards_prompt_days": {"fa": "درصد جدید روزها را ارسال کنید (مثلاً 1 یعنی 1%)", "en": "Send new days percentage (e.g. 1 for 1%)"},
+    "admin_rewards_prompt_credit": {"fa": "درصد جدید اعتبار را ارسال کنید (مثلاً 10 یعنی 10%)", "en": "Send new credit percentage (e.g. 10 for 10%)"},
+    "admin_rewards_set_traf_ok": {"fa": "پاداش ترافیک روی {val}% تنظیم شد", "en": "Traffic reward set to {val}%"},
+    "admin_rewards_set_days_ok": {"fa": "پاداش روزها روی {val}% تنظیم شد", "en": "Days reward set to {val}%"},
+    "admin_rewards_set_credit_ok": {"fa": "پاداش اعتبار روی {val}% تنظیم شد", "en": "Credit reward set to {val}%"},
 
     # Admin dashboard
-    "admin_dashboard_refreshed": {"fa": "داشبورد بروزرسانی شد ✅", "en": "Dashboard refreshed ✅"},
+    "admin_dashboard_refreshed": {"fa": "داشبورد بروزرسانی شد", "en": "Dashboard refreshed"},
 
     # Generic
     "user_not_found": {"fa": "کاربر یافت نشد.", "en": "User not found."},
@@ -298,31 +294,6 @@ STRINGS: dict[str, dict[str, str]] = {
     "purchase_choose_plan": {"fa": "لطفا یکی از پلن‌های زیر را انتخاب کنید:", "en": "Please choose a plan:"},
     "purchase_back_to_confirmation": {"fa": "به مرحله تایید سفارش بازگشتید.", "en": "Back to confirmation."},
 
-    # Admin - Gifts (paid receipts)
-    "admin_gift_not_found": {"fa": "هدیه یافت نشد.", "en": "Gift not found."},
-    "admin_gift_approved": {"fa": "هدیه تایید شد ✅", "en": "Gift approved!"},
-    "admin_gift_denied": {"fa": "هدیه رد شد.", "en": "Gift denied!"},
-    "admin_gift_details": {
-        "fa": (
-            "🎁 هدیه #{id}\n"
-            "از: {sender}\n"
-            "به: {receiver}\n"
-            "نوع: {type}\n"
-            "مبلغ/مقدار: {value}\n"
-            "پلن: {plan}\n"
-            "وضعیت: {status} | پذیرفته‌شده: {accepted}\n"
-        ),
-        "en": (
-            "🎁 Gift #{id}\n"
-            "From: {sender}\n"
-            "To: {receiver}\n"
-            "Type: {type}\n"
-            "Value: {value}\n"
-            "Plan: {plan}\n"
-            "Status: {status} | Accepted: {accepted}\n"
-        ),
-    },
-
     # Admin - Toggle approve/deny
     "admin_toggle_sub_not_found": {"fa": "اشتراک یافت نشد.", "en": "Subscription not found."},
     "admin_toggle_already_disabled": {"fa": "این سرویس قبلاً غیرفعال شده است.", "en": "Already disabled."},
@@ -335,13 +306,13 @@ STRINGS: dict[str, dict[str, str]] = {
     "admin_toggle_enabled": {"fa": "فعال شد.", "en": "Enabled."},
     "admin_toggle_request_details": {
         "fa": (
-            "🔧 درخواست تغییر وضعیت برای {username} (id={id})\n"
+            "درخواست تغییر وضعیت برای {username} (id={id})\n"
             "کاربر: {user}\n"
             "عملیات در انتظار: {action}\n\n"
             "لطفاً تایید یا رد کنید:"
         ),
         "en": (
-            "🔧 Toggle request for {username} (id={id})\n"
+            "Toggle request for {username} (id={id})\n"
             "User: {user}\n"
             "Pending action: {action}\n\n"
             "Approve or deny:"
@@ -362,20 +333,20 @@ STRINGS: dict[str, dict[str, str]] = {
 
     # Admin - Settings (plans / charge packages)
     "admin_settings_layout_set": {"fa": "چیدمان دکمه‌ها روی {cols} ستون تنظیم شد.", "en": "Button layout set to {cols} column(s)."},
-    "admin_settings_select_plan_swap": {"fa": "🔢 یک پلن را برای جابجایی انتخاب کنید:{preview}", "en": "🔢 Select a plan to swap positions:{preview}"},
-    "admin_settings_select_plan_swap_with": {"fa": "🔢 حالا پلن دوم را برای جابجایی انتخاب کنید:{preview}", "en": "🔢 Now select another plan to swap with:{preview}"},
-    "admin_settings_swapped_new_order": {"fa": "✅ جابجا شد! ترتیب جدید:{preview}", "en": "✅ Swapped! New order:{preview}"},
+    "admin_settings_select_plan_swap": {"fa": "یک پلن را برای جابجایی انتخاب کنید:{preview}", "en": "Select a plan to swap positions:{preview}"},
+    "admin_settings_select_plan_swap_with": {"fa": "حالا پلن دوم را برای جابجایی انتخاب کنید:{preview}", "en": "Now select another plan to swap with:{preview}"},
+    "admin_settings_swapped_new_order": {"fa": "جابجا شد! ترتیب جدید:{preview}", "en": "Swapped! New order:{preview}"},
     "admin_settings_plan_not_found": {"fa": "پلن یافت نشد.", "en": "Plan not found."},
     "admin_settings_package_not_found": {"fa": "پکیج یافت نشد.", "en": "Package not found."},
-    "admin_settings_edit_plan_title": {"fa": "✏️ ویرایش پلن:", "en": "✏️ Edit Plan:"},
-    "admin_settings_edit_package_title": {"fa": "✏️ ویرایش پکیج:", "en": "✏️ Edit Package:"},
+    "admin_settings_edit_plan_title": {"fa": "ویرایش پلن:", "en": "Edit Plan:"},
+    "admin_settings_edit_package_title": {"fa": "ویرایش پکیج:", "en": "Edit Package:"},
     "admin_settings_edit_plan_details": {"fa": "نام: {name}\nقیمت: {price}\nحجم: {gb} GB\nروزها: {days}", "en": "Name: {name}\nPrice: {price}\nGB: {gb}\nDays: {days}"},
     "admin_settings_edit_package_details": {"fa": "قیمت: {price}\nحجم: {gb} GB\nروزها: {days}", "en": "Price: {price}\nGB: {gb}\nDays: {days}"},
     "admin_settings_enter_new_value": {"fa": "مقدار جدید برای «{field}» از «{name}» را وارد کنید:", "en": "Enter new value for {field} of {name}:"},
     "admin_settings_invalid_price": {"fa": "قیمت نامعتبر است.", "en": "Invalid price."},
     "admin_settings_invalid_gb": {"fa": "حجم نامعتبر است.", "en": "Invalid GB."},
     "admin_settings_invalid_days": {"fa": "روزهای نامعتبر است.", "en": "Invalid days."},
-    "admin_settings_updated_ok": {"fa": "بروزرسانی شد ✅", "en": "Updated ✅"},
+    "admin_settings_updated_ok": {"fa": "بروزرسانی شد", "en": "Updated"},
     "admin_settings_enter_name_new_plan": {"fa": "نام پلن جدید را وارد کنید:", "en": "Enter name for new plan:"},
     "admin_settings_enter_price_new_plan": {"fa": "قیمت پلن جدید را وارد کنید:", "en": "Enter price for new plan:"},
     "admin_settings_invalid_price_number": {"fa": "قیمت نامعتبر است. یک عدد وارد کنید:", "en": "Invalid price. Enter a number:"},
@@ -383,127 +354,127 @@ STRINGS: dict[str, dict[str, str]] = {
     "admin_settings_invalid_gb_number": {"fa": "حجم نامعتبر است. یک عدد وارد کنید:", "en": "Invalid GB. Enter a number:"},
     "admin_settings_enter_days_new_plan": {"fa": "روزهای پلن جدید را وارد کنید:", "en": "Enter days for new plan:"},
     "admin_settings_invalid_days_number": {"fa": "روزهای نامعتبر است. یک عدد وارد کنید:", "en": "Invalid days. Enter a number:"},
-    "admin_settings_plan_added": {"fa": "✅ پلن «{name}» اضافه شد.", "en": "✅ Plan \"{name}\" added."},
+    "admin_settings_plan_added": {"fa": "پلن «{name}» اضافه شد.", "en": "Plan \"{name}\" added."},
     "admin_settings_plan_deleted": {"fa": "پلن «{name}» حذف شد.", "en": "Plan \"{name}\" deleted."},
     "admin_settings_enter_name_new_package": {"fa": "نام پکیج جدید را وارد کنید:", "en": "Enter name for new package:"},
     "admin_settings_enter_price_new_package": {"fa": "قیمت پکیج جدید را وارد کنید:", "en": "Enter price for new package:"},
     "admin_settings_enter_gb_new_package": {"fa": "حجم (GB) پکیج جدید را وارد کنید (اگر ندارد 0):", "en": "Enter GB for new package (send 0 if none):"},
     "admin_settings_enter_days_new_package": {"fa": "روزهای پکیج جدید را وارد کنید (اگر ندارد 0):", "en": "Enter days for new package (send 0 if none):"},
-    "admin_settings_package_added": {"fa": "✅ پکیج «{name}» اضافه شد.", "en": "✅ Package \"{name}\" added."},
+    "admin_settings_package_added": {"fa": "پکیج «{name}» اضافه شد.", "en": "Package \"{name}\" added."},
     "admin_settings_package_deleted": {"fa": "پکیج «{name}» حذف شد.", "en": "Package \"{name}\" deleted."},
     "admin_settings_btn_edit_name": {"fa": "ویرایش نام", "en": "Edit Name"},
     "admin_settings_btn_edit_price": {"fa": "ویرایش قیمت", "en": "Edit Price"},
     "admin_settings_btn_edit_gb": {"fa": "ویرایش حجم", "en": "Edit GB"},
     "admin_settings_btn_edit_days": {"fa": "ویرایش روزها", "en": "Edit Days"},
-    "admin_settings_btn_save": {"fa": "💾 ذخیره", "en": "💾 Save"},
-    "admin_settings_btn_cancel": {"fa": "❌ لغو", "en": "❌ Cancel"},
-    "admin_settings_menu_title": {"fa": "⚙️ منوی تنظیمات:", "en": "⚙️ Settings menu:"},
-    "admin_settings_btn_manage_plans": {"fa": "📦 مدیریت پلن‌ها", "en": "📦 Manage Plans"},
-    "admin_settings_btn_manage_charges": {"fa": "🔋 مدیریت شارژها", "en": "🔋 Manage Charges"},
-    "admin_settings_btn_renewal_settings": {"fa": "🔄 تنظیمات تمدید خودکار", "en": "🔄 Auto-renewal Settings"},
-    "admin_settings_btn_day_plans": {"fa": "📅 پلن‌های زمانی", "en": "📅 Day Plans"},
-    "admin_settings_btn_support_settings": {"fa": "🆘 پشتیبانی: یادآور/بستن", "en": "🆘 Support: reminders/close"},
-    "admin_settings_btn_jobs_manage": {"fa": "⏰ زمان‌بندی وظایف", "en": "⏰ Job schedules"},
-    "admin_settings_btn_close": {"fa": "❌ بستن", "en": "❌ Close"},
-    "admin_settings_plans_title": {"fa": "📦 پلن‌ها:", "en": "📦 Plans:"},
-    "admin_settings_charge_packages_title": {"fa": "🔋 پکیج‌های شارژ:", "en": "🔋 Charge Packages:"},
-    "admin_settings_btn_button_layout": {"fa": "🔲 چیدمان دکمه‌ها: {cols} ستون", "en": "🔲 Button layout: {cols} column(s)"},
-    "admin_settings_btn_positions": {"fa": "🔢 جایگاه‌ها", "en": "🔢 Positions"},
-    "admin_settings_btn_edit_item": {"fa": "✏️ ویرایش {name}", "en": "✏️ Edit {name}"},
-    "admin_settings_btn_delete_item": {"fa": "🗑️ حذف {name}", "en": "🗑️ Delete {name}"},
-    "admin_settings_btn_add_new_plan": {"fa": "➕ افزودن پلن جدید", "en": "➕ Add New Plan"},
-    "admin_settings_btn_add_new_package": {"fa": "➕ افزودن پکیج جدید", "en": "➕ Add New Package"},
-    "admin_settings_btn_back": {"fa": "⬅️ بازگشت", "en": "⬅️ Back"},
+    "admin_settings_btn_save": {"fa": "ذخیره", "en": "Save"},
+    "admin_settings_btn_cancel": {"fa": "لغو", "en": "Cancel"},
+    "admin_settings_menu_title": {"fa": "منوی تنظیمات:", "en": "Settings menu:"},
+    "admin_settings_btn_manage_plans": {"fa": "مدیریت پلن‌ها", "en": "Manage Plans"},
+    "admin_settings_btn_manage_charges": {"fa": "مدیریت شارژها", "en": "Manage Charges"},
+    "admin_settings_btn_renewal_settings": {"fa": "تنظیمات تمدید خودکار", "en": "Auto-renewal Settings"},
+    "admin_settings_btn_day_plans": {"fa": "پلن‌های زمانی", "en": "Day Plans"},
+    "admin_settings_btn_support_settings": {"fa": "پشتیبانی: یادآور/بستن", "en": "Support: reminders/close"},
+    "admin_settings_btn_jobs_manage": {"fa": "زمان‌بندی وظایف", "en": "Job schedules"},
+    "admin_settings_btn_close": {"fa": "بستن", "en": "Close"},
+    "admin_settings_plans_title": {"fa": "پلن‌ها:", "en": "Plans:"},
+    "admin_settings_charge_packages_title": {"fa": "پکیج‌های شارژ:", "en": "Charge Packages:"},
+    "admin_settings_btn_button_layout": {"fa": "چیدمان دکمه‌ها: {cols} ستون", "en": "Button layout: {cols} column(s)"},
+    "admin_settings_btn_positions": {"fa": "جایگاه‌ها", "en": "Positions"},
+    "admin_settings_btn_edit_item": {"fa": "ویرایش {name}", "en": "Edit {name}"},
+    "admin_settings_btn_delete_item": {"fa": "حذف {name}", "en": "Delete {name}"},
+    "admin_settings_btn_add_new_plan": {"fa": "افزودن پلن جدید", "en": "Add New Plan"},
+    "admin_settings_btn_add_new_package": {"fa": "افزودن پکیج جدید", "en": "Add New Package"},
+    "admin_settings_btn_back": {"fa": "بازگشت", "en": "Back"},
 
     # Admin - Cache tools
-    "admin_cache_unavailable": {"fa": "📊 کش Redis در دسترس نیست.", "en": "📊 Redis cache is not available"},
-    "admin_cache_clearing": {"fa": "🧹 در حال پاک‌سازی کش...", "en": "🧹 Clearing all cache data..."},
-    "admin_cache_empty": {"fa": "✅ کش خالی است.", "en": "✅ Cache is already empty"},
-    "admin_cache_cleared": {"fa": "✅ کش پاک شد!\n🗑️ تعداد کلیدهای حذف‌شده: {count}\n⏱️ زمان: {sec:.2f} ثانیه", "en": "✅ Cache cleared successfully!\n🗑️ Deleted {count} keys\n⏱️ Time taken: {sec:.2f} seconds"},
-    "admin_cache_test_start": {"fa": "🧪 در حال تست کش...", "en": "🧪 Testing cache functionality..."},
+    "admin_cache_unavailable": {"fa": "کش Redis در دسترس نیست.", "en": "Redis cache is not available"},
+    "admin_cache_clearing": {"fa": "در حال پاک‌سازی کش...", "en": "Clearing all cache data..."},
+    "admin_cache_empty": {"fa": "کش خالی است.", "en": "Cache is already empty"},
+    "admin_cache_cleared": {"fa": "کش پاک شد!\nتعداد کلیدهای حذف‌شده: {count}\nزمان: {sec:.2f} ثانیه", "en": "Cache cleared successfully!\nDeleted {count} keys\nTime taken: {sec:.2f} seconds"},
+    "admin_cache_test_start": {"fa": "در حال تست کش...", "en": "Testing cache functionality..."},
     "admin_cache_test_err_set": {"fa": "خطا در عملیات Set", "en": "Failed to set cache value"},
     "admin_cache_test_err_mismatch": {"fa": "عدم تطابق مقدار ذخیره‌شده و خوانده‌شده", "en": "Cache get/set mismatch"},
     "admin_cache_test_err_ttl": {"fa": "TTL درست تنظیم نشد", "en": "TTL not set correctly"},
     "admin_cache_test_err_delete": {"fa": "خطا در عملیات Delete", "en": "Failed to delete cache value"},
     "admin_cache_test_ok": {
-        "fa": "✅ تست کش موفق بود!\n⏱️ زمان: {sec:.3f} ثانیه\n✅ Set: OK\n✅ Get: OK\n✅ TTL: OK ({ttl}s)\n✅ Delete: OK",
-        "en": "✅ Cache test completed successfully!\n⏱️ Time taken: {sec:.3f} seconds\n✅ Set operation: Working\n✅ Get operation: Working\n✅ TTL operation: Working ({ttl}s)\n✅ Delete operation: Working",
+        "fa": "تست کش موفق بود!\nزمان: {sec:.3f} ثانیه\nSet: OK\nGet: OK\nTTL: OK ({ttl}s)\nDelete: OK",
+        "en": "Cache test completed successfully!\nTime taken: {sec:.3f} seconds\nSet operation: Working\nGet operation: Working\nTTL operation: Working ({ttl}s)\nDelete operation: Working",
     },
-    "admin_cache_test_failed": {"fa": "❌ تست کش ناموفق بود: {err}\n⏱️ زمان: {sec:.3f} ثانیه", "en": "❌ Cache test failed: {err}\n⏱️ Time taken: {sec:.3f} seconds"},
+    "admin_cache_test_failed": {"fa": "تست کش ناموفق بود: {err}\nزمان: {sec:.3f} ثانیه", "en": "Cache test failed: {err}\nTime taken: {sec:.3f} seconds"},
     "admin_cache_invalidate_user_usage": {"fa": "روش استفاده: روی پیام کاربر ریپلای کنید و دستور /cache_invalidate_user را بفرستید.", "en": "Usage: Reply to a user's message with /cache_invalidate_user"},
-    "admin_cache_invalidating_user": {"fa": "🔄 در حال پاک‌سازی کش برای کاربر {user_id}...", "en": "🔄 Invalidating cache for user {user_id}..."},
-    "admin_cache_invalidate_user_ok": {"fa": "✅ کش کاربر پاک شد.\n👤 User ID: {user_id}\n⏱️ زمان: {sec:.2f} ثانیه", "en": "✅ User cache invalidated successfully!\n👤 User ID: {user_id}\n⏱️ Time taken: {sec:.2f} seconds"},
-    "admin_cache_invalidate_user_none": {"fa": "⚠️ کش برای کاربر {user_id} پیدا نشد.\n⏱️ زمان: {sec:.2f} ثانیه", "en": "⚠️ No cache found for user {user_id}\n⏱️ Time taken: {sec:.2f} seconds"},
-    "admin_cache_invalidate_user_failed": {"fa": "❌ خطا در پاک‌سازی کش کاربر: {err}", "en": "❌ Failed to invalidate user cache: {err}"},
+    "admin_cache_invalidating_user": {"fa": "در حال پاک‌سازی کش برای کاربر {user_id}...", "en": "Invalidating cache for user {user_id}..."},
+    "admin_cache_invalidate_user_ok": {"fa": "کش کاربر پاک شد.\nUser ID: {user_id}\nزمان: {sec:.2f} ثانیه", "en": "User cache invalidated successfully!\nUser ID: {user_id}\nTime taken: {sec:.2f} seconds"},
+    "admin_cache_invalidate_user_none": {"fa": "کش برای کاربر {user_id} پیدا نشد.\nزمان: {sec:.2f} ثانیه", "en": "No cache found for user {user_id}\nTime taken: {sec:.2f} seconds"},
+    "admin_cache_invalidate_user_failed": {"fa": "خطا در پاک‌سازی کش کاربر: {err}", "en": "Failed to invalidate user cache: {err}"},
     "admin_cache_invalidate_pattern_usage": {"fa": "روش استفاده: /cache_invalidate_pattern <pattern>\nمثال: /cache_invalidate_pattern user:*", "en": "Usage: /cache_invalidate_pattern <pattern>\nExample: /cache_invalidate_pattern user:*"},
-    "admin_cache_invalidating_pattern": {"fa": "🔄 در حال پاک‌سازی کش با الگو: {pattern}", "en": "🔄 Invalidating cache with pattern: {pattern}"},
-    "admin_cache_invalidate_pattern_ok": {"fa": "✅ پاک‌سازی با الگو انجام شد!\n🔍 الگو: {pattern}\n🗑️ کلیدهای حذف‌شده: {count}\n⏱️ زمان: {sec:.2f} ثانیه", "en": "✅ Pattern cache invalidation completed!\n🔍 Pattern: {pattern}\n🗑️ Deleted keys: {count}\n⏱️ Time taken: {sec:.2f} seconds"},
-    "admin_cache_invalidate_pattern_failed": {"fa": "❌ خطا در پاک‌سازی کش با الگو: {err}", "en": "❌ Failed to invalidate pattern cache: {err}"},
-    "admin_cache_restarting": {"fa": "🔄 در حال راه‌اندازی مجدد Redis...", "en": "🔄 Restarting Redis cache connection..."},
-    "admin_cache_restart_ok": {"fa": "✅ Redis راه‌اندازی مجدد شد.\n⏱️ زمان: {sec:.2f} ثانیه", "en": "✅ Redis cache restarted successfully!\n⏱️ Time taken: {sec:.2f} seconds"},
-    "admin_cache_restart_failed": {"fa": "❌ خطا در راه‌اندازی مجدد Redis\n⏱️ زمان: {sec:.2f} ثانیه", "en": "❌ Failed to restart Redis cache\n⏱️ Time taken: {sec:.2f} seconds"},
-    "admin_cache_restart_error": {"fa": "❌ خطا در راه‌اندازی مجدد کش: {err}", "en": "❌ Failed to restart cache: {err}"},
-    "admin_cache_health_unavailable": {"fa": "🏥 وضعیت کش: در دسترس نیست\n❌ کش Redis متصل نیست", "en": "🏥 Cache Health: Unavailable\n❌ Redis cache is not connected"},
-    "admin_cache_health_failed": {"fa": "❌ خطا در بررسی سلامت کش: {err}", "en": "❌ Failed to check cache health: {err}"},
+    "admin_cache_invalidating_pattern": {"fa": "در حال پاک‌سازی کش با الگو: {pattern}", "en": "Invalidating cache with pattern: {pattern}"},
+    "admin_cache_invalidate_pattern_ok": {"fa": "پاک‌سازی با الگو انجام شد!\nالگو: {pattern}\nکلیدهای حذف‌شده: {count}\nزمان: {sec:.2f} ثانیه", "en": "Pattern cache invalidation completed!\nPattern: {pattern}\nDeleted keys: {count}\nTime taken: {sec:.2f} seconds"},
+    "admin_cache_invalidate_pattern_failed": {"fa": "خطا در پاک‌سازی کش با الگو: {err}", "en": "Failed to invalidate pattern cache: {err}"},
+    "admin_cache_restarting": {"fa": "در حال راه‌اندازی مجدد Redis...", "en": "Restarting Redis cache connection..."},
+    "admin_cache_restart_ok": {"fa": "Redis راه‌اندازی مجدد شد.\nزمان: {sec:.2f} ثانیه", "en": "Redis cache restarted successfully!\nTime taken: {sec:.2f} seconds"},
+    "admin_cache_restart_failed": {"fa": "خطا در راه‌اندازی مجدد Redis\nزمان: {sec:.2f} ثانیه", "en": "Failed to restart Redis cache\nTime taken: {sec:.2f} seconds"},
+    "admin_cache_restart_error": {"fa": "خطا در راه‌اندازی مجدد کش: {err}", "en": "Failed to restart cache: {err}"},
+    "admin_cache_health_unavailable": {"fa": "وضعیت کش: در دسترس نیست\nکش Redis متصل نیست", "en": "Cache Health: Unavailable\nRedis cache is not connected"},
+    "admin_cache_health_failed": {"fa": "خطا در بررسی سلامت کش: {err}", "en": "Failed to check cache health: {err}"},
 
     # Admin - DB index tools
-    "admin_db_indexes_creating": {"fa": "🔄 در حال ساخت ایندکس‌های دیتابیس...", "en": "🔄 Creating database indexes..."},
-    "admin_db_indexes_created": {"fa": "✅ ایندکس‌ها ساخته شد!\n⏱️ زمان: {sec:.2f} ثانیه\n📊 این کار سرعت کوئری‌ها را بهتر می‌کند.", "en": "✅ Database indexes created successfully!\n⏱️ Time taken: {sec:.2f} seconds\n📊 This will improve query performance significantly."},
-    "admin_db_analyzing": {"fa": "🔍 در حال تحلیل عملکرد دیتابیس...", "en": "🔍 Analyzing database performance..."},
-    "admin_db_postgres_only_analysis": {"fa": "ℹ️ این گزارش فقط برای PostgreSQL در دسترس است.", "en": "ℹ️ Analysis is available only on PostgreSQL."},
-    "admin_db_postgres_only_index_stats": {"fa": "ℹ️ آمار ایندکس فقط برای PostgreSQL در دسترس است.", "en": "ℹ️ Index stats are available only on PostgreSQL."},
-    "admin_db_no_index_usage": {"fa": "📊 آماری از استفاده ایندکس موجود نیست.", "en": "📊 No index usage statistics available"},
-    "admin_db_vacuum_running": {"fa": "🧹 در حال اجرای VACUUM ANALYZE...", "en": "🧹 Running VACUUM ANALYZE to update table statistics..."},
-    "admin_db_postgres_only_vacuum": {"fa": "ℹ️ VACUUM ANALYZE فقط در PostgreSQL انجام می‌شود.", "en": "ℹ️ VACUUM ANALYZE is a PostgreSQL operation. Skipping on this database."},
-    "admin_db_vacuum_done": {"fa": "✅ VACUUM ANALYZE انجام شد!\n⏱️ زمان: {sec:.2f} ثانیه\n📊 آمار جدول‌ها بروزرسانی شد.", "en": "✅ VACUUM ANALYZE completed successfully!\n⏱️ Time taken: {sec:.2f} seconds\n📊 Table statistics have been updated."},
-    "admin_db_postgres_only_slow": {"fa": "ℹ️ آمار کوئری‌های کند نیازمند PostgreSQL + pg_stat_statements است.", "en": "ℹ️ Slow query stats require PostgreSQL with pg_stat_statements."},
-    "admin_db_no_slow_queries": {"fa": "📊 آماری از کوئری‌های کند موجود نیست.", "en": "📊 No slow query statistics available"},
-    "admin_db_postgres_only_table_stats": {"fa": "ℹ️ آمار جدول‌ها فقط برای PostgreSQL در دسترس است.", "en": "ℹ️ Table statistics view is available only on PostgreSQL."},
-    "admin_db_no_table_stats": {"fa": "📊 آماری از جدول‌ها موجود نیست.", "en": "📊 No table statistics available"},
-    "admin_db_postgres_only_health": {"fa": "🏥 سلامت دیتابیس فقط برای PostgreSQL در این نسخه فعال است.", "en": "🏥 Database Health is available only on PostgreSQL in this build."},
-    "admin_db_failed_create_indexes": {"fa": "❌ خطا در ساخت ایندکس‌ها: {err}", "en": "❌ Failed to create indexes: {err}"},
-    "admin_db_failed_analyze_indexes": {"fa": "❌ خطا در تحلیل ایندکس‌ها: {err}", "en": "❌ Failed to analyze indexes: {err}"},
-    "admin_db_analysis_title": {"fa": "📊 **تحلیل عملکرد دیتابیس**", "en": "📊 **Database Performance Analysis**"},
-    "admin_db_suggested_indexes": {"fa": "💡 **ایندکس‌های پیشنهادی:**", "en": "💡 **Suggested Indexes:**"},
+    "admin_db_indexes_creating": {"fa": "در حال ساخت ایندکس‌های دیتابیس...", "en": "Creating database indexes..."},
+    "admin_db_indexes_created": {"fa": "ایندکس‌ها ساخته شد!\nزمان: {sec:.2f} ثانیه\nاین کار سرعت کوئری‌ها را بهتر می‌کند.", "en": "Database indexes created successfully!\nTime taken: {sec:.2f} seconds\nThis will improve query performance significantly."},
+    "admin_db_analyzing": {"fa": "در حال تحلیل عملکرد دیتابیس...", "en": "Analyzing database performance..."},
+    "admin_db_postgres_only_analysis": {"fa": "این گزارش فقط برای PostgreSQL در دسترس است.", "en": "Analysis is available only on PostgreSQL."},
+    "admin_db_postgres_only_index_stats": {"fa": "آمار ایندکس فقط برای PostgreSQL در دسترس است.", "en": "Index stats are available only on PostgreSQL."},
+    "admin_db_no_index_usage": {"fa": "آماری از استفاده ایندکس موجود نیست.", "en": "No index usage statistics available"},
+    "admin_db_vacuum_running": {"fa": "در حال اجرای VACUUM ANALYZE...", "en": "Running VACUUM ANALYZE to update table statistics..."},
+    "admin_db_postgres_only_vacuum": {"fa": "VACUUM ANALYZE فقط در PostgreSQL انجام می‌شود.", "en": "VACUUM ANALYZE is a PostgreSQL operation. Skipping on this database."},
+    "admin_db_vacuum_done": {"fa": "VACUUM ANALYZE انجام شد!\nزمان: {sec:.2f} ثانیه\nآمار جدول‌ها بروزرسانی شد.", "en": "VACUUM ANALYZE completed successfully!\nTime taken: {sec:.2f} seconds\nTable statistics have been updated."},
+    "admin_db_postgres_only_slow": {"fa": "آمار کوئری‌های کند نیازمند PostgreSQL + pg_stat_statements است.", "en": "Slow query stats require PostgreSQL with pg_stat_statements."},
+    "admin_db_no_slow_queries": {"fa": "آماری از کوئری‌های کند موجود نیست.", "en": "No slow query statistics available"},
+    "admin_db_postgres_only_table_stats": {"fa": "آمار جدول‌ها فقط برای PostgreSQL در دسترس است.", "en": "Table statistics view is available only on PostgreSQL."},
+    "admin_db_no_table_stats": {"fa": "آماری از جدول‌ها موجود نیست.", "en": "No table statistics available"},
+    "admin_db_postgres_only_health": {"fa": "سلامت دیتابیس فقط برای PostgreSQL در این نسخه فعال است.", "en": "Database Health is available only on PostgreSQL in this build."},
+    "admin_db_failed_create_indexes": {"fa": "خطا در ساخت ایندکس‌ها: {err}", "en": "Failed to create indexes: {err}"},
+    "admin_db_failed_analyze_indexes": {"fa": "خطا در تحلیل ایندکس‌ها: {err}", "en": "Failed to analyze indexes: {err}"},
+    "admin_db_analysis_title": {"fa": "**تحلیل عملکرد دیتابیس**", "en": "**Database Performance Analysis**"},
+    "admin_db_suggested_indexes": {"fa": "**ایندکس‌های پیشنهادی:**", "en": "**Suggested Indexes:**"},
     "admin_db_more_suggestions": {"fa": "... و {count} پیشنهاد دیگر", "en": "... and {count} more suggestions"},
-    "admin_db_no_suggestions": {"fa": "✅ ایندکس جدیدی پیشنهاد نشد", "en": "✅ No additional indexes suggested"},
-    "admin_db_index_usage_stats_heading": {"fa": "📈 **آمار استفاده از ایندکس‌ها:**", "en": "📈 **Index Usage Statistics:**"},
+    "admin_db_no_suggestions": {"fa": "ایندکس جدیدی پیشنهاد نشد", "en": "No additional indexes suggested"},
+    "admin_db_index_usage_stats_heading": {"fa": "**آمار استفاده از ایندکس‌ها:**", "en": "**Index Usage Statistics:**"},
     "admin_db_usage_line": {"fa": "• {table}.{index}: {scans} اسکن", "en": "• {table}.{index}: {scans} scans"},
-    "admin_db_index_stats_title": {"fa": "📊 **آمار استفاده از ایندکس‌ها**", "en": "📊 **Index Usage Statistics**"},
+    "admin_db_index_stats_title": {"fa": "**آمار استفاده از ایندکس‌ها**", "en": "**Index Usage Statistics**"},
     "admin_db_label_scans": {"fa": "اسکن‌ها", "en": "Scans"},
     "admin_db_label_tuples_read": {"fa": "رکوردهای خوانده‌شده", "en": "Tuples Read"},
     "admin_db_label_tuples_fetched": {"fa": "رکوردهای واکشی‌شده", "en": "Tuples Fetched"},
     "admin_db_label_efficiency": {"fa": "کارایی", "en": "Efficiency"},
     "admin_db_na": {"fa": "نامشخص", "en": "N/A"},
-    "admin_db_index_stats_total_scans": {"fa": "📈 **مجموع اسکن ایندکس‌ها: {total}**", "en": "📈 **Total Index Scans: {total}**"},
+    "admin_db_index_stats_total_scans": {"fa": "**مجموع اسکن ایندکس‌ها: {total}**", "en": "**Total Index Scans: {total}**"},
     "admin_db_part": {"fa": "*بخش {i}/{n}*", "en": "*Part {i}/{n}*"},
-    "admin_db_failed_index_stats": {"fa": "❌ خطا در دریافت آمار ایندکس: {err}", "en": "❌ Failed to get index stats: {err}"},
-    "admin_db_failed_vacuum": {"fa": "❌ خطا در اجرای VACUUM ANALYZE: {err}", "en": "❌ Failed to run VACUUM ANALYZE: {err}"},
-    "admin_db_failed_slow_queries": {"fa": "❌ خطا در دریافت کوئری‌های کند: {err}", "en": "❌ Failed to get slow queries: {err}"},
-    "admin_db_slow_title": {"fa": "🐌 **کندترین کوئری‌ها (بر اساس میانگین زمان)**", "en": "🐌 **Slowest Queries (by average time)**"},
+    "admin_db_failed_index_stats": {"fa": "خطا در دریافت آمار ایندکس: {err}", "en": "Failed to get index stats: {err}"},
+    "admin_db_failed_vacuum": {"fa": "خطا در اجرای VACUUM ANALYZE: {err}", "en": "Failed to run VACUUM ANALYZE: {err}"},
+    "admin_db_failed_slow_queries": {"fa": "خطا در دریافت کوئری‌های کند: {err}", "en": "Failed to get slow queries: {err}"},
+    "admin_db_slow_title": {"fa": "**کندترین کوئری‌ها (بر اساس میانگین زمان)**", "en": "**Slowest Queries (by average time)**"},
     "admin_db_slow_query_heading": {"fa": "**{i}. کوئری**", "en": "**{i}. Query**"},
     "admin_db_label_calls": {"fa": "تعداد اجرا", "en": "Calls"},
     "admin_db_label_total_time": {"fa": "زمان کل", "en": "Total Time"},
     "admin_db_label_avg_time": {"fa": "میانگین زمان", "en": "Avg Time"},
     "admin_db_label_rows": {"fa": "ردیف‌ها", "en": "Rows"},
     "admin_db_label_query": {"fa": "کوئری", "en": "Query"},
-    "admin_db_table_stats_title": {"fa": "📊 **آمار جدول‌ها**", "en": "📊 **Table Statistics**"},
+    "admin_db_table_stats_title": {"fa": "**آمار جدول‌ها**", "en": "**Table Statistics**"},
     "admin_db_table_stats_distinct_line": {"fa": "• {col}: {val} مقدار متمایز", "en": "• {col}: {val} distinct values"},
-    "admin_db_failed_table_stats": {"fa": "❌ خطا در دریافت آمار جدول‌ها: {err}", "en": "❌ Failed to get table sizes: {err}"},
-    "admin_db_health_title": {"fa": "🏥 **گزارش سلامت دیتابیس**", "en": "🏥 **Database Health Report**"},
-    "admin_db_health_table_stats_heading": {"fa": "📊 **آمار جدول‌ها:**", "en": "📊 **Table Statistics:**"},
+    "admin_db_failed_table_stats": {"fa": "خطا در دریافت آمار جدول‌ها: {err}", "en": "Failed to get table sizes: {err}"},
+    "admin_db_health_title": {"fa": "**گزارش سلامت دیتابیس**", "en": "**Database Health Report**"},
+    "admin_db_health_table_stats_heading": {"fa": "**آمار جدول‌ها:**", "en": "**Table Statistics:**"},
     "admin_db_health_rows_line": {"fa": "• {table}: {rows} ردیف", "en": "• {table}: {rows} rows"},
     "admin_db_health_dead_suffix": {"fa": " ({dead} مرده)", "en": " ({dead} dead)"},
-    "admin_db_health_total_rows": {"fa": "📈 **مجموع ردیف‌ها: {total}**", "en": "📈 **Total Rows: {total}**"},
-    "admin_db_health_index_usage_heading": {"fa": "🔍 **استفاده از ایندکس:**", "en": "🔍 **Index Usage:**"},
+    "admin_db_health_total_rows": {"fa": "**مجموع ردیف‌ها: {total}**", "en": "**Total Rows: {total}**"},
+    "admin_db_health_index_usage_heading": {"fa": "**استفاده از ایندکس:**", "en": "**Index Usage:**"},
     "admin_db_health_total_indexes": {"fa": "تعداد ایندکس‌ها", "en": "Total Indexes"},
     "admin_db_health_total_scans": {"fa": "مجموع اسکن‌ها", "en": "Total Scans"},
     "admin_db_health_avg_scans": {"fa": "میانگین اسکن به ازای هر ایندکس", "en": "Avg Scans per Index"},
-    "admin_db_health_score": {"fa": "🏆 **امتیاز سلامت: {score}/100**", "en": "🏆 **Health Score: {score}/100**"},
-    "admin_db_health_status_ok": {"fa": "✅ دیتابیس سالم است", "en": "✅ Database is healthy"},
-    "admin_db_health_status_attention": {"fa": "⚠️ دیتابیس نیاز به بررسی دارد", "en": "⚠️ Database needs attention"},
-    "admin_db_health_status_bad": {"fa": "❌ دیتابیس نیاز به بهینه‌سازی دارد", "en": "❌ Database needs optimization"},
-    "admin_db_failed_db_health": {"fa": "❌ خطا در دریافت سلامت دیتابیس: {err}", "en": "❌ Failed to get database health: {err}"},
+    "admin_db_health_score": {"fa": "**امتیاز سلامت: {score}/100**", "en": "**Health Score: {score}/100**"},
+    "admin_db_health_status_ok": {"fa": "دیتابیس سالم است", "en": "Database is healthy"},
+    "admin_db_health_status_attention": {"fa": "دیتابیس نیاز به بررسی دارد", "en": "Database needs attention"},
+    "admin_db_health_status_bad": {"fa": "دیتابیس نیاز به بهینه‌سازی دارد", "en": "Database needs optimization"},
+    "admin_db_failed_db_health": {"fa": "خطا در دریافت سلامت دیتابیس: {err}", "en": "Failed to get database health: {err}"},
 }
 
 

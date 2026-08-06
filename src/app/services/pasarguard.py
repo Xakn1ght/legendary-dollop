@@ -1,6 +1,5 @@
 import asyncio
 import base64
-import json
 import re
 import time as _time
 from datetime import datetime, timedelta
@@ -8,9 +7,14 @@ from typing import Optional
 
 import aiohttp
 
-from app.core.paths import core_path
 from app.core.redis_config import cache
-from app.core.settings import PASARGUARD_BASE_URL, PASARGUARD_GROUP_IDS, PASARGUARD_PASSWORD, PASARGUARD_USERNAME
+from app.core.settings import (
+    PASARGUARD_API_KEY,
+    PASARGUARD_BASE_URL,
+    PASARGUARD_GROUP_IDS,
+    PASARGUARD_PASSWORD,
+    PASARGUARD_USERNAME,
+)
 from app.utils.logger import log_api_call, log_error
 
 # Panel-load shield. Every read surface (dashboard list/overview, bot menus, the
@@ -132,10 +136,21 @@ def _make_slow_call_tracer() -> aiohttp.TraceConfig:
 
 
 class PasarGuardAPI:
+    # Auth modes (2026-07-20, Pasha-approved API-key switch):
+    #   * api_key set   -> every request carries X-Api-Key (PasarGuard 5.1+,
+    #     key "astrobyte-app", scoped: users CRUD/reset/revoke, templates read,
+    #     nodes read/stats, system read). Static — no login, no expiry, so the
+    #     per-method 401 retries become harmless no-ops and the raw session.put/
+    #     session.post call sites in renewal/charge/redemption code can no
+    #     longer fail on a stale token.
+    #   * api_key empty -> classic username/password bearer flow with the
+    #     _login()/401-retry dance, unchanged (the rollback path: unset
+    #     PASARGUARD_API_KEY and restart).
     def __init__(self):
         self.base_url = PASARGUARD_BASE_URL
         self.username = PASARGUARD_USERNAME
         self.password = PASARGUARD_PASSWORD
+        self.api_key = PASARGUARD_API_KEY
         self._access_token: Optional[str] = None
         self._session: Optional[aiohttp.ClientSession] = None
         # Prevent concurrent logins when multiple jobs request headers at once
@@ -169,6 +184,11 @@ class PasarGuardAPI:
         self._access_token = None
 
     async def _login(self):
+        # API-key mode: nothing to log in to. Returning True keeps every
+        # existing "401 -> _login() -> retry once" branch (here and in the raw
+        # call sites) valid: the retry just re-sends the same static header.
+        if self.api_key:
+            return True
         import time
         start_time = time.time()
         try:
@@ -203,39 +223,15 @@ class PasarGuardAPI:
             return False
 
     async def _get_headers(self):
+        if self.api_key:
+            return {"X-Api-Key": self.api_key}
         if not self._access_token:
             await self._login()
         return {"Authorization": f"Bearer {self._access_token}"}
 
-    async def _inbounds_for_new_user(self) -> dict:
-        """Load configured inbounds and drop any tag missing on the PasarGuard panel."""
-        with open(core_path("inbounds.json"), "r", encoding="utf-8") as f:
-            configured = json.load(f)
-        try:
-            session = await self._get_session()
-            headers = await self._get_headers()
-            url = f"{self.base_url}/api/inbounds"
-            async with session.get(url, headers=headers) as response:
-                if response.status != 200:
-                    return configured
-                live = await response.json()
-            live_tags: set[str] = set()
-            for proto, entries in (live or {}).items():
-                if not isinstance(entries, list):
-                    continue
-                for entry in entries:
-                    if isinstance(entry, dict) and entry.get("tag"):
-                        live_tags.add(str(entry["tag"]))
-            filtered: dict[str, list[str]] = {}
-            for proto, tags in (configured or {}).items():
-                if not isinstance(tags, list):
-                    continue
-                kept = [t for t in tags if t in live_tags]
-                if kept:
-                    filtered[proto] = kept
-            return filtered or configured
-        except Exception:
-            return configured
+    # NOTE (2026-07-20): _inbounds_for_new_user() removed — dead since the
+    # group_ids-based creation migration (inbounds come from group membership;
+    # nothing read config/inbounds.json anymore).
 
     # ---- PasarGuard user templates (2026-07-10 speed work) -----------------
     # Fixed plans whose (data_limit, duration) exactly matches a panel template
@@ -510,12 +506,6 @@ class PasarGuardAPI:
                 return None
         except Exception:
             return None
-
-    async def get_subscription_url(self, username: str):
-        user_info = await self.get_user_info(username)
-        if user_info:
-            return user_info.get("subscription_url")
-        return None
 
     async def delete_user(self, username: str):
         await self.invalidate_user_info(username)
@@ -891,6 +881,117 @@ class PasarGuardAPI:
                     return result if result is not None else False
             return False
 
+    async def get_user_hwid_devices(self, panel_user_id: int):
+        """GET /api/user/{user_id}/hwids — the user's registered devices
+        (PasarGuard 5.1.0, keyed by panel user ID, not username). Returns the
+        raw {"hwids": [...], "count": N} dict, or None on any failure so the
+        caller can distinguish "no devices" from "panel unreachable"."""
+        session = await self._get_session()
+        url = f"{self.base_url}/api/user/{int(panel_user_id)}/hwids"
+        headers = await self._get_headers()
+        try:
+            async with session.get(url, headers=headers) as resp:
+                if resp.status == 200:
+                    data = await resp.json()
+                    return data if isinstance(data, dict) else None
+                if resp.status == 401:
+                    await self._login()
+                    headers = await self._get_headers()
+                    async with session.get(url, headers=headers) as retry:
+                        if retry.status == 200:
+                            data = await retry.json()
+                            return data if isinstance(data, dict) else None
+                return None
+        except Exception as e:
+            log_error(e, {"operation": "pasarguard_get_hwids", "panel_user_id": panel_user_id})
+            return None
+
+    async def get_user_sub_updates(self, username: str, limit: int = 10):
+        """GET /api/user/{username}/sub_update — recent subscription/config
+        fetches ({"updates": [{created_at, user_agent, ip, hwid}], "count": N}).
+        Support triage: which client app the user runs and when it last pulled
+        the config. None on any failure."""
+        session = await self._get_session()
+        url = f"{self.base_url}/api/user/{username}/sub_update"
+        headers = await self._get_headers()
+        params = {"limit": max(1, min(int(limit), 50))}
+        try:
+            async with session.get(url, headers=headers, params=params) as resp:
+                if resp.status == 200:
+                    data = await resp.json()
+                    return data if isinstance(data, dict) else None
+                if resp.status == 401:
+                    await self._login()
+                    headers = await self._get_headers()
+                    async with session.get(url, headers=headers, params=params) as retry:
+                        if retry.status == 200:
+                            data = await retry.json()
+                            return data if isinstance(data, dict) else None
+                return None
+        except Exception as e:
+            log_error(e, {"operation": "pasarguard_get_sub_updates", "username": username})
+            return None
+
+    async def reconnect_node(self, node_id: int) -> bool:
+        """POST /api/node/{node_id}/reconnect — ask the panel to re-establish
+        the node connection. CAUTION (probed live 2026-07-21): the panel
+        answers 200 {} even for nonexistent node ids, so callers must validate
+        the id against get_nodes() first if they need a real existence check."""
+        session = await self._get_session()
+        url = f"{self.base_url}/api/node/{int(node_id)}/reconnect"
+        headers = await self._get_headers()
+        try:
+            async with session.post(url, headers=headers) as resp:
+                if resp.status == 200:
+                    return True
+                if resp.status == 401:
+                    await self._login()
+                    headers = await self._get_headers()
+                    async with session.post(url, headers=headers) as retry:
+                        return retry.status == 200
+                log_error(
+                    Exception(f"node reconnect failed: {resp.status} - {(await resp.text())[:200]}"),
+                    {"operation": "pasarguard_reconnect_node", "node_id": node_id, "status_code": resp.status},
+                )
+                return False
+        except Exception as e:
+            log_error(e, {"operation": "pasarguard_reconnect_node", "node_id": node_id})
+            return False
+
+    async def get_online_users_series(self, period: str = "hour", start_iso: str | None = None,
+                                      end_iso: str | None = None):
+        """GET /api/users/counts/online — online-user counts bucketed by
+        period. Returns the raw UserCountMetricStatsList dict ({"stats":
+        {node_id: [{count, period_start}...]}, "count_during_period": N}) or
+        None. SLOW on the panel (~13s for a 24h hourly window, probed live
+        2026-07-21) — callers must cache; a per-request 35s timeout overrides
+        the session's 12s default."""
+        session = await self._get_session()
+        url = f"{self.base_url}/api/users/counts/online"
+        headers = await self._get_headers()
+        params: dict = {"period": period if period in ("minute", "hour", "day", "month") else "hour"}
+        if start_iso:
+            params["start"] = start_iso
+        if end_iso:
+            params["end"] = end_iso
+        timeout = aiohttp.ClientTimeout(total=35)
+        try:
+            async with session.get(url, headers=headers, params=params, timeout=timeout) as resp:
+                if resp.status == 200:
+                    data = await resp.json()
+                    return data if isinstance(data, dict) else None
+                if resp.status == 401:
+                    await self._login()
+                    headers = await self._get_headers()
+                    async with session.get(url, headers=headers, params=params, timeout=timeout) as retry:
+                        if retry.status == 200:
+                            data = await retry.json()
+                            return data if isinstance(data, dict) else None
+                return None
+        except Exception as e:
+            log_error(e, {"operation": "pasarguard_online_series", "period": period})
+            return None
+
     async def get_nodes_realtime_stats(self) -> dict:
         """PasarGuard live per-node stats keyed by node id (as str):
         cpu_usage, cpu_cores, mem_used/total, incoming/outgoing_bandwidth_speed,
@@ -935,18 +1036,33 @@ class PasarGuardAPI:
             async with session.get(url, headers=headers) as resp:
                 if resp.status == 200:
                     stats = await resp.json()
-                    if isinstance(stats, dict) and "total_user" not in stats and "active_users" in stats:
-                        parts = ("active_users", "disabled_users", "expired_users", "limited_users", "on_hold_users")
-                        stats["total_user"] = sum(int(stats.get(k) or 0) for k in parts)
-                        stats["users_active"] = stats.get("active_users")
+                    if isinstance(stats, dict):
+                        # 5.1.0 ships total_user natively again but still never
+                        # the classic users_active; older builds shipped neither.
+                        # Alias each key independently — the old combined guard
+                        # skipped users_active as soon as total_user reappeared
+                        # (health card showed "?").
+                        if "users_active" not in stats and "active_users" in stats:
+                            stats["users_active"] = stats.get("active_users")
+                        if "total_user" not in stats and "active_users" in stats:
+                            parts = ("active_users", "disabled_users", "expired_users", "limited_users", "on_hold_users")
+                            stats["total_user"] = sum(int(stats.get(k) or 0) for k in parts)
                     return stats
                 return None
         except Exception as e:
             print(f"Error fetching system stats: {e}")
             return None
     
-    async def get_all_users(self, offset: int = 0, limit: int = 100, search: str = None):
-        """Get all users from PasarGuard with pagination"""
+    async def get_all_users(self, offset: int = 0, limit: int = 100, search: str = None,
+                            sort: str = None, status: str = None, extra_params: dict = None):
+        """Get all users from PasarGuard with pagination.
+
+        `sort` takes a panel UserSortOption string (e.g. '-created_at', 'expire',
+        '-used_traffic', 'username'); `status` a UserStatus value. Both verified
+        live 2026-07-20 — invalid sort values 400, so callers map from a fixed
+        table rather than passing UI input through. `extra_params` passes other
+        documented /api/users filters (expire_after, online, ...) verbatim.
+        """
         session = await self._get_session()
         url = f"{self.base_url}/api/users"
         headers = await self._get_headers()
@@ -957,6 +1073,12 @@ class PasarGuardAPI:
         }
         if search:
             params['search'] = search
+        if sort:
+            params['sort'] = sort
+        if status:
+            params['status'] = status
+        if extra_params:
+            params.update(extra_params)
         
         try:
             async with session.get(url, headers=headers, params=params) as resp:

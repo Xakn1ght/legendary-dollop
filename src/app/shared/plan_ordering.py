@@ -3,11 +3,10 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-from app.core.settings import CHARGE_PRESET_PACKAGES, PLANS
+from app.core.settings import PLANS
 
 _CORE_DIR = Path(__file__).resolve().parents[1] / "core"
 _PLANS_ORDER_FILE = _CORE_DIR / "plans_order.json"
-_CHARGE_PLANS_ORDER_FILE = _CORE_DIR / "charge_plans_order.json"
 
 
 def _load_order(path: Path, fallback: list[str]) -> list[str]:
@@ -30,15 +29,6 @@ def get_ordered_plans() -> list[str]:
     return ordered
 
 
-def get_ordered_charge_plans() -> list[str]:
-    order = _load_order(_CHARGE_PLANS_ORDER_FILE, list(CHARGE_PRESET_PACKAGES.keys()))
-    ordered = [k for k in order if k in CHARGE_PRESET_PACKAGES]
-    for k in CHARGE_PRESET_PACKAGES.keys():
-        if k not in ordered:
-            ordered.append(k)
-    return ordered
-
-
 def save_plans_order(order: list[str]) -> None:
     try:
         _PLANS_ORDER_FILE.write_text(
@@ -49,12 +39,4 @@ def save_plans_order(order: list[str]) -> None:
         pass
 
 
-def save_charge_plans_order(order: list[str]) -> None:
-    try:
-        _CHARGE_PLANS_ORDER_FILE.write_text(
-            json.dumps(order, ensure_ascii=False, indent=2),
-            encoding="utf-8",
-        )
-    except Exception:
-        pass
 

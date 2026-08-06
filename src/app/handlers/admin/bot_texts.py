@@ -4,7 +4,7 @@ Flow (built for a non-technical owner):
   /texts            → how-to + a few sample keys
   <paste any text>  → finds messages containing it (searches fa/en/keys)
   pick a result     → shows current fa/en with edit / reset buttons
-  ✍️ edit           → send the replacement AS A NORMAL MESSAGE — bold, links
+  edit              → send the replacement AS A NORMAL MESSAGE — bold, links
                       and PREMIUM EMOJIS are captured from the message
                       entities (html_text keeps <tg-emoji>) and stored in
                       data/bot_texts_overrides.json
@@ -65,9 +65,9 @@ def _results_kb(keys: list[str], page: int = 0) -> InlineKeyboardMarkup:
     rows = [[InlineKeyboardButton(text=_label(k), callback_data=f"btx:open:{k}")] for k in chunk]
     nav = []
     if page > 0:
-        nav.append(InlineKeyboardButton(text="◀️", callback_data=f"btx:page:{page - 1}"))
+        nav.append(InlineKeyboardButton(text="قبلی", callback_data=f"btx:page:{page - 1}"))
     if start + _PAGE_SIZE < len(keys):
-        nav.append(InlineKeyboardButton(text="▶️", callback_data=f"btx:page:{page + 1}"))
+        nav.append(InlineKeyboardButton(text="بعدی", callback_data=f"btx:page:{page + 1}"))
     if nav:
         rows.append(nav)
     return InlineKeyboardMarkup(inline_keyboard=rows)
@@ -77,15 +77,15 @@ def _detail_kb(key: str) -> InlineKeyboardMarkup:
     ov = bot_i18n.get_override(key)
     rows = [
         [
-            InlineKeyboardButton(text="✍️ ویرایش فارسی", callback_data=f"btx:edit:fa:{key}"),
-            InlineKeyboardButton(text="✍️ Edit EN", callback_data=f"btx:edit:en:{key}"),
+            InlineKeyboardButton(text="ویرایش فارسی", callback_data=f"btx:edit:fa:{key}"),
+            InlineKeyboardButton(text="Edit EN", callback_data=f"btx:edit:en:{key}"),
         ]
     ]
     reset = []
     if "fa" in ov:
-        reset.append(InlineKeyboardButton(text="♻️ فارسی به پیش‌فرض", callback_data=f"btx:reset:fa:{key}"))
+        reset.append(InlineKeyboardButton(text="فارسی به پیش‌فرض", callback_data=f"btx:reset:fa:{key}"))
     if "en" in ov:
-        reset.append(InlineKeyboardButton(text="♻️ EN default", callback_data=f"btx:reset:en:{key}"))
+        reset.append(InlineKeyboardButton(text="EN default", callback_data=f"btx:reset:en:{key}"))
     if reset:
         rows.append(reset)
     return InlineKeyboardMarkup(inline_keyboard=rows)
@@ -103,9 +103,9 @@ async def _show_detail(message: Message, key: str) -> None:
 
     note = ""
     if ph:
-        note = "\n\n🔤 جای‌گیرها (باید عیناً بمانند): " + " ".join(f"<code>{{{p}}}</code>" for p in sorted(ph))
+        note = "\n\nجای‌گیرها (باید عیناً بمانند): " + " ".join(f"<code>{{{p}}}</code>" for p in sorted(ph))
     await message.answer(
-        f"🧩 <b>{key}</b>\n\n{block('fa')}\n\n{block('en')}{note}",
+        f"<b>{key}</b>\n\n{block('fa')}\n\n{block('en')}{note}",
         reply_markup=_detail_kb(key),
     )
 
@@ -116,7 +116,7 @@ async def texts_cmd(message: Message):
         return
     _STATE[message.chat.id] = {"mode": "search"}
     await message.answer(
-        "📝 <b>ویرایش پیام‌های ربات</b>\n\n"
+        "<b>ویرایش پیام‌های ربات</b>\n\n"
         "بخشی از متن پیامی که می‌خوای عوض کنی رو همینجا بفرست "
         "(مثلاً «دعوت شما» یا «خرید سرویس») تا پیداش کنم.\n\n"
         "بعد از انتخاب، متن جدید رو به‌صورت یک پیام عادی بفرست — "
@@ -163,7 +163,7 @@ async def texts_cb(callback: CallbackQuery):
         )
         hint = (" — جای‌گیرها را نگه دار: " + " ".join(f"<code>{{{p}}}</code>" for p in sorted(ph))) if ph else ""
         await callback.message.answer(
-            f"✍️ متن جدید <b>{key}</b> ({lang.upper()}) را به‌صورت یک پیام بفرست{hint}\n"
+            f"متن جدید <b>{key}</b> ({lang.upper()}) را به‌صورت یک پیام بفرست{hint}\n"
             "برای انصراف: /cancel"
         )
         await callback.answer()
@@ -173,7 +173,7 @@ async def texts_cb(callback: CallbackQuery):
         lang, key = parts[2], parts[3]
         try:
             bot_i18n.set_override(key, lang, None)
-            await callback.answer("به پیش‌فرض برگشت ✅")
+            await callback.answer("به پیش‌فرض برگشت")
             await _show_detail(callback.message, key)
         except Exception as e:
             await callback.answer(f"خطا: {e}", show_alert=True)
@@ -217,7 +217,7 @@ async def texts_free_text(message: Message):
         unknown = used - allowed
         if unknown:
             await message.answer(
-                "❗️ این جای‌گیرها در متن اصلی وجود ندارند و موقع ارسال خطا می‌دهند: "
+                "این جای‌گیرها در متن اصلی وجود ندارند و موقع ارسال خطا می‌دهند: "
                 + " ".join(f"<code>{{{p}}}</code>" for p in sorted(unknown))
                 + "\nمتن را اصلاح کن و دوباره بفرست."
             )
@@ -238,13 +238,13 @@ async def texts_free_text(message: Message):
             preview = new_html.format(**sample) if sample else new_html
         except Exception:
             preview = new_html
-        await message.answer("✅ ذخیره شد — پیش‌نمایش (همین را کاربر می‌بیند):")
+        await message.answer("ذخیره شد — پیش‌نمایش (همین را کاربر می‌بیند):")
         try:
             await message.answer(preview)
         except Exception as e:
             bot_i18n.set_override(key, lang, None)
             await message.answer(
-                f"❗️ تلگرام این متن را نپذیرفت ({html_mod.escape(str(e))}) — تغییر برگردانده شد."
+                f"تلگرام این متن را نپذیرفت ({html_mod.escape(str(e))}) — تغییر برگردانده شد."
             )
         return
 
@@ -255,6 +255,6 @@ async def texts_free_text(message: Message):
         return
     st["results"] = hits
     await message.answer(
-        f"🔎 {len(hits)} پیام پیدا شد:",
+        f"{len(hits)} پیام پیدا شد:",
         reply_markup=_results_kb(hits, 0),
     )

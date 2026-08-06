@@ -65,11 +65,11 @@ async def show_toggle_request(callback: CallbackQuery, session: AsyncSession):
 
     kb = InlineKeyboardBuilder()
     if sub.status == 'pending_disable':
-        kb.button(text='✅ تایید غیرفعال', callback_data=f'approve_disable_{sub_id}_{sub.user.chat_id}_0')
-        kb.button(text='❌ رد', callback_data=f'deny_disable_{sub_id}_{sub.user.chat_id}_0')
+        kb.button(text='تایید غیرفعال', callback_data=f'approve_disable_{sub_id}_{sub.user.chat_id}_0')
+        kb.button(text='رد', callback_data=f'deny_disable_{sub_id}_{sub.user.chat_id}_0')
     elif sub.status == 'pending_enable':
-        kb.button(text='✅ تایید فعال', callback_data=f'approve_enable_{sub_id}_{sub.user.chat_id}_0')
-        kb.button(text='❌ رد', callback_data=f'deny_enable_{sub_id}_{sub.user.chat_id}_0')
+        kb.button(text='تایید فعال', callback_data=f'approve_enable_{sub_id}_{sub.user.chat_id}_0')
+        kb.button(text='رد', callback_data=f'deny_enable_{sub_id}_{sub.user.chat_id}_0')
     kb.adjust(2)
 
     await callback.message.edit_text(
@@ -123,7 +123,7 @@ async def approve_disable(callback: CallbackQuery, session: AsyncSession, bot: B
     sub.status = 'disabled'
     await session.commit()
 
-    await _dm_user(sub.user.chat_id, "⛔ سرویس شما توسط ادمین غیرفعال شد.")
+    await _dm_user(sub.user.chat_id, "سرویس شما توسط ادمین غیرفعال شد.")
     await _edit_user_detail(sub, user_chat_id, user_msg_id)
 
     await callback.answer(t(lang, "admin_toggle_disabled"))
@@ -193,7 +193,7 @@ async def approve_enable(callback: CallbackQuery, session: AsyncSession, bot: Bo
     sub.status = 'active'
     await session.commit()
 
-    await _dm_user(sub.user.chat_id, "✅ سرویس شما دوباره فعال شد.")
+    await _dm_user(sub.user.chat_id, "سرویس شما دوباره فعال شد.")
     await _edit_user_detail(sub, user_chat_id, user_msg_id)
 
     await callback.answer(t(lang, "admin_toggle_enabled"))

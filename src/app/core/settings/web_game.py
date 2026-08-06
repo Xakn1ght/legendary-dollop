@@ -70,6 +70,17 @@ GAME_REWARDS = {
     "max_points_per_second": 500,             # score ≤ this × server-elapsed seconds
     "max_score_absolute": 500_000,            # hard per-run ceiling
     "duration_slack_seconds": 30,             # client duration may exceed server elapsed by this
+    # ── Round checkpoints (2026-07-19) ─────────────────────────────────────
+    # v28+ clients POST /api/arcade/checkpoint every ~10s during active play.
+    # The rolling state lets the server (a) finalize interrupted runs with the
+    # score the player actually earned, (b) kill abandon-grinding (closing
+    # mid-run no longer resets the daily attempt once >= min_session_seconds
+    # were played), and (c) judge score curves per window instead of the blunt
+    # session average — bomb wipes / boss bursts fit in the burst allowance
+    # (megaboss max single dump is 8000).
+    "checkpoint_burst_allowance": 8000,       # extra points allowed on top of rate x window
+    "checkpoint_max_anomalies": 1,            # tolerated over-rate windows before the run is flagged
+    "round_stale_finalize_seconds": 30 * 60,  # sweep finalizes rounds idle this long (pauses stop checkpoints)
 }
 
 # ===========================================

@@ -1,7 +1,7 @@
 from ._achievements import _AchievementsMixin
 from ._challenges import _ChallengesMixin
+from ._discounts import _DiscountsMixin
 from ._game import _GameMixin
-from ._gifts import _GiftsMixin
 from ._points import _PointsMixin
 from ._season import _SeasonMixin
 from ._stars import _StarsMixin
@@ -16,6 +16,6 @@ class RewardRepository(
     _ChallengesMixin,
     _AchievementsMixin,
     _PointsMixin,
-    _GiftsMixin,
+    _DiscountsMixin,
 ):
     """All reward-related database operations."""

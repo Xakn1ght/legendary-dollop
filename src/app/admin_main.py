@@ -6,31 +6,22 @@ from aiogram.enums import ParseMode
 from aiogram.types import BotCommand
 
 from app.core.redis_config import close_redis, init_redis
-from app.core.settings import ADMIN_BOT_TOKEN, security_sanity_warnings
+from app.core.settings import ADMIN_BOT_TOKEN
 from app.database.models import AsyncSessionLocal, engine, init_db
 from app.handlers.admin import (
     bot_texts,
-    broadcast,
     cache,
+    catchall,
     charge,
-    dashboard,
     deletion_requests,
     financial,
-    gifts,
     indexes,
     menu,
     reward_settings,
-    service_management,
-    stats,
     subscription,
-    support,
     system,
     toggle,
-    user_management,
     vip,
-)
-from app.handlers.admin import (
-    settings as admin_settings,
 )
 from app.handlers.admin.common import ADMIN_IDS
 from app.utils.error_middleware import ErrorHandlingMiddleware
@@ -110,30 +101,27 @@ async def main() -> None:
     dp.update.outer_middleware.register(AdminOnlyMiddleware())
     dp.update.outer_middleware.register(DbSessionMiddleware(session_pool=AsyncSessionLocal))
 
-    # Routers (all admin features)
+    # Routers — approval cards + power commands only. The menu-navigation
+    # surfaces (dashboard/stats/financial menus/user browsing/broadcast/
+    # support/settings/system menus) were retired 2026-07-21 in favor of the
+    # admin web panel.
     routers = [
         menu.router,
         subscription.router,
         charge.router,
         toggle.router,
         deletion_requests.router,
-        broadcast.router,
         cache.router,
-        dashboard.router,
         financial.router,
-        gifts.router,
         indexes.router,
         reward_settings.router,
-        service_management.router,
-        admin_settings.router,
-        stats.router,
-        support.router,
         system.router,
-        user_management.router,
         vip.router,
         # LAST on purpose: its free-text handler catches search/edit input
         # only after every other admin text handler declined the update.
         bot_texts.router,
+        # VERY LAST: quiet fallback for callbacks from retired menu messages.
+        catchall.router,
     ]
     for r in routers:
         try:
@@ -146,6 +134,11 @@ async def main() -> None:
             [
                 BotCommand(command="start", description="Start"),
                 BotCommand(command="admin", description="Open admin panel"),
+                BotCommand(command="cashouts", description="Pending cash-out requests"),
+                BotCommand(command="rewards", description="Reward percentages"),
+                BotCommand(command="texts", description="Edit bot texts"),
+                BotCommand(command="errors", description="Latest client errors"),
+                BotCommand(command="health", description="System health"),
             ]
         )
     except Exception:

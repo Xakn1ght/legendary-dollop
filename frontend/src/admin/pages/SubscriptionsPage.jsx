@@ -1,17 +1,22 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 
 import { apiFetch, apiJson, postJson } from '../api.js';
 import { useModal } from '../components/Modal.jsx';
 import { useToast } from '../components/Toast.jsx';
 import { Icons } from '../icons.jsx';
-import { STATUS_COLORS } from '../util.js';
+import { STATUS_COLORS, timeAgo } from '../util.js';
 
 const PER_PAGE = 50;
 
+// Server-driven pagination (2026-07-20): each page is ONE panel-backed request
+// with native search/sort — replaces the old fetch-2000-then-filter-in-JS page,
+// whose single call was the slowest in the panel (3s+).
 export function SubscriptionsPage() {
   const modal = useModal();
   const toast = useToast();
   const [subs, setSubs] = useState([]);
+  const [total, setTotal] = useState(0);
+  const [stats, setStats] = useState(null);
   const [loading, setLoading] = useState(true);
   const [q, setQ] = useState('');
   const [sortBy, setSortBy] = useState('created');
@@ -20,48 +25,44 @@ export function SubscriptionsPage() {
   const [selected, setSelected] = useState(() => new Set());
   const [detail, setDetail] = useState(null);
   const searchTimer = useRef(null);
+  const reqSeq = useRef(0);
 
-  const load = async (search = '') => {
+  const load = async (search = q.trim(), pageIdx = page, sort = sortBy) => {
+    const seq = ++reqSeq.current;
     setLoading(true);
     try {
-      const { data } = await apiJson(`/api/admin/subscriptions?limit=2000${search ? '&search=' + encodeURIComponent(search) : ''}`);
-      if (data.ok) setSubs(data.users || data.subscriptions || []);
-    } catch (_) { /* ignore */ } finally { setLoading(false); }
-  };
-  useEffect(() => { load(); }, []);
-
-  const view = useMemo(() => {
-    let out = subs.slice();
-    const query = q.trim().toLowerCase();
-    if (query) out = out.filter((s) => (s.username || '').toLowerCase().includes(query) || (s.note || '').toLowerCase().includes(query));
-    out.sort((a, b) => {
-      switch (sortBy) {
-        case 'created_asc': return new Date(a.created_at || 0) - new Date(b.created_at || 0);
-        case 'expire': return (a.expire || 9999999999) - (b.expire || 9999999999);
-        case 'expire_desc': return (b.expire || 0) - (a.expire || 0);
-        case 'used': return (b.used_traffic_gb || 0) - (a.used_traffic_gb || 0);
-        case 'used_asc': return (a.used_traffic_gb || 0) - (b.used_traffic_gb || 0);
-        case 'username': return (a.username || '').localeCompare(b.username || '');
-        default: return new Date(b.created_at || 0) - new Date(a.created_at || 0);
+      const params = new URLSearchParams({ page: String(pageIdx + 1), limit: String(PER_PAGE), sort });
+      if (search) params.set('search', search);
+      const { data } = await apiJson(`/api/admin/subscriptions?${params}`);
+      if (seq !== reqSeq.current) return; // a newer request superseded this one
+      if (data.ok) {
+        setSubs(data.users || data.subscriptions || []);
+        setTotal(Number(data.total) || 0);
+        if (data.stats && data.stats.total != null) setStats(data.stats);
       }
-    });
-    return out;
-  }, [subs, q, sortBy]);
+    } catch (_) { /* ignore */ } finally { if (seq === reqSeq.current) setLoading(false); }
+  };
+  useEffect(() => { load('', 0, 'created'); }, []);
 
-  const totalPages = Math.max(1, Math.ceil(view.length / PER_PAGE));
+  const totalPages = Math.max(1, Math.ceil(total / PER_PAGE));
   const curPage = Math.min(page, totalPages - 1);
   const start = curPage * PER_PAGE;
-  const pageSubs = view.slice(start, start + PER_PAGE);
-  const stats = useMemo(() => ({
-    total: subs.length,
-    active: subs.filter((s) => s.status === 'active').length,
-    online: subs.filter((s) => s.is_online).length,
-  }), [subs]);
+  const pageSubs = subs;
 
   function onSearch(v) {
     setQ(v); setPage(0);
     if (searchTimer.current) clearTimeout(searchTimer.current);
-    searchTimer.current = setTimeout(() => { /* client filter only; server search on refresh */ }, 150);
+    searchTimer.current = setTimeout(() => { load(v.trim(), 0); }, 350);
+  }
+
+  function onSort(v) {
+    setSortBy(v); setPage(0);
+    load(q.trim(), 0, v);
+  }
+
+  function goPage(idx) {
+    setPage(idx);
+    load(q.trim(), idx);
   }
 
   function toggleSel(username) {
@@ -100,9 +101,9 @@ export function SubscriptionsPage() {
   return (
     <>
       <div className="stats-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(110px, 1fr))', gap: 12, marginBottom: 16 }}>
-        <div className="glass-card stat-card" style={{ padding: 16 }}><div className="stat-label">Total</div><div className="stat-value">{loading ? '…' : stats.total}</div></div>
-        <div className="glass-card stat-card" style={{ padding: 16 }}><div className="stat-label">Active</div><div className="stat-value" style={{ color: 'var(--success)' }}>{loading ? '…' : stats.active}</div></div>
-        <div className="glass-card stat-card" style={{ padding: 16 }}><div className="stat-label">Online</div><div className="stat-value" style={{ color: 'var(--brand)' }}>{loading ? '…' : stats.online}</div></div>
+        <div className="glass-card stat-card" style={{ padding: 16 }}><div className="stat-label">Total</div><div className="stat-value">{stats ? stats.total : (loading ? '…' : total)}</div></div>
+        <div className="glass-card stat-card" style={{ padding: 16 }}><div className="stat-label">Active</div><div className="stat-value" style={{ color: 'var(--success)' }}>{stats ? stats.active : '…'}</div></div>
+        <div className="glass-card stat-card" style={{ padding: 16 }}><div className="stat-label">Online</div><div className="stat-value" style={{ color: 'var(--brand)' }}>{stats ? stats.online : '…'}</div></div>
       </div>
 
       <div className="filter-bar glass-card rcp-bar">
@@ -111,7 +112,7 @@ export function SubscriptionsPage() {
         </div>
         <div className="rcp-bar-row">
           <button className={'btn btn-secondary sb-select' + (bulkMode ? ' on' : '')} onClick={() => { setBulkMode((v) => !v); setSelected(new Set()); }}>{bulkMode ? 'Cancel' : 'Select'}</button>
-          <select className="input-field" value={sortBy} onChange={(e) => { setSortBy(e.target.value); setPage(0); }}>
+          <select className="input-field" value={sortBy} onChange={(e) => onSort(e.target.value)}>
             <option value="created">Created (new)</option>
             <option value="created_asc">Created (old)</option>
             <option value="expire">Expiry (soon)</option>
@@ -120,7 +121,7 @@ export function SubscriptionsPage() {
             <option value="used_asc">Traffic: low first</option>
             <option value="username">Username</option>
           </select>
-          <span className="rcp-count">{view.length}</span>
+          <span className="rcp-count">{total}</span>
           <button className="refresh-btn" onClick={() => load(q.trim())} title="Refresh" disabled={loading}>
             <Icons.refresh width={15} height={15} />
           </button>
@@ -184,18 +185,86 @@ export function SubscriptionsPage() {
 
       {totalPages > 1 && (
         <div className="pagination-bar glass-card usr-pager">
-          <span className="usr-pager-info">{view.length ? start + 1 : 0}–{Math.min(start + PER_PAGE, view.length)} of {view.length}</span>
+          <span className="usr-pager-info">{total ? start + 1 : 0}–{Math.min(start + pageSubs.length, total)} of {total}</span>
           <div className="usr-pager-nav">
-            <button className="btn btn-secondary" disabled={curPage === 0} onClick={() => setPage(curPage - 1)}>Prev</button>
-            <select className="input-field" value={curPage} onChange={(e) => setPage(Number(e.target.value))}>
+            <button className="btn btn-secondary" disabled={curPage === 0 || loading} onClick={() => goPage(curPage - 1)}>Prev</button>
+            <select className="input-field" value={curPage} onChange={(e) => goPage(Number(e.target.value))} disabled={loading}>
               {Array.from({ length: totalPages }, (_, i) => <option key={i} value={i}>Page {i + 1}</option>)}
             </select>
-            <button className="btn btn-secondary" disabled={start + PER_PAGE >= view.length} onClick={() => setPage(curPage + 1)}>Next</button>
+            <button className="btn btn-secondary" disabled={start + PER_PAGE >= total || loading} onClick={() => goPage(curPage + 1)}>Next</button>
           </div>
         </div>
       )}
 
       {detail && <SubDetail sub={detail} onClose={() => setDetail(null)} onChanged={() => { setDetail(null); load(q.trim()); }} />}
+    </>
+  );
+}
+
+// Read-only device/client view under the cap control. HWIDs only come from
+// Hiddify-family clients; the recent config fetches (user-agent + time) cover
+// everything else, so support can tell "which app is this user on" either way.
+function DeviceList({ username, hwidLimit }) {
+  const [d, setD] = useState(null); // null=loading, 'error', or payload
+
+  useEffect(() => {
+    let alive = true;
+    (async () => {
+      try {
+        const { data } = await apiJson(`/api/admin/subscriptions/${encodeURIComponent(username)}/devices`);
+        if (alive) setD(data.ok ? data : 'error');
+      } catch (_) { if (alive) setD('error'); }
+    })();
+    return () => { alive = false; };
+  }, [username]);
+
+  const cap = hwidLimit || 0;
+  const head = (label) => (
+    <div style={{ fontSize: 10.5, fontWeight: 700, letterSpacing: '0.07em', textTransform: 'uppercase', color: 'var(--text-muted)', margin: '10px 0 4px' }}>{label}</div>
+  );
+
+  if (d === null) return <>{head('Devices')}<div style={{ fontSize: 12, color: 'var(--text-muted)' }}>Loading devices…</div></>;
+  if (d === 'error' || d.devices_available === false) {
+    return <>{head('Devices')}<div style={{ fontSize: 12, color: 'var(--text-muted)' }}>Device info unavailable right now.</div></>;
+  }
+
+  const devices = d.devices || [];
+  const fetches = d.recent_fetches || [];
+  return (
+    <>
+      {head(`Devices (${d.device_count ?? devices.length}${cap ? `/${cap}` : ''})`)}
+      {devices.length === 0 && (
+        <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>
+          No devices registered{cap ? '' : ' (only Hiddify-family clients report device ids)'}.
+        </div>
+      )}
+      {devices.length > 0 && (
+        <div style={{ display: 'grid', gap: 4 }}>
+          {devices.map((dev) => (
+            <div key={dev.id ?? dev.hwid} style={{ display: 'flex', justifyContent: 'space-between', gap: 8, fontSize: 12, fontVariantNumeric: 'tabular-nums' }}>
+              <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={dev.hwid || ''}>
+                {[dev.device_model, dev.device_os, dev.os_version].filter(Boolean).join(' · ')
+                  || (dev.hwid ? `hwid ${String(dev.hwid).slice(0, 10)}…` : 'unknown device')}
+              </span>
+              <span style={{ color: 'var(--text-muted)', flexShrink: 0 }} title="Last seen">{timeAgo(dev.last_seen)}</span>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {fetches.length > 0 && (
+        <>
+          {head('Recent config fetches')}
+          <div style={{ display: 'grid', gap: 4 }}>
+            {fetches.map((f, i) => (
+              <div key={i} style={{ display: 'flex', justifyContent: 'space-between', gap: 8, fontSize: 12, fontVariantNumeric: 'tabular-nums' }}>
+                <span dir="ltr" style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={f.user_agent || ''}>{f.user_agent || 'unknown client'}</span>
+                <span style={{ color: 'var(--text-muted)', flexShrink: 0 }}>{timeAgo(f.at)}</span>
+              </div>
+            ))}
+          </div>
+        </>
+      )}
     </>
   );
 }
@@ -269,6 +338,8 @@ function SubDetail({ sub, onClose, onChanged }) {
           <div className="sub-modal-row" style={{ display: 'flex', justifyContent: 'space-between', padding: '6px 0' }}><span style={{ color: 'var(--text-muted)' }}>Traffic</span><span>{used.toFixed(2)} / {limit > 0 ? limit.toFixed(0) + ' GB' : '∞'}</span></div>
           <div className="sub-modal-row" style={{ display: 'flex', justifyContent: 'space-between', padding: '6px 0' }}><span style={{ color: 'var(--text-muted)' }}>Expires</span><span>{sub.days_left != null ? sub.days_left + 'd left' : '∞'}</span></div>
           {sub.note && <div className="sub-modal-row" style={{ display: 'flex', justifyContent: 'space-between', padding: '6px 0' }}><span style={{ color: 'var(--text-muted)' }}>Note</span><span>{sub.note}</span></div>}
+
+          <DeviceList username={sub.username} hwidLimit={sub.hwid_limit} />
 
           <div style={{ marginTop: 16, display: 'grid', gap: 10 }}>
             <div style={{ display: 'flex', gap: 8 }}>

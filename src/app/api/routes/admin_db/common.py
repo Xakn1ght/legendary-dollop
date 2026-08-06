@@ -8,9 +8,6 @@ import re
 import uuid
 
 from aiohttp import web
-from sqlalchemy import text
-
-from app.database.models import AsyncSessionLocal
 
 
 def _json_safe(value):
@@ -45,6 +42,18 @@ _SCHEMA_IDENT_RE = re.compile(r"^(?P<schema>[A-Za-z_][A-Za-z0-9_]*)\.(?P<table>[
 
 def _is_dangerous_sql_enabled() -> bool:
     return str(os.getenv("ADMIN_DB_DANGEROUS_SQL", "")).strip().lower() in {"1", "true", "yes", "on"}
+
+
+def _is_sql_runner_enabled() -> bool:
+    """Kill switch for the free-text SQL runner (query AND exec). Default OFF."""
+    from app.core.settings.security import ADMIN_DB_SQL_ENABLED
+
+    return bool(ADMIN_DB_SQL_ENABLED)
+
+
+def _sql_disabled_response() -> web.Response:
+    """404 as if the endpoint does not exist — no hint that a flag would enable it."""
+    return web.json_response({"ok": False, "error": "disabled"}, status=404)
 
 
 def _validate_table_name(name: str) -> tuple[str, str | None]:

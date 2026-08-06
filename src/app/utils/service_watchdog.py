@@ -76,7 +76,7 @@ async def service_watchdog(bot) -> None:
                 if error is None:
                     if down_since is not None:
                         mins = max(1, int((now - down_since) / 60))
-                        await _notify(bot, f"🟢 سرویس اصلی دوباره در دسترس است (قطعی: ~{mins} دقیقه)")
+                        await _notify(bot, f"سرویس اصلی دوباره در دسترس است (قطعی: ~{mins} دقیقه)")
                         logger.info("watchdog: service recovered after ~%sm", mins)
                     fails = 0
                     down_since = None
@@ -89,7 +89,7 @@ async def service_watchdog(bot) -> None:
                             last_alert = now
                             await _notify(
                                 bot,
-                                "🔴 هشدار: ربات اصلی / داشبورد پاسخ نمی‌دهد!\n"
+                                "هشدار: ربات اصلی / داشبورد پاسخ نمی‌دهد!\n"
                                 f"خطا: {error}\n"
                                 "بررسی: systemctl status astrobyte-userbot",
                             )
@@ -104,14 +104,14 @@ async def service_watchdog(bot) -> None:
                             disk_high = True
                             await _notify(
                                 bot,
-                                f"🟠 هشدار فضای دیسک: {pct}٪ پر است!\n"
+                                f"هشدار فضای دیسک: {pct}٪ پر است!\n"
                                 "بررسی: du -sh /root/5a06b8e65bdb/ASTROBYTE/{backups,logs}",
                             )
                             logger.error("watchdog: disk usage %s%%", pct)
                     elif disk_high and pct < _DISK_CLEAR_PCT:
                         disk_high = False
                         last_disk_alert = 0.0
-                        await _notify(bot, f"🟢 فضای دیسک به حالت عادی برگشت ({pct}٪)")
+                        await _notify(bot, f"فضای دیسک به حالت عادی برگشت ({pct}٪)")
             except Exception as e:
                 logger.warning("watchdog loop error: %s", e)
 

@@ -16,9 +16,9 @@ async def show_reward_history(callback: CallbackQuery, session: AsyncSession):
 
     history = await get_user_reward_history(session, user.id, limit=20)
     if not history:
-        text = "📊 **تاریخچه پاداش‌ها**\n\nهنوز هیچ پاداشی دریافت نکرده‌اید!"
+        text = "**تاریخچه پاداش‌ها**\n\nهنوز هیچ پاداشی دریافت نکرده‌اید!"
     else:
-        text = "📊 **تاریخچه پاداش‌ها**\n\n"
+        text = "**تاریخچه پاداش‌ها**\n\n"
         src_names = {
             "referral": "معرفی",
             "achievement": "دستاورد",
@@ -26,20 +26,19 @@ async def show_reward_history(callback: CallbackQuery, session: AsyncSession):
             "streak": "رکورد ورود",
             "level_up": "ارتقاء سطح",
             "daily_login": "ورود روزانه",
-            "gift": "هدیه",
         }
         for entry in history:
             date_str = entry.earned_at.strftime('%Y/%m/%d %H:%M')
             source = src_names.get(entry.source, entry.source)
             text += (
-                f"🎁 {entry.reward_value:,} {entry.reward_type}\n"
-                f"   📝 منبع: {source}\n"
-                f"   📅 {date_str}\n\n"
+                f"{entry.reward_value:,} {entry.reward_type}\n"
+                f"   منبع: {source}\n"
+                f"   {date_str}\n\n"
             )
 
     kb = InlineKeyboardMarkup(inline_keyboard=[[
-        InlineKeyboardButton(text="🔄 بروزرسانی", callback_data="enhanced_reward_history"),
-        InlineKeyboardButton(text="🔙 بازگشت", callback_data="enhanced_rewards_menu"),
+        InlineKeyboardButton(text="بروزرسانی", callback_data="enhanced_reward_history"),
+        InlineKeyboardButton(text="بازگشت", callback_data="enhanced_rewards_menu"),
     ]])
 
     try:
