@@ -386,8 +386,20 @@ class SubscriptionRepository:
             # Reward free-plans provision as on_hold: countdown starts at the
             # user's first connection instead of at approval time.
             on_hold_days = plan_days if plan_info.get("on_hold") else None
+            # Route decides the panel group. Passing it explicitly also switches
+            # add_user off its template fast path, which would otherwise put a
+            # Pro order in the normal group (see the comment there).
+            from app.core.products import ROUTE_PRO
+            from app.core.settings import panel_group_ids
+            route = plan_info.get("route")
+            # Only NAME the groups for Pro. Normal orders keep passing None so
+            # they still take add_user's template fast path - passing [1]
+            # explicitly would be the same group but would switch the fast path
+            # off for every purchase in the system.
+            group_ids = panel_group_ids(route) if route == ROUTE_PRO else None
             pasarguard_user = await pasarguard_api.add_user(
-                subscription.marzban_username, gb, plan_days, on_hold_days=on_hold_days
+                subscription.marzban_username, gb, plan_days,
+                on_hold_days=on_hold_days, group_ids=group_ids,
             )
             
             # If add_user failed (returns None), check if user already exists (from partial approval)

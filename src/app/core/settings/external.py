@@ -33,6 +33,20 @@ PASARGUARD_WEBHOOK_SECRET = os.environ.get("PASARGUARD_WEBHOOK_SECRET", "")
 # (POST /api/webhook/pasarguard). Empty = receiver disabled (403s everything).
 PASARGUARD_WEBHOOK_SECRET = os.environ.get("PASARGUARD_WEBHOOK_SECRET", "").strip()
 
+# Pro / IR-Tun route: a premium path that works on all Iranian operators,
+# sold per GB. It lives in its OWN panel group and must never be created in the
+# normal customer group (or the customer pays Pro rates for normal routing).
+# Group 12 is the value the live sales bot uses.
+PASARGUARD_IR_TUN_GROUP_ID = int(os.environ.get("PASARGUARD_IR_TUN_GROUP_ID", "12") or 12)
+
+
+def panel_group_ids(route: str | None = None) -> list[int]:
+    """Panel groups for a product route. Anything not Pro is the normal group."""
+    if route == "pro":
+        return [PASARGUARD_IR_TUN_GROUP_ID]
+    return list(PASARGUARD_GROUP_IDS)
+
+
 # --- Test mode -----------------------------------------------------------------
 # When set, every panel username created by a purchase/charge gets this prefix,
 # so test accounts are distinguishable from the thousands of real ones sharing

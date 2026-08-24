@@ -338,14 +338,26 @@ class PasarGuardAPI:
             return None
 
     async def add_user(self, username: str, data_limit_gb: int, expire_days: int,
-                       on_hold_days: int | None = None):
+                       on_hold_days: int | None = None, group_ids: list[int] | None = None):
         import time
         start_time = time.time()
         await self.invalidate_user_info(username)
 
         # Template fast path — only for plain active plans whose exact shape is
         # template-backed on the panel. on_hold gifts can't ride a template.
-        if not on_hold_days and data_limit_gb > 0 and expire_days > 0 and float(data_limit_gb).is_integer():
+        #
+        # It is ALSO skipped whenever the caller names its groups. Panel
+        # templates carry their own group, so a Pro order (whole-number GB, so
+        # it passes the is_integer() check) would be created from a template
+        # into the NORMAL group — a working subscription link on the wrong
+        # route, with nothing to alert on. Do not relax this.
+        if (
+            not on_hold_days
+            and group_ids is None
+            and data_limit_gb > 0
+            and expire_days > 0
+            and float(data_limit_gb).is_integer()
+        ):
             try:
                 tmap = await self.audit_templates()
                 template = tmap.get((int(data_limit_gb) * 1024 ** 3, int(expire_days) * 86400))
@@ -369,8 +381,9 @@ class PasarGuardAPI:
             url = f"{self.base_url}/api/user"
             headers = await self._get_headers()
             
-            # Convert GB to bytes
-            data_limit_bytes = data_limit_gb * 1024 * 1024 * 1024
+            # Convert GB to bytes. int() matters: free trials are 0.25 GB, and
+            # a float here reaches the panel as 268435456.0 in the JSON body.
+            data_limit_bytes = int(data_limit_gb * 1024 * 1024 * 1024)
             # Convert days to timestamp
             expire_timestamp = int((datetime.now() + timedelta(days=expire_days)).timestamp()) if expire_days > 0 else 0
 
@@ -380,7 +393,7 @@ class PasarGuardAPI:
             user_data = {
                 "data_limit": data_limit_bytes,
                 "expire": expire_timestamp,
-                "group_ids": list(PASARGUARD_GROUP_IDS),
+                "group_ids": list(group_ids) if group_ids else list(PASARGUARD_GROUP_IDS),
                 "note": "",
                 "status": "active",
                 "username": username
