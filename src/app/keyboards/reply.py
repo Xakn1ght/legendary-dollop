@@ -66,8 +66,8 @@ KEYBOARD_MARKUP_PURCHASE = ReplyKeyboardMarkup(
 
 KEYBOARD_MARKUP_CONFIRM_PURCHASE = ReplyKeyboardMarkup(
     keyboard=[
-        [KeyboardButton(text="تایید و پرداخت ✅")],
-        [KeyboardButton(text="ویرایش ✏️"), KeyboardButton(text='بازگشت🔙')]
+        [KeyboardButton(text="تایید و پرداخت")],
+        [KeyboardButton(text="ویرایش"), KeyboardButton(text='بازگشت🔙')]
     ],
     resize_keyboard=True
 )

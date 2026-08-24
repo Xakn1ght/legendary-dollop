@@ -101,7 +101,7 @@ async def process_referral_code(message: Message, state: FSMContext, session: As
             await message.answer("شما نمی توانید از کد دعوت خودتان استفاده کنید!" if lang == "fa" else "You can't use your own invite code!")
             return
         await state.update_data(referrer_id=referrer.id)
-        await message.answer("✅ کد دعوت با موفقیت اعمال شد!" if lang == "fa" else "✅ Invite code applied!")
+        await message.answer("کد دعوت با موفقیت اعمال شد." if lang == "fa" else "Invite code applied.")
     else:
         # If user skipped entering code, but already registered via referral entry earlier, reuse it
         user = await crud.get_user(session, message.chat.id)

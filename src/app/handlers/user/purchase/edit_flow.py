@@ -26,13 +26,16 @@ async def go_back_from_confirmation(message: Message, state: FSMContext, session
         reply_markup=await _name_keyboard(state, lang),
     )
 
-@router.message(PurchaseState.confirmation, lambda m: (m.text or "").strip() in {"ویرایش ✏️", "Edit ✏️"})
+@router.message(PurchaseState.confirmation, lambda m: (m.text or "").strip() in {
+    "ویرایش", "Edit",
+    "ویرایش ✏️", "Edit ✏️",  # pre-2026-08-24 labels, see confirmation.py
+})
 async def edit_from_confirmation(message: Message, state: FSMContext, session: AsyncSession):
     """Ask the user what they want to edit (name or plan)."""
     lang = await _lang_for(message, session)
     edit_markup = await ikb(state, [
-        [("ویرایش نام ✏️" if lang == "fa" else "Edit name ✏️")],
-        [("ویرایش پلن 📦" if lang == "fa" else "Edit plan 📦")],
+        [("ویرایش نام" if lang == "fa" else "Edit name")],
+        [("ویرایش پلن" if lang == "fa" else "Edit plan")],
         [t(lang, "btn_back")],
     ])
     await state.set_state(PurchaseState.edit_choice)
@@ -40,7 +43,9 @@ async def edit_from_confirmation(message: Message, state: FSMContext, session: A
 
 # -------- Edit choice handlers --------
 
-@router.message(PurchaseState.edit_choice, lambda m: (m.text or "").strip() in {"ویرایش نام ✏️", "Edit name ✏️"})
+@router.message(PurchaseState.edit_choice, lambda m: (m.text or "").strip() in {
+    "ویرایش نام", "Edit name", "ویرایش نام ✏️", "Edit name ✏️",
+})
 async def edit_name_choice(message: Message, state: FSMContext, session: AsyncSession):
     # Go to name selection step
     await state.set_state(PurchaseState.name)
@@ -48,7 +53,9 @@ async def edit_name_choice(message: Message, state: FSMContext, session: AsyncSe
     await message.answer(t(lang, "purchase_choose_new_name"), reply_markup=await _name_keyboard(state, lang))
 
 
-@router.message(PurchaseState.edit_choice, lambda m: (m.text or "").strip() in {"ویرایش پلن 📦", "Edit plan 📦"})
+@router.message(PurchaseState.edit_choice, lambda m: (m.text or "").strip() in {
+    "ویرایش پلن", "Edit plan", "ویرایش پلن 📦", "Edit plan 📦",
+})
 async def edit_plan_choice(message: Message, state: FSMContext, session: AsyncSession):
     # Go back to plan selection step
     await state.update_data(editing_plan_only=True)

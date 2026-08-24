@@ -190,8 +190,8 @@ async def _back_keyboard(state: FSMContext, lang: str) -> InlineKeyboardMarkup:
 
 async def _confirm_keyboard(state: FSMContext, lang: str) -> InlineKeyboardMarkup:
     return await ikb(state, [
-        [("تایید و پرداخت ✅" if lang == "fa" else "Confirm & Pay ✅")],
-        [("ویرایش ✏️" if lang == "fa" else "Edit ✏️"), t(lang, "btn_back")],
+        [("تایید و پرداخت" if lang == "fa" else "Confirm and Pay")],
+        [("ویرایش" if lang == "fa" else "Edit"), t(lang, "btn_back")],
     ])
 
 

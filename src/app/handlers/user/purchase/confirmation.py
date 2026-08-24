@@ -14,7 +14,12 @@ from .common import PurchaseState, _back_keyboard, _lang_for, _name_keyboard, ro
 from .summary import build_quote_from_state
 
 
-@router.message(PurchaseState.confirmation, lambda m: (m.text or "").strip() in {"تایید و پرداخت ✅", "Confirm & Pay ✅"})
+@router.message(PurchaseState.confirmation, lambda m: (m.text or "").strip() in {
+    "تایید و پرداخت", "Confirm and Pay",
+    # pre-2026-08-24 labels, kept so a keyboard rendered before the deploy
+    # still works for anyone mid-purchase
+    "تایید و پرداخت ✅", "Confirm & Pay ✅",
+})
 async def process_confirmation(message: Message, state: FSMContext, session: AsyncSession, bot: Bot):
     lang = await _lang_for(message, session)
     data = await state.get_data()

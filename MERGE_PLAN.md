@@ -90,19 +90,27 @@ other purchase (Pricing Parity Law in CLAUDE.md).
 
 One at a time. Do not start the next until the previous works.
 
-### Slice 1 — Purchase flow (current)
+### Slice 1 — Purchase flow (bot side DONE 2026-08-24)
 
 The sales bot's buying experience, which Pasha says works well.
 
-- [ ] 1.1 One merged catalog: add test, pro_test and Pro/IR-Tun to `PLANS`;
-      re-anchor the custom-GB curve to this project's prices
-- [ ] 1.2 Free test tiers: eligibility, cooldowns, auto-provisioning without a
-      name prompt, and the separate 30-day Pro-test allowance
-- [ ] 1.3 Pro / IR-Tun routing: its own panel group, never the normal one
-- [ ] 1.4 Normal-vs-Pro two-level purchase menu (Pasha-approved UX on the live
-      bot: the two never share a screen)
+- [x] 1.1 Merged catalog. `test`, `pro_test` and `pro:<gb>` resolve as VIRTUAL
+      products in `core/products.py`, not rows in `PLANS` — `PLANS` is iterated
+      raw by the Mini App grid, the charge grid and `core/coupons`, all of
+      which would render a free 250 MB tile and a priceless Pro tile.
+- [x] 1.2 Free trials: 7-day normal / 30-day Pro allowances counted
+      independently, derived from the subscriptions table, instant
+      provisioning with no name and no receipt.
+- [x] 1.3 Pro routing to `PASARGUARD_IR_TUN_GROUP_ID`, with the panel template
+      fast path suppressed so a Pro order cannot land in the normal group.
+- [x] 1.4 Two-level Normal/Pro inline menu; the two never share a screen.
 - [ ] 1.5 Delivery banners and the `تست پرو` labelling rule
 - [ ] 1.6 Renewal flow (the live bot's is far more developed — 381 references)
+
+**Not yet done for slice 1:** the Mini App still shows only the `PLANS` grid —
+free trials and Pro are bot-only until the webapp learns the virtual products.
+Pro per-GB pricing is 7,000/GB up to 10 GB then 5,500/GB; the step down at
+10 GB is deliberate (it pushes buyers past 10 GB).
 
 ### Slice 2 — AI support
 
