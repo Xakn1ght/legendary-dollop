@@ -21,6 +21,8 @@ from app.utils.validation import InputValidator, sanitize_user_input
 from .common import (
     CUSTOM_PLAN_BTN_EN,
     CUSTOM_PLAN_BTN_FA,
+    PRO_BUY_BTN_EN,
+    PRO_BUY_BTN_FA,
     PurchaseState,
     _auto_renew_keyboard,
     _back_keyboard,
@@ -51,12 +53,11 @@ async def start_purchase(message: Message, state: FSMContext, session: AsyncSess
         if ref_row:
             await state.update_data(referrer_id=ref_row.referrer_id)
 
-    await state.set_state(PurchaseState.plan)
-    plan_kb = await _get_plan_keyboard_for_user(session, message.chat.id, state, lang)
-    await message.answer(
-        ("لطفا یکی از پلن های زیر را انتخاب کنید:" if lang == "fa" else "Please choose a plan:"),
-        reply_markup=plan_kb,
-    )
+    # Level 1 first: Normal or Pro. The plan list itself is level 2, so the
+    # two product families never share a screen.
+    from .flow_category import show_category_menu
+
+    await show_category_menu(message, state, session, lang)
 
 @router.message(PurchaseState.referral_code)
 async def process_referral_code(message: Message, state: FSMContext, session: AsyncSession):
@@ -183,6 +184,26 @@ async def ask_custom_gb(message: Message, state: FSMContext, session: AsyncSessi
     await _ask_custom_gb(message, state, session, for_renewal=False)
 
 
+_PRO_BTNS = {PRO_BUY_BTN_FA, PRO_BUY_BTN_EN}
+
+
+@router.message(PurchaseState.plan, F.text.in_(_PRO_BTNS))
+async def ask_pro_gb(message: Message, state: FSMContext, session: AsyncSession):
+    """Pro is sold by GB, so its plan button opens the same GB prompt as a
+    custom build - a route flag, not a new state (mirrors custom_for_renewal)."""
+    from app.core.products import PRO_MAX_GB, PRO_MIN_GB
+
+    lang = await _lang_for(message, session)
+    await state.update_data(custom_for_renewal=False, custom_route="pro")
+    await state.set_state(PurchaseState.custom_gb)
+    await message.answer(
+        (f"اشتراک پرو\n\nچند گیگابایت می‌خواهید؟ یک عدد بین {_fa_int(PRO_MIN_GB, lang)} تا "
+         f"{_fa_int(PRO_MAX_GB, lang)} بفرستید:" if lang == "fa"
+         else f"Pro subscription\n\nHow many GB? Send a number between {PRO_MIN_GB} and {PRO_MAX_GB}:"),
+        reply_markup=await _back_keyboard(state, lang),
+    )
+
+
 @router.message(PurchaseState.renewal_template, F.text.in_(_CUSTOM_BTNS))
 async def ask_custom_gb_renewal(message: Message, state: FSMContext, session: AsyncSession):
     await _ask_custom_gb(message, state, session, for_renewal=True)
@@ -193,8 +214,11 @@ async def back_from_custom_gb(message: Message, state: FSMContext, session: Asyn
     lang = await _lang_for(message, session)
     data = await state.get_data()
     target = PurchaseState.renewal_template if data.get("custom_for_renewal") else PurchaseState.plan
+    await state.update_data(custom_route=None)
     await state.set_state(target)
-    plan_kb = await _get_plan_keyboard_for_user(session, message.chat.id, state, lang)
+    plan_kb = await _get_plan_keyboard_for_user(
+        session, message.chat.id, state, lang, route=data.get("route", "normal")
+    )
     await message.answer(
         ("لطفا یکی از پلن های زیر را انتخاب کنید:" if lang == "fa" else "Please choose a plan:"),
         reply_markup=plan_kb,
@@ -204,7 +228,14 @@ async def back_from_custom_gb(message: Message, state: FSMContext, session: Asyn
 @router.message(PurchaseState.custom_gb)
 async def process_custom_gb(message: Message, state: FSMContext, session: AsyncSession):
     lang = await _lang_for(message, session)
-    lo, hi = await _custom_gb_bounds(session, message.chat.id)
+    data = await state.get_data()
+    is_pro = data.get("custom_route") == "pro"
+    if is_pro:
+        from app.core.products import PRO_MAX_GB, PRO_MIN_GB
+
+        lo, hi = PRO_MIN_GB, PRO_MAX_GB
+    else:
+        lo, hi = await _custom_gb_bounds(session, message.chat.id)
     raw = (message.text or "").strip().translate(_FA_DIGITS)
     try:
         gb = int(raw)
@@ -216,9 +247,14 @@ async def process_custom_gb(message: Message, state: FSMContext, session: AsyncS
              else f"Invalid number. Send a number between {lo} and {hi}.")
         )
         return
-    plan_name = f"custom:{gb}"
-    price = custom_plan_price(gb)
-    data = await state.get_data()
+    if is_pro:
+        from app.core.products import pro_gb_price, pro_plan_name
+
+        plan_name = pro_plan_name(gb)
+        price = pro_gb_price(gb)
+    else:
+        plan_name = f"custom:{gb}"
+        price = custom_plan_price(gb)
     price_str = f"{price:,}".translate(_TO_FA_DIGITS) if lang == "fa" else f"{price:,}"
     await message.answer(
         (f"{plan_display_name(plan_name, lang)}\nقیمت: {price_str} تومان" if lang == "fa"

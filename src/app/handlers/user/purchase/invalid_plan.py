@@ -44,13 +44,13 @@ async def invalid_plan(message: Message, state: FSMContext, session: AsyncSessio
 
     lang = await _lang_for(message, session)
 
-    # Back = cancel the purchase (plan selection is the first step; no order
-    # row exists yet). Delegates to plan_exits.cancel_from_plan — lazy import,
-    # so module registration order stays untouched.
+    # Back now goes UP to the Normal/Pro chooser rather than cancelling: the
+    # plan list is level 2, so leaving it should not abandon the purchase.
+    # Still handled HERE for the shadowing reason above.
     if text in {"بازگشت🔙", "Back 🔙"}:
-        from .plan_exits import cancel_from_plan
+        from .flow_category import show_category_menu
 
-        await cancel_from_plan(message, state, session)
+        await show_category_menu(message, state, session, lang)
         return
 
     # Main-menu button while stuck in plan state: abandon the flow and let the
@@ -60,5 +60,8 @@ async def invalid_plan(message: Message, state: FSMContext, session: AsyncSessio
         await state.clear()
         raise SkipHandler()
 
-    plan_kb = await _get_plan_keyboard_for_user(session, message.chat.id, state, lang)
+    data = await state.get_data()
+    plan_kb = await _get_plan_keyboard_for_user(
+        session, message.chat.id, state, lang, route=data.get("route", "normal")
+    )
     await message.answer(("لطفا از دکمه های زیر استفاده کنید." if lang == "fa" else "Please use the buttons below."), reply_markup=plan_kb)

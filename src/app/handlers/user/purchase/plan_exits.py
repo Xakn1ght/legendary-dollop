@@ -29,7 +29,10 @@ async def cancel_from_plan(message: Message, state: FSMContext, session: AsyncSe
 async def back_from_auto_renew_choice(message: Message, state: FSMContext, session: AsyncSession):
     lang = await _lang_for(message, session)
     await state.set_state(PurchaseState.plan)
-    plan_kb = await _get_plan_keyboard_for_user(session, message.chat.id, state, lang)
+    data = await state.get_data()
+    plan_kb = await _get_plan_keyboard_for_user(
+        session, message.chat.id, state, lang, route=data.get("route", "normal")
+    )
     await message.answer(("لطفا یکی از پلن های زیر را انتخاب کنید:" if lang == "fa" else "Please choose a plan:"), reply_markup=plan_kb)
 
 @router.message(PurchaseState.renewal_template, lambda m: (m.text or "").strip() in {"بازگشت🔙", "Back 🔙"})

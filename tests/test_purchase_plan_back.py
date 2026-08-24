@@ -1,10 +1,15 @@
-"""Regression: Back on the purchase PLAN step must cancel the flow, and
-main-menu buttons must escape it.
+"""Regression: Back on the purchase PLAN step must MOVE, and main-menu buttons
+must escape the flow.
 
 Until 2026-07-14 the plan-state catch-all (invalid_plan, registered before
 plan_exits) shadowed the back handler, so every Back tap re-sent the same
 "use the buttons below" + plans keyboard forever (Pasha screenshot, 11:34 PM
-loop), and «سرویس‌های من» taps were eaten the same way.
+loop), and «سرویس‌های من» taps were eaten the same way. That shadowing is why
+Back is still handled inside invalid_plan rather than in a later module.
+
+2026-08-24: the plan list became level 2 of a Normal/Pro menu, so Back now
+goes UP to the chooser instead of cancelling the purchase. The anti-loop
+guarantee is unchanged and is what this file really protects.
 
 Run: PYTHONPATH=src python tests/test_purchase_plan_back.py
 """
@@ -77,15 +82,23 @@ async def main():
     ctx = FSMContext(storage=dp.storage,
                      key=StorageKey(bot_id=42, chat_id=CHAT, user_id=CHAT))
 
-    # 1. Back on the plan step cancels the purchase (state cleared, main menu),
-    #    instead of looping "use the buttons below" forever.
+    # 1. Back on the plan step moves UP to the Normal/Pro chooser - it must
+    #    not loop "use the buttons below", and must not be eaten.
     await ctx.set_state(PurchaseState.plan)
     await _feed(dp, bot, Session, "بازگشت🔙", 1)
     state_now = await ctx.get_state()
-    assert state_now is None, f"state after back: {state_now}"
-    assert sent and "لغو" in sent[-1], f"expected cancel message, got: {sent[-1] if sent else None}"
+    assert state_now == PurchaseState.plan_category.state, f"state after back: {state_now}"
+    assert sent and "نوع اشتراک" in sent[-1], f"expected the chooser, got: {sent[-1] if sent else None}"
     assert all("از دکمه های زیر" not in s for s in sent), f"back looped the plans prompt: {sent}"
-    print("PASS back cancels the plan step")
+    print("PASS back on the plan step goes up to the chooser")
+
+    # 1b. Back again, now at level 1, leaves the purchase entirely.
+    sent.clear()
+    await _feed(dp, bot, Session, "بازگشت🔙", 11)
+    state_now = await ctx.get_state()
+    assert state_now is None, f"state after second back: {state_now}"
+    assert sent and "لغو" in sent[-1], f"expected cancel message, got: {sent[-1] if sent else None}"
+    print("PASS back at the chooser cancels the purchase")
 
     # 2. A main-menu button escapes the flow: state cleared, catch-all stays
     #    silent (the real my-services handler lives in another router).
