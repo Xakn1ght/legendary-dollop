@@ -44,6 +44,33 @@ deliberately.
 **Open:** should Pro / IR-Tun per-GB prices also rise? There is no competing
 number, so they stay as-is until Pasha says otherwise.
 
+## Referrals — a gate here, a reward there
+
+The two systems share a name and nothing else:
+
+- **Sales bot:** `REQUIRE_REFERRER = True`. You cannot buy unless someone
+  referred you. An invite-only gate with an approval status per customer
+  (`referrer_status`, `referrer_approved_by`, …).
+- **This project:** referrals are a reward. Refer people, earn credit, stars
+  and tier percentages. Entirely optional.
+
+**Decision (2026-08-24):** keep the gate AND add the rewards. Still invite-only,
+but referring now pays. The 985 already-referred customers carry over as-is.
+
+## Customer data and cutover
+
+The live bot holds real history: **1,237 customers** (985 with a referrer),
+**4,593 orders**, **1,486 subscriptions**. Referrer data lives on the customer
+record, not a separate table.
+
+A copy sits at `/opt/incoming/bakbot/` and is used only to design the
+migration — field mapping, edge cases, weird records. It will be weeks stale by
+go-live, so **on cutover day Pasha sends a fresh export and the migration runs
+against that**. Nothing is imported into this project's database before then.
+
+The 210 MB of `user_logs/` and 926 MB of dated `backups/` were deleted from the
+copy; the rollback `sales_bot.*.py` sources were kept.
+
 ## Pro vs VIP — not the same thing
 
 They were built separately and look similar, but:
@@ -93,8 +120,10 @@ Pillow-rendered Persian status images (`usage_card.py`).
 
 ### Slice 5 — Cutover
 
-Move customers from the live bot to the merged one. Not started; needs its own
-plan.
+Move customers from the live bot to the merged one. Needs its own plan. Must
+carry over: customer records, referrer links and approval status, active
+subscriptions and their panel names, and order history. Fresh export on the
+day, never the stale copy.
 
 ---
 
