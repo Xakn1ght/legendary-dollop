@@ -63,11 +63,17 @@ export function monthsLabel(n, t, fmt) {
 // autoDiscounts: custom plans are NOT vip_only, so the VIP % applies — show
 // the discounted price here exactly like the fixed cards (Pasha bug report:
 // "the VIP offer isn't applied on the custom").
-function CustomPlanCard({ t, fmt, selected, onSelect, autoOpen, autoDiscounts }) {
+function CustomPlanCard({ t, fmt, selected, onSelect, autoOpen, autoDiscounts, route }) {
+  const isPro = route === 'pro';
+  const planPrefix = isPro ? 'pro:' : 'custom:';
+  const quoteUrl = isPro
+    ? '/api/dashboard/purchase/custom-quote?route=pro'
+    : '/api/dashboard/purchase/custom-quote';
+  const mine = (sel) => (isPro ? sel?.route === 'pro' : (sel?.custom && sel?.route !== 'pro'));
   const customPct = discountPctFor(autoDiscounts);
   const discounted = (price) => (customPct > 0 ? price - Math.floor(price * (customPct / 100)) : price);
-  const [open, setOpen] = useState(autoOpen || (selected?.custom ?? false));
-  const [gb, setGb] = useState(selected?.custom ? selected.gb : 50);
+  const [open, setOpen] = useState(autoOpen || mine(selected) || false);
+  const [gb, setGb] = useState(mine(selected) ? selected.gb : 50);
   const [maxGb, setMaxGb] = useState(300); // VIP-aware ceiling from the server (300 / 500)
   const [priceLabel, setPriceLabel] = useState(null); // null=tap hint, 'loading', number=price
   // Android Telegram overlays the keyboard without resizing the page; while
@@ -86,7 +92,7 @@ function CustomPlanCard({ t, fmt, selected, onSelect, autoOpen, autoDiscounts })
 
   const loadTable = () => {
     if (tableRef.current || tableLoadRef.current) return tableLoadRef.current;
-    tableLoadRef.current = api('/api/dashboard/purchase/custom-quote?gb=all')
+    tableLoadRef.current = api(`${quoteUrl}${quoteUrl.includes('?') ? '&' : '?'}gb=all`)
       .then((d) => {
         if (d && d.ok && Array.isArray(d.prices)) {
           tableRef.current = { min: d.min || 1, prices: d.prices };
@@ -101,7 +107,7 @@ function CustomPlanCard({ t, fmt, selected, onSelect, autoOpen, autoDiscounts })
 
   const applyPrice = (value, price) => {
     setPriceLabel(price);
-    onSelect({ name: `custom:${value}`, gb: value, price, custom: true });
+    onSelect({ name: `${planPrefix}${value}`, gb: value, price, custom: true, route: route || 'normal' });
   };
 
   const quote = (value) => {
@@ -122,7 +128,7 @@ function CustomPlanCard({ t, fmt, selected, onSelect, autoOpen, autoDiscounts })
       }
       timerRef.current = setTimeout(async () => {
         try {
-          const data = await api(`/api/dashboard/purchase/custom-quote?gb=${value}`);
+          const data = await api(`${quoteUrl}${quoteUrl.includes('?') ? '&' : '?'}gb=${value}`);
           if (!(data && data.ok)) { setPriceLabel(null); return; }
           if (gbRef.current !== data.gb) return; // stale response
           applyPrice(data.gb, data.price);
@@ -135,7 +141,7 @@ function CustomPlanCard({ t, fmt, selected, onSelect, autoOpen, autoDiscounts })
   // A fixed plan was picked while the builder was open → close the slider
   // (owner bug report: "I have 40 selected and it still shows the bar").
   useEffect(() => {
-    if (selected && !selected.custom && open) { setOpen(false); setPriceLabel(null); }
+    if (selected && !mine(selected) && open) { setOpen(false); setPriceLabel(null); }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selected]);
 
@@ -165,12 +171,12 @@ function CustomPlanCard({ t, fmt, selected, onSelect, autoOpen, autoDiscounts })
     if (!open) {
       setOpen(true);
       quote(parseInt(gb, 10));
-    } else if (!selected?.custom) {
+    } else if (!mine(selected)) {
       setOpen(false);
     }
   };
 
-  const isSelected = !!selected?.custom;
+  const isSelected = !!mine(selected);
   // Hint reflects the live VIP-aware ceiling (maxGb = 300 / 500 from the
   // server) instead of a hardcoded "1-300".
   const customHint = t('customPlanHint').replace('{max}', fmt(maxGb));
@@ -179,7 +185,7 @@ function CustomPlanCard({ t, fmt, selected, onSelect, autoOpen, autoDiscounts })
       <div
         ref={cardRef}
         className={`plan-card plan-card-custom${isSelected ? ' selected' : ''}`}
-        data-plan="custom"
+        data-plan={isPro ? 'pro' : 'custom'}
         role="button"
         tabIndex={0}
         onClick={onCardClick}
@@ -187,7 +193,7 @@ function CustomPlanCard({ t, fmt, selected, onSelect, autoOpen, autoDiscounts })
       >
         <AutoBadges autoDiscounts={autoDiscounts} fmt={fmt} t={t} lang="fa" vipOnly={false} />
         <div className="plan-gb" style={{ fontSize: 26, display: 'flex', justifyContent: 'center' }}><PackageIcon size={26} /></div>
-        <div className="plan-gb-label">{t('customPlan')}</div>
+        <div className="plan-gb-label">{isPro ? t('proPlan') : t('customPlan')}</div>
         <div className="plan-price">
           {customPct > 0 && typeof (priceLabel === 'number' ? priceLabel : (isSelected ? selected.price : null)) === 'number' && (
             <div className="old">
@@ -244,7 +250,7 @@ function CustomPlanCard({ t, fmt, selected, onSelect, autoOpen, autoDiscounts })
   );
 }
 
-export function PlanGrid({ id, t, fmt, lang, plans, autoDiscounts, selectedPlan, onSelect, autoOpenCustom, months = 1 }) {
+export function PlanGrid({ id, t, fmt, lang, plans, autoDiscounts, selectedPlan, onSelect, autoOpenCustom, months = 1, pro }) {
   // months=1: base plans + custom builder + VIP plans (shown at their 2-month
   //           minimum — they must never be hidden from VIP users).
   // months=2/3: everything scaled ×months, no custom builder.
@@ -297,6 +303,9 @@ export function PlanGrid({ id, t, fmt, lang, plans, autoDiscounts, selectedPlan,
       })}
       {showCustom && (
         <CustomPlanCard t={t} fmt={fmt} selected={selectedPlan} onSelect={onSelect} autoOpen={autoOpenCustom} autoDiscounts={autoDiscounts} />
+      )}
+      {pro?.available && months === 1 && (
+        <CustomPlanCard t={t} fmt={fmt} selected={selectedPlan} onSelect={onSelect} autoDiscounts={autoDiscounts} route="pro" />
       )}
     </div>
   );

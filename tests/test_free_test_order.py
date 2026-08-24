@@ -160,8 +160,31 @@ async def test_free_trial_never_pays_a_referral_reward():
     print("free trial pays no referral reward OK")
 
 
+async def test_cooldown_holds_even_bypassing_start_free_test():
+    """The webapp posts a plan name straight into quote_purchase +
+    start_purchase_order, with no allowlist on the name. If the cooldown lived
+    only in start_free_test, that path would mint unlimited trials."""
+    from app.services.flows.pricing import quote_purchase
+    from app.services.flows.purchase import start_purchase_order
+
+    Session, panel = await _setup()
+    db = Session()
+    user = await crud.get_user(db, CHAT)
+    await ft.start_free_test(db, user, TEST_PLAN, bot=None)
+
+    quote = await quote_purchase(db, user, plan_name=TEST_PLAN)
+    try:
+        await start_purchase_order(db, user, quote=quote, service_name=None, bot=None)
+        raise AssertionError("second trial slipped past start_purchase_order")
+    except FlowError as e:
+        assert e.code == "test_cooldown", e.code
+    await db.close()
+    print("cooldown holds on the raw purchase path too OK")
+
+
 async def main():
     await test_trial_provisions_with_no_name_and_no_receipt()
+    await test_cooldown_holds_even_bypassing_start_free_test()
     await test_second_trial_is_refused()
     await test_pro_trial_is_independent_and_routed()
     await test_failed_provision_leaves_no_row_and_no_cooldown()

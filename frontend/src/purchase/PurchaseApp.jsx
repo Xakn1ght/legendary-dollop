@@ -45,6 +45,10 @@ export function PurchaseApp() {
   const [step, setStep] = useState(1);
   const [plans, setPlans] = useState([]);
   const [plansStatus, setPlansStatus] = useState('loading'); // loading | ready | empty | error
+  // Products that are not PLANS rows: the two free trials (null when the user
+  // is on cooldown - hidden, not relabelled) and the Pro route's availability.
+  const [freeTests, setFreeTests] = useState([]);
+  const [proInfo, setProInfo] = useState(null);
   const [months, setMonths] = useState(1); // duration tab: 1 | 2 | 3
   const [autoOpenCustom, setAutoOpenCustom] = useState(false);
   const [userInfo, setUserInfo] = useState(null);
@@ -256,6 +260,39 @@ export function PurchaseApp() {
     });
   }, [busy, goToStep, useCredit, selectedDiscountIds, selectedCouponId, serviceNameState.name, referralState.code]);
 
+  const takeFreeTest = useCallback(async (tier) => {
+    const tt = makeT(langRef.current);
+    await busy(async () => {
+      try {
+        const data = await api('/api/dashboard/purchase/start', {
+          method: 'POST',
+          body: JSON.stringify({
+            plan: tier,
+            service_name: null,
+            auto_renewal: false,
+            renewal_plan: null,
+            referral_code: null,
+            use_credit: false,
+            discount_ids: [],
+            coupon_id: null,
+          }),
+        });
+        if (data.ok) {
+          orderIdRef.current = data.order.id;
+          setOrderFinalPrice(0);
+          goToStep(5);
+          hapticNotify('success');
+        } else {
+          astroToast(data.message || tt('errorOccurred'));
+          hapticNotify('error');
+        }
+      } catch (e) {
+        console.error('Failed to start free test:', e);
+        astroToast(tt('errorOccurred'));
+      }
+    });
+  }, [busy, goToStep]);
+
   const submitReceipt = useCallback(async () => {
     const tt = makeT(langRef.current);
     if (!orderIdRef.current) return;
@@ -345,6 +382,8 @@ export function PurchaseApp() {
             setPlans(data.plans);
             setPlansStatus('ready');
             if (data.payment) setPaymentInfo(data.payment);
+            setFreeTests([data.free_test, data.pro_test].filter(Boolean));
+            setProInfo(data.pro || null);
             return data.plans;
           }
           if (!cancelled) setPlansStatus('empty');
@@ -508,6 +547,23 @@ export function PurchaseApp() {
                   {/* Multi-month is a VIP perk (2026-07-14): non-VIP never
                       sees the duration tabs and buys 1-month only. */}
                   {!!userInfo?.is_vip && <MonthsTabs t={t} fmt={fmt} months={months} onChange={changeMonths} />}
+                  {months === 1 && freeTests.length > 0 && (
+                    <div className="free-test-row">
+                      {freeTests.map((ft) => (
+                        <button
+                          key={ft.name}
+                          type="button"
+                          className="btn btn-secondary free-test-btn"
+                          onClick={() => takeFreeTest(ft.name)}
+                        >
+                          <span className="free-test-title">
+                            {ft.name === 'pro_test' ? t('freeProTest') : t('freeTest')}
+                          </span>
+                          <span className="free-test-hint">{t('freeTestHint')}</span>
+                        </button>
+                      ))}
+                    </div>
+                  )}
                   <PlanGrid
                     id="plansGrid"
                     t={t} fmt={fmt} lang={lang}
@@ -517,6 +573,7 @@ export function PurchaseApp() {
                     onSelect={setSelectedPlan}
                     autoOpenCustom={autoOpenCustom}
                     months={months}
+                    pro={proInfo}
                   />
                 </>
               )}

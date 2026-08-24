@@ -149,6 +149,17 @@ async def start_purchase_order(
     """
     from datetime import datetime
 
+    # Free trials are rate-limited, and this is the only place every caller
+    # shares. quote_purchase happily prices "test", so without this a crafted
+    # webapp request (plan_name is not allowlisted there) mints unlimited
+    # trials. Checked here, not per route.
+    from app.core.products import FREE_TEST_PLANS
+
+    if quote.plan_name in FREE_TEST_PLANS:
+        from app.services.flows.free_tests import assert_test_allowed
+
+        await assert_test_allowed(session, user, quote.plan_name)
+
     marzban_username = await resolve_service_name(session, service_name)
 
     renewal_plan = quote.renewal_plan if auto_renewal else None

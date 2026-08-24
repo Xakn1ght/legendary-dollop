@@ -2,6 +2,7 @@ from aiohttp import web
 
 from app.api.deps import _verify_webapp_auth, set_tma_session_cookie
 from app.core.pricing import CUSTOM_MAX_GB, CUSTOM_MAX_GB_NONVIP, CUSTOM_MIN_GB
+from app.core.products import PRO_MAX_GB, PRO_MIN_GB, pro_gb_price, pro_plan_name
 from app.database import crud
 from app.database.models import AsyncSessionLocal
 from app.services.flows.pricing import custom_plan_price, get_plan_info
@@ -30,20 +31,30 @@ async def handle_custom_plan_quote(request: web.Request):
     if not user_chat_id:
         return web.json_response({"ok": False, "error": "unauthorized"}, status=403)
 
-    user_max = await _user_custom_max(user_chat_id)
+    # Pro / IR-Tun is the same shape as a custom build - pick GB, get a price -
+    # so it rides this endpoint rather than getting its own. Different curve,
+    # different bounds, different plan-name prefix; everything else identical.
+    is_pro = request.query.get("route") == "pro"
+    if is_pro:
+        lo, user_max, ceiling = PRO_MIN_GB, PRO_MAX_GB, PRO_MAX_GB
+        price_of, name_of = pro_gb_price, pro_plan_name
+    else:
+        lo, ceiling = CUSTOM_MIN_GB, CUSTOM_MAX_GB
+        user_max = await _user_custom_max(user_chat_id)
+        price_of, name_of = custom_plan_price, (lambda g: f"custom:{g}")
 
     raw_gb = request.query.get("gb", "")
     if raw_gb == "all":
-        info = get_plan_info(f"custom:{CUSTOM_MIN_GB}") or {}
+        info = get_plan_info(name_of(lo)) or {}
         resp = web.json_response(
             {
                 "ok": True,
-                "min": CUSTOM_MIN_GB,
+                "min": lo,
                 "max": user_max,
                 "days": info.get("days"),
                 # Full table to the ABSOLUTE ceiling so a VIP slider has every
                 # price; non-VIP clients simply cap their slider at ``max``.
-                "prices": [custom_plan_price(g) for g in range(CUSTOM_MIN_GB, CUSTOM_MAX_GB + 1)],
+                "prices": [price_of(g) for g in range(lo, ceiling + 1)],
             }
         )
         resp.headers["Cache-Control"] = "private, max-age=600"
@@ -55,21 +66,21 @@ async def handle_custom_plan_quote(request: web.Request):
         gb = int(raw_gb)
     except ValueError:
         return web.json_response({"ok": False, "error": "invalid_gb"}, status=400)
-    if not (CUSTOM_MIN_GB <= gb <= user_max):
+    if not (lo <= gb <= user_max):
         return web.json_response(
-            {"ok": False, "error": "out_of_range", "min": CUSTOM_MIN_GB, "max": user_max}, status=400
+            {"ok": False, "error": "out_of_range", "min": lo, "max": user_max}, status=400
         )
 
-    plan_name = f"custom:{gb}"
+    plan_name = name_of(gb)
     info = get_plan_info(plan_name) or {}
     resp = web.json_response(
         {
             "ok": True,
             "plan_name": plan_name,
             "gb": gb,
-            "price": custom_plan_price(gb),
+            "price": price_of(gb),
             "days": info.get("days"),
-            "min": CUSTOM_MIN_GB,
+            "min": lo,
             "max": user_max,
         }
     )

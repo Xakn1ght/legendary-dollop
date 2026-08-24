@@ -1245,3 +1245,14 @@ html:has(.custom-plan-pop.kb-float) :is(.card, .section, .content, .container) {
   margin: 2px 0 6px; font-size: 11px; line-height: 1.6;
   color: var(--warning, #fbbf24); text-align: start;
 }
+
+/* Free-trial buttons above the plan grid. Shown only while eligible - the
+   server omits a trial on cooldown, so there is nothing to grey out. */
+.free-test-row { display: flex; gap: 10px; margin: 0 0 12px; }
+.free-test-row .free-test-btn {
+  flex: 1 1 0; display: flex; flex-direction: column; gap: 2px;
+  align-items: center; justify-content: center; min-height: 56px;
+  padding: 10px 12px; border-radius: 14px; text-align: center;
+}
+.free-test-title { font-weight: 700; font-size: 13px; }
+.free-test-hint { font-size: 11px; opacity: .72; }

@@ -15,6 +15,13 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "src"))
 
 from app.services.flows import purchase as p  # noqa: E402
 
+# This file is about seed sanitising, not test mode. TEST_PANEL_PREFIX is a
+# real env var (set while phone-testing) and would prefix every generated name,
+# so neutralise it here rather than letting the developer's .env decide.
+import app.core.settings as _settings  # noqa: E402
+
+_settings.TEST_PANEL_PREFIX = ""
+
 
 def test_seed_sanitize():
     f = p.sanitize_panel_username_seed

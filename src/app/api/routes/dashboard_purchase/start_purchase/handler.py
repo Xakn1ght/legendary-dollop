@@ -108,9 +108,10 @@ async def handle_start_purchase(request: web.Request):
                 admin_bot = get_admin_bot()
                 if admin_bot:
                     plan_gb = (_get_plan_info(quote.plan_name) or {}).get("gb", 0)
+                    is_free = bool((_get_plan_info(quote.plan_name) or {}).get("free"))
                     admin_text = (
-                        "خرید با اعتبار (خودکار)\n\n"
-                        f"کاربر: {user.full_name} ({user_chat_id})\n"
+                        ("تست رایگان (خودکار)\n\n" if is_free else "خرید با اعتبار (خودکار)\n\n")
+                        + f"کاربر: {user.full_name} ({user_chat_id})\n"
                         f"پلن: {quote.plan_name} ({plan_gb} گیگابایت)\n"
                         f"نام سرویس: {sub.marzban_username}\n"
                         f"اعتبار استفاده شده: {quote.credit_used:,} تومان\n"
