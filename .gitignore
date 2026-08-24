@@ -79,3 +79,9 @@ docs/premium-tier-redesign*/
 audit-screens/
 /app/
 checkpoints/
+
+# .env backups (secrets) - never in git
+.env.bak*
+**/.env.bak*
+.env.*
+!.env.example

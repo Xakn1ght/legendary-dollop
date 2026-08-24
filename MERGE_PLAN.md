@@ -104,7 +104,8 @@ The sales bot's buying experience, which Pasha says works well.
 - [x] 1.3 Pro routing to `PASARGUARD_IR_TUN_GROUP_ID`, with the panel template
       fast path suppressed so a Pro order cannot land in the normal group.
 - [x] 1.4 Two-level Normal/Pro inline menu; the two never share a screen.
-- [ ] 1.5 Delivery banners and the `تست پرو` labelling rule
+- [ ] 1.5 Delivery banners - DEFERRED. Pasha wants them REDESIGNED, not ported;
+      do not copy the sales bot's templates.json as-is.
 - [ ] 1.6 Renewal flow (the live bot's is far more developed — 381 references)
 
 **Not yet done for slice 1:** the Mini App still shows only the `PLANS` grid —
