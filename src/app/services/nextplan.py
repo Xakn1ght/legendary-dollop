@@ -63,6 +63,27 @@ async def arm_native_next_plan(session, sub, *, plans: dict | None = None, sourc
     template = getattr(sub, "renewal_template", None)
     if not (getattr(sub, "renewal_paid", False) and template):
         return False
+    # Defence in depth: quote_purchase and start_charge_order both refuse to
+    # book a free trial or a cross-route template, but this is the last gate
+    # before the PANEL holds the booking and fires it on its own, possibly
+    # months later with nobody watching.
+    from app.core.products import plan_route
+    from app.services.flows.pricing import get_plan_info
+
+    booked_info = get_plan_info(template, plans if plans is not None else PLANS)
+    if booked_info and booked_info.get("free"):
+        bot_logger.warning(
+            f"[NEXTPLAN] refusing to arm a free trial for {sub.marzban_username} ({source})"
+        )
+        return False
+    current_info = get_plan_info(getattr(sub, "plan_name", "") or "", plans if plans is not None else PLANS)
+    if booked_info and plan_route(booked_info) != plan_route(current_info):
+        bot_logger.warning(
+            f"[NEXTPLAN] refusing cross-route booking for {sub.marzban_username}: "
+            f"{plan_route(current_info)} sub, {plan_route(booked_info)} template ({source})"
+        )
+        return False
+
     fields = booked_next_plan_fields(template, plans)
     if not fields:
         bot_logger.warning(

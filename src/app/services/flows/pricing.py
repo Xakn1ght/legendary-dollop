@@ -267,6 +267,29 @@ async def quote_purchase(
     if renewal_plan is not None and not renewal_info:
         raise QuoteError("invalid_renewal_plan", "Invalid renewal plan selected")
 
+    # Free trials cost nothing, so every money extra is meaningless on them -
+    # and silently ignoring a coupon would BURN it (one reward coupon per
+    # purchase, consumed at order creation) on a zero-toman item. Reject loudly.
+    if plan_info.get("free"):
+        if coupon_id is not None:
+            raise QuoteError("free_plan_no_coupon", "A free trial cannot use a coupon")
+        if discount_ids:
+            raise QuoteError("free_plan_no_discount", "A free trial cannot use a discount")
+        if use_credit:
+            raise QuoteError("free_plan_no_credit", "A free trial cannot use credit")
+        if renewal_plan is not None:
+            raise QuoteError("free_plan_no_renewal", "A free trial cannot book a renewal")
+    # A trial is never a renewal template - the panel would book a 250 MB plan
+    # as the follow-up to a paid subscription.
+    if renewal_info is not None and renewal_info.get("free"):
+        raise QuoteError("invalid_renewal_plan", "A free trial cannot be booked as a renewal")
+
+    # Routes must not mix. A Pro subscription renewing into a normal template
+    # (or the reverse) would provision into the wrong PasarGuard group when the
+    # booking fires, months later, with nobody watching.
+    if renewal_info is not None and plan_route(renewal_info) != plan_route(plan_info):
+        raise QuoteError("route_mismatch", "The renewal plan must be the same type as the plan")
+
     plan_price = int(plan_info.get("price") or 0)
     renewal_price = int(renewal_info.get("price") or 0) if renewal_info else 0
     base_total = plan_price + renewal_price

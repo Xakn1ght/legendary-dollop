@@ -116,6 +116,7 @@ async def start_charge_order(
     via :func:`submit_charge_receipt` instead.
     """
     from app.core.pricing import CUSTOM_MAX_GB_NONVIP
+    from app.core.products import plan_route as _plan_route
     from app.services.flows.pricing import get_plan_info as _gpi
     from app.services.flows.pricing import parse_plan_months as _parse_months
     from app.services.flows.pricing import plan_min_months as _plan_min_months
@@ -136,6 +137,12 @@ async def start_charge_order(
             raise FlowError("plan_min_months", "This plan is only sold as a 2-3 month package")
         raise FlowError("invalid_package", "Selected package does not exist")
 
+    # A free trial is a product you are GIVEN, not a top-up you apply to an
+    # existing subscription. get_plan_info resolves "test"/"pro_test" happily,
+    # so without this a user could top up any subscription for zero toman.
+    if pkg_info.get("free"):
+        raise FlowError("free_not_chargeable", "A free trial cannot be used as a top-up")
+
     is_vip_user = await crud.is_user_vip(session, user.id)
     package_is_vip_only = bool(pkg_info.get("vip_only"))
     if package_is_vip_only and not is_vip_user:
@@ -154,6 +161,8 @@ async def start_charge_order(
         renewal_probe = _gpi(renewal_template, PLANS)
         if not renewal_probe:
             raise FlowError("invalid_renewal_plan", "Invalid renewal plan selected")
+        if renewal_probe.get("free"):
+            raise FlowError("invalid_renewal_plan", "A free trial cannot be booked as a renewal")
         if int(renewal_probe.get("months") or 1) > 1 and not is_vip_user:
             raise FlowError("months_vip_only", "Multi-month plans are exclusive to VIP members")
         if (
@@ -168,6 +177,17 @@ async def start_charge_order(
         raise FlowError("subscription_not_found")
     if sub.user_id != user.id:
         raise FlowError("unauthorized")
+
+    # Routes must not mix. The panel user already lives in one group; topping a
+    # normal subscription up with a Pro package (or the reverse) would sell Pro
+    # traffic that is never delivered over the Pro route. Historical plan names
+    # that no longer resolve fall back to the normal route, which is what every
+    # subscription predating the merge is.
+    sub_route = _plan_route(_gpi(sub.plan_name, PLANS))
+    if _plan_route(pkg_info) != sub_route:
+        raise FlowError("route_mismatch", "This package is not available for this subscription")
+    if renewal_template is not None and _plan_route(_gpi(renewal_template, PLANS)) != sub_route:
+        raise FlowError("route_mismatch", "The renewal plan must match this subscription")
     if sub.status != "active":
         raise FlowError("subscription_not_active")
 
