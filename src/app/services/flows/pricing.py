@@ -49,6 +49,16 @@ from app.core.pricing import (  # noqa: E402
 
 CUSTOM_PLAN_PREFIX = "custom:"
 
+# ── virtual products ported from the sales bot (free trials + Pro/IR-Tun) ────
+# Deliberately not rows in PLANS - see app/core/products.py for why.
+from app.core.products import (  # noqa: E402
+    PRO_TEST_PLAN,
+    TEST_PLAN,
+    parse_pro_plan,
+    plan_route,
+    resolve_virtual_product,
+)
+
 
 def parse_custom_plan(plan_name: str) -> int | None:
     """Return the GB for a "custom:<gb>" plan name, else None."""
@@ -120,6 +130,15 @@ def get_plan_info(plan_name: str, plans: dict | None = None) -> dict | None:
                 "custom": True,
                 "name_en": f"{gb} GB | Custom",
             }
+        else:
+            virtual = resolve_virtual_product(base_name)
+            if virtual is not None:
+                # Free trials and Pro/IR-Tun are single-period products: a
+                # trial has a fixed 10 days, and Pro is sold by GB, so "@Nm"
+                # has nothing to scale and must not silently double a price.
+                if months is not None:
+                    return None
+                base = virtual
     if base is None:
         return None
 
@@ -152,6 +171,15 @@ def plan_display_name(plan_name: str, lang: str = "fa") -> str:
     gb = parse_custom_plan(base_name)
     if gb is not None:
         return f"{gb} گیگ | سفارشی".translate(_FA_DIGITS) if lang == "fa" else f"{gb} GB | Custom"
+    # Virtual products carry no catalog name, so without these the summary,
+    # receipt caption, admin card and delivery message all print "pro:50".
+    if base_name == TEST_PLAN:
+        return "تست رایگان" if lang == "fa" else "Free test"
+    if base_name == PRO_TEST_PLAN:
+        return "تست پرو رایگان" if lang == "fa" else "Free Pro test"
+    pro_gb = parse_pro_plan(base_name)
+    if pro_gb is not None:
+        return f"{pro_gb} گیگ | پرو".translate(_FA_DIGITS) if lang == "fa" else f"{pro_gb} GB | Pro"
     info = get_plan_info(plan_name)
     # Bare VIP names resolve to their min_months package (2-month/700GB), so
     # the rebuild keys off the RESOLVED months, not just an explicit suffix.
