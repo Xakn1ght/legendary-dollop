@@ -135,12 +135,17 @@ async def start_purchase_order(
     referrer_id: int | None = None,
     auto_renewal: bool = False,
     bot=None,
+    approved_by: str | None = None,
 ) -> OrderResult:
     """Create the order row and consume credit/discounts/coupon.
 
     ``bot`` is the **user** Telegram bot, required only for the auto-approve path
     (it DMs the subscription link). Raises FlowError(auto_approve_failed) after a
     full rollback when provisioning fails.
+
+    ``approved_by`` labels a zero-price order in the audit trail and on the admin
+    card. It defaults to the credit wording; free trials pass their own, or every
+    trial would be recorded and announced as a credit purchase.
     """
     from datetime import datetime
 
@@ -184,14 +189,22 @@ async def start_purchase_order(
         await crud.mark_coupon_used(session, quote.coupon.id)
 
     if quote.final_price <= 0:
-        await _auto_approve(session, sub, bot)
+        await _auto_approve(session, sub, bot, reason=approved_by)
         return OrderResult(subscription=sub, quote=quote, auto_approved=True)
 
     return OrderResult(subscription=sub, quote=quote)
 
 
-async def _auto_approve(session: AsyncSession, sub: Subscription, bot) -> None:
-    """Provision a fully-covered order now; roll everything back on failure."""
+async def _auto_approve(
+    session: AsyncSession, sub: Subscription, bot, reason: str | None = None
+) -> None:
+    """Provision a fully-covered order now; roll everything back on failure.
+
+    ``reason`` is what the audit trail and the admin card show. Zero-price used
+    to mean one thing only (fully covered by credit), so it was hardcoded; free
+    trials are the second way to reach here.
+    """
+    label = reason or "سیستم (پرداخت با اعتبار)"
     from app.services.subscription_processing import process_approved_subscription
 
     ok = False
@@ -200,7 +213,7 @@ async def _auto_approve(session: AsyncSession, sub: Subscription, bot) -> None:
         sub.status = "pending"
         await session.commit()
         try:
-            ok = await process_approved_subscription(sub.id, session, bot, approved_by="سیستم (پرداخت با اعتبار)")
+            ok = await process_approved_subscription(sub.id, session, bot, approved_by=label)
         except Exception as e:
             logger.error(f"Auto-approve failed for order {sub.id}: {e}")
             ok = False

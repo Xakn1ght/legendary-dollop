@@ -267,7 +267,11 @@ async def process_approved_subscription(sub_id: int, session: AsyncSession, bot:
 
     await _cleanup_admin_messages(subscription)
 
-    if subscription.referrer_id:
+    # Free trials never pay a referral reward. The price is 0 so no credit is
+    # minted, but the GB/days percentages would still pay out on the trial's
+    # 0.25 GB - and once referrals also EARN (the merge adds rewards on top of
+    # the invite gate), "refer yourself a trial a week" becomes a farm.
+    if subscription.referrer_id and not (plan_info or {}).get("free"):
         from app.database.models import ReferralReward as _ReferralReward
 
         existing_reward_q = await session.execute(

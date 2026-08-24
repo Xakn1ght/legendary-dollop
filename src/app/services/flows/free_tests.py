@@ -152,6 +152,54 @@ async def release_free_test_claim(user, tier: str) -> None:
         pass
 
 
+async def start_free_test(session: AsyncSession, user, tier: str, bot=None):
+    """Provision a free trial immediately. No name prompt, no receipt step.
+
+    That is the whole point of the flow Pasha approved on the live bot: tap the
+    button, the subscription arrives. It works here without a special path
+    because the order simply prices to zero - ``start_purchase_order`` sends any
+    fully-covered order straight down ``_auto_approve``, so the FSM never enters
+    the name or receipt states.
+
+    ``service_name=None`` makes ``resolve_service_name`` generate a random
+    8-character name, already sanitised for the panel and already carrying
+    TEST_PANEL_PREFIX when test mode is on. That is exactly the live bot's
+    random_sub_name; do not reimplement it.
+
+    Raises FlowError: invalid_test_tier, test_in_progress, test_cooldown,
+    auto_approve_failed.
+    """
+    from app.services.flows.pricing import quote_purchase
+    from app.services.flows.purchase import start_purchase_order
+
+    if tier not in FREE_TEST_PLANS:
+        raise FlowError("invalid_test_tier", "Unknown trial")
+
+    if not await claim_free_test(user, tier):
+        raise FlowError("test_in_progress", "Your trial is already being created")
+
+    try:
+        # Checked again inside the lock: the tap that lost the race must not
+        # get through on a stale read taken before the winner's row existed.
+        await assert_test_allowed(session, user, tier)
+        quote = await quote_purchase(session, user, plan_name=tier)
+        label = "سیستم (تست رایگان)" if tier == TEST_PLAN else "سیستم (تست پرو رایگان)"
+        result = await start_purchase_order(
+            session, user, quote=quote, service_name=None,
+            auto_renewal=False, bot=bot, approved_by=label,
+        )
+    except Exception:
+        # A pre-provision failure rolls the row away, so the allowance is
+        # intact - release the lock too or the user waits 90s for nothing.
+        await release_free_test_claim(user, tier)
+        raise
+    # Released on success as well: the order row now exists, so the in-progress
+    # and cooldown checks are the real gate and the lock has nothing left to
+    # protect. Holding it would just be 90 seconds of a worse error message.
+    await release_free_test_claim(user, tier)
+    return result
+
+
 __all__ = [
     "PRO_TEST_PLAN",
     "TEST_PLAN",
@@ -161,5 +209,6 @@ __all__ = [
     "free_test_in_progress",
     "is_free_test_available",
     "release_free_test_claim",
+    "start_free_test",
     "test_cooldown_remaining",
 ]
