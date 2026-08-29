@@ -24,6 +24,7 @@ from app.handlers.admin import (
     vip,
 )
 from app.handlers.admin.common import ADMIN_IDS
+from app.utils.bot_session import bot_session
 from app.utils.error_middleware import ErrorHandlingMiddleware
 from app.utils.logger import bot_logger, log_error, setup_logging
 
@@ -93,7 +94,8 @@ async def main() -> None:
 
     # aiogram 3.7+ dropped the `default_parse_mode` kwarg; it was silently
     # swallowed by **kwargs so /errors etc. showed raw <b> tags (audit fix).
-    bot = Bot(token=ADMIN_BOT_TOKEN, default=DefaultBotProperties(parse_mode=ParseMode.HTML))
+    bot = Bot(token=ADMIN_BOT_TOKEN, default=DefaultBotProperties(parse_mode=ParseMode.HTML),
+              session=bot_session())
     dp = Dispatcher()
 
     # Middlewares

@@ -39,7 +39,7 @@ from app.jobs.season_reset import season_reset_job
 from app.jobs.sms_sweep import sms_sweep_job
 from app.services.pasarguard import pasarguard_api
 from app.utils.banned_user_middleware import BannedUserMiddleware
-from app.utils.webapp_lock_middleware import WebappLockMiddleware
+from app.utils.bot_session import bot_session
 from app.utils.error_middleware import (
     ErrorHandlingMiddleware,
     PerformanceMiddleware,
@@ -47,6 +47,7 @@ from app.utils.error_middleware import (
     ValidationMiddleware,
 )
 from app.utils.logger import bot_logger, log_error, log_job_execution, setup_logging
+from app.utils.webapp_lock_middleware import WebappLockMiddleware
 
 # Notification queue for real-time alerts
 notification_queue = asyncio.Queue()
@@ -183,7 +184,8 @@ async def main():
     # aiogram 3.7+ silently swallows the old `default_parse_mode` kwarg — the
     # user bot ran with NO default parse mode (raw <b> tags in any message
     # that didn't pass parse_mode explicitly). Same fix as admin_main.py.
-    bot = Bot(token=BOT_TOKEN, default=DefaultBotProperties(parse_mode=ParseMode.HTML))
+    bot = Bot(token=BOT_TOKEN, default=DefaultBotProperties(parse_mode=ParseMode.HTML),
+              session=bot_session())
     try:
         await bot.set_my_commands([
             BotCommand(command="start", description="شروع"),

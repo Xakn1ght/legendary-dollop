@@ -1,5 +1,6 @@
 """Admin panel login: password step."""
 
+import logging
 from datetime import datetime, timedelta
 
 from aiogram import Bot
@@ -16,10 +17,9 @@ from app.core.settings import (
     needs_password_migration,
     verify_admin_password,
 )
+from app.utils.bot_session import bot_session
 
 from ... import state as st
-
-import logging
 
 logger = logging.getLogger(__name__)
 
@@ -113,7 +113,7 @@ async def handle_admin_login(request: web.Request):
                 )
 
             try:
-                admin_bot = Bot(token=ADMIN_BOT_TOKEN)
+                admin_bot = Bot(token=ADMIN_BOT_TOKEN, session=bot_session())
                 await admin_bot.send_message(
                     chat_id,
                     f"🔐 **کد ورود پنل ادمین**\n\n"

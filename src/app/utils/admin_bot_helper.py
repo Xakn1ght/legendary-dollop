@@ -15,6 +15,7 @@ from aiogram import Bot
 from aiogram.types import BufferedInputFile
 
 from app.core.settings import ADMIN_BOT_TOKEN, ADMIN_ID, BOT_TOKEN
+from app.utils.bot_session import bot_session
 
 if TYPE_CHECKING:
     from aiogram.types import Message
@@ -29,7 +30,7 @@ def get_admin_bot() -> Bot | None:
     if not ADMIN_BOT_TOKEN:
         return None
     if _admin_bot_instance is None:
-        _admin_bot_instance = Bot(token=ADMIN_BOT_TOKEN)
+        _admin_bot_instance = Bot(token=ADMIN_BOT_TOKEN, session=bot_session())
     return _admin_bot_instance
 
 
@@ -39,7 +40,7 @@ def get_user_bot() -> Bot | None:
     if not BOT_TOKEN:
         return None
     if _user_bot_instance is None:
-        _user_bot_instance = Bot(token=BOT_TOKEN)
+        _user_bot_instance = Bot(token=BOT_TOKEN, session=bot_session())
     return _user_bot_instance
 
 
