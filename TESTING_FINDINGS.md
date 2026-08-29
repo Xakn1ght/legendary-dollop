@@ -12,20 +12,28 @@ Format: `- [ ] where — what happened`
 
 ## Open
 
-Rescued from the old checklists (found during earlier runs, never triaged):
+- [ ] Charge page — spacing needs a redesign. Cosmetic; goes with the
+      delivery-banner redesign rather than on its own.
 
-- [ ] Buy > custom plan — it only asks for GB, never asks for days. The old
-      test expected a days question and rejection under 15 days.
-- [ ] Charge page — pressing Cancel does nothing; stays on the same "choose a
-      subscription" page.
-- [ ] Charge page — spacing needs a redesign.
-- [ ] Referrals — an existing ("og") user cannot enter a referral code.
-- [ ] Support, new ticket — "field required" error even though every field is
-      filled. `POST /api/dashboard/tickets` returns 400.
-- [ ] Support, live chat — WebSocket fails to connect. It is pointed at
-      `wss://game1.astrobytech.com/...` (the arcade domain) instead of
-      `dash.astrobytech.com`. Likely the cause of the ticket failure above.
+## Fixed / not a bug
 
-## Fixed
+Checked 2026-08-29. The list rescued from the old checklists was mostly stale —
+five of six had already been fixed or turned out to be by design.
 
-_(move lines here with the date once confirmed fixed)_
+- [x] Support, new ticket — 400 "field required". Fixed: `subject` is optional
+      now (`api/schemas/tickets.py`), and the form only sends category,
+      message and subscription_id. Verified against the schema.
+- [x] Support, live chat — WebSocket pointed at the arcade domain. Fixed: the
+      URL is built from `window.location.host`, and the bot opens support with
+      `DASHBOARD_PUBLIC_BASE_URL` (`handlers/user/common.py:141`), so it can
+      only inherit the dashboard domain now.
+- [x] Charge page — Cancel did nothing. Fixed: `cancelOrder` leaves the charge
+      flow entirely instead of returning to the choose-a-subscription step.
+- [x] Buy > custom plan — never asks for days. **By design**: custom plans are
+      GB-only and 1-month (`flows/pricing.py`), so there is no days question to
+      ask. The old expectation predates that rule.
+- [x] Referrals — an existing user cannot enter a referral code. **By design**:
+      referral attribution comes from signup only; the purchase flow
+      deliberately never interrupts to ask for a code
+      (`purchase/flow_referral_plan.py`), because existing users found it
+      confusing.
