@@ -381,11 +381,23 @@ def _evidence_contradiction(dep: dict, cand: dict) -> str | None:
     return None
 
 
+def _dep_key(dep: dict) -> str:
+    """Identity of ONE pooled deposit.
+
+    Normally the bank tracking number, but tracking numbers get reused: a
+    proven-distinct second payment carries its own fingerprint in `claim_id`.
+    Anything that singles out a pooled row must compare THIS, not `dedup_id`,
+    or approving one payment silently consumes the other. Rows pooled before
+    `claim_id` existed fall back to `dedup_id`.
+    """
+    return str((dep or {}).get('claim_id') or (dep or {}).get('dedup_id') or '')
+
+
 def _update_deposit(dedup_id: str, **fields) -> None:
     with _lock:
         deps = _load_deposits()
         for d in deps:
-            if d.get('dedup_id') == dedup_id:
+            if _dep_key(d) == dedup_id:
                 d.update(fields)
         _save_deposits(deps)
 
@@ -403,7 +415,7 @@ def _veto_defer(dep: dict, order_id: str, reason: str) -> bool:
     if not since or dep.get('veto_order') != order_id:
         dep['veto_since'] = now
         dep['veto_order'] = order_id
-        _update_deposit(dep['dedup_id'], veto_since=now, veto_order=order_id)
+        _update_deposit(_dep_key(dep), veto_since=now, veto_order=order_id)
         bot_logger.info(f"[SMS] evidence veto: deposit {dep['dedup_id']} vs {order_id} — "
                         f"{reason}; deferring up to {SMS_VETO_GRACE_SEC}s")
         return True
@@ -476,7 +488,7 @@ async def _block_unreadable(bot, dep: dict, order_id: str) -> None:
     if dep.get('unreadable_notified') == order_id:
         return
     dep['unreadable_notified'] = order_id
-    _update_deposit(dep['dedup_id'], unreadable_notified=order_id)
+    _update_deposit(_dep_key(dep), unreadable_notified=order_id)
     bot_logger.info(f"[SMS] unreadable-receipt gate: deposit {dep['dedup_id']} amount-matches "
                     f"{order_id} but its receipt is not a readable transfer image — manual only")
     await _notify_admin(
@@ -519,8 +531,21 @@ async def handle_incoming_sms(bot, text: str) -> None:
         return
     with _lock:
         deps = _prune(_load_deposits())
-        if any(d.get('dedup_id') == dep['dedup_id'] for d in deps):
-            return  # already seen this deposit
+        identity = sms_autoapprove.classify_deposit_identity(deps, dep)
+        if identity == 'duplicate':
+            return  # replay of a deposit already pooled
+        if identity == 'collision':
+            # Bank tracking numbers are short and DO repeat. This one is
+            # proven materially different, so it is a second real payment:
+            # pool it under its own claim key (keeping the legacy dedup_id for
+            # display and for bakbot's shared claim on the original), and flag
+            # it so it can only auto-approve on positive receipt evidence.
+            dep['tracking_collision'] = 1
+            dep['claim_id'] = sms_autoapprove.deposit_fingerprint(dep)
+            bot_logger.info(f"[SMS] tracking {dep.get('tracking')} reused — pooling as a "
+                            f"distinct deposit ({sms_autoapprove.deposit_amount_toman(dep)} toman)")
+        else:
+            dep['claim_id'] = dep['dedup_id']
         dep['ts'] = int(time.time())
         dep['matched'] = None
         deps.append(dep)
@@ -593,7 +618,7 @@ async def _sweep(bot) -> None:
                         rivals = _amount_rivals(cand, [p for p in pending if not p.get('matched')])
                         if len(rivals) > 1:
                             chosen = _pick_rival_by_evidence(rivals, cand)
-                            if chosen is not None and chosen.get('dedup_id') != dep.get('dedup_id'):
+                            if chosen is not None and _dep_key(chosen) != _dep_key(dep):
                                 # The rightful deposit approves this order in
                                 # its own turn; this one stays available.
                                 bot_logger.info(
@@ -605,7 +630,7 @@ async def _sweep(bot) -> None:
                                 if fresh:
                                     await _audit_multi_deposit_deferred(res, rivals)
                                     for r in rivals:
-                                        if r.get('dedup_id') != dep.get('dedup_id'):
+                                        if _dep_key(r) != _dep_key(dep):
                                             _veto_defer(r, res, 'multi-deposit contention (no decisive evidence)')
                                 if _veto_defer(dep, res, 'multi-deposit contention (no decisive evidence)'):
                                     continue
@@ -614,11 +639,29 @@ async def _sweep(bot) -> None:
                         reason = _evidence_contradiction(dep, cand)
                         if reason and _veto_defer(dep, res, reason):
                             continue
+            if kind == 'approve' and dep.get('tracking_collision'):
+                # 5e. A reused tracking number needs POSITIVE receipt evidence.
+                # Amount-only uniqueness is not enough: the rightful order for
+                # the other same-tracking payment may simply not exist yet.
+                cand = next((c for c in cands if c['order_id'] == res), None)
+                if not (cand and (_ref_joined(dep, cand) or _card_joined(dep, cand))):
+                    if not dep.get('collision_notified'):
+                        _update_deposit(_dep_key(dep), collision_notified=1)
+                        await _notify_admin(
+                            bot,
+                            'شماره پیگیری تکراری با مبلغ متفاوت — تأیید خودکار متوقف شد '
+                            '(تأیید دستی لازم):\n'
+                            f'مبلغ: {sms_autoapprove.deposit_amount_toman(dep) or 0:,} تومان'
+                            f' · پیگیری: {dep.get("tracking") or "—"}\n'
+                            f'سفارش: {res}')
+                    bot_logger.info(f"[SMS] collision gate: {dep['dedup_id']} -> {res} "
+                                    "held for manual review (no receipt evidence)")
+                    continue
             if kind == 'approve':
                 ok = await _approve(bot, session, res, dep)
                 if ok:
                     dep['matched'] = res  # in-memory too: rivals within THIS sweep must see it
-                    _mark_matched(dep['dedup_id'], res)
+                    _mark_matched(_dep_key(dep), res)
                     # This order is consumed; drop it from the candidate pool.
                     cands = [c for c in cands if c['order_id'] != res]
             elif kind == 'ambiguous':
@@ -637,7 +680,7 @@ def _mark_matched(dedup_id: str, order_id: str) -> None:
     with _lock:
         deps = _load_deposits()
         for d in deps:
-            if d.get('dedup_id') == dedup_id:
+            if _dep_key(d) == dedup_id:
                 d['matched'] = order_id
         _save_deposits(deps)
 
@@ -651,7 +694,8 @@ async def _approve(bot, session, typed_id: str, dep: dict) -> bool:
     except Exception:
         return False
 
-    if not _claim_deposit(dep['dedup_id']):
+    claim_id = _dep_key(dep)
+    if not _claim_deposit(claim_id):
         bot_logger.info(f"[SMS] deposit {dep['dedup_id']} already claimed elsewhere; skip {typed_id}")
         return False
 
@@ -660,7 +704,7 @@ async def _approve(bot, session, typed_id: str, dep: dict) -> bool:
             from app.services.subscription_processing import process_approved_subscription
             sub = await session.get(Subscription, oid)
             if not sub or sub.status != 'pending':
-                _release_claim(dep['dedup_id'])
+                _release_claim(claim_id)
                 return False
             ok = await process_approved_subscription(oid, session, bot, approved_by="سیستم (پیامک بانک)")
         elif kind == 'charge':
@@ -676,7 +720,7 @@ async def _approve(bot, session, typed_id: str, dep: dict) -> bool:
             from app.handlers.admin.vip import activate_vip_order
             v = await session.get(VipOrder, oid)
             if not v or v.status != 'pending':
-                _release_claim(dep['dedup_id'])
+                _release_claim(claim_id)
                 return False
             ok = await activate_vip_order(session, v, notify_user_bot=bot)
         else:
@@ -686,7 +730,7 @@ async def _approve(bot, session, typed_id: str, dep: dict) -> bool:
         ok = False
 
     if not ok:
-        _release_claim(dep['dedup_id'])
+        _release_claim(claim_id)
         return False
 
     bot_logger.info(f'[SMS] AUTO-APPROVED {typed_id} amount={dep["amount"]} tracking={dep.get("tracking")}')

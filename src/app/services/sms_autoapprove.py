@@ -15,8 +15,11 @@ Safety stance (money is involved):
   - a deposit auto-approves at most ONE order, and only when unambiguous.
   - a ref-number join (receipt's شماره مرجع == SMS's شماره بازیابی/پیگیری) may
     break an amount collision, but never overrides the amount gate.
-  - the caller dedups by the bank's tracking number (and a cross-system claim)
-    so one deposit can never approve twice.
+  - the caller keeps the bank's tracking number as the cross-system claim key,
+    but bank tracking numbers DO get reused: when a same-tracking SMS is proven
+    materially different (amount / retrieval / card), it is a second real
+    payment, not a replay, and is pooled under its own fingerprint. A tracking
+    collision is never approval evidence by itself.
 """
 
 from __future__ import annotations
@@ -184,6 +187,74 @@ def deposit_amount_toman(deposit: dict) -> int | None:
         return amount
     return amount // 10 if amount % 10 == 0 else None
 
+
+
+def _identity_digits(deposit: dict, full_key: str, last4_key: str) -> str:
+    """Best stable card identity available in a parsed bank notification."""
+    full = re.sub(r'\D', '', str((deposit or {}).get(full_key) or ''))
+    if full:
+        return full
+    return re.sub(r'\D', '', str((deposit or {}).get(last4_key) or ''))
+
+
+def deposit_fingerprint(deposit: dict) -> str:
+    """Namespaced claim key for one specific bank transaction.
+
+    Used ONLY after a same-tracking collision has been proven by deterministic
+    bank fields; normal deposits keep the legacy tracking id so this app and
+    bakbot keep contending on the same shared claim.
+    """
+    amount = deposit_amount_toman(deposit)
+    parts = (
+        str((deposit or {}).get('tracking') or ''),
+        str((deposit or {}).get('retrieval') or ''),
+        '' if amount is None else str(amount),
+        _identity_digits(deposit, 'source_card', 'source_last4'),
+        _identity_digits(deposit, 'dest_card', 'dest_last4'),
+    )
+    basis = '\x1f'.join(parts)
+    return 'sms2:' + hashlib.sha256(basis.encode('utf-8')).hexdigest()[:32]
+
+
+def deposits_materially_distinct(old: dict, new: dict) -> bool:
+    """True only when strong bank fields PROVE two same-id rows are different.
+
+    Missing fields never prove a difference. Fails closed: if a tracking number
+    repeats and every field we can compare is identical, automation cannot tell
+    the two apart and must treat the second as a replay.
+    """
+    old_amount = deposit_amount_toman(old)
+    new_amount = deposit_amount_toman(new)
+    if old_amount is not None and new_amount is not None and old_amount != new_amount:
+        return True
+
+    a, b = str((old or {}).get('retrieval') or ''), str((new or {}).get('retrieval') or '')
+    if a and b and a != b:
+        return True
+
+    for full_key, last4_key in (('source_card', 'source_last4'), ('dest_card', 'dest_last4')):
+        a = _identity_digits(old, full_key, last4_key)
+        b = _identity_digits(new, full_key, last4_key)
+        # last four digits are stable across full and masked representations
+        if a and b and a[-4:] != b[-4:]:
+            return True
+    return False
+
+
+def classify_deposit_identity(existing: list[dict], incoming: dict) -> str:
+    """'new' | 'duplicate' | 'collision' for an incoming SMS against the pool.
+
+    An indistinguishable row wins over older differing ones, so re-forwarding
+    an already-accepted collision stays idempotent.
+    """
+    legacy_id = str((incoming or {}).get('dedup_id') or '')
+    same_id = [d for d in (existing or [])
+               if str((d or {}).get('dedup_id') or '') == legacy_id]
+    if not same_id:
+        return 'new'
+    if any(not deposits_materially_distinct(old, incoming) for old in same_id):
+        return 'duplicate'
+    return 'collision'
 
 def dest_card_allowed(deposit: dict, allowed_last4: set[str]) -> bool:
     dl4 = deposit.get('dest_last4')

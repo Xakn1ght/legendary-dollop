@@ -313,6 +313,55 @@ def test_bin_prefix_never_survives_as_veto_evidence():
     assert _deposits()[0].get("veto_since"), _deposits()[0]
 
 
+def test_reused_tracking_pools_second_real_payment():
+    """Bank tracking numbers repeat. A same-tracking SMS with a DIFFERENT
+    amount is a second real payment: it must be pooled (not dropped as a
+    replay), must not amount-approve, and must not consume the first one."""
+    first = _dep(_sms(850_000, "3264", "248125"))
+    _reset(deposits=[dict(first, claim_id=first["dedup_id"])],
+           cands=[{"order_id": "sub:1", "amount": 85000, "receipt_ts": NOW},
+                  {"order_id": "sub:2", "amount": 120000, "receipt_ts": NOW}])
+    sms_ingest.sms_autoapprove = sms_autoapprove
+
+    asyncio.run(sms_ingest.handle_incoming_sms(None, _sms(1_200_000, "3264", "248125")))
+    deps = _deposits()
+    assert len(deps) == 2, [d.get("amount") for d in deps]
+
+    second = deps[1]
+    assert second.get("tracking_collision") == 1, second
+    assert second["dedup_id"] == first["dedup_id"]
+    assert second["claim_id"].startswith("sms2:"), second["claim_id"]
+    assert second["claim_id"] != deps[0]["claim_id"]
+
+    # amount-only uniqueness is NOT enough for a reused tracking number
+    # (the untouched first deposit approving sub:1 is normal and expected)
+    assert "sub:2" not in [a[0] for a in APPROVALS], APPROVALS
+    assert any("پیگیری تکراری" in n for n in NOTICES), NOTICES
+    assert second.get("matched") is None
+
+    # an exact replay of either one is still dropped
+    asyncio.run(sms_ingest.handle_incoming_sms(None, _sms(1_200_000, "3264", "248125")))
+    assert len(_deposits()) == 2
+
+
+def test_reused_tracking_approves_on_card_evidence():
+    """The same collided deposit DOES approve once the receipt proves the
+    payer — and marking it matched leaves its same-tracking twin alone."""
+    first = _dep(_sms(850_000, "3264", "248125"))
+    second = _dep(_sms(1_200_000, "3264", "248125"))
+    second["tracking_collision"] = 1
+    second["claim_id"] = sms_autoapprove.deposit_fingerprint(second)
+    _reset(deposits=[dict(first, claim_id=first["dedup_id"]), second],
+           cands=[{"order_id": "sub:2", "amount": 120000, "receipt_ts": NOW, "image": None}])
+    sms_ingest._ai_read_cache["sub:2"] = {"receipt_last4": "3264"}
+    asyncio.run(_sweep())
+    assert [a[0] for a in APPROVALS] == ["sub:2"], APPROVALS
+
+    deps = _deposits()
+    assert deps[1].get("matched") == "sub:2"
+    assert deps[0].get("matched") is None, "approving one consumed its twin"
+
+
 if __name__ == "__main__":
     setup_module()
     fns = [v for k, v in sorted(globals().items()) if k.startswith("test_")]
