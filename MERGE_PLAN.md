@@ -106,7 +106,15 @@ The sales bot's buying experience, which Pasha says works well.
 - [x] 1.4 Two-level Normal/Pro inline menu; the two never share a screen.
 - [ ] 1.5 Delivery banners - DEFERRED. Pasha wants them REDESIGNED, not ported;
       do not copy the sales bot's templates.json as-is.
-- [ ] 1.6 Renewal flow (the live bot's is far more developed — 381 references)
+- [x] 1.6 Renewal flow. Mostly already here: the 5 GB eligibility gate,
+      carryover capped at 5 GB, and native next_plan booking all existed, and
+      the low-traffic/expiry reminder DMs already carry a renew button. Only
+      gap was ordering - the subscription's current plan now sits first in the
+      renewal keyboard. The sales bot's 10% late-renew discount was
+      deliberately NOT ported (Pasha, 2026-08-29): it would have to apply on
+      bot, Mini App and charge under the Pricing Parity Law. Its days-left
+      warning was skipped too - booking early is the intended use of next_plan
+      here, so the warning would be noise.
 
 **Not yet done for slice 1:** the Mini App still shows only the `PLANS` grid —
 free trials and Pro are bot-only until the webapp learns the virtual products.

@@ -34,7 +34,7 @@ async def cb_quick_charge(cb: CallbackQuery, state: FSMContext, session: AsyncSe
     if not target:
         await cb.answer(t(lang, "charge_service_not_found"), show_alert=True)
         return
-    await state.update_data(subscription_id=target.id)
+    await state.update_data(subscription_id=target.id, current_plan=target.plan_name)
     # Route into normal charge flow starting with traffic check
     await check_subscription_traffic(cb.message, state, session, target)
     await cb.answer()
@@ -59,7 +59,7 @@ async def cb_buy_days(cb: CallbackQuery, state: FSMContext, session: AsyncSessio
         await cb.answer(t(lang, "charge_service_not_found"), show_alert=True)
         return
     # Ask user to choose a day plan (admin-configurable)
-    await state.update_data(subscription_id=target.id)
+    await state.update_data(subscription_id=target.id, current_plan=target.plan_name)
     rows = [[title] for title in DAY_PLANS.keys()]
     rows.append([t(lang, "btn_back")])
     await state.set_state(ChargeState.buy_days_plan)
@@ -111,7 +111,10 @@ async def cb_renew(cb: CallbackQuery, state: FSMContext, session: AsyncSession):
     if not target:
         await cb.answer(t(lang, "charge_service_not_found"), show_alert=True)
         return
-    await state.update_data(subscription_id=target.id, charge_type='booking', booking_months=1)
+    await state.update_data(
+        subscription_id=target.id, charge_type='booking', booking_months=1,
+        current_plan=target.plan_name,
+    )
     is_vip = bool(await crud.is_user_vip(session, user.id))
     if not is_vip:
         from .common import _build_main_plan_keyboard

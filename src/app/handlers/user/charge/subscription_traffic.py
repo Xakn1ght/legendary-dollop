@@ -45,7 +45,7 @@ async def start_charge(message: Message, state: FSMContext, session: AsyncSessio
         )
         return
     if len(subs) == 1:
-        await state.update_data(subscription_id=subs[0].id)
+        await state.update_data(subscription_id=subs[0].id, current_plan=subs[0].plan_name)
         # Check traffic before proceeding
         await check_subscription_traffic(message, state, session, subs[0])
     else:
@@ -93,7 +93,7 @@ async def choose_subscription(message: Message, state: FSMContext, session: Asyn
     if not selected:
         await message.answer(t(lang, "charge_invalid_service"))
         return
-    await state.update_data(subscription_id=selected.id)
+    await state.update_data(subscription_id=selected.id, current_plan=selected.plan_name)
     # Check traffic before proceeding
     await check_subscription_traffic(message, state, session, selected)
 

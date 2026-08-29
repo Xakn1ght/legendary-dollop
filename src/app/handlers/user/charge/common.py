@@ -116,16 +116,36 @@ async def _build_traffic_options_keyboard(state: FSMContext, lang: str = "fa") -
 
 async def _build_main_plan_keyboard(
     state: FSMContext, lang: str = "fa", include_custom: bool = False, is_vip: bool = False,
+    current_plan: str | None = None,
 ) -> InlineKeyboardMarkup:
     """Keyboard for selecting main subscription PLANS (for booking/renewal template).
 
     ``include_custom`` adds the build-your-own GB option (1-month bookings only —
     custom plans are GB-only by design, same rule as the webapp picker).
-    VIP-exclusive plans are hidden for non-VIP users (flows enforce it too)."""
+    VIP-exclusive plans are hidden for non-VIP users (flows enforce it too).
+
+    The subscription's existing plan is moved to the FRONT, so renewing onto
+    the same plan is the first thing under your thumb instead of a hunt through
+    the grid. It keeps the plan's own label rather than a "renew same plan"
+    wrapper: that label IS what the booking_plan handler matches on, so
+    reordering needs no new handler and no new failure mode. Custom plans are
+    not catalog keys, so they simply do not match and nothing moves.
+
+    ``current_plan`` defaults to whatever the flow stored in FSM data when the
+    subscription was picked, which covers every call site without threading it
+    through each one."""
     from app.core.settings import PLANS
+
+    if current_plan is None:
+        try:
+            current_plan = (await state.get_data()).get("current_plan")
+        except Exception:
+            current_plan = None
 
     rows = []
     keys = [k for k in get_ordered_plans() if is_vip or not PLANS.get(k, {}).get("vip_only")]
+    if current_plan in keys:
+        keys = [current_plan] + [k for k in keys if k != current_plan]
     for i in range(0, len(keys), PLANS_BUTTON_COLUMNS):
         rows.append(keys[i:i + PLANS_BUTTON_COLUMNS])
     if include_custom:
