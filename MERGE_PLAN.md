@@ -123,8 +123,47 @@ Pro per-GB pricing is 7,000/GB up to 10 GB then 5,500/GB; the step down at
 
 ### Slice 2 — AI support
 
-Port `support_ai.py` (787 lines): Telegram Business chat, corpus retrieval,
-intent/risk gates, rate limits. Self-contained and touches no money.
+**2a DONE (2026-08-30) — the brain, nothing wired.** Three modules ported from
+the sales bot, plus its mined corpus of real support chats:
+
+- `services/support_provider.py` — the LLM chain with a hard monthly USD cap
+  (`SUPPORT_AI_MONTHLY_USD`, default 3). Reservations make concurrent calls
+  cap-safe; an unreadable ledger or an unpriced model fails CLOSED. Rewritten
+  from `requests` onto aiohttp. Kept separate from `sms_ai` on purpose: a
+  support model experiment must never change how a payment is perceived.
+- `services/support_knowledge.py` — the owner-approved, time-aware knowledge
+  store (draft -> approve -> expire). Copied nearly verbatim; it never had a
+  sales-bot dependency.
+- `services/support_ai.py` — the brain: noise/intent/escalation detectors,
+  corpus retrieval, prompt assembly under a char budget, and every output
+  gate (leak markers, action claims, uncited live records, ownership).
+- `services/support_context.py` — NEW here. The sales bot built its knowledge
+  blocks by reaching into its own module globals; ours reads this project's
+  catalog, settings and DB, so the brain stays pure and testable.
+- `data/support_corpus/` — 41 canonical answers, 8 style exemplars and 21
+  escalation patterns mined from the owner's real chats.
+
+Two deliberate differences from the source:
+
+- **No emojis.** The sales bot upgraded plain emojis into Telegram premium
+  custom-emoji entities; CLAUDE.md forbids emojis in user-facing copy, so the
+  model is told plain text only and that machinery is gone. The one exception
+  is a Telegram *reaction*, which is not text.
+- **Wired to our ticket system, not Telegram Business.** A business account
+  connects to exactly ONE bot and the live sales bot holds that connection
+  today — taking it would cut off real customers. The Business path moves at
+  cutover (slice 5); the brain is identical either way.
+
+Tests: `test_support_provider.py` (13), `test_support_knowledge.py` (11),
+`test_support_ai.py` (58 checks).
+
+**2b TODO — wiring.** Answer a new ticket, escalate on handoff, attach the
+subscription buttons behind `show_subs` / `show_links` / `show_renew`, rate
+limits, and an owner pause. Needs `SUPPORT_AI_*` keys in `config/.env` before
+it can do anything — with no key configured the whole path stays silent.
+
+**2c TODO — admin UI** for the knowledge store (draft, preview, approve,
+expire) and the budget/status readout.
 
 ### Slice 3 — Receipt AI
 
