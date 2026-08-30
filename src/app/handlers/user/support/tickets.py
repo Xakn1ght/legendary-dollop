@@ -150,6 +150,11 @@ async def add_message_text(message: Message, state: FSMContext, session: AsyncSe
     await crud.add_ticket_message(session, ticket_id, sender='user', content_type='text', text=message.text)
     await state.clear()
     await message.answer("پیام شما افزوده شد.")
+    from app.database.crud import get_user
+    from app.services.support_assist import maybe_answer_ticket
+    user = await get_user(session, message.from_user.id)
+    if user:
+        await maybe_answer_ticket(session, ticket, user, message.text, bot=message.bot)
 
 
 @router.callback_query(F.data.startswith("support_close_"))

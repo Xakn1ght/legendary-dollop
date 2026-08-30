@@ -99,6 +99,15 @@ async def handle_dashboard_tickets_create(request: web.Request):
 
             await session.commit()
 
+            # The assistant may answer the first message straight away; every
+            # gate (switch, human present, escalation words, rate limit) lives
+            # in the service, and it stays silent unless all of them pass.
+            try:
+                from app.services.support_assist import maybe_answer_ticket
+                await maybe_answer_ticket(session, new_ticket, user, message)
+            except Exception:
+                pass
+
             try:
                 await broadcast_ticket_list_update()
             except Exception:

@@ -263,6 +263,13 @@ async def submit_ticket(callback: CallbackQuery, state: FSMContext, session: Asy
         mm_id = image_msg_ids[i] if i < len(image_msg_ids) else None
         await crud.add_ticket_message(session, ticket.id, sender='user', content_type='photo', file_id=file_id, telegram_message_id=mm_id)
 
+    # The assistant may answer the first message straight away; every gate
+    # (switch, human present, escalation words, rate limit) lives in the
+    # service, and it stays silent unless all of them pass.
+    if texts:
+        from app.services.support_assist import maybe_answer_ticket
+        await maybe_answer_ticket(session, ticket, user, texts[0], bot=callback.message.bot)
+
     # Compute queue position
     pos = await crud.get_category_queue_position(session, category, ticket.id)
 

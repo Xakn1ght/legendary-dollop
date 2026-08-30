@@ -157,10 +157,29 @@ Two deliberate differences from the source:
 Tests: `test_support_provider.py` (13), `test_support_knowledge.py` (11),
 `test_support_ai.py` (58 checks).
 
-**2b TODO — wiring.** Answer a new ticket, escalate on handoff, attach the
-subscription buttons behind `show_subs` / `show_links` / `show_renew`, rate
-limits, and an owner pause. Needs `SUPPORT_AI_*` keys in `config/.env` before
-it can do anything — with no key configured the whole path stays silent.
+**2b DONE (2026-08-30) — wired to tickets.** `services/support_assist.py`
+holds every policy decision behind one entry point, `maybe_answer_ticket()`,
+called from the four places a customer's text lands on a ticket (bot: new
+ticket + follow-up; dashboard: create + reply). One line per site, so they
+cannot drift apart.
+
+It stays silent unless ALL of these pass: the switch is on
+(`SUPPORT_AI_ENABLED=1` or `data/support_ai_state.json`), a provider key is
+configured, the ticket is open, no admin is assigned and none is live in
+chat, the message is not content-free, it is not an escalation (refund,
+dispute, "do it yourself"), and the rate limits allow it — 4 per ticket, 8
+per customer per day, 200 a day globally, on top of the USD budget. Noise and
+escalation are caught BEFORE the model call, so they cost nothing.
+
+Replies are written with `sender='admin'`: that is the only sender value both
+UIs render on the support side (`SupportInbox.jsx` treats anything else as the
+customer's own bubble). Rate limits fail CLOSED — with no Redis it cannot
+count answers, and an uncounted assistant could answer one ticket forever.
+
+Test: `test_support_assist.py` (22 checks, one per gate).
+
+**Still open in 2b:** the `show_subs` / `show_links` / `show_renew` flags come
+back from the brain but nothing attaches subscription buttons yet.
 
 **2c TODO — admin UI** for the knowledge store (draft, preview, approve,
 expire) and the budget/status readout.
