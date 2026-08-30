@@ -73,6 +73,9 @@ from app.api.routes.admin.ops import (
     handle_admin_nodes,
     handle_admin_sms_control_get,
     handle_admin_sms_control_set,
+    handle_admin_support_ai_get,
+    handle_admin_support_ai_knowledge,
+    handle_admin_support_ai_set,
     handle_admin_system_health,
 )
 from app.api.routes.admin.users import (
@@ -103,6 +106,9 @@ __all__ = [
     "handle_admin_nodes",
     "handle_admin_sms_control_get",
     "handle_admin_sms_control_set",
+    "handle_admin_support_ai_get",
+    "handle_admin_support_ai_knowledge",
+    "handle_admin_support_ai_set",
     "handle_admin_system_health",
     "handle_admin_broadcast",
     "handle_admin_deny_cashout",

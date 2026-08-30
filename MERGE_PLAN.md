@@ -178,11 +178,30 @@ count answers, and an uncounted assistant could answer one ticket forever.
 
 Test: `test_support_assist.py` (22 checks, one per gate).
 
-**Still open in 2b:** the `show_subs` / `show_links` / `show_renew` flags come
-back from the brain but nothing attaches subscription buttons yet.
+Subscription buttons are attached too: `show_links` / `show_renew` /
+`show_subs` map onto the existing `link_` / `charge_` / `usage_` callbacks
+rather than new ones, so the ownership checks those handlers already do apply
+unchanged. Buttons only ride the bot DM — the dashboard thread shows the same
+answer as text and its own UI already has those actions a tap away.
 
-**2c TODO — admin UI** for the knowledge store (draft, preview, approve,
-expire) and the budget/status readout.
+**2c DONE (2026-08-30) — admin UI.** Settings ▸ Support Assistant, built on
+the SMS Auto-Approve panel's shape:
+
+- on/off switch, refused while no provider key is configured (it would look
+  armed and answer nothing);
+- status line: providers, month-to-date spend against the cap, corpus and
+  knowledge counts;
+- teach it a fact (incident/maintenance/product/policy/faq with an expiry).
+  Saved as a DRAFT — it reaches customers only after Approve;
+- the record table with approve / end / delete;
+- the recent `[SUPPORT-AI]` log tail.
+
+Routes: `GET|POST /api/admin/support-ai`, `POST
+/api/admin/support-ai/knowledge`, all audited and behind the existing admin
+auth middleware.
+
+**Slice 2 is complete.** Remaining before it can answer anything real: an AI
+key in `config/.env`, `SUPPORT_AI_ENABLED=1`, and a phone test.
 
 ### Slice 3 — Receipt AI
 

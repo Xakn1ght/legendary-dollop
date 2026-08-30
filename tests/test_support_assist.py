@@ -44,12 +44,20 @@ class User:
     credit = 0
 
 
+class Sub:
+    def __init__(self, sub_id, plan='۲۰ گیگ'):
+        self.id = sub_id
+        self.plan_name = plan
+        self.marzban_username = f'user{sub_id}'
+
+
 class Session:
     """Minimal async session: records what would have been written."""
 
-    def __init__(self):
+    def __init__(self, rows=()):
         self.added = []
         self.commits = 0
+        self.rows = list(rows)
 
     def add(self, obj):
         self.added.append(obj)
@@ -58,13 +66,25 @@ class Session:
         self.commits += 1
 
     async def execute(self, *_a, **_kw):
+        rows = self.rows
+
         class _R:
             def scalars(self_inner):
                 class _S:
                     def all(self_s):
-                        return []
+                        return rows
                 return _S()
         return _R()
+
+
+class Bot:
+    """Captures the DM the assistant would send."""
+
+    def __init__(self):
+        self.sent = []
+
+    async def send_message(self, chat_id, text, reply_markup=None):
+        self.sent.append((chat_id, text, reply_markup))
 
 
 def _install(reply='پاسخ تست', handoff=False, allow=True):
@@ -188,6 +208,50 @@ def test_failure_never_breaks_the_customers_message():
     sa.support_ai.generate_reply = _boom
     check('an exception degrades to silence, not an error',
           _run(Ticket(), 'چطور وصل بشم؟') is False)
+
+
+def test_buttons_only_when_the_brain_asks():
+    _install()
+    bot = Bot()
+    asyncio.run(sa.maybe_answer_ticket(Session([Sub(4)]), Ticket(), User(),
+                                       'چطور وصل بشم؟', bot=bot))
+    check('a plain answer carries no buttons', bot.sent[0][2] is None)
+
+
+def test_button_flags_pick_the_right_action():
+    for flag, prefix in (('show_links', 'link_'), ('show_renew', 'charge_'),
+                         ('show_subs', 'usage_')):
+        _install()
+        real = sa.support_ai.generate_reply
+
+        async def _gen(*a, _flag=flag, **kw):
+            out = await real(*a, **kw)
+            out[_flag] = True
+            return out
+
+        sa.support_ai.generate_reply = _gen
+        bot = Bot()
+        asyncio.run(sa.maybe_answer_ticket(Session([Sub(4), Sub(9)]), Ticket(), User(),
+                                           'سوال', bot=bot))
+        markup = bot.sent[0][2]
+        check(f'{flag} attaches buttons', markup is not None)
+        data = [b.callback_data for row in markup.inline_keyboard for b in row]
+        check(f'{flag} uses {prefix} callbacks', data == [f'{prefix}4', f'{prefix}9'], data)
+
+
+def test_no_subscriptions_means_no_buttons():
+    _install()
+    real = sa.support_ai.generate_reply
+
+    async def _gen(*a, **kw):
+        out = await real(*a, **kw)
+        out['show_links'] = True
+        return out
+
+    sa.support_ai.generate_reply = _gen
+    bot = Bot()
+    asyncio.run(sa.maybe_answer_ticket(Session([]), Ticket(), User(), 'سوال', bot=bot))
+    check('no active subscription means no buttons', bot.sent[0][2] is None)
 
 
 def main():

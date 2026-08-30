@@ -18,6 +18,11 @@ from .export import handle_admin_export_transactions
 from .health import handle_admin_system_health
 from .nodes import handle_admin_node_reconnect, handle_admin_nodes
 from .sms import handle_admin_sms_control_get, handle_admin_sms_control_set
+from .support_ai import (
+    handle_admin_support_ai_get,
+    handle_admin_support_ai_knowledge,
+    handle_admin_support_ai_set,
+)
 
 __all__ = [
     "handle_admin_analytics_expiring",
@@ -33,5 +38,8 @@ __all__ = [
     "handle_admin_node_reconnect",
     "handle_admin_nodes",
     "handle_admin_sms_control_get",
+    "handle_admin_support_ai_get",
+    "handle_admin_support_ai_knowledge",
+    "handle_admin_support_ai_set",
     "handle_admin_sms_control_set",
 ]

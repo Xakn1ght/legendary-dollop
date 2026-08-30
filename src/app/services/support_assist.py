@@ -116,6 +116,42 @@ def _human_is_live(ticket) -> bool:
     return bool(ticket.chat_started_at and not ticket.chat_ended_at)
 
 
+async def _subscription_keyboard(session, user, result: dict):
+    """Buttons for the flags the brain sets, or None.
+
+    Reuses the my-services callbacks rather than inventing new ones — they
+    already verify the subscription belongs to the caller, so a button in a
+    support DM can never expose someone else's service.
+    """
+    if not any(result.get(k) for k in ('show_subs', 'show_links', 'show_renew')):
+        return None
+    try:
+        from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup
+
+        from app.database.models import Subscription
+
+        subs = (await session.execute(
+            select(Subscription)
+            .where(Subscription.user_id == user.id, Subscription.status == 'active')
+            .order_by(Subscription.created_at.desc())
+            .limit(5))).scalars().all()
+        if not subs:
+            return None
+        if result.get('show_links'):
+            prefix, label = 'link_', 'دریافت لینک'
+        elif result.get('show_renew'):
+            prefix, label = 'charge_', 'تمدید'
+        else:
+            prefix, label = 'usage_', 'وضعیت'
+        rows = [[InlineKeyboardButton(
+            text=f'{label} - {sub.plan_name or sub.marzban_username}'[:60],
+            callback_data=f'{prefix}{sub.id}')] for sub in subs]
+        return InlineKeyboardMarkup(inline_keyboard=rows)
+    except Exception as exc:
+        bot_logger.debug(f'[SUPPORT-AI] buttons skipped: {type(exc).__name__}')
+        return None
+
+
 async def maybe_answer_ticket(session, ticket, user, text: str, *, bot=None) -> bool:
     """Answer one customer message if every gate allows it.
 
@@ -172,8 +208,13 @@ async def maybe_answer_ticket(session, ticket, user, text: str, *, bot=None) -> 
             bot_logger.debug(f'[SUPPORT-AI] broadcast skipped: {type(exc).__name__}')
 
         if bot is not None:
+            # Buttons only exist in the bot DM; the dashboard thread shows the
+            # same answer as plain text and its own UI already has these
+            # actions a tap away.
             try:
-                await bot.send_message(user.chat_id, reply)
+                await bot.send_message(
+                    user.chat_id, reply,
+                    reply_markup=await _subscription_keyboard(session, user, result))
             except Exception as exc:
                 bot_logger.debug(f'[SUPPORT-AI] DM skipped: {type(exc).__name__}')
 

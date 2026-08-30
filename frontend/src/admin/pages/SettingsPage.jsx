@@ -12,6 +12,7 @@ const SECTIONS = [
   { id: 'plans', label: 'Plans', desc: 'Subscription and top-up catalog', icon: 'subscriptions' },
   { id: 'payment', label: 'Payment', desc: 'Card shown to buyers', icon: 'crown' },
   { id: 'sms', label: 'SMS Auto-Approve', desc: 'Bank-SMS receipt matching', icon: 'check' },
+  { id: 'supportai', label: 'Support Assistant', desc: 'AI answers on tickets', icon: 'support' },
   { id: 'jobs', label: 'Job Schedules', desc: 'Background job intervals', icon: 'refresh' },
   { id: 'sessions', label: 'Admin Sessions', desc: 'Multi-device logins', icon: 'users' },
 ];
@@ -44,7 +45,7 @@ export function SettingsPage() {
   }
   const setDirty = (id, v) => setDirtyMap((m) => (m[id] === v ? m : { ...m, [id]: v }));
 
-  const Section = { plans: PlansEditor, payment: PaymentEditor, sms: SmsControlEditor, jobs: JobsEditor, sessions: SessionsEditor }[active];
+  const Section = { plans: PlansEditor, payment: PaymentEditor, sms: SmsControlEditor, supportai: SupportAiEditor, jobs: JobsEditor, sessions: SessionsEditor }[active];
 
   const nav = (
     <nav className="set-nav">
@@ -182,6 +183,157 @@ function SmsControlEditor() {
         <p>Last [SMS] lines from the bot log — matches, misses, and approvals.</p>
       </div>
       <pre className="sms-log">{log.length ? log.join('\n') : 'No SMS log lines yet.'}</pre>
+    </div>
+  );
+}
+
+/* ---- support assistant --------------------------------------------------- */
+// Mirrors SmsControlEditor: one switch, a status readout, and the records the
+// assistant is allowed to quote. A new record is always a DRAFT — it reaches
+// customers only after Approve.
+function SupportAiEditor() {
+  const modal = useModal();
+  const toast = useToast();
+  const [state, setState] = useState(null);
+  const [busy, setBusy] = useState(false);
+  const [draft, setDraft] = useState({ kind: 'incident', title: '', body: '', hours: 24 });
+
+  const load = async () => {
+    try {
+      const { data } = await apiJson('/api/admin/support-ai');
+      if (data.ok !== false) setState(data);
+    } catch (_) { /* ignore */ }
+  };
+  useEffect(() => { load(); }, []);
+
+  async function toggle() {
+    if (!state || busy) return;
+    const on = !state.enabled;
+    const ok = await modal.confirm(
+      on ? 'Turn the support assistant on?' : 'Turn the support assistant off?',
+      on
+        ? 'It will answer new ticket messages by itself. It stays silent on anything it cannot answer, on refunds, disputes and anger, and whenever an admin is assigned or live in the chat.'
+        : 'Tickets go back to waiting for a human, exactly as before.',
+      { okText: on ? 'Turn on' : 'Turn off', danger: on },
+    );
+    if (!ok) return;
+    setBusy(true);
+    try {
+      const { data } = await postJson('/api/admin/support-ai', { enabled: on });
+      if (data.ok) { toast(on ? 'Support assistant is ON' : 'Support assistant is off', 'success'); await load(); }
+      else toast(data.error === 'no_provider_configured' ? 'No AI key configured in config/.env' : 'Failed', 'error');
+    } catch (_) { toast('Request failed', 'error'); }
+    setBusy(false);
+  }
+
+  async function act(action, record) {
+    setBusy(true);
+    try {
+      const body = action === 'create'
+        ? {
+          action, kind: draft.kind, title: draft.title, body: draft.body,
+          expires_ts: draft.hours ? Math.floor(Date.now() / 1000) + Number(draft.hours) * 3600 : null,
+        }
+        : { action, id: record.id, expected_version: record.version };
+      const { data } = await postJson('/api/admin/support-ai/knowledge', body);
+      if (data.ok) {
+        toast(action === 'create' ? 'Draft saved (not live until approved)' : `Record ${action}d`, 'success');
+        if (action === 'create') setDraft({ ...draft, title: '', body: '' });
+        await load();
+      } else toast(data.detail || data.error || 'Failed', 'error');
+    } catch (_) { toast('Request failed', 'error'); }
+    setBusy(false);
+  }
+
+  const records = state?.records || [];
+  const log = state?.log || [];
+  const budget = state?.budget || {};
+  const canCreate = draft.title.trim() && draft.body.trim();
+
+  return (
+    <div className="sms-panel">
+      <div className="sms-arm-row">
+        <div>
+          <div className="sms-arm-title">
+            Support assistant is <b style={{ color: state?.enabled ? 'var(--success)' : 'var(--text-muted)' }}>{state ? (state.enabled ? 'ON' : 'OFF') : '…'}</b>
+          </div>
+          <div className="sms-arm-sub">
+            {state?.provider_configured
+              ? `Providers: ${(state.providers || []).join(', ')} · spent $${Number(budget.spent_usd || 0).toFixed(3)} of $${Number(budget.cap_usd || 0).toFixed(2)} this month`
+              : 'No AI key in config/.env — turning it on is blocked.'}
+          </div>
+          <div className="sms-arm-sub">
+            Knowledge: {state?.knowledge_summary || '…'} · Corpus: {state?.corpus || '…'}
+          </div>
+        </div>
+        <button
+          className={'btn ' + (state?.enabled ? 'btn-secondary' : 'btn-primary')}
+          disabled={!state || busy || (!state.enabled && !state.provider_configured)}
+          onClick={toggle}
+        >
+          {busy ? '…' : state?.enabled ? 'Turn off' : 'Turn on'}
+        </button>
+      </div>
+
+      <div className="set-pane-head" style={{ marginTop: 18 }}>
+        <h3 style={{ fontSize: 14 }}>Teach it something</h3>
+        <p>Facts the assistant may quote. Saved as a draft — it reaches customers only after you approve it. An incident should carry an expiry so it cannot outlive the problem.</p>
+      </div>
+      <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'flex-end' }}>
+        <div className="set-field set-field-sm">
+          <label>Kind</label>
+          <select className="input-field" value={draft.kind} onChange={(e) => setDraft({ ...draft, kind: e.target.value })}>
+            {['incident', 'maintenance', 'product', 'policy', 'faq'].map((k) => <option key={k} value={k}>{k}</option>)}
+          </select>
+        </div>
+        <div className="set-field set-field-sm">
+          <label>Expires (hours)</label>
+          <input className="input-field" type="number" min="0" value={draft.hours} onChange={(e) => setDraft({ ...draft, hours: e.target.value })} />
+        </div>
+        <div className="set-field set-field-grow">
+          <label>Title</label>
+          <input className="input-field" value={draft.title} onChange={(e) => setDraft({ ...draft, title: e.target.value })} placeholder="قطعی سرور آلمان" />
+        </div>
+      </div>
+      <div className="set-field-block" style={{ marginTop: 10 }}>
+        <label>What customers should be told</label>
+        <textarea className="input-field" rows={3} value={draft.body} onChange={(e) => setDraft({ ...draft, body: e.target.value })} placeholder="سرور آلمان تا ساعت ۱۸ در حال تعمیر است؛ لطفاً از لوکیشن فنلاند استفاده کنید." />
+      </div>
+      <button className="btn btn-primary" disabled={busy || !canCreate} onClick={() => act('create')} style={{ marginTop: 10 }}>
+        Save draft
+      </button>
+
+      <div className="set-pane-head" style={{ marginTop: 18 }}>
+        <h3 style={{ fontSize: 14 }}>Knowledge records ({records.length})</h3>
+        <p>Only Active records are quoted to customers.</p>
+      </div>
+      <div className="table-responsive">
+        <table>
+          <thead><tr><th>Status</th><th>Kind</th><th>Title</th><th>Expires</th><th /></tr></thead>
+          <tbody>
+            {records.length === 0 && <tr><td colSpan={5} style={{ textAlign: 'center', color: 'var(--text-muted)', padding: 20 }}>Nothing taught yet</td></tr>}
+            {records.map((r) => (
+              <tr key={r.id}>
+                <td><b style={{ color: r.effective_status === 'active' ? 'var(--success)' : 'var(--text-muted)' }}>{r.effective_status}</b></td>
+                <td>{r.kind}</td>
+                <td title={r.body}>{r.title}</td>
+                <td>{r.expires_ts ? fmtDateTime(r.expires_ts * 1000) : '—'}</td>
+                <td style={{ whiteSpace: 'nowrap' }}>
+                  {r.status === 'draft' && <button className="btn btn-primary btn-sm" disabled={busy} onClick={() => act('approve', r)}>Approve</button>}
+                  {r.effective_status === 'active' && <button className="btn btn-secondary btn-sm" disabled={busy} onClick={() => act('resolve', r)}>End</button>}
+                  <button className="btn btn-danger btn-sm" disabled={busy} onClick={() => act('delete', r)}>Delete</button>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+
+      <div className="set-pane-head" style={{ marginTop: 18 }}>
+        <h3 style={{ fontSize: 14 }}>Recent assistant activity</h3>
+        <p>Last [SUPPORT-AI] lines from the bot log — answers, refusals and rate limits.</p>
+      </div>
+      <pre className="sms-log">{log.length ? log.join('\n') : 'No assistant log lines yet.'}</pre>
     </div>
   );
 }
