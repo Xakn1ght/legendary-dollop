@@ -234,9 +234,19 @@ path:
 Tests: two new cases in `test_sms_tracking_collision.py`; the glue backoff test
 now expects the extra read.
 
-### Slice 4 — Usage card images
+### Slice 4 — Usage card images — ALREADY DONE (2026-07-12, verified 2026-08-31)
 
-Pillow-rendered Persian status images (`usage_card.py`).
+Nothing to port. `handlers/user/my_services/chart_generator.py` is the sales
+bot's `usage_card.py` layout — landscape glass panel, flat donut with the
+REMAINING GB in the middle, four RTL stat rows, health-coloured accent —
+restyled onto our Dark Nebula tokens and Vazirmatn. It is wired into
+`subscription_details.py` and renders correctly (checked by rendering one:
+Persian shaping via raqm, Jalali expiry, Persian digits, green/amber/red by
+remaining traffic and days).
+
+The sales bot's copy has not changed since that port, so the two are current
+with each other. The three Vazirmatn weights already live in
+`src/app/assets/fonts/`.
 
 ### Slice 5 — Cutover
 
