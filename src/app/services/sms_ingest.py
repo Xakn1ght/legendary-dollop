@@ -269,6 +269,15 @@ async def _ai_enrich(cands: list) -> bool:
             continue
         mime = 'image/png' if c['image'].lower().endswith('.png') else 'image/jpeg'
         fields = await sms_ai.extract_receipt_fields(blob, mime)
+        # Second opinion (bakbot parity, 2026-08-31): a single read drops or
+        # deforms digits — their #2742 misread an amount, #2744 lost a card,
+        # and each bad scalar cost a real payment a 10-minute defer. Read the
+        # image twice and keep only what both reads agree on. Costs one extra
+        # call per order, once, and only for orders already in contention.
+        if fields:
+            fields2 = await sms_ai.extract_receipt_fields(blob, mime)
+            if fields2:
+                fields = sms_ai.merge_receipt_reads(fields, fields2)
         if fields is None:
             _ai_fail_until = time.time() + SMS_AI_FAIL_BACKOFF_SEC
             bot_logger.info(f'[SMS] receipt of {oid}: AI read FAILED (quota/network/no JSON) — '
@@ -327,7 +336,7 @@ def _dep_refs(dep: dict) -> set:
 def _ref_joined(dep: dict, cand: dict) -> bool:
     """True when the deposit's SMS refs agree with the candidate's TRUSTED
     receipt refs — the definitive join; never vetoed, never gated."""
-    return bool(_dep_refs(dep) & {str(r) for r in (cand.get('refs') or ()) if r})
+    return sms_autoapprove.refs_join(_dep_refs(dep), cand.get('refs') or ())
 
 
 def _card_joined(dep: dict, cand: dict) -> bool:
@@ -363,7 +372,7 @@ def _evidence_contradiction(dep: dict, cand: dict) -> str | None:
     cand = cand or {}
     dep_refs = _dep_refs(dep)
     trusted_refs = {str(r) for r in (cand.get('refs') or ()) if r}
-    if dep_refs & trusted_refs:
+    if sms_autoapprove.refs_join(dep_refs, trusted_refs):
         return None  # 1. ref join — definitive, never vetoed
     src4 = dep.get('source_last4')
     if src4 and cand.get('receipt_last4') and str(cand['receipt_last4']) == str(src4):
@@ -376,7 +385,7 @@ def _evidence_contradiction(dep: dict, cand: dict) -> str | None:
             if rc and str(rc) != str(src4):
                 return f'payer card …{src4} != receipt card …{rc} ({key})'
     veto_refs = {str(r) for r in (cand.get('veto_refs') or ()) if r}
-    if dep_refs and veto_refs and not (dep_refs & veto_refs):
+    if dep_refs and veto_refs and not sms_autoapprove.refs_join(dep_refs, veto_refs):
         return f'sms refs {sorted(dep_refs)} disagree with mismatched-receipt refs {sorted(veto_refs)}'
     return None
 
@@ -456,7 +465,7 @@ def _pick_rival_by_evidence(rivals: list, cand: dict) -> dict | None:
     """
     cand_refs = {str(r) for r in (cand.get('refs') or ()) if r}
     if cand_refs:
-        ref_hits = [d for d in rivals if _dep_refs(d) & cand_refs]
+        ref_hits = [d for d in rivals if sms_autoapprove.refs_join(_dep_refs(d), cand_refs)]
         if len(ref_hits) == 1:
             return ref_hits[0]
     c4 = cand.get('receipt_last4')

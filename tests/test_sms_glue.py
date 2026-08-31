@@ -260,7 +260,10 @@ def test_failed_ai_read_backoff():
         json.dump([_dep(_sms(170_000, "1234", "903"))], f, ensure_ascii=False)
     APPROVALS.clear()
     asyncio.run(_sweep())
-    assert len(AI_CALLS) == 2, "read must be retried after the backoff"
+    # 2 calls, not 1: a successful read is taken twice and merged (the
+    # second-opinion rule ported 2026-08-31). A FAILED read never gets a
+    # second opinion, which is why the earlier counts above stay at 1.
+    assert len(AI_CALLS) == 3, "read must be retried after the backoff, with a second opinion"
     assert sms_ingest._ai_read_cache.get("sub:8") == {"receipt_last4": "1234", "refs": ["77"]}
     assert APPROVALS == [("sub:8", "903")], APPROVALS
 

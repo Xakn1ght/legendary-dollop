@@ -203,10 +203,36 @@ auth middleware.
 **Slice 2 is complete.** Remaining before it can answer anything real: an AI
 key in `config/.env`, `SUPPORT_AI_ENABLED=1`, and a phone test.
 
-### Slice 3 — Receipt AI
+### Slice 3 — Receipt AI — DONE (2026-08-31)
 
-Compare `sms_ai.py` on both sides first — they were kept in sync as twins, so
-this may already be mostly done.
+The twins had drifted both ways. Prompt, Gemini/NVIDIA model lists and the key
+chain already matched; three things did not, and all three are on the money
+path:
+
+- **Second-opinion read.** A single read drops or deforms digits — their #2742
+  misread an amount, #2744 lost a card, and each bad scalar cost a legitimate
+  payment a 10-minute deferral. `sms_ai.merge_receipt_reads()` takes two
+  independent reads and keeps only what both agree on for the scalar fields; a
+  value only one read saw survives ONLY when the other saw nothing there (a
+  hallucination gives a different value, not an empty one). Refs are unioned —
+  a wrong ref cannot accidentally equal a 12+ digit bank ref. Wired into
+  `_ai_enrich`, so it costs one extra call per order, once, and only for
+  orders already in contention.
+- **Segment-aware reference join.** The bank SMS and the customer's receipt app
+  print the SAME POL tracking code with its segments permuted (their order
+  #2998: `140505030173131084179145020` vs `14050503145020131084179`). Exact
+  equality missed it and the payment rode the full veto grace. `refs_join()` /
+  `pol_refs_join()` join only when the codes share the 8-digit date prefix, an
+  8+ digit serial run, and a 6-digit time run — same date+time with a
+  different serial is NOT a join. Short card-to-card refs still need exact
+  equality. Now used at every site that compared refs (`_ref_joined`, both
+  contradiction checks, rival tie-break, `pick_match`).
+- Their `_shrink_for_inline` is deliberately NOT ported: it exists to fit a
+  receipt image into an NVIDIA NIM inline request, and NIM is TEXT-ONLY here
+  (it fabricates receipt digits — see the CLAUDE.md note).
+
+Tests: two new cases in `test_sms_tracking_collision.py`; the glue backoff test
+now expects the extra read.
 
 ### Slice 4 — Usage card images
 

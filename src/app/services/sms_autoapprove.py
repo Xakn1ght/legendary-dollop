@@ -169,6 +169,85 @@ def parse_bank_sms(text: str) -> dict | None:
     }
 
 
+# ── segment-aware reference join (bakbot parity, 2026-08-31) ───────────────
+# Ported verbatim: the bank SMS and the customer's receipt app print the same
+# POL transaction code with its segments permuted, so exact equality misses
+# real joins and the payment rides the full veto grace for nothing.
+def _plausible_pol_code(s: str) -> bool:
+    """18+ digits opening with a plausible Jalali date (14yy mm dd) — the
+    shape of a پل (POL) کد رهگیری. Card-to-card refs are far shorter and
+    never enter the segment-aware comparison."""
+    if len(s) < 18 or not s.startswith('14'):
+        return False
+    try:
+        mm, dd = int(s[4:6]), int(s[6:8])
+    except ValueError:
+        return False
+    return 1 <= mm <= 12 and 1 <= dd <= 31
+
+
+def _longest_common_digits(a: str, b: str) -> str:
+    """Longest contiguous digit run appearing in both strings (codes are
+    <=30 chars, the quadratic scan is nothing)."""
+    best = ''
+    for i in range(len(a)):
+        for j in range(i + len(best) + 1, len(a) + 1):
+            if a[i:j] in b:
+                best = a[i:j]
+            else:
+                break
+    return best
+
+
+def pol_refs_join(a, b) -> bool:
+    """Segment-aware join for پل tracking codes. The bank SMS and the
+    customer's receipt app print the SAME transaction's code with its
+    segments (Jalali date, 6-digit time, long serial) in DIFFERENT orders and
+    with app-specific extra chunks — e.g. order #2998: SMS
+    '140505030173131084179145020' vs receipt '14050503145020131084179'
+    (date 14050503 · time 145020 · serial 131084179, permuted, SMS adds
+    '0173'). Exact equality misses these and the pairing rides the 10-minute
+    defer.
+
+    Conservative rule — join only when the codes share ALL of:
+      - the 8-digit date prefix (both must open with a plausible date),
+      - a long serial: an >=8-digit common run after the date (an >=14-digit
+        common run counts as serial+time fused in one block),
+      - a 6-digit time: a common run among what remains once the serial is
+        removed.
+    Anything less (same date+time but a different serial, same date+serial
+    but a different time, different dates, short card-to-card refs) is NOT a
+    join. Two same-day پل payments never share an >=8-digit serial run."""
+    a = re.sub(r'\D', '', str(a or ''))
+    b = re.sub(r'\D', '', str(b or ''))
+    if not (_plausible_pol_code(a) and _plausible_pol_code(b)):
+        return False
+    if a == b:
+        return True
+    if a[:8] != b[:8]:
+        return False
+    ra, rb = a[8:], b[8:]
+    serial = _longest_common_digits(ra, rb)
+    if len(serial) >= 14:
+        return True
+    if len(serial) < 8:
+        return False
+    t = _longest_common_digits(ra.replace(serial, '', 1), rb.replace(serial, '', 1))
+    return len(t) >= 6
+
+
+def refs_join(refs_a, refs_b) -> bool:
+    """True when two ref collections identify the same transaction: exact
+    string intersection, or a segment-aware پل join between any pair."""
+    A = {str(r) for r in (refs_a or ()) if r}
+    B = {str(r) for r in (refs_b or ()) if r}
+    if not A or not B:
+        return False
+    if A & B:
+        return True
+    return any(pol_refs_join(x, y) for x in A for y in B)
+
+
 def deposit_amount_toman(deposit: dict) -> int | None:
     """Deposit amount converted to toman (order prices are toman).
 
@@ -292,7 +371,7 @@ def pick_match(deposit: dict, candidates: list[dict], deposit_ts: int,
     # actual transfer, so a unique hit is definitive even in a collision.
     dep_refs = {r for r in (deposit.get('tracking'), deposit.get('retrieval')) if r}
     if dep_refs:
-        ref_hits = [c for c in in_window if dep_refs & {str(r) for r in (c.get('refs') or ())}]
+        ref_hits = [c for c in in_window if refs_join(dep_refs, c.get('refs') or ())]
         if len(ref_hits) == 1:
             return ('approve', ref_hits[0]['order_id'])
 

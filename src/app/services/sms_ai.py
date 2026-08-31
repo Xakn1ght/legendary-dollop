@@ -332,6 +332,34 @@ async def extract_receipt_fields(image_bytes: bytes, mime: str = 'image/jpeg') -
     }
 
 
+def merge_receipt_reads(f1: dict, f2: dict) -> dict:
+    """Second-opinion merge: keep only what BOTH reads agree on for the
+    high-stakes scalar fields.
+
+    A value seen by just one read survives only when the other read produced
+    nothing for that field — a hallucination yields a DIFFERENT value, not an
+    empty one, so disagreement means "we do not know" and the field is
+    dropped. Reference numbers are unioned instead: a wrong ref cannot
+    accidentally equal a 12+ digit bank ref, and a union only improves joins.
+
+    Ported from the live sales bot, where two incidents (a misread amount and
+    a dropped card) each cost a legitimate payment a 10-minute deferral.
+    """
+    if not f1:
+        return f2
+    if not f2:
+        return f1
+    out = dict(f1)
+    for k in ('amount', 'amount_unit', 'source_card_last4', 'dest_card_last4',
+              'source_card_digits'):
+        v1, v2 = f1.get(k), f2.get(k)
+        out[k] = v1 if v1 == v2 else (v1 or v2 if not (v1 and v2) else None)
+    out['ref_numbers'] = sorted(set(f1.get('ref_numbers') or [])
+                                | set(f2.get('ref_numbers') or []))
+    out['success'] = bool(f1.get('success') or f2.get('success'))
+    return out
+
+
 def receipt_amount_toman(fields: dict) -> int | None:
     """Receipt amount in toman, or None if the unit is unknown/ambiguous."""
     amount = fields.get('amount')
