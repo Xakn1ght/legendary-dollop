@@ -278,6 +278,15 @@ async def build_phone():
               challenges_router.router, game_router.router, star_levels_router.router):
         dp.include_router(r)
 
+    # Warm the render pool here too. The bot warms its own at startup; without
+    # this the simulator would pay the 7s cold start itself and report a slow
+    # step that no customer ever sees.
+    try:
+        from app.utils.render_manager import warm_up
+        await warm_up()
+    except Exception as exc:
+        print(f"(render pool warm-up skipped: {type(exc).__name__})")
+
     return Phone(dp, bot), bot
 
 
@@ -362,10 +371,9 @@ async def scenario_services(p: Phone):
         print(f"  !! no subscription button: {screen.buttons}")
         return
     await p.tap(sub, "opened a subscription")
-    for want, title in (("لینک", "links"), ("مصرف", "usage")):
+    for want, title in (("همه لینک‌ها", "all links"), ("نمودار مصرف", "usage chart")):
         if any(want in b for b in screen.buttons):
             await p.tap(want, title)
-            await p.tap(sub, "back to the subscription")
 
 
 async def scenario_renew(p: Phone):

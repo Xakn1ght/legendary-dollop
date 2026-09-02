@@ -177,7 +177,13 @@ async def cmd_start(message: Message, state: FSMContext, session: AsyncSession, 
 					parts.append("حجم: نامحدود")
 				elif total_remaining_bytes > 0:
 					remaining_gb = total_remaining_bytes / (1024 ** 3)
-					parts.append(f"حجم باقیمانده: {remaining_gb:.1f}GB")
+					# Under 1 GB reads in MB: the free trial is 250 MB and
+					# "0.2GB" both understates it and disagrees with the
+					# subscription screen.
+					if remaining_gb < 1:
+						parts.append(f"حجم باقیمانده: {round(remaining_gb * 1024)}MB")
+					else:
+						parts.append(f"حجم باقیمانده: {remaining_gb:.1f}GB")
 				parts.append(f"کیف‌پول: {credit_amount:,} تومان")
 				stats_line = "\n📊 وضعیت حساب: " + " | ".join(parts)
 			else:
