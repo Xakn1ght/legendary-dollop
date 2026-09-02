@@ -166,8 +166,8 @@ header {
 
 [data-theme="light"] header {
   background: rgba(255,255,255,0.80) !important;
-  backdrop-filter: blur(40px) saturate(240%) brightness(1.02) !important;
-  -webkit-backdrop-filter: blur(40px) saturate(240%) brightness(1.02) !important;
+  backdrop-filter: blur(40px) saturate(148%) brightness(1.02) !important;
+  -webkit-backdrop-filter: blur(40px) saturate(148%) brightness(1.02) !important;
   border-bottom: 1px solid rgba(255,255,255,0.90) !important;
   box-shadow:
     0 1px 0 rgba(255,255,255,0.95),
@@ -192,8 +192,8 @@ header.scrolled {
 /* ── 5. BOTTOM NAV → GLASS PILL ─────────────────────────────────── */
 .bottom-nav {
   background: rgba(8, 14, 26, 0.92) !important;
-  backdrop-filter: blur(24px) saturate(180%) brightness(1.04) !important;
-  -webkit-backdrop-filter: blur(24px) saturate(180%) brightness(1.04) !important;
+  backdrop-filter: blur(24px) saturate(165%) brightness(1.04) !important;
+  -webkit-backdrop-filter: blur(24px) saturate(165%) brightness(1.04) !important;
   border-top: 1px solid rgba(255,255,255,0.10) !important;
   box-shadow:
     0 -1px 0 rgba(255,255,255,0.08),
@@ -203,8 +203,8 @@ header.scrolled {
 
 [data-theme="light"] .bottom-nav {
   background: rgba(255,255,255,0.92) !important;
-  backdrop-filter: blur(26px) saturate(200%) brightness(1.02) !important;
-  -webkit-backdrop-filter: blur(26px) saturate(200%) brightness(1.02) !important;
+  backdrop-filter: blur(26px) saturate(148%) brightness(1.02) !important;
+  -webkit-backdrop-filter: blur(26px) saturate(148%) brightness(1.02) !important;
   border-top: 1px solid rgba(255,255,255,0.98) !important;
   box-shadow:
     0 -1px 0 rgba(255,255,255,1),
@@ -2115,8 +2115,8 @@ html[data-theme="light"] body::before {
 [data-theme="light"] .card,
 [data-theme="light"] .placeholder-card {
   background: rgba(255, 255, 255, 0.48) !important;
-  backdrop-filter: blur(22px) saturate(200%) brightness(1.03) !important;
-  -webkit-backdrop-filter: blur(22px) saturate(200%) brightness(1.03) !important;
+  backdrop-filter: blur(22px) saturate(148%) brightness(1.03) !important;
+  -webkit-backdrop-filter: blur(22px) saturate(148%) brightness(1.03) !important;
   border: 1px solid rgba(255, 255, 255, 0.62) !important;
   border-top-color: rgba(255, 255, 255, 0.95) !important;
   box-shadow:
@@ -2129,8 +2129,8 @@ html[data-theme="light"] body::before {
 /* ── 6. ACTION TILES ─────────────────────────────────────────── */
 [data-theme="light"] .action-tile {
   background: rgba(255, 255, 255, 0.48) !important;
-  backdrop-filter: blur(22px) saturate(200%) brightness(1.03) !important;
-  -webkit-backdrop-filter: blur(22px) saturate(200%) brightness(1.03) !important;
+  backdrop-filter: blur(22px) saturate(148%) brightness(1.03) !important;
+  -webkit-backdrop-filter: blur(22px) saturate(148%) brightness(1.03) !important;
   border: 1px solid rgba(255, 255, 255, 0.62) !important;
   border-top-color: rgba(255, 255, 255, 0.95) !important;
   box-shadow:
@@ -2142,8 +2142,8 @@ html[data-theme="light"] body::before {
 /* ── 7. SPEED CHIPS ──────────────────────────────────────────── */
 [data-theme="light"] .speed-chip {
   background: rgba(255, 255, 255, 0.50) !important;
-  backdrop-filter: blur(18px) saturate(180%) !important;
-  -webkit-backdrop-filter: blur(18px) saturate(180%) !important;
+  backdrop-filter: blur(18px) saturate(148%) !important;
+  -webkit-backdrop-filter: blur(18px) saturate(148%) !important;
   border: 1px solid rgba(255, 255, 255, 0.68) !important;
   border-top-color: rgba(255, 255, 255, 0.95) !important;
   box-shadow:
@@ -2154,8 +2154,8 @@ html[data-theme="light"] body::before {
 /* ── 8. PLACEHOLDER ITEMS ────────────────────────────────────── */
 [data-theme="light"] .placeholder-item {
   background: rgba(255, 255, 255, 0.45) !important;
-  backdrop-filter: blur(22px) saturate(200%) brightness(1.03) !important;
-  -webkit-backdrop-filter: blur(22px) saturate(200%) brightness(1.03) !important;
+  backdrop-filter: blur(22px) saturate(148%) brightness(1.03) !important;
+  -webkit-backdrop-filter: blur(22px) saturate(148%) brightness(1.03) !important;
   border: 1px solid rgba(255, 255, 255, 0.62) !important;
   border-top-color: rgba(255, 255, 255, 0.94) !important;
 }
@@ -2163,8 +2163,8 @@ html[data-theme="light"] body::before {
 /* ── 9. HEADER — frosted glass bar ───────────────────────────── */
 [data-theme="light"] header {
   background: rgba(255, 255, 255, 0.90) !important;
-  backdrop-filter: blur(36px) saturate(220%) brightness(1.02) !important;
-  -webkit-backdrop-filter: blur(36px) saturate(220%) brightness(1.02) !important;
+  backdrop-filter: blur(36px) saturate(148%) brightness(1.02) !important;
+  -webkit-backdrop-filter: blur(36px) saturate(148%) brightness(1.02) !important;
   border-bottom: 1px solid rgba(255, 255, 255, 0.88) !important;
   box-shadow:
     0 1px 0 rgba(255, 255, 255, 0.96),
@@ -2180,8 +2180,8 @@ html[data-theme="light"] body::before {
 /* ── 10. BOTTOM NAV — frosted glass pill ─────────────────────── */
 [data-theme="light"] .bottom-nav {
   background: rgba(255, 255, 255, 0.80) !important;
-  backdrop-filter: blur(30px) saturate(220%) brightness(1.02) !important;
-  -webkit-backdrop-filter: blur(30px) saturate(220%) brightness(1.02) !important;
+  backdrop-filter: blur(30px) saturate(148%) brightness(1.02) !important;
+  -webkit-backdrop-filter: blur(30px) saturate(148%) brightness(1.02) !important;
   border-top: 1px solid rgba(255, 255, 255, 0.92) !important;
   box-shadow:
     0 -1px 0 rgba(255, 255, 255, 1),
@@ -2204,8 +2204,8 @@ html[data-theme="light"] body::before {
 html[data-theme="light"] .vpn-card {
   position: relative !important;
   background: rgba(255, 255, 255, 0.55) !important;
-  backdrop-filter: blur(28px) saturate(200%) brightness(1.04) !important;
-  -webkit-backdrop-filter: blur(28px) saturate(200%) brightness(1.04) !important;
+  backdrop-filter: blur(28px) saturate(148%) brightness(1.04) !important;
+  -webkit-backdrop-filter: blur(28px) saturate(148%) brightness(1.04) !important;
   border: 1px solid rgba(255, 255, 255, 0.72) !important;
   border-top: 2.5px solid rgba(var(--brandRgb), 0.85) !important;
   border-radius: 20px !important;
@@ -2318,8 +2318,8 @@ html[data-theme="light"] .vpn-usage-track {
 /* ── 12. SHEET PANEL ─────────────────────────────────────────── */
 [data-theme="light"] .sheet-panel {
   background: rgba(255, 255, 255, 0.86) !important;
-  backdrop-filter: blur(36px) saturate(220%) brightness(1.02) !important;
-  -webkit-backdrop-filter: blur(36px) saturate(220%) brightness(1.02) !important;
+  backdrop-filter: blur(36px) saturate(148%) brightness(1.02) !important;
+  -webkit-backdrop-filter: blur(36px) saturate(148%) brightness(1.02) !important;
   border: 1px solid rgba(255, 255, 255, 0.95) !important;
   border-bottom: none !important;
   box-shadow:
@@ -2368,8 +2368,8 @@ html[data-theme="light"] .vpn-usage-track {
 /* ── 14. DROPDOWNS + MENUS ──────────────────────────────────── */
 [data-theme="light"] .sub-actions-menu {
   background: rgba(255, 255, 255, 0.88) !important;
-  backdrop-filter: blur(28px) saturate(200%) !important;
-  -webkit-backdrop-filter: blur(28px) saturate(200%) !important;
+  backdrop-filter: blur(28px) saturate(148%) !important;
+  -webkit-backdrop-filter: blur(28px) saturate(148%) !important;
   border: 1px solid rgba(255, 255, 255, 0.95) !important;
   box-shadow: var(--glass-drop-lg) !important;
 }
@@ -2381,8 +2381,8 @@ html[data-theme="light"] .vpn-usage-track {
 }
 [data-theme="light"] .subs-dd .panel {
   background: rgba(255, 255, 255, 0.88) !important;
-  backdrop-filter: blur(28px) saturate(200%) !important;
-  -webkit-backdrop-filter: blur(28px) saturate(200%) !important;
+  backdrop-filter: blur(28px) saturate(148%) !important;
+  -webkit-backdrop-filter: blur(28px) saturate(148%) !important;
   border: 1px solid rgba(255, 255, 255, 0.95) !important;
 }
 [data-theme="light"] .subs-dd .item {
@@ -2412,8 +2412,8 @@ html[data-theme="light"] .vpn-usage-track {
 /* ── 16. TOASTS ──────────────────────────────────────────────── */
 [data-theme="light"] .toast {
   background: rgba(255, 255, 255, 0.88) !important;
-  backdrop-filter: blur(22px) saturate(180%) !important;
-  -webkit-backdrop-filter: blur(22px) saturate(180%) !important;
+  backdrop-filter: blur(22px) saturate(148%) !important;
+  -webkit-backdrop-filter: blur(22px) saturate(148%) !important;
   border: 1px solid rgba(255, 255, 255, 0.95) !important;
   box-shadow: var(--glass-drop-md) !important;
 }
@@ -2515,8 +2515,8 @@ html[data-theme="light"] .card.vpn-card {
 /* purchase.html .header class */
 [data-theme="light"] .header {
   background: rgba(255, 255, 255, 0.68) !important;
-  backdrop-filter: blur(36px) saturate(220%) brightness(1.02) !important;
-  -webkit-backdrop-filter: blur(36px) saturate(220%) brightness(1.02) !important;
+  backdrop-filter: blur(36px) saturate(148%) brightness(1.02) !important;
+  -webkit-backdrop-filter: blur(36px) saturate(148%) brightness(1.02) !important;
   border-bottom: 1px solid rgba(255, 255, 255, 0.88) !important;
   box-shadow:
     0 1px 0 rgba(255, 255, 255, 0.96),
@@ -2526,8 +2526,8 @@ html[data-theme="light"] .card.vpn-card {
 /* purchase plan cards */
 [data-theme="light"] .plan-card {
   background: rgba(255, 255, 255, 0.42) !important;
-  backdrop-filter: blur(18px) saturate(180%) !important;
-  -webkit-backdrop-filter: blur(18px) saturate(180%) !important;
+  backdrop-filter: blur(18px) saturate(148%) !important;
+  -webkit-backdrop-filter: blur(18px) saturate(148%) !important;
   border: 1.5px solid rgba(255, 255, 255, 0.65) !important;
   box-shadow:
     0 4px 18px rgba(20, 40, 100, 0.09),
@@ -2545,8 +2545,8 @@ html[data-theme="light"] .card.vpn-card {
 /* shop elements — only add backdrop-filter (shop-content.css owns colors/borders) */
 [data-theme="light"] .shop-plan-card,
 [data-theme="light"] .shop-charge-card {
-  backdrop-filter: blur(18px) saturate(180%) !important;
-  -webkit-backdrop-filter: blur(18px) saturate(180%) !important;
+  backdrop-filter: blur(18px) saturate(148%) !important;
+  -webkit-backdrop-filter: blur(18px) saturate(148%) !important;
   color: #0d1b2e !important;
 }
 [data-theme="light"] .shop-tabs,
@@ -2559,8 +2559,8 @@ html[data-theme="light"] .card.vpn-card {
 /* profile hero */
 [data-theme="light"] .profile-hero {
   background: rgba(255, 255, 255, 0.50) !important;
-  backdrop-filter: blur(22px) saturate(200%) brightness(1.03) !important;
-  -webkit-backdrop-filter: blur(22px) saturate(200%) brightness(1.03) !important;
+  backdrop-filter: blur(22px) saturate(148%) brightness(1.03) !important;
+  -webkit-backdrop-filter: blur(22px) saturate(148%) brightness(1.03) !important;
   border: 1px solid rgba(255, 255, 255, 0.70) !important;
   box-shadow:
     0 8px 32px rgba(20, 40, 100, 0.12),
@@ -2579,16 +2579,16 @@ html[data-theme="light"] .card.vpn-card {
 [data-theme="light"] .referral-card,
 [data-theme="light"] .referral-stat {
   background: rgba(255, 255, 255, 0.45) !important;
-  backdrop-filter: blur(18px) saturate(180%) !important;
-  -webkit-backdrop-filter: blur(18px) saturate(180%) !important;
+  backdrop-filter: blur(18px) saturate(148%) !important;
+  -webkit-backdrop-filter: blur(18px) saturate(148%) !important;
   border: 1px solid rgba(255, 255, 255, 0.65) !important;
 }
 
 /* tasks / redeem panel */
 [data-theme="light"] #redeemPanel {
   background: rgba(255, 255, 255, 0.88) !important;
-  backdrop-filter: blur(36px) saturate(220%) !important;
-  -webkit-backdrop-filter: blur(36px) saturate(220%) !important;
+  backdrop-filter: blur(36px) saturate(148%) !important;
+  -webkit-backdrop-filter: blur(36px) saturate(148%) !important;
   border-top: 1px solid rgba(255, 255, 255, 0.95) !important;
 }
 [data-theme="light"] #redeemPanel .sheet-item {
@@ -2630,7 +2630,7 @@ html:not([data-theme="light"]) {
 html:not([data-theme="light"]) #astro-lava,
 html[data-theme="dark"] #astro-lava {
   display: block !important;
-  filter: blur(72px) saturate(160%) contrast(1.8) !important;
+  filter: blur(72px) saturate(148%) contrast(1.8) !important;
   opacity: 1 !important;
 }
 html:not([data-theme="light"]) .lava-blob-1,
@@ -2675,8 +2675,8 @@ html[data-theme="dark"] .card,
 html:not([data-theme="light"]) .card,
 [data-theme="dark"] .card {
   background: rgba(10, 18, 34, 0.58) !important;
-  backdrop-filter: blur(22px) saturate(160%) brightness(1.06) !important;
-  -webkit-backdrop-filter: blur(22px) saturate(160%) brightness(1.06) !important;
+  backdrop-filter: blur(22px) saturate(148%) brightness(1.06) !important;
+  -webkit-backdrop-filter: blur(22px) saturate(148%) brightness(1.06) !important;
   border: 1px solid rgba(255, 255, 255, 0.07) !important;
   border-top-color: rgba(255, 255, 255, 0.14) !important;
   box-shadow:
@@ -2687,8 +2687,8 @@ html:not([data-theme="light"]) .card,
 html[data-theme="dark"] .placeholder-card,
 html:not([data-theme="light"]) .placeholder-card {
   background: rgba(10, 18, 34, 0.52) !important;
-  backdrop-filter: blur(22px) saturate(160%) !important;
-  -webkit-backdrop-filter: blur(22px) saturate(160%) !important;
+  backdrop-filter: blur(22px) saturate(148%) !important;
+  -webkit-backdrop-filter: blur(22px) saturate(148%) !important;
   border: 1px solid rgba(255, 255, 255, 0.07) !important;
   border-top-color: rgba(255, 255, 255, 0.12) !important;
 }
@@ -2698,8 +2698,8 @@ html[data-theme="dark"] .action-tile,
 html:not([data-theme="light"]) .action-tile,
 [data-theme="dark"] .action-tile {
   background: rgba(10, 18, 34, 0.55) !important;
-  backdrop-filter: blur(22px) saturate(160%) brightness(1.06) !important;
-  -webkit-backdrop-filter: blur(22px) saturate(160%) brightness(1.06) !important;
+  backdrop-filter: blur(22px) saturate(148%) brightness(1.06) !important;
+  -webkit-backdrop-filter: blur(22px) saturate(148%) brightness(1.06) !important;
   border: 1px solid rgba(255, 255, 255, 0.07) !important;
   border-top-color: rgba(255, 255, 255, 0.14) !important;
   box-shadow:
@@ -2711,8 +2711,8 @@ html:not([data-theme="light"]) .action-tile,
 html[data-theme="dark"] .speed-chip,
 html:not([data-theme="light"]) .speed-chip {
   background: rgba(10, 18, 34, 0.52) !important;
-  backdrop-filter: blur(18px) saturate(150%) !important;
-  -webkit-backdrop-filter: blur(18px) saturate(150%) !important;
+  backdrop-filter: blur(18px) saturate(148%) !important;
+  -webkit-backdrop-filter: blur(18px) saturate(148%) !important;
   border: 1px solid rgba(255, 255, 255, 0.07) !important;
   border-top-color: rgba(255, 255, 255, 0.13) !important;
 }
@@ -2720,8 +2720,8 @@ html:not([data-theme="light"]) .speed-chip {
 /* Shop — dark mode: only backdrop-filter (shop-content.css owns colors) */
 html[data-theme="dark"] .shop-plan-card,
 html:not([data-theme="light"]) .shop-plan-card {
-  backdrop-filter: blur(22px) saturate(160%) !important;
-  -webkit-backdrop-filter: blur(22px) saturate(160%) !important;
+  backdrop-filter: blur(22px) saturate(148%) !important;
+  -webkit-backdrop-filter: blur(22px) saturate(148%) !important;
 }
 html[data-theme="dark"] .shop-tabs,
 html:not([data-theme="light"]) .shop-tabs,
@@ -2737,8 +2737,8 @@ html:not([data-theme="light"]) .shop-field {
 html[data-theme="dark"] .sheet-panel,
 html:not([data-theme="light"]) .sheet-panel {
   background: rgba(8, 14, 28, 0.88) !important;
-  backdrop-filter: blur(36px) saturate(180%) !important;
-  -webkit-backdrop-filter: blur(36px) saturate(180%) !important;
+  backdrop-filter: blur(36px) saturate(148%) !important;
+  -webkit-backdrop-filter: blur(36px) saturate(148%) !important;
   border: 1px solid rgba(255, 255, 255, 0.09) !important;
   border-bottom: none !important;
 }
@@ -3013,8 +3013,8 @@ html[data-theme="light"] body::before {
 html[data-theme="light"] .vpn-card {
   position: relative !important;
   background: var(--lg-bg-strong) !important;
-  backdrop-filter: blur(28px) saturate(190%) brightness(1.05) !important;
-  -webkit-backdrop-filter: blur(28px) saturate(190%) brightness(1.05) !important;
+  backdrop-filter: blur(28px) saturate(148%) brightness(1.05) !important;
+  -webkit-backdrop-filter: blur(28px) saturate(148%) brightness(1.05) !important;
   border: 1px solid var(--lg-edge) !important;
   border-top: 2px solid rgba(var(--brandRgb), 0.82) !important;
   border-radius: 18px !important;
@@ -3139,8 +3139,8 @@ html[data-theme="light"] .vpn-action-btn {
 /* ── 11. BUTTONS ─────────────────────────────────────────────── */
 [data-theme="light"] .btn:not(.btn-primary):not(.nav-item):not(.btn-remove):not(.btn-danger) {
   background: rgba(255, 255, 255, 0.60) !important;
-  backdrop-filter: blur(14px) saturate(160%) !important;
-  -webkit-backdrop-filter: blur(14px) saturate(160%) !important;
+  backdrop-filter: blur(14px) saturate(148%) !important;
+  -webkit-backdrop-filter: blur(14px) saturate(148%) !important;
   border: 1px solid rgba(255, 255, 255, 0.82) !important;
   border-top-color: rgba(255, 255, 255, 0.96) !important;
   box-shadow:
@@ -3150,8 +3150,8 @@ html[data-theme="light"] .vpn-action-btn {
 }
 [data-theme="light"] .btn-icon:not(.btn-primary):not(.btn-remove) {
   background: rgba(255, 255, 255, 0.60) !important;
-  backdrop-filter: blur(14px) saturate(160%) !important;
-  -webkit-backdrop-filter: blur(14px) saturate(160%) !important;
+  backdrop-filter: blur(14px) saturate(148%) !important;
+  -webkit-backdrop-filter: blur(14px) saturate(148%) !important;
   border: 1px solid rgba(255, 255, 255, 0.82) !important;
 }
 [data-theme="light"] .mini-btn {
@@ -3212,8 +3212,8 @@ html[data-theme="light"] .vpn-action-btn {
 /* ── 14. TOASTS ──────────────────────────────────────────────── */
 [data-theme="light"] .toast {
   background: var(--lg-bg-heavy) !important;
-  backdrop-filter: blur(22px) saturate(180%) !important;
-  -webkit-backdrop-filter: blur(22px) saturate(180%) !important;
+  backdrop-filter: blur(22px) saturate(148%) !important;
+  -webkit-backdrop-filter: blur(22px) saturate(148%) !important;
   border: 1px solid rgba(255, 255, 255, 0.90) !important;
   box-shadow:
     0 8px 30px rgba(60, 48, 32, 0.13),
@@ -3296,8 +3296,8 @@ html[data-theme="light"] .card.vpn-card {
 }
 [data-theme="light"] .profile-hero {
   background: var(--lg-bg-strong) !important;
-  backdrop-filter: blur(24px) saturate(185%) brightness(1.04) !important;
-  -webkit-backdrop-filter: blur(24px) saturate(185%) brightness(1.04) !important;
+  backdrop-filter: blur(24px) saturate(148%) brightness(1.04) !important;
+  -webkit-backdrop-filter: blur(24px) saturate(148%) brightness(1.04) !important;
   border: 1px solid var(--lg-edge) !important;
   box-shadow: var(--lg-shadow-md) !important;
 }
@@ -3462,8 +3462,8 @@ html[data-theme="light"] .vpn-card {
   background:
     radial-gradient(120% 80% at 50% -20%, rgba(var(--brandRgb), 0.12) 0%, transparent 58%),
     rgba(255, 255, 255, 0.66) !important;
-  backdrop-filter: blur(26px) saturate(190%) brightness(1.04) !important;
-  -webkit-backdrop-filter: blur(26px) saturate(190%) brightness(1.04) !important;
+  backdrop-filter: blur(26px) saturate(148%) brightness(1.04) !important;
+  -webkit-backdrop-filter: blur(26px) saturate(148%) brightness(1.04) !important;
   border: 1px solid rgba(255, 255, 255, 0.75) !important;
   /* border-top: 2px solid rgba(var(--brandRgb), 0.85) !important; */
   color: #211e18 !important;
@@ -4004,8 +4004,8 @@ html:not([data-theme="light"]) .vpn-card {
   background:
     radial-gradient(120% 80% at 50% -20%, rgba(var(--brandRgb), 0.16) 0%, transparent 58%),
     linear-gradient(155deg, rgba(36, 48, 72, 0.46) 0%, rgba(16, 28, 46, 0.40) 100%) !important;
-  backdrop-filter: blur(28px) saturate(170%) brightness(1.12) !important;
-  -webkit-backdrop-filter: blur(28px) saturate(170%) brightness(1.12) !important;
+  backdrop-filter: blur(28px) saturate(148%) brightness(1.12) !important;
+  -webkit-backdrop-filter: blur(28px) saturate(148%) brightness(1.12) !important;
 }
 /* Light: white frosted slab with a corner-localized brand tint.
    The internal magma blobs supply the life as visible drifting
@@ -4055,8 +4055,8 @@ html[data-theme="light"] .vpn-card::after { opacity: 0.08 !important; }
   :root .vpn-card,
   [data-theme="dark"] .vpn-card,
   html:not([data-theme="light"]) .vpn-card {
-    backdrop-filter: blur(18px) saturate(160%) brightness(1.1) !important;
-    -webkit-backdrop-filter: blur(18px) saturate(160%) brightness(1.1) !important;
+    backdrop-filter: blur(18px) saturate(148%) brightness(1.1) !important;
+    -webkit-backdrop-filter: blur(18px) saturate(148%) brightness(1.1) !important;
   }
 }
 
@@ -4159,8 +4159,8 @@ header, .header {
 .vpn-card,
 :root .vpn-card, [data-theme="dark"] .vpn-card, html:not([data-theme="light"]) .vpn-card,
 [data-theme="light"] .vpn-card, html[data-theme="light"] .vpn-card {
-  backdrop-filter: blur(14px) saturate(165%) brightness(1.06) !important;
-  -webkit-backdrop-filter: blur(14px) saturate(165%) brightness(1.06) !important;
+  backdrop-filter: blur(14px) saturate(148%) brightness(1.06) !important;
+  -webkit-backdrop-filter: blur(14px) saturate(148%) brightness(1.06) !important;
 }
 
 /* ═══════════════════════════════════════════════════════════════
