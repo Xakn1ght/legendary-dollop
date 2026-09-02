@@ -4826,3 +4826,53 @@ html[data-theme="light"] .sub-actions-menu .menu-item {
   border-color: var(--line) !important;
   box-shadow: none !important;
 }
+
+/* ── Accessibility floor (Mini App audit, 2026-09-02) ─────────────────────
+   Loaded last on every page, so it wins the cascade.
+
+   1. Text on the brand fill. White on #ec5652 measures 3.49:1 — under the
+      4.5:1 AA bar for any label smaller than 14px bold. The small labelled
+      controls below take the deeper brand shade (--brandDark, defined per
+      accent in tokens.css: red #d43f3b -> 4.59:1) so their text clears AA.
+      Big CTAs keep the brand red: their labels are >=14px bold, where 3:1 is
+      the bar and 3.49 passes. Known limit: on the cyan/emerald/amber worlds
+      white text on brandDark still falls short; those need dark ink, a
+      separate pass.
+   2. Tap targets. Anything under 44px gets an invisible ::after hit area.
+      Nothing moves and nothing looks different — only the touchable box
+      grows. None of these controls had a ::after or overflow:hidden before. */
+.lang-switch.active,
+.shop-tab.active,
+.shop-help .btn,
+.filter-tab.active,
+.modal .btn-block {
+  background: var(--brandDark) !important;
+  border-color: var(--brandDark) !important;
+}
+[data-theme="light"] .plan-gb { color: var(--brandDark); }   /* 2.99 -> 4.41 on paper */
+
+.lang-switch, .rw-node, .rw-info-btn, .shop-icon-btn, .shop-sort-pill, .shop-tab,
+.shop-help .btn, .filter-tab, .back-btn, .sheet-close, .app-get, .header-row .btn,
+#clearHistoryBtn, #markAllReadBtn, .modal > div > button { position: relative; }
+.lang-switch::after, .rw-info-btn::after, .shop-icon-btn::after,
+.shop-sort-pill::after, .shop-tab::after, .shop-help .btn::after, .filter-tab::after,
+.back-btn::after, .sheet-close::after, .app-get::after, .header-row .btn::after,
+#clearHistoryBtn::after, #markAllReadBtn::after, .modal > div > button::after {
+  content: ''; position: absolute; inset: -6px;
+}
+.lang-switch::after      { inset: -8px -2px; }   /* 46x28 -> 50x44 */
+/* .rw-node.next already spends ::after on its pulse halo (pointer-events:none),
+   so the ladder nodes take the hit area on ::before. The rail's 11px vertical
+   padding keeps it inside the overflow-y:hidden scroll box. */
+.rw-node::before         { content: ''; position: absolute; inset: -6px; }
+.rw-info-btn::after      { inset: -9px; }        /* 28 -> 46; a neighbour chip claims a few px */
+.filter-tab::after       { inset: -7px -2px; }   /* ~31   -> 45    */
+#clearHistoryBtn::after,
+#markAllReadBtn::after   { inset: -12px -4px; }  /* 20 tall -> 44  */
+.modal > div > button::after { inset: -7px -10px; } /* 24x31 -> 44x45 */
+/* The theme switch is a 56x27 checkbox stretched over its track; grow the
+   invisible input, not the drawing. */
+.toggle-container .toggle-input { top: -9px; left: -4px; width: calc(100% + 8px); height: calc(100% + 18px); }
+/* shop-content.css styles this one by ID with !important; match its specificity. */
+.card.shop-help #shopSupportBtn { background: var(--brandDark) !important; border-color: var(--brandDark) !important; position: relative; }
+.card.shop-help #shopSupportBtn::after { content: ''; position: absolute; inset: -6px; }

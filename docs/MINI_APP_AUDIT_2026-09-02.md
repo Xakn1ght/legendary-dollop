@@ -13,16 +13,31 @@ language actually set to `en`. Contact sheets: session scratchpad `audit/`.
 
 | # | Dimension | Score | Key finding |
 |---|-----------|-------|-------------|
-| 1 | Accessibility | 2 | White on brand red `#ec5652` is 3.49:1 — every small button/chip label fails AA; controls at 27–38px tall |
+| 1 | Accessibility | 3 | White on brand red `#ec5652` is 3.49:1 — every small button/chip label fails AA; controls at 27–38px tall |
 | 2 | Performance | 2 | `backdrop-filter` on 248 rules (rule allows header/hero/sheets/menus); `saturate()` up to 240% (now clamped) |
 | 3 | Responsive | 4 | 0 sideways overflow, 0 clipped text across all 160 renders |
 | 4 | Theming | 3 | Dark/light/EN all coherent; 157 undocumented literal colors per detector |
 | 5 | Implementation integrity | 3 | Coherent, product-specific; one dead placeholder page (removed) |
-| | **Total** | **14/20** | Good — address the two weak dimensions |
+| | **Total** | **15/20** | Good — remaining weak spot is blur cost on low-end Android |
 
 ## Fixed in this pass
 - **Dead placeholder page** `dashboard/tutorial.html` ("Tutorial (Placeholder)", English lorem) served on the public domain. Linked from nowhere. Removed.
 - **`saturate()` over DESIGN.md limits** (≤148% light / ≤165% dark): 71 declarations in `glass.css` were 150–240%. Clamped; light theme visually unchanged in a before/after check; `glass.css?v=67`.
+
+- **Contrast on brand-red controls (P1)** — the five small labelled controls
+  (header FA chip, shop active tab, shop "پشتیبانی", support active filter,
+  support "ایجاد تیکت") now use `--brandDark` (red: #d43f3b, 4.59:1); the
+  purchase plan numerals use it on light (4.41:1). Re-measured: zero
+  low-contrast text on home/shop/tasks/support/apps/purchase. Big CTAs keep
+  the brand red (labels ≥14px bold pass the 3:1 large-text bar).
+- **Tap targets (P2)** — 15 controls that measured 27–42px got an invisible
+  `::after`/`::before` hit area (theme switch, FA chip, ladder nodes, sort
+  pills, tabs, filter chips, back buttons, store buttons, notification
+  actions, modal close). Verified with `elementFromPoint` probes: every one
+  now catches a tap ≥44px in both axes. Nothing moved visually.
+  Both live in the "Accessibility floor" block at the end of `glass.css`
+  (`?v=68`). Known limit: on the cyan/emerald/amber accent worlds white text on
+  `--brandDark` still falls short of AA — needs dark ink there, separate pass.
 
 ## Not bugs (checked, so nobody chases them)
 - Profile/Rewards "•" values are Persian zero U+06F0 in Vazirmatn — real data. (Legibility note below.)
