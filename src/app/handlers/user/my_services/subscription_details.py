@@ -9,6 +9,11 @@ from .constants import STATUS_MAP_NO_EMOJI
 from .utils import convert_to_gb, to_persian_digits
 
 
+def _fa_mb(value_gb: float) -> str:
+    """Megabytes in Persian digits, for plans below 1 GB."""
+    return to_persian_digits(int(round(float(value_gb or 0) * 1024)))
+
+
 def _fa_gb(value: float) -> str:
     """GB figure in Persian digits: integer when whole, else one decimal
     with the Persian decimal mark (matches the card image)."""
@@ -75,7 +80,14 @@ def build_subscription_detail(sub, user_info, generate_image=True):
     lines = [f"<b>{sub.marzban_username}</b>", ""]
     lines.append(f"وضعیت: {status_str_chart}")
     if limit_gb:
-        lines.append(f"حجم باقی‌مانده: {_fa_gb(max(limit_gb - used_gb, 0))} از {_fa_gb(limit_gb)} گیگ")
+        # A plan smaller than 1 GB reads in MB. The free trial is sold as
+        # "۲۵۰ مگابایت"; rounded to GB it became "۰٫۲ گیگ", which understates
+        # what was bought and is the first screen a new customer lands on.
+        if 0 < limit_gb < 1:
+            lines.append(f"حجم باقی‌مانده: {_fa_mb(max(limit_gb - used_gb, 0))} از "
+                         f"{_fa_mb(limit_gb)} مگابایت")
+        else:
+            lines.append(f"حجم باقی‌مانده: {_fa_gb(max(limit_gb - used_gb, 0))} از {_fa_gb(limit_gb)} گیگ")
     else:
         lines.append("حجم: نامحدود")
     if isinstance(days_remaining, str):

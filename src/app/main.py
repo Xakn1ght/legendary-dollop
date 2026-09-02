@@ -378,6 +378,18 @@ async def main():
 
     asyncio.create_task(_audit_panel_templates())
 
+    # Boot the image-render pool now, not on a customer's first tap — see
+    # render_manager.warm_up (7.2s cold vs 0.35s warm).
+    async def _warm_render_pool():
+        try:
+            from app.utils.render_manager import warm_up
+            await warm_up()
+            bot_logger.info("Render pool warmed")
+        except Exception as e:
+            log_error(e, {"operation": "startup_render_warmup"})
+
+    asyncio.create_task(_warm_render_pool())
+
     # Start the dedicated notification worker
     notification_task = asyncio.create_task(notification_worker(notification_queue, bot))
     

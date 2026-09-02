@@ -31,3 +31,23 @@ async def render_subscription_photo_async(**kwargs: Any) -> bytes:
     loop = asyncio.get_running_loop()
     executor = _ensure_executor()
     return await loop.run_in_executor(executor, _render_subscription_photo_task, kwargs)
+
+
+def _warm_task() -> bool:
+    """Import the renderer inside the worker so the first real one is cheap."""
+    from app.handlers.user.my_services import chart_generator  # noqa: F401
+    return True
+
+
+async def warm_up() -> None:
+    """Boot the render pool before a customer needs it.
+
+    The pool starts lazily, and with the `forkserver` start method the first
+    call spawns a fresh interpreter that re-imports the app: measured 7.2s,
+    against 0.35s once warm. Opening a subscription awaits this render, so
+    without warming, the first person to open one after every restart waits
+    seven seconds. Called as a background task at startup; failure is
+    harmless, the pool just stays cold.
+    """
+    loop = asyncio.get_running_loop()
+    await loop.run_in_executor(_ensure_executor(), _warm_task)

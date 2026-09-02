@@ -315,9 +315,33 @@ _ACTION_CLAIM_MARKERS = ('اشتراکتون شارژ شد', 'اشتراک شم�
                          'پرداختتون تایید شد')
 
 
+# Every emoji-ish codepoint, plus the variation selector and ZWJ that glue
+# multi-part emoji together. Deliberately NOT applied to a Telegram reaction,
+# which is not text.
+_EMOJI_RX = re.compile(
+    "[\U0001F000-\U0001FAFF\U00002190-\U000027BF\U00002B00-\U00002BFF"
+    "\u2600-\u27BF\u2B00-\u2BFF\uFE0F\u200D\u2764\u263A\u2122\u2139]+")
+
+
+def strip_emojis(text: str) -> str:
+    """Remove emojis and tidy the spacing they leave behind.
+
+    The prompt already forbids them (CLAUDE.md hard rule), but the mined
+    corpus is the owner's real chats, which are full of them — and few-shot
+    examples beat an instruction every time. Verified: the model returned
+    "سلام QA عزیز 👋 ... 🌹" on the first live answer. So the rule is enforced
+    here, at the one point every answer passes through, instead of being asked
+    for politely.
+    """
+    out = _EMOJI_RX.sub("", text or "")
+    out = re.sub(r"[ \t]{2,}", " ", out)
+    out = "\n".join(line.rstrip() for line in out.splitlines())
+    return re.sub(r"\n{3,}", "\n\n", out).strip()
+
+
 def _clean_reply(d: dict) -> str | None:
     """Model-output sanitizer: fences, null-words, leak markers, owner-only
-    action claims, length cap. None means SILENCE."""
+    action claims, emojis, length cap. None means SILENCE."""
     reply = d.get('reply')
     if not isinstance(reply, str):
         return None
@@ -328,6 +352,9 @@ def _clean_reply(d: dict) -> str | None:
     if any(m in low for m in _LEAK_MARKERS):
         return None
     if any(m in reply for m in _ACTION_CLAIM_MARKERS):
+        return None
+    reply = strip_emojis(reply)
+    if not reply:
         return None
     if len(reply) > MAX_ANSWER_CHARS:
         reply = reply[:MAX_ANSWER_CHARS].rstrip() + '…'

@@ -84,6 +84,20 @@ def test_reply_sanitizer():
     check('length capped', len(long) <= s.MAX_ANSWER_CHARS + 1)
 
 
+def test_emojis_are_stripped_in_code():
+    """The prompt forbids emojis, but the corpus is the owner's real chats and
+    is full of them — few-shot beats instruction, and the first live answer
+    came back with 👋 and 🌹. So the rule is enforced here."""
+    out = s._clean_reply({'reply': 'سلام QA عزیز 👋\nاشتراک را به\u200cروز کنید 🌹'})
+    check('no emoji survives', all(not (0x2190 <= ord(c) <= 0x2BFF or ord(c) >= 0x1F000) for c in out), out)
+    check('wording kept', 'سلام QA عزیز' in out and 'اشتراک را به\u200cروز کنید' in out, out)
+    check('ZWNJ kept (Persian needs it)', '\u200c' in out, repr(out))
+    check('an emoji-only reply becomes silence',
+          s._clean_reply({'reply': '👋🌹'}) is None)
+    check('a Telegram reaction is NOT stripped — it is not text',
+          s._clean_reaction({'reaction': '👍'}) == '👍')
+
+
 def test_knowledge_id_and_note_gates():
     check('uncited id rejects the answer',
           s._clean_knowledge_ids({'knowledge_ids': ['nope']}, {'abc'}) is None)

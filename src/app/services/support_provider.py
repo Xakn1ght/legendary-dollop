@@ -23,6 +23,10 @@ from zoneinfo import ZoneInfo
 
 import aiohttp
 
+# Importing settings loads config/.env into os.environ. This module reads the
+# keys at import time, and without that it silently sees none — the assistant
+# would then just never answer, with nothing in the log to say why.
+import app.core.settings  # noqa: F401
 from app.core.paths import data_path
 
 BUDGET_FILE = data_path('support_budget.json')
